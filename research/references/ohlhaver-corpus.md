@@ -595,6 +595,449 @@ Supporting sociology, both cited by her:
 
 ### 5.4 *Plurality* (Weyl & Tang) and the plural-identity implementations
 ## 6. Implications for the aggregator
+
+Written as an argument aimed at us, at full strength. Her critique is close to fatal for the naive
+version of this product and I have not softened it. Where I think she is wrong or incomplete I say
+so; there are a few such places, and they are where our design should live.
+
+**The one-paragraph version.** Every protocol we aggregate filters *bots*. None filters *puppets*.
+Ohlhaver's Idena data shows that a protocol which perfectly solves bots and additionally defeats
+account trading still collapsed into oligopoly within three years, because paying humans to prove
+they are human creates an arbitrage that resourceful operators will always harvest. An aggregator
+does not fix this. By making credentials more liquid, more valuable and cheaper to acquire in
+bundles, an aggregator **raises the return to puppeteering** and lowers its unit cost. The naive
+product — sum up credentials, return a humanity score — is not merely useless against her attack,
+it is an accelerant. There is exactly one defensible position available to us, and it is not
+"we detect fraud better." It is: **we are the only layer in the stack that can see correlation
+across trust roots, and correlation is the quantity that actually matters.** Everything below
+argues that.
+
+### 6.1 De facto sybils: can an aggregator detect puppeteering that no single protocol can?
+
+This is the question on which our reason to exist turns, so it deserves the most honest answer I
+can give. **Partially yes — and not in the way that would save the naive product.**
+
+**The case for.** An aggregator occupies a genuinely privileged vantage point. A single protocol
+sees only its own graph; we see the same human across many. Four signals are available to us and to
+nobody else:
+
+1. **Cross-protocol co-enrollment cohorts.** A set of identities that all verified on protocol A in
+   one window, then on protocol B in another window, in the same order, is a batch-onboarding
+   signature. No single protocol can see the second leg.
+2. **Common funding ancestry.** Gas funding source is the strongest and cheapest clustering signal
+   in crypto forensics, and it is inherently cross-protocol. Idena's analysis was exactly this:
+   funds converging on one wallet, then to an exchange.
+3. **Temporal co-movement in credential lifecycle events** — renewal, revocation, re-attestation
+   clustering in time within a cohort. This is a direct transplant of her top-31-pools criterion:
+   *"the unlikely coincidence of simultaneous or sequential transactions from different accounts in
+   the same pool"* (§1.8).
+4. **Our own query telemetry** — which relying apps ask about which identities, from where, when.
+
+And there is real precedent that the signature generalises. The *same* co-movement pattern has now
+been found independently three times, on three chains, against three different attacks: Ohlhaver on
+Idena pools (2024); Gitcoin's COCM catching the "Crypto Babes Club" — identical donation amounts,
+near-simultaneous wallet creation, single-project focus (§2.4); and Circles, whose own public
+indexer exposes event namespaces literally named `BotCreated` and `FarmGrown`, with one inviter
+behind **27.5% of recent at-scale registrations laundered through 1,687 proxy bots**. That last
+case is instructive twice over — it shows the pattern is real, and it shows the adversary already
+laundering through proxies to break it.
+
+**The case against — and it is stronger.** Four objections, in ascending order of severity.
+
+**(a) The undecidability is structural, and she proved it herself.** §1.5 is the whole problem:
+*"the same transaction pattern … were consistent with puppeteering and voluntary cooperation. Both
+extremes differed not in their coordination on-chain, but in the distribution of information and
+control—or power— off-chain."* On-chain co-movement is evidence of **coordination**, never of
+**exploitation**. To close that gap Ohlhaver needed Telegram DMs, operator confessions, jurisdiction
+priors and forum archaeology — a hand-audited forensic exercise on 31 pools, which she explicitly
+declines to generalise and invites others to complete. **None of that is available at API latency,
+and none of it is automatable.** Any claim that we "detect puppeteering" is a claim to have solved
+a problem she deliberately did not claim to have solved.
+
+**(b) The base-rate and false-positive problem is disqualifying for exclusion, and it is not
+politically neutral.** This is the objection I would put in front of anyone who wants to ship a
+puppet detector. The populations that trip a co-movement detector hardest are the ones that are
+*legitimately* correlated: users onboarded in cohorts by an NGO or a community organiser; users of a
+single custodial wallet or regional exchange; users funded from one faucet; users in one country,
+one language, one time zone. Those are precisely the people for whom the credential is worth most —
+aid, UBI, financial access. A detector built on correlation will red-line Nairobi and Jakarta and
+wave through Palo Alto, **not because it is badly tuned but because the signal it consumes is
+poverty-correlated coordination**. Note that Ohlhaver's own strand 2 — weak-rule-of-law jurisdictions
+as evidence of puppeteering — is defensible as one input to a scholarly judgement about three named
+pools and utterly indefensible as a production feature, where it is nationality-based
+discrimination with a scoring API in front of it. Excluding real humans from money is a serious
+harm, it is irreversible from the user's side, and it will land on the global poor. We should treat
+any *exclusionary* use of correlation signals as out of scope.
+
+**(c) Adversarial half-life.** She flags this herself (p.19 n.44): Idena's operators did not obfuscate
+because there was no penalty for being caught, and she expects that *"there will be a cost to
+getting 'caught' as a puppeteer, and the resulting strategies will incur obfuscation costs that are
+less than the expected value of avoiding detection."* Circles' 1,687 proxy bots are that prediction
+already coming true. Fresh wallet per credential, staggered timing and hop-laundering defeat
+signals 1-3 above at trivial cost. A detector whose evasion costs less than the credential is worth
+does not survive contact.
+
+**(d) Our own privacy commitments destroy the signal.** This is the cleanest finding in this
+section and it deserves to be stated plainly: **app-scoped nullifiers and unlinkability — the
+privacy properties we should want from every protocol we integrate — are precisely the properties
+that make cross-protocol correlation impossible.** World ID's app-scoped nullifiers exist to stop
+exactly the linking we would need. We cannot simultaneously market "we never link your identities
+across apps" and "we detect cross-protocol puppet cohorts." One of those two claims has to go, and
+we should decide which deliberately rather than discover the contradiction in an audit.
+
+**Verdict.** We can build a *correlated-cohort detector*. We cannot build a *puppet detector*, and
+we should never claim to. But — and this is the move that rescues the whole thing — **we do not
+need one.** DeSoc §4.5 already dissolved the problem: *"such a vote is more likely to be a group of
+Souls who are making the same error in judgment or who share the same bias, and so should reasonably
+be weighted less."* Fraud and shared bias get the same treatment because they do the same damage.
+The correct output of a correlation signal is a **graded discount**, not a **binary exclusion** —
+and a graded discount is robust to exactly the false-positive problem in (b), because a legitimately
+correlated cohort *should* also count for somewhat less than the same number of independent people,
+and because being discounted is a recoverable state whereas being denied is not. The Appendix A
+bounded-loss result (§2.3) is the formal version: pairwise correlation discounting bounds attacker
+gain at `M·(N²−N)` **without ever requiring you to correctly identify who is colluding.** That is
+the single most important technical fact in this document for our design.
+
+So: an aggregator *does* have a genuine reason to exist under her critique — but the reason is
+measurement of correlation, not detection of fraud, and the output is a weight, not a verdict.
+
+### 6.2 Economies of scale: does an aggregator reduce this or amplify it?
+
+**It amplifies it. This is the sharpest critique of our thesis and I am not going to soften it.**
+
+Her takeaway 3 is general and it is not about verification methods: *every* global protocol paying
+humans to differentiate themselves from bots creates an incentive for resourceful actors to
+intermediate less-resourceful humans, "just because participants don't have to run a node or do
+periodic cognitive tests doesn't mean that they don't have hassles they just have a different set of
+hassles which intermediaries will be happy to perform." The intermediary's product is **hassle
+absorption**. Now read our own pitch back: *one API, one embedded flow, routes a user across many
+personhood protocols.* **We are selling hassle absorption across personhood protocols. That is the
+puppeteer's business model with a developer-facing SDK.**
+
+Four mechanisms by which we make it worse:
+
+1. **We raise the value of the asset.** A credential accepted in one place is worth less than the
+   same credential accepted everywhere through one integration. Aggregation is an acceptance-surface
+   multiplier, and the return to puppeteering scales with acceptance surface. Ohlhaver measured the
+   arbitrage at **2x–55x** local wages at Idena's trivial $2–$14 per epoch. The 2026 numbers are
+   worse, not better: World ID Orb-verified accounts trade openly at **$0.50–$15** (ZachXBT,
+   2026-04-28), and a Circles sybil costs about **two days of freely minted currency** —
+   `Hub.sol` sets `INVITATION_COST = 96 CRC` against `WELCOME_BONUS = 48 CRC` at 24 CRC/day
+   issuance. Different verification methods; identical collapse. Her generalisation has now been
+   confirmed outside Idena, which is the thing a good theory is supposed to do.
+2. **We industrialise multi-protocol farming.** Today an operator farming World ID *and* Circles
+   *and* Passport integrates three stacks, three SDKs, three flows. We hand them one. **Our
+   onboarding funnel, read adversarially, is a puppet-enrollment funnel with better UX** — and it is
+   better UX *for the operator*, who is the high-information party, more than for the puppet, who is
+   the low-information one. Every integration we add makes the marginal farm cheaper.
+3. **We are structurally Idena's delegation.** This analogy is exact and it should worry us. Idena's
+   delegation was a *transparency* improvement, motivated by good intentions, that simultaneously
+   moved the fixed cost outside the per-account multiplier — `P = a(c+m−t) − n` instead of
+   `P = a(c+m−t−n)` (§1.6) — and thereby made pooling strictly cheaper than being a solo account.
+   Concentration accelerated: solo accounts 62%→27%, large pools 22%→61%. An aggregator does the
+   identical thing at ecosystem scale: the per-protocol integration cost moves outside the per-user
+   multiplier. **The fix that made it worse is the product we are proposing to build.**
+4. **We make credentials liquid.** A heterogeneous pile of credentials is not fungible; a normalised
+   score is. Liquidity is the property a farming operation most needs and least has today.
+
+**The one honest counter-argument** — and it is the only one — is that an aggregator which
+**discounts correlated evidence** destroys the return to farming *multiple credentials that share a
+trust root*. This is not speculative: roughly **40 rostered protocols collapse to about 6 distinct
+trust roots**. Under additive scoring, an operator who buys one passport-derived credential can
+convert it into five and quintuple the score. Under root-deduplicated scoring they get one, and the
+other four are free to no one. That genuinely removes an arbitrage that exists today and that every
+current aggregator leaves on the table — note that Gitcoin Passport's own deduplication
+documentation pushes cross-provider collision resolution *onto the aggregator*, i.e. this is a
+known-unowned problem sitting in our lane.
+
+**Therefore: the scoring rule is not an implementation detail. It determines which side we are on.**
+Ship additive scoring and we are, unambiguously, an amplifier of exactly the dynamic she documents.
+Ship correlation-discounted scoring and we are a partial defence. There is no neutral option, and
+"we'll add correlation handling in v2" is a decision to launch as the weapon.
+
+A sobering commercial note alongside this. Human Passport reached **~2M users and 35M credentials on
+under $1M of revenue and sold for ~$10M**. That is the market's revealed valuation of doing the
+naive version competently at scale. The naive product is not just intellectually weak; it is not
+obviously a business. If we are going to do this, the correlation layer is also the only part with
+pricing power, because it is the only part nobody else owns.
+
+### 6.3 Collusion resistance and sybil resistance are the same problem — what that does to a scoring API
+
+Her claim (§1.9d): *"de facto sybil resistance is a mutually-implicated (or mirror) challenge to
+'collusion-resistance:' neither can be solved independently but both must be tackled
+simultaneously."* If that is right — and the Miller/Weyl/Erichsen formulation in §5.3 makes it
+close to definitional — then it has a hard architectural consequence that we should confront now
+rather than after we have an API in the wild.
+
+**Collusion is a property of a set. A per-identity score is therefore ill-typed.** There is no
+function of one identity alone that can answer "is this participant independent?", because
+independence is *relative to the other participants in the same decision*. The same human is
+maximally independent in a global population and perfectly redundant in a room full of their own
+colleagues. Her p.10 n.29 says exactly this about agency: *"A person's agency is not either-or, but
+context-specific. A person can be an 'agent' in local contexts … and yet be a 'de facto sybil' … in
+more socially distant … contexts."*
+
+This kills `GET /score/{address}` as the primary abstraction. Concretely:
+
+- **The unit of analysis must be the cohort, not the user.** The natural API is closer to
+  *"here is the set of participants in this airdrop/vote/round — return weights"* than to a credit
+  score. That is precisely the shape Gitcoin's COCM round computation takes, and COCM is the only
+  correlation-discounting system with real production history.
+- **Scores are not cacheable, portable, or tokenisable.** A number that depends on the cohort cannot
+  be stamped into an NFT or an attestation and carried around. Anyone who wants that has
+  misunderstood the problem. (Expect this to be the single most requested feature and the one we
+  should most firmly refuse in its naive form.)
+- **We need the cohort, and only the app has it.** This is an awkward but clarifying business fact:
+  the relying app knows who its other participants are; we know the credential structure. Neither
+  side can compute the discount alone. That argues for either cohort submission or a privacy-
+  preserving two-party computation, and it means our product is a *joint* computation with the
+  customer, not a lookup.
+- **A per-user score can still exist, but only as an honest sub-object**: "how much independent
+  evidence backs this identity" (a genuine per-user quantity — see §6.4) is separable from "how much
+  should this identity count in *this* decision" (irreducibly cohort-relative). Conflating those two
+  into one number is the original sin, and it is what every existing product in this space does.
+
+### 6.4 Informational uniqueness vs biological uniqueness — is our README asking the wrong question?
+
+Her position (p.30, and the Intro): the real problem is faction — *"establishing the informational
+uniqueness of participants—or the extent to which they cluster with the same interests and
+biases"* — and *"this is an informational problem not a technical problem and in fact a social
+one."* Our README frames the product as **"is this a unique human?"**
+
+**Verdict: the README's question is well-posed, answerable, and mostly worthless on its own. It is
+not the wrong question so much as a small subordinate part of the right one.** Two reasons to
+resist adopting her framing wholesale, and then the part where she is right.
+
+Where she overstates: (i) biological uniqueness is a genuine *floor*. If you cannot filter bots at
+all, the informational question never arises, and in a world of cheap generative agents that floor
+is doing more work every year, not less. (ii) "It's a social problem, not a technical one" is true
+and also the kind of true that ends research programmes; the interesting question is which
+technical measurements make the social problem more tractable, and she gestures at rather than
+answers this. (iii) Her framing has an uncomfortable implication she never confronts: if sybil-ness
+is measured by how few independent groups you belong to (§5.3), then a devout member of a single
+tight community is *legitimately less than one person*. That is a real normative cost and it should
+be argued for, not assumed.
+
+Where she is right, and it bites: **the quantity our customers actually need is not uniqueness, it
+is independence**, and uniqueness is a bad proxy for it. A thousand verified-unique humans under one
+operator are one agent for every purpose a customer cares about — governance capture, airdrop
+farming, review manipulation, UBI drain. Selling "1,000 unique humans" when the customer needs
+"1,000 independent decisions" is selling the wrong quantity, and the gap between them is the entire
+Idena result.
+
+**What would a score that measured independence look like, and is it buildable?** Partially — and
+the honest split matters:
+
+*Buildable now, cheap, defensible:*
+- **Trust-root diversity.** Not "how many credentials" but "how many *distinct trust roots*." With
+  ~40 protocols reducing to ~6 roots, this is a real, computable, honest number, and it is the
+  single highest-value thing we can ship. It converts the overlap problem from a caveat into the
+  product.
+- **Evidence-type diversity** across the BRIEF's categories — uniqueness / liveness / social-trust /
+  state-identity / behavioural. Five weak credentials of one kind is a different epistemic object
+  from three of different kinds.
+- **Acquisition-cohort dispersion** — issuance-time bucketing, issuer diversity, funding ancestry
+  dispersion. Computable from data we will already hold, with the §6.1(b) caveat that it must
+  discount, never exclude.
+
+*Not buildable, and we should say so:*
+- Genuine **social**-affiliation independence — the Simmel/Granovetter quantity she and DeSoc
+  actually mean — requires the social graph and group memberships. We will not have that data, and
+  the version of us that does have it is a surveillance product. Her own paper is explicit that the
+  cure must not be surveillance (p.33). **We should not pretend that trust-root diversity is social
+  independence.** It is a proxy for one narrow slice: independence of *evidence*, not independence
+  of *interest*.
+
+**Concrete recommendation:** stop saying "is this a unique human?" and start saying **"how much
+independent evidence supports the claim that this is a distinct person, and how correlated is this
+identity with the others in your cohort?"** That is honest, it is differentiated, it is what the
+overlap problem forces us to compute anyway, and — unlike a humanity score — it degrades gracefully
+when it is wrong.
+
+### 6.5 Her constructive direction: individuals as composed of groups — what that means for our data model
+
+Her answer in the ETHBerlin Q&A, and the closing of the paper: *"just as you can represent groups as
+composed of individuals you can represent individuals as composed of groups"*; the sovereign
+individual "always loses against a nation state, always loses against big Tech"; power is
+decentralised by forming coalitions, not by atomising. Formally (p.37): *"When identity is expressed
+as a dynamic constellation of memberships to groups, participants reveal different, partial aspects
+of their identity in communication."*
+
+Translated into our stack, this is a concrete and, I think, correct instruction: **the aggregate
+assertion should carry structure, not collapse to a scalar.** Sketch:
+
+- **Replace the score with a typed assertion object.** Minimum viable structure:
+  - `credentials[]` — each with issuer, category, issuance time, expiry/revocation state;
+  - `trust_roots[]` — the *deduplicated* roots those credentials reduce to, with the mapping shown;
+  - `independent_evidence_count` — cardinality of `trust_roots`, the headline number, replacing
+    "score";
+  - `cohort_markers` — coarse, privacy-budgeted bucket identifiers (issuance epoch, issuer,
+    attestation batch) sufficient to compute correlation *between* identities without revealing
+    anything about one identity;
+  - `confidence` / `staleness` per credential.
+- **Add a cohort endpoint** that takes a set of identities and returns pairwise correlation and
+  derived weights, per §6.3. This is the actual product; the per-identity object is the input to it.
+- **Return provenance, let the app own the policy.** Shipping the structure rather than a verdict is
+  more honest, more defensible legally, keeps the risk decision with the party that understands
+  their own threat model, and — commercially — makes us infrastructure rather than an oracle whose
+  single number everyone will argue with.
+- **Affiliations, if we ever carry them, must be consented and app-scoped.** DeSoc's unsolved
+  problem was that publicly legible affiliations are a targeting list (§2.4). We should treat any
+  affiliation data as high-toxicity: derive correlation from it, never expose it.
+
+The honest framing of this pivot: **we sell the correlation structure, not the score.** That is the
+only version of this product that survives her critique, and it happens to be the only part that
+nobody else in the roster owns.
+
+### 6.6 Off-chain migration: what is our analogue?
+
+Her final technical point (§1.10): hardening on-chain vote-buying with receipt-freeness, proofs of
+complete knowledge and TEEs does not eliminate the demand, it relocates it into meatspace — and may
+make it *cheaper*, because the adjacent channel was never priced. Idena killed account trading and
+got puppeteering. **The general law: raising the cost of one channel subsidises the next-cheapest
+channel, and the next-cheapest channel is usually less observable.** Our analogues, in the order I
+expect them:
+
+1. **Credential forgery → human recruitment.** Already complete. Nobody needs to break an Orb; they
+   pay someone to stand in front of one. Every protocol on our roster is currently defeated by a
+   willing human, and *the operative question across the whole roster is not "can this be forged"
+   but "can this be sold or rented"* — iris scans, palm scans, passports and social handles all fail
+   that test, because the human stays willing.
+2. **Wallet-level correlation → wallet hygiene.** The moment funding-ancestry clustering has
+   consequences, farms use fresh funding paths per identity. Cost: near zero. Our best cross-protocol
+   signal has the shortest half-life.
+3. **Farms → "assisted onboarding" businesses.** This is the one I would flag hardest, because
+   **it defeats Ohlhaver's own test.** Her silent-strings argument infers exploitation from the
+   *absence* of marketing, disputes and complaints (§1.7). A professionalised intermediary — an
+   onboarding vendor, a custodial wallet, a regional agent network — will have a website, terms of
+   service, a support queue and a dispute log. It will pass the silence test perfectly while
+   performing the identical function. **Her test detects amateur puppeteering; it is blind to
+   institutionalised puppeteering, which is the form the industry is evolving toward.** We should not
+   adopt her heuristic as a control.
+4. **Gaming the score → capturing the scorer.** If we succeed at being the routing layer, the
+   cheapest attack stops being "farm credentials" and becomes "become a large integrator and
+   negotiate scoring treatment," or "acquire a trust root." This is her §1.9(c) Hobson's-choice
+   dynamic pointed at us: the more essential we become, the more the rational move is to capture us
+   rather than to defeat us, and the less any customer can afford to walk away. An aggregator that
+   works is a single point worth capturing — which is an argument for making our scoring rules
+   public, versioned, and independently reproducible from public data, so that capture is at least
+   visible.
+5. **Credential layer → social layer.** Any friction we add pushes the coordination we care about
+   into channels we cannot see. That is not a reason to add no friction. It is a reason to be honest
+   that our measurements have a ceiling, and to prefer mechanisms that are robust to being evaded
+   (graded discounts, bounded loss) over mechanisms that depend on catching people (detection,
+   exclusion).
 ## 7. Open questions for us
+
+Ordered by how much they should change what we build.
+
+1. **Do we ship correlation-discounted scoring in v1, or additive scoring?** §6.2 argues there is no
+   neutral option and that additive scoring makes us an amplifier of the exact dynamic Ohlhaver
+   documents. This is a founding decision, not a roadmap item. If the answer is "additive for now,"
+   we should at least write down that we know what we are doing.
+2. **Is the primary abstraction the identity or the cohort?** §6.3 argues a per-identity score is
+   ill-typed for the quantity customers need. But cohort-relative scoring is harder to sell, harder
+   to cache, impossible to tokenise, and requires the customer to hand us their participant set.
+   Is there a customer who will actually buy that? **This is the biggest open commercial question in
+   the document** — the intellectually correct architecture may have no market, and I have not
+   established that it does.
+3. **Do we resolve the privacy/detection contradiction in favour of privacy or detection?**
+   (§6.1(d)). App-scoped nullifiers and unlinkability are exactly what defeats cross-protocol
+   correlation. We cannot market both. Which?
+4. **Can trust-root deduplication be done well enough to be the headline product?** ~40 protocols →
+   ~6 roots is the claim. How stable is that mapping, who maintains it, what happens when a protocol
+   changes its root, and can we compute it without the vendors' cooperation? If this is solid it is
+   our best asset; if it is mushy, §6.4's recommendation collapses.
+5. **What is our policy on exclusion?** §6.1(b) argues correlation signals must discount and never
+   deny, because false positives concentrate on the global poor and denial is an irreversible harm.
+   Do we commit to that publicly? Do we let customers override it? (They will want to.)
+6. **How do we avoid being Idena's delegation?** Is there a version of "reduce hassle for users"
+   that does not simultaneously reduce hassle for operators farming those users? I could not
+   construct one. If nobody can, that is a finding worth stating in the README rather than hiding.
+7. **What is the aggregate assertion's ground truth, and can we ever measure our own error rate?**
+   We have no labelled set of puppets. Idena's labels came from confessions. Without ground truth we
+   cannot report precision/recall, which means every quality claim we make is unfalsifiable. What
+   would a credible evaluation even look like?
+8. **Does the "independence" framing survive contact with a customer?** §6.4 recommends replacing
+   "is this a unique human?" with an evidence-diversity claim. That is more honest and less
+   sellable. Test it on a real buyer before committing the README to it.
+9. **UNRESOLVED: is sublinear staking a mechanism we should borrow?** See §3 — whether the promised
+   paper exists determines whether there is anything here to borrow at all.
+
 ## 8. Quotable lines (with locators)
+
+Paper citations preferred throughout; the ETHBerlin transcript is machine-generated ASR and must not
+be quoted verbatim in anything public without checking the audio. Page numbers refer to the Ash
+Center PDF of *Compressed to 0*
+(https://ash.harvard.edu/wp-content/uploads/2024/06/proof-of-personhood_ohlhaver.pdf).
+
+1. **The thesis.** *"Achieving de jure sybil-resistance (filtering humans from bots) revealed a
+   deeper challenge of de-facto sybil resistance (filtering humans acting like bots), which could
+   not coherently or computationally be disentangled from the problem of collusion-resistance."*
+   — *Compressed to 0*, Abstract, p.1.
+2. **Why a boolean credential is the wrong object.** *"Proof of Personhood is reductive, compressing
+   identity into a standardized binary ('verified' or 'not verified') and overlooking the social and
+   economic ties from talking and trading that differentiate people."* — ibid., §V.A, p.27.
+3. **Why a global scalar score cannot be right.** *"A person's agency is not either-or, but
+   context-specific. A person can be an 'agent' in local contexts with relatively high information
+   and control … and yet be a 'de facto sybil' (acting like a bot) in more socially distant … and
+   even nested contexts."* — ibid., p.10 n.29.
+4. **The undecidability at the heart of any detector.** *"Theoretically, the same transaction pattern
+   of blocks of one-way transfers at the same time to the same wallet were consistent with
+   puppeteering and voluntary cooperation. Both extremes differed not in their coordination on-chain,
+   but in the distribution of information and control—or power— off-chain."* — ibid., §III.B, p.12.
+5. **The economies-of-scale result, stated as a general law.** *"By giving humans economic incentives
+   to periodically differentiate themselves from bots—even as low as $2 to $14 every few weeks—the
+   protocol gave more informed, resourceful humans financial incentives to puppeteer less informed
+   humans like bots."* — ibid., Abstract, p.1.
+6. **The concentration finding.** *"by May 2022, 23 entities constituting less than 0.6% of the
+   network's distinct entities controlled at least ~40% of accounts and the distribution of almost
+   half (~48%) the network rewards. More striking, 3 entities controlled ~19% accounts and ~24%
+   rewards."* — ibid., Abstract, p.1.
+7. **Why a credential market is not the worst sign.** *"illicit account trading in protocols should
+   not be treated as evidence of advanced mechanisms or protections; to the contrary, illicit trading
+   may signal a lack of them and be a precursor to puppeteering."* — ibid., §V.A, pp.28-29.
+8. **The specification for a different product.** *"if the goal is to filter 'fake' from 'authentic'
+   accounts, the threshold for 'fake' moves from attestations from a verification method (whether
+   biometric, cognitive, or otherwise) to a constellation of uncorrelated attestations from
+   participants who are unlikely to be talking to each other."* — ibid., p.34 n.87.
+9. **Sybil resistance ≡ collusion resistance.** *"de facto sybil resistance is a mutually-implicated
+   (or mirror) challenge to 'collusion-resistance:' neither can be solved independently but both
+   must be tackled simultaneously."* — ibid., §V.C, p.33.
+10. **Why crypto alone does not fix it.** *"a Proof of Complete Knowledge may establish that someone
+    has direct access to a private key, but doesn't guarantee that the intended or designated
+    participant does."* — ibid., §V.D, p.35.
+11. **Off-chain migration.** *"Thwarting on-chain vote-buying doesn't solve for off-chain vote-buying
+    into 'meatspace,' and may encourage it as a low-cost alternative."* — ibid., §V.D, p.36.
+12. **The constructive alternative.** *"Within the pursuit of egalitarianism, the choice is two-fold:
+    level the playing field, or expand it. … whereas a single identity game has inevitable economies
+    of scale towards one global oligopoly, a plurality of games open the possibility space for a
+    normal (Gaussian) distribution of power, achieved through diversity, not brute-forced
+    equality."* — ibid., §VI Conclusion, p.37.
+13. **The design principle for our scoring rule** (and the reason we need no puppet detector).
+    *"A vote supported by many Souls who all share the same SBT(s) is more likely to be a Sybil
+    attack and—even if not a Sybil attack—such a vote is more likely to be a group of Souls who are
+    making the same error in judgment or who share the same bias, and so should reasonably be
+    weighted less than a vote with the same numerical level of support but from a more diverse base
+    of participants."* — *Decentralized Society*, §4.5, p.7
+    (https://www.radicalxchange.org/updates/papers/desoc.pdf).
+14. **Why existing decentralization metrics fail.** *"even if addresses could be traced back to unique
+    individuals, those individuals could be socially correlated groups prone to accidental
+    coordination (at best) or intentional collusion (at worst)."* — ibid., §4.6, p.8.
+15. **Making a credential unsellable.** *"because a Seller would need to prove selling the recovery
+    relationships, any attempt to sell a Soul lacks credibility."* — ibid., §4.3.
+16. **Sybil-ness as a continuum** (Miller, Weyl & Erichsen, quoted approvingly by her at p.33 n.82).
+    *"What makes Sybil agents Sybils is that the will of one entity centrally coordinates them. They
+    should be recognized as precisely the same because they all listen to that same entity and that
+    entity alone."* — "Beyond Collusion Resistance," https://ssrn.com/abstract=4311507.
+
+*From the ETHBerlin Q&A — paraphrase only, ASR unreliable, do not quote verbatim publicly:* her
+answer on what to do instead is that you can think of a person as the sum of their affiliations and
+conversations, that identity is the output of a networked social process, and that just as groups are
+composed of individuals, individuals can be represented as composed of groups — with the political
+point that the sovereign individual always loses to the nation state and to big tech, and that power
+is decentralised by forming coalitions. Transcript lines 302-315 of
+`research/references/ohlhaver-ethberlin-2024-transcript.md`. **If we want this in a public document,
+someone must check the audio at https://www.youtube.com/watch?v=-mwUQp2qwjk (27:02).**
+
 ## 9. References

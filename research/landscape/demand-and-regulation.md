@@ -1,11 +1,29 @@
 # Demand and Regulation — who pays for personhood, and what law forces it
 
-> STATUS: in progress (started 2026-07-24)
+**One-liner:** The world's largest identity mandate (age assurance) is real, enforced and
+nine-figure — and it asks a different question than personhood does; meanwhile the buyers who
+genuinely need uniqueness have repeatedly chosen $0 substitutes.
+**Category:** landscape / commercial — demand-side and regulatory analysis
+**Status (2026-07-24):** current as of writing; several volatile items flagged for re-check.
+**Verdict (headline):** **No regulatory forcing function exists for personhood.** Age-assurance law
+(UK OSA/ICO, *FSC v. Paxton* + ~23–25 US states, EU DSA Art. 28 + a free state-built AV app,
+Australia's under-16 ban) forces an **attribute**, not **cardinality**, and is being served by
+$0.05–$5 IDV incumbents and state-funded wallets. AI Act Art. 50 and the bot-disclosure laws put the
+duty on the **bot to self-disclose**, not on the platform to verify humans. AML/KYC requires
+**identification**, which a uniqueness credential structurally cannot provide. The one real emerging
+pull is **per-human accountability for AI agents** (x402 / World AgentKit / Cloudflare Web Bot Auth) —
+directionally strong, financially tiny today (~$50m *cumulative* x402 volume). Evidence supports a
+**services business or a grant-funded public good**, plus one narrow venture path: sell **anti-abuse
+per-human entitlement enforcement** priced against fraud loss, not "personhood."
 
-**One-liner:** …
-**Category:** landscape / commercial
-**Status (2026-07):** …
-**Verdict:** …
+**The five numbers that decide it:**
+| Number | Meaning |
+|---|---|
+| **£14.47m** ICO fine on Reddit (2026-02-24) | a real, named, dollar-denominated identity loss — **but it was an *age* failure, cured with conventional IDV** |
+| **<$1M revenue** at Human Passport on 2M users / 75 partners | measured willingness to pay for a personhood score: **<$0.50 lifetime per user** |
+| **$0** — Reddit chose passkeys; LayerZero paid sybil bounties in its own token; Gitcoin moved to COCM | the three biggest buyers all priced uniqueness at zero |
+| **$0.001 → $5** | the price ladder we are squeezed inside: free CAPTCHA below, richer document IDV above |
+| **~$50m cumulative x402 volume** (late Apr 2026) | the agent thesis is real and directionally right, and currently too small to charge per-transaction |
 
 ## 1. Regulatory forcing functions
 ### 1.1 Age assurance (the big one)
@@ -534,6 +552,346 @@ to be worth more than the delta between "user-presence gesture" and "unique huma
 revealed preference says that delta is currently not worth paying for at consumer-social scale.
 
 ## 4. Willingness to pay
+
+### 4.1 The price ladder buyers already see
+
+All figures list-price, dated 2026-07, and sourced from vendor pricing pages and comparison
+roundups; treat the comparison-site numbers as **secondary and indicative** — enterprise deals are
+negotiated 50–90% below list.
+
+| What is bought | Price per unit | Source / note |
+|---|---|---|
+| CAPTCHA / "not a bot" (Cloudflare Turnstile) | **$0.00** | free at ordinary volumes — this is the floor |
+| reCAPTCHA Enterprise assessment | **~$0.001** | ~$1 / 1,000 assessments; `UNVERIFIED:` re-check cloud.google.com/recaptcha/pricing |
+| Cloudflare pay-per-crawl page access | **$0.01+** | https://blog.cloudflare.com/introducing-pay-per-crawl/ |
+| Phone/email risk signal, device fingerprint | **~$0.01–0.10** | `UNVERIFIED:` typical vendor list, not confirmed this run |
+| Facial **age estimation** (no ID) | **~$0.05–0.30** | `UNVERIFIED:` Yoti/VerifyMy do not publish list prices; verify via Yoti's published rate card or Companies House filings |
+| Document + selfie IDV — Veriff | **$0.80** + $49/mo | https://trustswiftly.com/blog/identity-verification-pricing-comparison-and-alternatives/ (secondary) |
+| Document + selfie IDV — Sumsub | **$1.35** (Basic, $149/mo min) / **$1.85** (Conformity, $299/mo min) | same (secondary) |
+| Full KYC / IDV orchestration — Persona | **$2–$5** depending on config | same (secondary) |
+| Enterprise bot management (Cloudflare/DataDome/HUMAN) | **5–6 figure annual contract**, priced on traffic | `UNVERIFIED:` no public rate cards |
+
+### 4.2 What that implies for a personhood score
+
+The uncomfortable arithmetic:
+
+- **The band we can plausibly price into is $0.05–$0.50 per verified user**, one-off or annualised.
+  Above ~$1 we are competing with a full document IDV that gives the buyer *more* information
+  (a name, a DOB, an audit trail, an AML-usable record) than our score does. **A pseudonymous
+  uniqueness score is strictly less useful to a compliance-minded buyer than a $1.35 Sumsub check.**
+  That is a brutal comparison and it holds in every regulated vertical.
+- Below ~$0.01 we are competing with free CAPTCHA, which the buyer already deploys, already trusts,
+  and which imposes no consent, no PII, and no user drop-off.
+- **We only escape the squeeze where the buyer needs the specific property neither alternative
+  gives: cardinality across a population, without identification.** IDV gives identification without
+  (cheap) cardinality. CAPTCHA gives neither. Our whole business lives in that gap.
+- **Empirical willingness to pay in that gap, measured:** Human Passport — 2M users, 35M credentials,
+  ~75 partners, **<$1M revenue**, sold for ~$10M. That is **under $0.50 of lifetime revenue per user
+  and roughly $13,000 of lifetime revenue per partner.** If our aggregator achieved Human Passport's
+  entire distribution it would be a sub-$1M-ARR business. **This is the most important number in the
+  file after the £14.47m ICO fine, and the two numbers point in opposite directions.**
+- **Reddit's revealed preference** (§3.4) prices the "user-presence gesture" tier at **$0** (passkeys).
+- **Airdrop issuers' revealed preference** (§2.1) prices sybil detection at **$0 cash** (pay the
+  bounty in your own token).
+- **Where a real price exists:** in the *agent* context (§3.1), per-human entitlement enforcement
+  attaches to a loss the buyer already books — free-trial abuse, promo fraud, API quota abuse, seat
+  sharing. Those buyers today pay $0.50–$5 per blocked fraudulent signup to fraud vendors. That is
+  the only place a $0.10–$1.00 personhood price is defensible, and it is defensible **only** because
+  it is compared against fraud loss rather than against CAPTCHA.
+
+### 4.3 The aggregator-specific pricing problem
+
+An aggregator's gross margin is (price charged) − (cost of the underlying credential checks). Most
+personhood credentials are **free to verify** (on-chain reads, public nullifier registries), which
+sounds like 100% margin — but it also means **the buyer can verify them directly for free**. Our
+product is not access; it is **normalisation, coverage and liability absorption**. Historically
+buyers pay for normalisation only when the underlying integrations are genuinely painful (Plaid,
+Trulioo) or when someone must own the decision (Alloy, Persona). We should assume **we are selling
+an SLA and a risk transfer, not data** — and price accordingly (platform fee + per-decision), not
+per-credential.
+
 ## 5. Privacy law as a constraint on us
+
+**Take this section as seriously as the revenue sections. The regulatory risk here is not
+theoretical — it has already killed or crippled the largest players in our supply chain.**
+
+### 5.1 The evidence that this risk is live
+
+- **World / Worldcoin has been fined, banned or ordered to delete data in a long list of
+  jurisdictions**: Spain's AEPD precautionary ban (March 2024); Bavaria's BayLDA ordering deletion
+  and GDPR-compliant rebuild (December 2024); **South Korea's PIPC fine of ~₩1.1bn (~$829,000)** for
+  mishandling biometrics; **Brazil's ANPD outright ban (January 2025, reaffirmed March 2025)** with a
+  threatened **R$50,000/day** penalty on resumption; **Thailand ordering shutdown and deletion
+  (November 2025)**. (Secondary aggregation:
+  https://restofworld.org/2026/sam-altman-worldcoin-zoom-tinder-partnerships/ ;
+  https://www.biometricupdate.com/202403/worldcoin-fights-spanish-regulators-ban-in-court ;
+  https://idtechwire.com/thailand-orders-worldcoin-to-halt-iris-scans-and-delete-biometric-data/ .
+  `UNVERIFIED:` I have not re-fetched each DPA's own decision this run — do that before citing
+  specific figures externally.)
+- **Fractal ID's 2024 breach** exposed KYC documents of web3 users (see
+  `/home/hugo/Projects/poh-aggregator/research/landscape/kyc-liveness-vendors.md`), demonstrating
+  that the web3 identity supply chain is not operationally hardened.
+- **Civic discontinued its uniqueness and liveness products on 2025-07-31** and pivoted to embedded
+  wallet auth. The most direct precedent available: a funded, credible team in exactly our category
+  decided the product was not worth operating. `UNVERIFIED:` I did not re-fetch Civic's shutdown
+  notice in this run; the sibling prior-art file has it.
+
+### 5.2 GDPR mechanics that bite an aggregator specifically
+
+1. **Art. 9 special-category data.** Biometric data *processed for the purpose of uniquely
+   identifying a natural person* is prohibited unless an Art. 9(2) exception applies. In practice for
+   a consumer product the only workable basis is **Art. 9(2)(a) explicit consent** — which is
+   **freely revocable**, cannot be a condition of service without consent-freeness problems, and is
+   exactly the basis Bavaria and the AEPD attacked at World. *An aggregator that never touches raw
+   biometrics is in a far better position than one that does* — this is a strong argument for
+   **never proxying a biometric capture flow ourselves** and only ever consuming an upstream
+   attestation.
+2. **Controller vs. processor is genuinely hard for us, and the honest answer is unhelpful.** If we
+   decide *which* protocols to query, *how* to weight them and *what* score to emit, we determine the
+   purposes and means of processing → **we are a controller**, not a processor, regardless of what the
+   contract says (EDPB Guidelines 07/2020). Consequences: our own Art. 13/14 notices to *the
+   customer's* users, our own lawful basis, our own DPIA (Art. 35 — near-certainly mandatory:
+   large-scale, systematic, special-category, innovative technology), our own Art. 30 records, and
+   **direct exposure to supervisory authorities and to data-subject claims**. Being a joint
+   controller with each customer (Art. 26 arrangements × N customers) is an operational nightmare.
+   `UNVERIFIED:` this is my legal reading, not advice — it needs a real DPO/counsel review before it
+   goes in any customer contract.
+3. **Data minimisation (Art. 5(1)(c)) vs. the product's core temptation.** A better score comes from
+   more history: which protocols a user has, when, revocations, cross-protocol correlations, device
+   and behavioural signals. **Every improvement to score quality is a data-minimisation violation
+   waiting to be argued.** This tension is structural, not fixable by engineering.
+4. **Automated decision-making (Art. 22).** A score that gates access to a service — denying an
+   account, blocking a claim — is plausibly a decision producing legal or similarly significant
+   effects, triggering rights to human review, explanation and contestation. **Our product is
+   literally an automated decision engine.** Budget for an appeals process from day one; it is a real
+   cost and a real support burden.
+5. **International transfers.** Personhood protocols are globally distributed; several credential
+   issuers sit in jurisdictions without adequacy. SCCs + TIAs per issuer.
+6. **Non-EU regimes with sharper teeth for biometrics:** Illinois **BIPA** (private right of action,
+   statutory damages **$1,000/$5,000 per violation**, the reason Clearview and Meta paid nine
+   figures), Texas CUBI, Washington MHMDA. **BIPA alone is an existential risk if we ever handle a
+   face template for an Illinois resident.** Strong argument for a hard architectural rule:
+   **we never receive, store or transit a biometric template. Ever.**
+
+### 5.3 The correlation honeypot — our worst structural problem
+
+**State it without softening: the aggregator is the one party in the system that holds the join key.**
+
+Every protocol in our set is individually designed to be unlinkable. World ID uses app-scoped
+nullifiers precisely so a user's actions in app A cannot be linked to app B. Passport-based ZK proofs
+reveal an attribute and nothing else. Circles is a pseudonymous social graph. BrightID is a graph
+identifier. **Each was built so that no one can correlate them.** Our product's entire function is to
+put them side by side against a single user session — which means **we manufacture exactly the
+linkage every one of those designs exists to prevent.**
+
+Concretely, a compromise or a subpoena of our database yields, for a given person:
+their World ID nullifier set → their passport-derived attributes → their Circles/on-chain addresses →
+their linked social accounts → their IP and device → the list of every customer service they verified
+at. **That is a deanonymisation oracle for the entire pseudonymous crypto population.** It is more
+dangerous than any single protocol's database, and it is dangerous *because* we did our job.
+
+This is simultaneously:
+
+- **A regulatory liability.** A single database enabling cross-context identification is the paradigm
+  case for Art. 5(1)(b) purpose-limitation and Art. 25 data-protection-by-design challenges, and it
+  is the specific harm DPAs cite when they act against identity aggregators.
+- **A product-trust problem, and the more binding one.** Our users are disproportionately
+  privacy-motivated crypto users, and our customers' legal teams will ask, correctly, "so you hold a
+  map from real people to all their pseudonyms?" **The answer "yes, but we're careful" loses the
+  deal and loses the community.** Cypherpunk users will actively campaign against us; that is not
+  hypothetical, it is what happened to every centralised identity linker in this space.
+- **A moat problem in disguise.** The correlation graph is the obvious data moat and it is the one
+  asset we must refuse to build. **Any business plan whose defensibility rests on accumulated
+  credential-graph data is not investable and not shippable.**
+
+**Architectural implications, if we build this at all — these are requirements, not nice-to-haves:**
+
+1. **Stateless-by-default verification.** Compute the score in-session, return it, retain a signed
+   attestation and an audit hash — **not the constituent credentials**.
+2. **Per-customer scoping.** Derive customer-scoped pseudonyms so the *same* user at two customers is
+   not correlatable in our own store. Accept the resulting loss of cross-customer signal as the price
+   of existing. (Note this destroys the "our network effect grows with users" pitch. That is a real
+   strategic cost and it should be priced into any fundraising narrative.)
+3. **Never handle biometrics.** Consume upstream attestations only. This keeps us out of Art. 9 and
+   BIPA.
+4. **Client-side aggregation where possible.** If the scoring can run in the user's wallet/browser
+   and we only verify a proof, we never hold the join at all. **This is the only architecture that
+   genuinely answers the honeypot objection, and it should be the default design.**
+5. **Publish the threat model.** In this community, an unpublished privacy claim is disbelieved by
+   default.
 ## 6. Verdict on commercial viability
+
+### 6.1 What the evidence actually says
+
+**There is no regulatory forcing function for personhood. There is a very large forcing function for
+*age*, and a smaller one for *content provenance*, and neither of them buys a uniqueness score.**
+
+The mandate map, honestly scored:
+
+| Regime | Forces what? | Creates demand for personhood? |
+|---|---|---|
+| UK OSA / ICO / Ofcom | age attribute, HEAA | **No** — buys age estimation & IDV |
+| EU DSA Art. 28 + AV app + eIDAS2 | age attribute, state-funded and free | **No** — and actively crowds out paid alternatives |
+| *FSC v. Paxton* + ~23–25 US states | age attribute for adult content | **No** |
+| Australia SMMA | age attribute (waterfall/successive validation) | **No**, but validates the *aggregator architecture* |
+| EU AI Act Art. 50 (from 2026-08-02) | **self**-disclosure by the AI, content watermarking | **No** — duty is on the bot, not the platform |
+| DSA Art. 34/35 (VLOPs) | assess & mitigate inauthentic use, unspecified method | **Weakly** — best theoretical hook, no enforcement precedent |
+| Cal. B.O.T. Act & successors | self-disclosure by the bot, ≥10m MAU, AG-only, no enforcement history found | **No** |
+| MiCA / TFR / AMLR | **identification** of a named person | **No — and structurally incompatible** (§1.5) |
+
+The demand map, honestly scored:
+
+| Segment | Value at risk | Actual cash spend | Recurring? |
+|---|---|---|---|
+| Airdrop sybil filtering | 9 figures per major event | ~$0 cash (paid in own token; bounty crowdsourcing) | No — episodic |
+| Quadratic funding / public goods | ~$1.3M per Gitcoin round | low six figures ecosystem-wide | Yes but trivially small |
+| Bot mitigation / CAPTCHA | very large | large — but at **$0–$0.001/request**, to incumbents | Yes, and not available to us |
+| Fraud / IDV / AML | very large | large — but requires **identification**, not uniqueness | Yes, and not available to us |
+| **Agent accountability / per-human entitlements** | growing fast | tiny today ($50m *cumulative* x402 volume) | **Plausibly yes, from ~2027** |
+
+Three independent revealed-preference signals all point the same way, and they are the strongest
+evidence in this file because they are decisions, not opinions:
+
+1. **Reddit** — the loudest "we need human verification" buyer on earth — chose **passkeys ($0)**.
+2. **LayerZero** — facing 800k+ sybils — chose **token-denominated bounties ($0 cash)**.
+3. **Gitcoin/QF** — the category's home turf — drifted to **COCM, an algorithmic fix ($0)**.
+
+And three supply-side signals confirm the sellers reached the same conclusion:
+
+4. **Human Passport**: 2M users, 35M credentials, 75 partners → **<$1M revenue, ~$10M exit.**
+5. **Civic**: killed uniqueness + liveness products **2025-07-31** and pivoted to wallet auth.
+6. **Humanity Protocol**: abandoned "Proof-of-Personhood" for "Proof-of-Trust" (Feb 2026) and pivoted
+   to enterprise AI after a $36M hack (June 2026). **The #2 network concluded uniqueness was not the
+   sellable product.**
+
+When the two largest buyers, the flagship seller, the #2 network and a well-funded competitor all
+independently price uniqueness at approximately zero, the market is telling us something, and it is
+not "you need better distribution."
+
+### 6.2 The buyer segments with a real, dollar-denominated, recurring pain
+
+Only three survive scrutiny. Ranked by strength of evidence.
+
+**1. Per-human entitlement enforcement in agent-mediated commerce and SaaS. (Strongest. Bet here.)**
+Free-trial abuse, promo/referral fraud, API quota abuse, seat sharing, one-review-per-customer,
+one-listing-per-seller. The pain is **recurring**, already **booked in dollars** as fraud/abuse loss,
+and **structurally worsening** because one human now operates N agents — which breaks device- and
+behaviour-based limits that used to work. World's AgentKit framing ("cap usage based on the
+underlying person") is the clearest articulation anyone has published, and the fact that World,
+Coinbase and Cloudflare are converging on it is corroboration. **Our differentiated wedge is
+coverage**: World ID is unavailable or banned across much of the world (§5.1), so a merchant who
+needs per-human limits *globally* needs a router. That is a real, defensible aggregator job.
+*Caveat: dollars are small today ($50m cumulative x402 volume) and the buyer is enterprise, with an
+18-month sales cycle and a security review we must pass despite §5.3.*
+
+**2. Marketplaces, dating, and reputation systems with a fraud P&L. (Solid, unglamorous, real.)**
+Dating apps (Tinder is a named World partner), gig marketplaces, ticketing, review platforms, online
+gaming/gambling. They already pay **$0.80–$5 per verification** to Veriff/Sumsub/Persona, so the
+budget line exists and the price point is proven. They want ban evasion prevented — a
+**re-registration** problem, which is exactly a uniqueness problem and exactly what IDV does badly
+and expensively. **This is the segment most likely to write a real cheque in the next 12 months.**
+*Caveat: we win here only by being cheaper or higher-coverage than a document check, and the buyer
+will happily take the document check if we wobble.*
+
+**3. Token/protocol distribution and governance. (Real, but episodic and cash-poor.)**
+Airdrops, governance sybil resistance, points programs, NFT allowlists. Genuinely needs uniqueness,
+genuinely has value at risk, and is our natural distribution — but pays in tokens, buys once, and
+often prefers post-hoc forensics. **Treat as a go-to-market channel and design partner source, not as
+the revenue base.** The mistake Human Passport made was believing this was segment #1.
+
+Explicitly **not** buyer segments, despite frequent claims: KYC/AML compliance (needs identification,
+§1.5), age assurance compliance (needs an attribute, and the state is shipping it free, §1.1.6),
+DSA/AI Act compliance (duty falls on bots and content, §1.2/§1.4), and enterprise agent identity
+(already solved by the HR directory, §3.3).
+
+### 6.3 The blunt answer
+
+**On current evidence this is not a venture-scale business, and pitching it as one requires ignoring
+five well-documented failures in the same category.** The honest reading:
+
+- **As a standalone personhood-score API sold to crypto: it is a sub-$1M-ARR business.** That is not
+  a forecast, it is the measured outcome for the company that reached 2M users and 75 partners doing
+  exactly this. Nothing in the 2026 regulatory picture changes it, because every mandate that
+  arrived asks a different question.
+- **As a services / infrastructure business it works modestly.** Sybil-analysis engagements, airdrop
+  design, round-integrity audits, integration consulting. Chaos Labs, Nansen and Trusta demonstrate
+  demand. Ceiling: a good consultancy, single-digit millions, not a platform.
+- **As a public good it is genuinely valuable and should be grant-funded.** Coverage-maximising,
+  privacy-preserving, client-side, non-correlating verification is exactly what QF, governance and
+  civic tech need and exactly what no one will pay market rates for. Optimism RetroPGF, Ethereum
+  Foundation, Gitcoin, NLnet and EU Horizon are the realistic funders. Note this path is *consistent*
+  with the architecture §5.3 forces on us anyway — the non-correlating, client-side design is both
+  the ethical answer and the un-monetisable one. **That is not a coincidence; it is the category's
+  core tension.**
+- **The one credible venture path is to stop selling personhood and start selling per-human agent
+  accountability** to segments 1 and 2 — priced against fraud loss, sold as an anti-abuse product,
+  with personhood as the invisible mechanism rather than the pitch. That is a different company with
+  a different name, a different buyer and a different demo. Whether that is the company we want to
+  build is a founder question, not a research question.
+
+**The disqualifying test to run before writing code:** find **three** companies that will sign an LOI
+to pay **≥$0.10 per verified user per year** with a named budget line, before World ID's enterprise
+motion locks up segment 1. If three months of selling cannot produce three such LOIs, the evidence in
+this file says stop — and every prior team in this category learned that lesson after building the
+product rather than before.
+
 ## References
+
+Primary sources (regulator, court, company IR, official docs):
+
+- Reddit Q1'26 earnings call transcript (Reddit IR CDN) — https://s203.q4cdn.com/380862485/files/doc_financials/2026/q1/Reddit-Q1-26-Earnings-Call-Transcript.pdf
+- ICO — Reddit fined £14.47m — https://ico.org.uk/about-the-ico/media-centre/news-and-blogs/2026/02/reddit-issued-with-1447m-fine-for-children-s-privacy-failures/
+- Ofcom online safety industry bulletin, March 2026 — https://www.ofcom.org.uk/online-safety/illegal-and-harmful-content/online-safety-industry-bulletins/online-safety-industry-bulletin-march-2026
+- *Free Speech Coalition, Inc. v. Paxton*, No. 23-1122 (U.S. June 27, 2025) — https://www.supremecourt.gov/opinions/24pdf/23-1122_3e04.pdf
+- CRS Legal Sidebar LSB11354 — https://www.congress.gov/crs-product/LSB11354
+- EU AI Act Art. 50 — https://artificialintelligenceact.eu/article/50/ ; Commission FAQ — https://digital-strategy.ec.europa.eu/en/faqs/transparency-obligations-under-article-50-ai-act
+- California B.O.T. Act (SB 1001) text — https://leginfo.legislature.ca.gov/faces/billTextClient.xhtml?bill_id=201720180SB1001
+- eSafety Commissioner — social media age restrictions — https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restrictions
+- Cloudflare — pay per crawl — https://blog.cloudflare.com/introducing-pay-per-crawl/ ; AI Crawl Control — https://blog.cloudflare.com/introducing-ai-crawl-control/ ; changelog — https://developers.cloudflare.com/changelog/2025-12-10-pay-per-crawl-enhancements/
+- Coinbase — x402 Foundation — https://www.coinbase.com/blog/coinbase-and-cloudflare-will-launch-x402-foundation
+- Okta — Cross App Access partners — https://www.okta.com/newsroom/press-releases/okta-announces-cross-app-access-partners/ ; https://www.okta.com/solutions/cross-app-access/
+- Gitcoin — GG23 retro — https://www.gitcoin.co/blog/gitcoin-grants-23-retro ; QF sybil resistance — https://gitcoin.co/research/quadratic-funding-sybil-resistance
+
+Secondary (labelled as such throughout):
+
+- Lewis Silkin, "Age Assurance in 2026" (2026-04-17) — https://www.lewissilkin.com/insights/2026/04/17/age-assurance-in-2026-what-do-digital-businesses-operating-in-the-uk-and-eu-need-to-know
+- Osborne Clarke on the ICO/Reddit decision — https://www.osborneclarke.com/insights/uk-ico-fines-online-platform-ps1447m-and-warns-age-self-declaration-not-enough-protect
+- Inforrm / Antoniou on Ofcom AV fines — https://inforrm.org/2026/03/11/ofcom-steps-up-online-safety-act-enforcement-with-two-further-age-assurance-fines-for-pornographic-platforms-alexandros-antoniou/
+- AEI on the narrowness of *Paxton* — https://www.aei.org/technology-and-innovation/understanding-why-the-supreme-courts-ruling-in-free-speech-coalition-v-paxton-is-narrow/
+- Greenberg Traurig on AI Act Art. 50 guidance (June 2026) — https://www.gtlaw.com/en/insights/2026/6/deepfakes-chatbots-ai-generated-text-european-commission-details-transparency-obligations-under-the-ai-act
+- Perkins Coie on SB 1001 — https://perkinscoie.com/insights/update/i-am-robot-californias-new-law-requires-disclosure-use-bots
+- Engadget on Reddit "verify humanness" (2026-03) — https://www.engadget.com/social-media/reddit-will-prompt-some-accounts-to-verify-humanness-in-latest-bot-crackdown-161000181.html
+- CoinDesk on World AgentKit + x402 (2026-03-17) — https://www.coindesk.com/tech/2026/03/17/sam-altman-s-world-teams-up-with-coinbase-to-prove-there-is-a-real-person-behind-every-ai-transaction
+- InfoQ on Cloudflare/AWS x402 at the edge (2026-07) — https://www.infoq.com/news/2026/07/cloudflare-aws-x402-micropayment/
+- TechCrunch on Cloudflare's crawler policy (2026-07-01) — https://techcrunch.com/2026/07/01/cloudflares-new-policy-pushes-ai-companies-to-pay-for-publishers-content/
+- Crypto Briefing / crypto.news / Coincu on LayerZero sybil detection — https://cryptobriefing.com/layerzero-airdrop-fairness/ , https://crypto.news/layerzero-spots-800k-sybil-addresses-airdrop-scheme/ , https://coincu.com/layerzero-sybil-detection-report/
+- Trust Swiftly IDV pricing comparison (2026) — https://trustswiftly.com/blog/identity-verification-pricing-comparison-and-alternatives/
+- Rest of World on World's bans and US partnerships (2026) — https://restofworld.org/2026/sam-altman-worldcoin-zoom-tinder-partnerships/
+- Biometric Update / ID Tech Wire on World regulatory actions — https://www.biometricupdate.com/202403/worldcoin-fights-spanish-regulators-ban-in-court , https://idtechwire.com/thailand-orders-worldcoin-to-halt-iris-scans-and-delete-biometric-data/
+- TechPolicy.Press and eMarketer on Australia's ban results — https://www.techpolicy.press/early-lessons-from-australias-teen-social-media-ban-for-the-rest-of-the-world/ , https://www.emarketer.com/content/70-percent-australian-minors-still-use-social-media-three-months-after-ban
+
+Sibling research files relied on:
+
+- `/home/hugo/Projects/poh-aggregator/research/landscape/identity-infra-prior-art.md` (Human Passport, Civic, Spruce numbers)
+- `/home/hugo/Projects/poh-aggregator/research/landscape/kyc-liveness-vendors.md`
+- `/home/hugo/Projects/poh-aggregator/research/landscape/eidas2-eudi-wallet.md`
+- `/home/hugo/Projects/poh-aggregator/research/landscape/poh-landscape-sweep.md` (Humanity Protocol pivot, World AgentKit partner list)
+
+## Open questions for us
+
+1. **Ofcom's age-assurance effectiveness report, due end of July 2026** — publishes within days of
+   this file. It will name which assurance methods actually worked and may create the first
+   regulator-blessed method ranking. Re-check.
+2. **Reddit Q2'26 earnings (~late July / early August 2026)** — the only reliable way to learn whether
+   passkeys sufficed or whether Reddit escalated to third-party human verification. This single
+   datapoint moves the verdict more than anything else pending.
+3. **Exact current count of US state age-verification laws** — needed for any external claim; use the
+   FSC tracker and NCSL, not press reports.
+4. **Whether any DSA Art. 34/35 enforcement has ever required user-level human verification.** If one
+   appears, segment ranking changes materially.
+5. **Real revenue figures for hCaptcha, Arkose, DataDome, HUMAN** — the size of the pool we would be
+   displacing. Best available proxies: funding rounds, Gartner MQ share estimates, Companies House
+   filings for UK entities (Yoti in particular).
+6. **Whether Okta ships anything literally called "Human Principal"** — check Oktane 2026.
+7. **x402 volume trajectory** — if cumulative volume goes from $50m to $5bn in 12 months, segment 1
+   becomes urgent; if it stalls, the agent thesis is a 2028 story.

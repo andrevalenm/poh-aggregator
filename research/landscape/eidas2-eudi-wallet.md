@@ -37,8 +37,39 @@ https://www.eideasy.com/blog/eu-digital-identity-wallets-july-2026):**
 French and German respondents had never heard of the EUDI Wallet**, only ~20% claimed clear
 understanding. (https://www.biometricupdate.com/202607/eudi-what-as-wallet-deadline-looms-awareness-remains-low)
 
-`UNVERIFIED:` no reliable public **holder counts** for any national wallet were found. This is
-the single most important missing number for us.
+**Did the deadline slip?** Formally, no — 24 December 2026 still stands and no amendment or
+infringement moratorium was found. In practice it is missing badly:
+
+- **ENISA** (EU cybersecurity agency), in a draft certification scheme published early 2026:
+  *"In early 2026, no EUDI Wallet has been deployed or certified, and the specification remains
+  work in progress."*
+- A report from the **EUDI Wallets Launchpad** event: only **16 of 27** member states participated
+  in testing, showing *"a spectrum in maturity and readiness"*, and *"fewer than one quarter of
+  Member States are likely to meet the … EUDIW deadline"*.
+  (both via https://www.biometricupdate.com/202604/eu-commission-doubtful-all-member-states-will-be-able-launch-eudi-wallets-this-year — secondary source, April 2026)
+- **The Netherlands** has signalled it will not meet the deadline; **Malta** expects a product that
+  is available but not fully functional; **Bulgaria** reportedly has not started. (secondary,
+  2026-07 trackers)
+- **France Identité** is a live production national eID service being upgraded into an EUDI Wallet
+  — arguably a second "live" case depending on how strictly you read "EUDI-conformant".
+  `UNCLEAR:` whether France Identité is yet a *certified* EUDI Wallet Unit or a national eID app on
+  a path to becoming one. These are very different things and trackers blur them.
+
+**Holder counts.** `UNVERIFIED:` **no reliable public holder count exists for any national EUDI
+wallet as of 2026-07.** The only adjacent hard number is that **87% of Danish adults use MitID at
+least weekly** — and AltID *requires an existing MitID account to enrol*, so Denmark has a very
+high ceiling but an unknown floor. This is the single most important missing number for us: without
+it, "largest state-issued personhood credential in existence" is an aspiration, not a fact. Next
+place to look: Danish Agency for Digital Government (Digitaliseringsstyrelsen) statistics pages,
+the Commission's eIDAS Dashboard / Digital Decade reporting.
+
+**Denmark AltID specifics** (secondary, Biometric Update Dec 2025 + Jun 2026): launched as *"a
+digital age certificate and ID"*; the announcement explicitly claims **zero-knowledge proofs** for
+age — *"AltID shares only a zero-knowledge proof"* — without naming the scheme. Signicat won the
+Denmark wallet + mDL contract. `UNCLEAR:` whether AltID's "ZKP" is a genuine ZK proof or marketing
+for salted-hash selective disclosure of an `age_over_18` boolean; given TS4's position that no ZKP
+scheme is mature enough, **treat the ZKP claim as unverified**. Next place to look: AltID developer
+docs / the Danish Agency for Digital Government technical spec.
 
 ## Implementing acts
 
@@ -485,6 +516,66 @@ working assumption should be **yes, verifiers are accredited**. Next place to lo
 `ageverification.dev` verifier onboarding docs and the blueprint's own architecture document.
 
 ## Reference implementations and SDKs
+
+GitHub org: **https://github.com/eu-digital-identity-wallet** — **85 repos**, and it is very much
+alive: 4 repos had commits on **2026-07-24** (the day this file was written). Checked via the
+GitHub API on 2026-07-24.
+
+### Licences — two regimes, and the difference matters
+
+- **Libraries and server components: Apache-2.0.** Permissive, commercially usable.
+- **Reference *apps*: EUPL-1.2.** A copyleft licence (network-use is not a trigger, but derivative
+  distribution is). If we forked the reference wallet UI, we'd inherit EUPL obligations.
+
+### The pieces relevant to a verifier (all Apache-2.0)
+
+| Repo | What | Lang | Last push |
+|---|---|---|---|
+| `eudi-srv-verifier-endpoint` | *"Web application (Backend Restful service) that acts as a Verifier/RP trusted end-point"* — the reference verifier backend | Kotlin | 2026-07-24 |
+| `eudi-web-verifier` | Verifier web UI | TypeScript | 2026-07-24 |
+| `eudi-app-multiplatform-verifier-ui` | Proximity verifier app | Kotlin | 2026-07-21 (EUPL-1.2) |
+| `eudi-lib-jvm-openid4vp-kt` | OpenID4VP (verifier side) | Kotlin | 2026-07-23 |
+| `eudi-lib-jvm-openid4vci-kt` | OpenID4VCI | Kotlin | 2026-07-20 |
+| `eudi-lib-jvm-sdjwt-kt` / `eudi-lib-sdjwt-swift` | SD-JWT VC | Kotlin / Swift | 2026-07-20 / 07-01 |
+| `eudi-lib-kmp-statium`, `eudi-lib-ios-statium-swift`, `eudi-srv-status-validator-py` | Token Status List / revocation checking | KMP / Swift / Python | 2026-07-20 |
+| `eudi-srv-trust-validator` | Trusted-list / trust-anchor validation service | Kotlin | 2026-07-22 |
+| `eudi-lib-kmp-etsi-1196x2` | ETSI TS 119 6x2 (trusted lists / LoTE) | Kotlin | 2026-07-24 |
+| **`eudi-srv-web-relyingparty-registration-py`** | *"Relying Party registration service"* — reference registrar | Python | 2026-07-06 (1 star) |
+
+Holder-side: `eudi-lib-android-wallet-core` (Kotlin, Apache-2.0), `eudi-lib-ios-wallet-kit` (Swift,
+Apache-2.0), `eudi-lib-ios-iso18013-*` family, `eudi-app-android-wallet-ui` / `eudi-app-ios-wallet-ui`
+(EUPL-1.2, 215 / 85 stars). Issuer-side: `eudi-srv-pid-issuer` (Kotlin),
+`eudi-srv-web-issuing-eudiw-py` (Python), `eudi-srv-wallet-provider` (Kotlin).
+
+### The age-verification app is a separate `av-*` family — and it has real ZK code
+
+- `av-app-android-wallet-ui` (EUPL-1.2, **294 stars — the most-starred repo in the org**, pushed
+  2026-07-17), `av-app-ios-wallet-ui` (EUPL-1.2, 2026-07-12)
+- `av-srv-verifier-endpoint`, `av-srv-trust-validator`, `av-web-verifier-ui`, `av-dc-api-backend`
+  (Digital Credentials API backend), `av-verifier-frontend-cinema` (a demo RP) — all Apache-2.0,
+  all pushed within the last month
+- **`av-lib-ios-longfellow-zkp`** — *"A Swift library for zero-knowledge proof (ZKP) generation and
+  verification of **mdoc** credentials using the **Longfellow** ZK system"*, Apache-2.0, pushed
+  2026-07-09, 4 stars.
+
+**This is the single most concrete signal that EU ZK is real:** Longfellow (Google's
+`eprint 2024/2010`, ZK over ECDSA-signed mdocs, no trusted setup) is being coded into the shipping
+age-verification app, matching TS13's statement that it "will be tested in the Age Verification"
+app. It is *not* in the mainline EUDI wallet repos yet.
+
+### Are these usable by a third party?
+
+**The code, yes; the credential, no.** The verifier stack is Apache-2.0 and self-hostable, and the
+Commission runs public test infrastructure (`conformance.eudi.dev` for functional test cases; there
+are public issuer/verifier sandboxes). You can stand up a working verifier this afternoon.
+
+What you **cannot** get from GitHub is an **access certificate chaining to a Member-State-notified
+Access Certificate Authority**. Without it, a real wallet refuses (`RPA_03`/`RPA_04`). So the
+open-source stack lets you *develop*; it does not let you *operate*. `UNVERIFIED:` whether the
+public sandbox wallets accept self-signed/test access certificates — almost certainly yes for the
+sandbox, which is the only way the demos work; but that is a test trust anchor, not a production
+one.
+
 ## The uniqueness question
 ## Trust root & failure modes
 ## Integration surface

@@ -34,9 +34,9 @@ to a uniqueness gate."
 | Event | Date | Scale of sybil finding | Detection method | Outcome |
 |---|---|---|---|---|
 | **Hop Protocol** | 2022-05 | **10,253 of 43,058** eligible addresses flagged sybil (~23.8%) | Transfer-graph connected components + funding-source clustering + timing/gas correlation; community bounty | Excluded from airdrop; self-reporting sybils kept 25% of allocation |
-| **Optimism airdrop #1** | 2022-06 | ~17k addresses removed pre-drop (see §1.3, UNVERIFIED exact figure) | Manual + heuristic clustering | Excluded |
-| **Arbitrum** | 2023-03 | Foundation published its own sybil-detection code and lists | Open-sourced heuristics repo (`ArbitrumFoundation/sybil-detection`) | Excluded; large community dispute over false positives |
-| **Aptos** | 2022-10 | Widely-reported mass farming of testnet/NFT criteria | X-explore on-chain analysis | Little clawback; farmers profited |
+| **Optimism airdrop #1** | 2022-05 | **17,000 addresses removed**, **>14,000,000 OP recovered** | Post-hoc clustering after the drop was announced | Recovered OP **redistributed proportionally** to legitimate airdrop-1 recipients |
+| **Arbitrum** | 2023-03 | **148,595 sybil addresses received the airdrop — ~253M ARB, 21.8% of tokens dropped** (X-explore, post-hoc) | Foundation open-sourced its heuristics (`ArbitrumFoundation/sybil-detection`): transaction graph + funder/sweep graph, **Louvain community detection**, clusters >20 addresses, exchange/bridge/contract filtering using Nansen + Hop + Offchain Labs lists | Some exclusion pre-drop; **the 21.8% is what got through**. Large dispute over false positives |
+| **Aptos** | 2022-10 | Widely-reported mass farming of testnet/NFT criteria | X-explore on-chain analysis | Little clawback; farmers profited. `UNVERIFIED:` no primary figure located |
 | **LayerZero** | 2024-05 | **803,093 addresses** identified as sybil (see §1.2 — the self-report bounty) | Self-report + bounty hunting + LayerZero/Chaos Labs/Nansen analysis | Self-reporters kept 15%; the remaining 85% redistributed |
 | **zkSync** | 2024-06 | Criteria deliberately *not* anti-sybil; team stated sybils were expected to pass | Volume/duration criteria only | No meaningful clawback |
 | **Starknet** | 2024-02 | Criteria excluded most farmed wallets by requiring pre-2023 activity + GitHub/staking identity | Eligibility design rather than detection | Farmers largely excluded by *criteria*, not by *detection* |
@@ -167,6 +167,27 @@ Structural features of the industry that are well-attested and matter more than 
 services. Do not put a specific dollar figure in a public deck without sourcing it. Where to look
 next: academic measurement papers on residential-proxy and anti-detect-browser markets, and
 Chainalysis / TRM / Nansen industry reports.
+
+### 1.6 Arbitrum — the number that should actually scare us
+
+Every other figure in this section is *how many sybils were caught*. Arbitrum's is **how many got
+through after a serious, well-funded, open-sourced detection effort**: X-explore's post-hoc
+analysis found **148,595 sybil addresses that successfully received the airdrop, taking ~253M ARB —
+21.8% of all tokens distributed**
+([X-explore analysis](https://paragraph.com/@x-explore/LkyJPs8v4QkRWxZAx2gc); summarised in
+[Beosin](https://beosin.com/resources/a-closer-look-at-the-anti-sybil-mechanism-under-the-arbitrum)).
+
+The Arbitrum Foundation's detection stack was not naive. Per its published repo
+(<https://github.com/ArbitrumFoundation/sybil-detection>): two transaction graphs (value transfers,
+and a "funder"/"sweep" graph of first-in/last-out transfers), **Louvain community detection** on
+strongly/weakly connected subgraphs, a rule flagging clusters of **>20 addresses** moving funds
+together, plus entity filtering for bridges, exchanges, contracts and donation addresses using
+Nansen, Hop and Offchain Labs label data. It is roughly the state of the art for graph-based sybil
+detection, it is open source, and **it still let a fifth of the airdrop go to farms.**
+
+**Take this as the empirical ceiling on graph-based detection under adversarial conditions: on the
+order of 80% recall, in the best-resourced public attempt, against 2023-era farms.** Anyone
+promising better should be asked to publish their confusion matrix.
 
 ---
 

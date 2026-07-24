@@ -439,7 +439,239 @@ Three consequences, all of which matter more than any accuracy metric:
   audit-probability curve unpublished and rotating.
 
 ## 2. Credit scoring as canonical prior art
+
+Credit scoring is the only field that has run a heterogeneous-evidence trust score at population
+scale for fifty years, under a regulator, against a motivated adversary. It is our best source of
+hard-won operational lessons — and its differences from our case are as instructive as its
+similarities.
+
+### 2.1 What FICO/VantageScore actually is, mechanically
+
+A FICO score is a **scorecard**: a segmented (by "scorecard assignment" — thin file, prior
+derogatory, etc.) generalised-linear model over **binned, WOE-transformed** attributes, monotonicity
+constrained, then rescaled to the 300–850 band. Two design choices in that sentence are directly
+relevant to us:
+
+- **Binning + weight-of-evidence** rather than raw features. Every attribute becomes a small number
+  of ordered bins with a fitted point value. This is *deliberately* lossy: it buys monotonicity,
+  stability under drift, and — crucially — reason codes, at the cost of some discrimination. That
+  trade (accuracy for explainability and stability) is one they make consciously, every time.
+- **Segmentation**. Different scorecards for different populations because the same attribute means
+  different things in a thin file than in a thick one. Our analogue: a user with three credentials
+  and a user with fifteen should not be scored by the same function; the marginal value of a
+  credential depends on what else is present. (In our formalism this falls out of the factor model
+  rather than needing separate scorecards — see §7.)
+
+### 2.2 How they handle correlated features — and the honest answer is "crudely, but on purpose"
+
+Credit attributes are enormously correlated (utilisation, balances, limits, number of accounts, all
+move together). The industry's methods:
+
+1. **Attribute selection with correlation screening** — drop one of any highly correlated pair
+   before fitting. This is not a correlation *model*; it is correlation *avoidance*.
+2. **The GLM handles residual collinearity by shrinking coefficients**, which produces stable
+   predictions but unstable and uninterpretable individual weights — a known problem they live with.
+3. **Monotonicity constraints** prevent the pathological sign-flips collinearity otherwise produces.
+
+The key point for us: **credit scoring solves correlated evidence by throwing evidence away, because
+it can.** They have hundreds of correlated attributes and can afford to keep one per family. We have
+five to ten credentials per user and cannot afford to discard four of them — we need to *price* the
+correlation, not avoid it. This is the main reason the scorecard tradition does not transfer directly
+and the factor model does.
+
+### 2.3 Reason codes and the regulatory explainability regime — transfer this wholesale
+
+Under **ECOA / Regulation B, 12 CFR § 1002.9**, a creditor taking adverse action must give the
+**specific principal reasons**. The official interpretation says disclosure of **more than four
+reasons "is not likely to be helpful"** — hence the industry's four-reason-code convention
+([CFPB Interp-9](https://www.consumerfinance.gov/rules-policy/regulations/1002/Interp-9),
+[§1002.9](https://www.consumerfinance.gov/rules-policy/regulations/1002/9/)). Vague reasons
+("you did not meet our internal standards", "your score was insufficient") **do not comply**, and
+notably, disclosing the *credit-score* key factors does **not by itself** satisfy the ECOA
+requirement to state reasons for the *credit decision*.
+
+**CFPB Circular 2022-03** is the sentence to tattoo on the wall of anyone shipping a model-based
+score ([CFPB](https://www.consumerfinance.gov/compliance/circulars/circular-2022-03-adverse-action-notification-requirements-in-connection-with-credit-decisions-based-on-complex-algorithms/),
+[Federal Register](https://www.federalregister.gov/documents/2022/06/14/2022-12729/consumer-financial-protection-circular-2022-03-adverse-action-notification-requirements-in)):
+
+> "ECOA and Regulation B do not permit creditors to use complex algorithms when doing so means they
+> cannot provide the specific and accurate reasons for adverse actions."
+
+> "A creditor cannot justify noncompliance with ECOA and Regulation B's requirements based on the
+> mere fact that the technology it employs to evaluate applications is too complicated or opaque to
+> understand. A creditor's lack of understanding of its own methods is therefore not a cognizable
+> defense against liability."
+
+FICO's own reason-code sheet exists precisely to serve this
+([FICO — US FICO Score Reason Codes](https://www.fico.com/en/latest-thinking/product-sheet/us-fico-score-reason-codes);
+consumer-facing explainer, [myFICO](https://www.myfico.com/credit-education/blog/reason-codes)),
+with codes ordered by influence, top four surfaced.
+
+**What transfers to us, and it is a lot:**
+
+- **A denial must come with actionable, specific, ordered reasons.** Ours should be *root-shaped*:
+  "you have evidence from 1 of 6 trust-root families; add a distinct root (state document, biometric
+  registry, or an established social position)". That is specific, actionable, and — importantly —
+  **it is a statement about the user's own evidence, not about our weights**, which is how you get
+  explainability without full gameability (§1.6, §3.3).
+- **The four-reason convention is a good product constraint**, not just a legal one. It forces the
+  model to have a small number of legible drivers.
+- **We are not currently in scope for Reg B** (we are not a creditor), but the moment a personhood
+  score gates access to money — airdrops, grants, UBI-style distributions — the *shape* of the
+  regulatory argument arrives regardless of the statute. And EU-side, if a score materially affects a
+  person, GDPR Art. 22 (automated decisions) and the AI Act's transparency provisions land on very
+  similar ground. Designing reason codes from day one is cheap; retrofitting explainability onto an
+  opaque score is what Circular 2022-03 says is not permitted. `UNVERIFIED:` I have not checked
+  whether any current EU instrument classifies a personhood score as high-risk under the AI Act —
+  see `research/landscape/demand-and-regulation.md` and confirm before relying on this.
+
+### 2.4 Score stability, population drift, and redevelopment
+
+Three operational facts, all of which we inherit:
+
+- **Scores drift because populations drift.** Scorecards are redeveloped every few years (FICO 8,
+  9, 10/10T; VantageScore 3.0 → 4.0) because the relationship between attributes and default changes.
+  The industry monitors this with **Population Stability Index** and characteristic-analysis reports,
+  and has a well-understood tripwire convention (PSI > 0.25 → redevelop). We should adopt PSI
+  monitoring per credential from day one: a stamp whose population distribution shifts sharply is
+  either being farmed or has broken.
+- **Score stability is a product requirement in its own right.** Lenders will not deploy a model
+  whose output jumps under small input changes; consumers will not trust one. Our version:
+  **credential expiry and graph churn must not cause discontinuous score drops.** Circles trust edges
+  expire; Passport stamps expire (typically 90 days); Verax/Sumsub PoP has a ≤90-day window. A score
+  that cliff-edges on expiry will generate exactly the support load and mistrust that FICO's
+  smoothing conventions exist to avoid. Decay must be continuous.
+- **Every model change is a redistribution of who passes**, and it is politically contested. Expect
+  the same: our re-weight is somebody's airdrop eligibility.
+
+### 2.5 Gaming — the part where credit scoring is a *closer* analogue than it first looks
+
+The received wisdom is "credit scoring has no adversary". That is wrong in an instructive way. The
+adversary is smaller and slower, but it exists, and the single best analogy in this whole document
+lives here:
+
+**Authorized-user tradelines ("piggybacking") are credential rental.** A stranger pays to be added as
+an authorized user on an old, clean, high-limit account; the account's history flows onto their file;
+their score jumps. The account holder rents out their reputation. This is *structurally identical* to
+personhood-credential rental — the Idena human-farm, the sold World ID, the borrowed passport — right
+down to the fact that the underlying credential is genuine and the *relationship* is the lie.
+
+The industry's response is the interesting part. FICO announced it would drop authorized-user
+accounts from FICO 08 and then **did not** — instead it kept them and added filters that attempt to
+distinguish genuine household authorized users (spouses, children) from paid tradelines, using
+relationship signals from the credit file, **and it does not publish how**
+([Credit.com, secondary](https://www.credit.com/blog/piggybacking-to-boost-fico-scores-does-it-still-work/);
+[creditscoring.com, secondary](https://www.creditscoring.com/creditscore/fico/quirks/authorizeduser.html);
+academic treatment: [Federal Reserve FEDS 2010-23, "Credit Where None Is Due? Authorized User Account
+Status and Piggybacking Credit"](https://www.federalreserve.gov/pubs/feds/2010/201023/201023pap.pdf)).
+VantageScore's approach has been to exclude or discount them.
+
+**Four lessons, all directly applicable:**
+
+1. **Do not remove a gamed signal; discount it conditionally.** Authorized-user history is real
+   evidence for real families. The fix was a *relationship* test, not deletion. Our analogue: a
+   credential that is rentable is not worthless — it is worth less *when the surrounding context
+   looks like rental* (fresh key, no social embedding, synchronous behaviour with a cluster). This is
+   the `C` dimension of §1.0 doing real work.
+2. **The anti-gaming layer is the part you don't publish.** FICO publishes the reason codes and the
+   broad factor categories with percentage weights; it does not publish the piggybacking filter. That
+   is precisely the explainability/gameability split we should copy (§7).
+3. **A whole industry forms around any published threshold.** Tradeline brokers exist because the
+   score matters and the mechanism is known. Assume the equivalent for us on day one of mattering.
+4. **The gaming arrived only after the score had consequences.** The corollary is that *our* score
+   being currently un-gamed is not evidence of robustness — it is evidence of irrelevance.
+
+### 2.6 What does *not* transfer
+
+- **Ground truth.** Credit has a clean, observable, time-boxed label: 90+ days delinquent in 24
+  months. We have **no label at all** for "is a unique independently-controlled human". Everything we
+  can build is semi-supervised at best, and every calibration claim we make will be against a proxy.
+  This is the single biggest methodological gap between us and the prior art, and any honest version
+  of our docs says so.
+- **A repeated game with the same person.** Lenders observe outcomes and refit. We mostly observe
+  nothing after issuance.
+- **Bureau-level data monopoly.** FICO scores a file assembled by three bureaus with legal reporting
+  obligations. Nobody is obliged to report anything to us; our data is voluntary and adversarially
+  selected (users show us their *best* credentials, never their worst).
+- **The adversary's speed.** Credit fraud iterates in months; airdrop farming iterates in hours, and
+  the payoff per identity is immediate and liquid.
+
 ## 3. Anti-fraud / bot-detection scoring in production
+
+This industry is a better *behavioural* match than credit scoring — real-time, adversarial, no clean
+label, published scores — and its consensus design choices are worth reading as revealed preference.
+
+### 3.1 The published surface, protocol by protocol
+
+**Google reCAPTCHA v3** ([docs](https://developers.google.com/recaptcha/docs/v3)). Returns a
+continuous score in `[0.0, 1.0]`: "1.0 is very likely a good interaction, 0.0 is very likely a bot",
+with "by default, you can use a threshold of 0.5". No explanation of the score is given to the site,
+let alone the user. The guidance is explicitly *not* to block on it: use it to trigger
+step-up (2FA, moderation, manual review) "behind the scenes". Two things to steal:
+**(a) ship a continuous score and let the relying party choose the threshold**, and **(b) design the
+product around graded response rather than binary admit/deny.**
+
+**Cloudflare Bot Management** ([Bot scores](https://developers.cloudflare.com/bots/concepts/bot-score/),
+[Bot detection engines](https://developers.cloudflare.com/bots/concepts/bot-detection-engines/)).
+Score `1–99`, 1 = almost certainly automated, 99 = almost certainly human; "<30" is the commonly-cited
+bot band. What is architecturally interesting is that the score is the output of **several distinct
+engines** — heuristics (deterministic, emits a hard `1`), supervised ML (produces most of the 2–99
+range), anomaly detection, and JS detections — with the heuristic engine able to *override*. That is
+the right structure for us too: **deterministic disqualifiers must not be averaged with a soft
+model**. If we detect a shared global nullifier across two accounts, that is a hard `1`, not −3
+points.
+
+**Sift / Forter / Arkose.** Commercially, these sell scores plus decisions; the explainability they
+offer is to the *merchant* (risk factors, "insights", decision reasons for chargeback
+representment), never to the end user, and never at a fidelity that permits reconstruction of the
+model. Arkose's public positioning is different in kind: instead of scoring you, it *prices* you —
+escalating challenge difficulty so that the attacker's unit economics break. That is the closest
+thing in industry to our §1.6 minimax framing, and it is a better idea than a threshold.
+`UNVERIFIED:` I did not fetch current Sift/Forter/Arkose technical documentation in this pass;
+statements here are from general knowledge of their public positioning and should be checked against
+their docs before being cited externally.
+
+### 3.2 What they publish about calibration — essentially nothing, and that is the finding
+
+Not one of these vendors publishes a calibration curve, a reliability diagram, a confusion matrix at
+a stated operating point, or a base rate. reCAPTCHA v3's own guidance says score distributions differ
+per site and per environment (staging vs production), which is an admission that the score is **not
+calibrated across contexts** — it is an ordinal ranking within a site's own traffic. Cloudflare's
+score is likewise a supervised model's probability output mapped to 1–99, with no published
+reliability data.
+
+**Implication for our product, and it is a positive one:** *published calibration is an open
+differentiator*. Nobody in adjacent industries does it, and our buyer (an airdrop or grant operator)
+genuinely needs to know "if I set the threshold at 25, what fraction of accepted addresses are farm
+addresses?" We cannot answer that honestly without labels (§2.6), but we can publish (a) the score
+distribution by credential class, (b) results on any labelled sybil-cluster dataset we can get, and
+(c) an explicit statement of what we cannot measure. Doing that badly is worse than not doing it;
+doing it honestly is a real moat.
+
+### 3.3 The explainability/gameability trade-off, as the industry actually resolves it
+
+The resolution is consistent across every vendor above, and it is **asymmetric disclosure**:
+
+| Disclosed | Withheld |
+|---|---|
+| The score, its range, its direction | The features |
+| Recommended operating points | The weights |
+| Coarse categories of signal ("automation detected") | Which signal fired, and its threshold |
+| Guidance to step up rather than block | The detection cadence and rotation |
+
+Nobody in production bot detection publishes weights. Human Passport did, and got exactly what §1.6
+predicts (§4.1). The reconciliation with §2.3's legal requirement is subtler than "pick one":
+
+> **Explain the *user's evidence*, not the *model's weights*.** "You have one trust root; a second,
+> distinct root would materially raise your score" is specific, actionable, satisfies the spirit of a
+> reason code, and reveals nothing exploitable — because the thing it tells the attacker to do (go
+> acquire a genuinely distinct root) is *exactly the expensive thing we want to charge them for*.
+
+That formulation is, I think, the cleanest resolution available to us, and it only works because our
+score is cost-denominated. In a correlation-blind additive score, "add more stamps" is cheap advice;
+in a root-cost score, the advice and the defence are the same sentence.
+
+
 ## 4. Web3 attempts at exactly this
 ## 5. Graph-based trust propagation
 ## 6. Privacy composition

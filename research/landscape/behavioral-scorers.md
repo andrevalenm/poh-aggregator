@@ -422,3 +422,212 @@ exactly that failure: 47/10,000 vs. 2,754/10,000, a **59×** understatement.
    community event in the global south."** That is the population every one of D1-D4 flags.
 
 ---
+
+## 3. Off-chain behavioural signals observable in a verification flow
+
+If we run an embedded flow, we can observe the client. This is a much richer signal space than the
+chain — and a much more legally constrained one.
+
+### 3.1 The signals
+
+| Signal | What it is | Discriminating power | Cost to defeat |
+|---|---|---|---|
+| **Device fingerprint** | Canvas/WebGL rendering, font list, audio stack, screen metrics, hardware concurrency, timezone, language — hashed into a stable ID | High for *linking sessions*; near-zero for "is a human" | Antidetect browsers (Multilogin, GoLogin, AdsPower, Dolphin) exist as a **commercial product category** whose entire purpose is generating consistent, distinct, plausible fingerprints per profile. This is a **solved problem for farms**, sold as a subscription. |
+| **IP reputation / ASN classification** | Is this a datacenter IP, a known VPN exit, a residential proxy, a mobile carrier NAT? | Moderate. Datacenter/VPN detection is reliable; **residential and mobile proxy detection is not** | Residential and mobile proxies are a mature market. Farming vendors openly advise budgeting **$50-100/month per wallet** for dedicated mobile proxies plus antidetect profiles, explicitly justified as cheaper than losing a 100-wallet farm to one correlation signal (secondary, self-serving: [Coronium farming guide, 2026](https://www.coronium.io/blog/airdrop-farming-proxy-guide-2026)). **Note what that number means: it is one of the few honest published prices for defeating our detectors, and it is the top of the market — ~$600-1200/identity/year.** A farm that pays it is essentially unfalsifiable by IP signals. A farm that does not pay it is trivially caught. |
+| **Mouse / touch dynamics** | Cursor trajectory curvature, velocity profiles, pressure, touch area, jerk | Moderate for scripted-vs-human; **poor** for human-farm-worker vs. genuine user, because in a human farm the mouse *is* moved by a human | Cheap to replay/synthesise; also defeated by paying a human $0.50 to click. |
+| **Typing cadence / keystroke dynamics** | Inter-key intervals, dwell/flight times | Same as above. Genuinely identifying (that is the problem — see §3.2) | Same |
+| **Session behaviour** | Time-on-page, scroll patterns, form-fill order, copy-paste of fields, tab-switching, error/retry patterns | Moderate. **Copy-paste of an "own" name/DOB field is a real, cheap tell** in a farm context | Cheap |
+| **Cross-session / cross-identity co-occurrence** | Same device or IP presenting for N different identities | **This is the good one.** It is a D5-class correlation signal, not a per-user signal | Requires per-identity device+proxy isolation, i.e. the $50-100/mo/identity price above |
+
+**The pattern repeats from §1:** the per-user signals are cheap to defeat and weak; the
+**cross-identity correlation** signals are the valuable ones — and correlation is again a
+*cluster-level* output.
+
+### 3.2 The legal position — this is a real constraint, not a footnote
+
+- **EU: storing or reading anything on a user's device requires consent.** EDPB **Guidelines 2/2023
+  on the technical scope of Art. 5(3) ePrivacy Directive**, adopted **16 October 2024**, confirm
+  that Art. 5(3) is not limited to cookies but covers tracking pixels, tracking links, **device
+  fingerprinting**, and certain local processing where information leaves the device. Building on
+  Opinion 9/2014, which already placed fingerprinting inside Art. 5(3).
+  Primary: https://www.edpb.europa.eu/system/files/2024-10/edpb_guidelines_202302_technical_scope_art_53_eprivacydirective_v2_en_0.pdf
+  Practically: **passive fingerprinting for fraud prevention is not automatically exempt.** The
+  ePrivacy "strictly necessary" exemption is read narrowly and is assessed against the service the
+  *user* requested. Fraud/sybil prevention is a service the *relying party* requested.
+  **UNVERIFIED / needs counsel:** whether "sybil prevention for an airdrop" can ever qualify as
+  strictly necessary. My reading is that it usually cannot, but this is a legal question.
+- **Behavioural biometrics may be Article 9 special-category data.** GDPR Art. 4(14) defines
+  biometric data as personal data resulting from specific technical processing relating to physical,
+  physiological **or behavioural** characteristics *which allow or confirm the unique identification*
+  of a natural person; Art. 9(1) then prohibits processing biometric data *for the purpose of
+  uniquely identifying* a person absent a narrow exception (in practice, explicit consent).
+  Keystroke dynamics and mouse dynamics used to *identify* rather than merely to *classify
+  bot/not-bot* fall on the wrong side of that line. Primary text:
+  https://eur-lex.europa.eu/eli/reg/2016/679/oj (Art. 4(14), Art. 9).
+  **This is a genuine landmine for a personhood product**, because our entire purpose is unique
+  identification. Note the perverse structure: the *less* we use behavioural biometrics for
+  identification, the more legal they are, and the less useful.
+- **US state biometric law:** Illinois BIPA is the main private-right-of-action risk; Texas CUBI and
+  Washington's My Health My Data create regulator risk. **UNVERIFIED:** whether BIPA's definition of
+  "biometric identifier" reaches keystroke dynamics — the statute enumerates retina/iris,
+  fingerprint, voiceprint, hand/face geometry, and courts have generally read it as a closed list,
+  which would *exclude* keystroke dynamics. Worth confirming with counsel before relying on it.
+- **Practical consequence:** device fingerprinting and behavioural biometrics require a consent
+  gate in the EU/UK, and a consent gate that users can decline makes them **optional**, which makes
+  them **useless as a gate** (an adversary always declines). This is not a compliance nuisance; it
+  structurally removes the strongest off-chain per-user signals from our threat model.
+
+### 3.3 Verdict on off-chain behavioural
+
+- **Do not build** mouse dynamics, keystroke dynamics, or a proprietary fingerprinting stack. Legal
+  exposure is high, discriminating power against a *human* farm is near zero, and the antidetect
+  market has already commoditised the counter.
+- **Do build** the cheap, defensible pieces: **datacenter/VPN/ASN classification** (server-side,
+  no device access, no ePrivacy issue — the IP is transmitted necessarily) and **cross-identity
+  device/IP co-occurrence counting** with short retention.
+- Note that IP-based signals **systematically penalise** VPN users, Tor users, people in countries
+  where VPN use is normal or necessary, and users on carrier-grade NAT (much of mobile Africa and
+  South Asia shares few egress IPs across enormous user populations). CGNAT alone can put tens of
+  thousands of genuinely distinct humans behind one IP. **Never treat shared IP as sybil evidence
+  without an ASN-type check.**
+
+---
+
+## 4. Web2 account-age, platform, and hardware-attestation signals
+
+### 4.1 Web2 platform signals (GitHub, X, Reddit, Discord, Google/Apple)
+
+Another agent covers the *social/zkTLS attestation* products in depth; my angle is only what the
+underlying signal is worth as evidence.
+
+- **The general shape:** every one of these is an *account*, and accounts are a **commodity with a
+  spot market**. Aged Reddit accounts with karma, aged Twitter/X accounts, GitHub accounts with
+  commit history, and Discord accounts with server tenure are all openly sold. The signal is
+  therefore priced, and its price is its evidential weight — which is low, because the prices are
+  single-digit to low-double-digit dollars.
+  **UNVERIFIED:** I did not pull current spot prices from a primary marketplace for this pass
+  (deliberately — I am not going to transact). Next step if we need exact figures: the
+  academic literature on underground account markets (e.g. Thomas et al., "Trafficking Fraudulent
+  Accounts", USENIX Security 2013) gives methodology, but 2013 prices are useless in 2026.
+- **What actually differs between them:** the *cost to produce*, not the *cost to buy*.
+  - **GitHub commit history** — cheap to fake (backdated commits are trivial; `git commit --date`
+    accepts anything, and contribution graphs are attacker-controlled for one's own repos).
+    Contributions *merged into other people's repositories* are much harder to fake. If we use
+    GitHub at all, use **merged PRs into third-party repos**, not the contribution graph.
+  - **X/Twitter account age** — purchasable; account age is the age of the *account*, not the human.
+  - **Reddit karma** — purchasable and farmable; also gameable by reposting.
+  - **Discord tenure** — near-worthless; server join dates are trivially accumulated.
+  - **Google/Apple account attestation** (Sign in with Google/Apple) — attests that a
+    Google/Apple account exists and is in good standing. Better than the others because Google and
+    Apple run their own large-scale abuse detection, and a *banned* account is a real loss. Still:
+    accounts are creatable in bulk and are sold.
+- **Verdict:** **Very low weight, and only as a bundle.** A single platform account is noise. Five
+  independent, long-lived, *organically-linked* platform accounts is weak but non-zero evidence of
+  effort. Never let Web2 account age alone cross a threshold.
+
+### 4.2 Phone-number verification — a collapsed signal
+
+Phone verification was, for a decade, the default sybil gate. It is now close to worthless, and the
+price collapse is documentable.
+
+- **SMS-verification-as-a-service is a mature retail market.** 5sim advertises numbers **from
+  ~$0.008**, with common services in the **$0.01-$0.10** range (Instagram/Facebook ~$0.01,
+  WhatsApp ~$0.06, Telegram ~$0.10), across 180+ countries, with an API for bulk automation
+  (https://5sim.net/prices ; comparison secondary sources:
+  [pricing breakdown across 7 platforms, 2026](https://www.yoobfriv.com/sms-activation-services-in-2026-pricing-breakdown-across-7-platforms/)).
+  Long-standing competitor SMS-Activate **shut down in 2025** but the category did not — successors
+  (HeroSMS, SMS-Man, OnlineSIM, Grizzly SMS) fill the same niche at similar prices.
+- **Therefore: a phone-verified account costs roughly one to ten US cents.** At that price, phone
+  verification imposes **no meaningful constraint on a farm** — 800,000 numbers at $0.05 is $40,000,
+  which is trivial against the airdrop values involved.
+- **The one remaining use:** *non-VoIP, carrier-attested, long-held* numbers with a
+  reputation/porting history are still moderately expensive — but distinguishing those from
+  virtual numbers requires a carrier-lookup vendor (Twilio Lookup, Telesign, Prove), which is a
+  paid dependency and imperfect. **UNVERIFIED:** current accuracy of VoIP/virtual detection against
+  the specific pools these services use; vendors do not publish it.
+- **Verdict:** **Phone verification is theatre for our purposes.** Do not weight it as personhood
+  evidence. It retains value only as a *friction* and as a *rate-limiter*, not as evidence.
+
+### 4.3 Hardware attestation — the genuinely interesting one
+
+Hardware attestation is the most promising thing in this entire file, because it is **cheap for us**
+and **expensive to farm at scale**, which is the opposite of every other signal here. Assess it
+seriously, then read the limits carefully, because the limits are decisive.
+
+**What each primitive actually asserts:**
+
+- **Apple App Attest** — a hardware-backed key generated in the Secure Enclave, attested by Apple,
+  asserting *"this request comes from a genuine, unmodified instance of your app on a genuine Apple
+  device."* Scope: **per app installation**, not per device. Apple explicitly expects `attestKey()`
+  to be called **once per app installation per device**, and enforces an **undisclosed** rate limit
+  on unique devices attesting; Apple's guidance to developers is to keep total attest calls in the
+  low hundreds per second and to roll out gradually
+  (Apple Developer Forums threads [759285](https://developer.apple.com/forums/thread/759285),
+  [778937](https://developer.apple.com/forums/thread/778937),
+  [818214](https://developer.apple.com/forums/thread/818214) — note these are Apple-staff forum
+  answers, not formal documentation; **Apple does not publish the quota**).
+  Third-party critiques of its limits: [Approov](https://approov.io/blog/limitations-of-apple-devicecheck-and-apple-app-attest),
+  [Guardsquare](https://www.guardsquare.com/blog/remove-constraints-of-ios-app-attest) (both vendors
+  selling competing products — read as adversarial but informed).
+- **Apple DeviceCheck** — the more interesting primitive for *us*: **two bits of persistent,
+  per-device, per-developer state**, which survive app reinstall. Two bits is exactly enough to
+  record "this device has already been used to claim a personhood credential."
+  **UNVERIFIED:** I could not fetch Apple's DeviceCheck documentation page in this pass (it returned
+  only the page title). The two-bit persistence and its reset-on-factory-reset behaviour is
+  well-known but I am flagging it as unconfirmed-by-primary-source here.
+  Next step: read https://developer.apple.com/documentation/devicecheck and the
+  `DCDevice`/`DCAppAttestService` API reference directly.
+- **Google Play Integrity API** (successor to SafetyNet) — returns device-integrity verdicts;
+  `MEETS_STRONG_INTEGRITY` on Android 13+ requires device integrity **plus** security updates within
+  the last year across all partitions. Since **May 2025** Google requires **hardware-backed** signals
+  for the stronger verdicts by default, which materially raised the bar for rooted/custom-ROM
+  devices. Primary: https://developer.android.com/google/play/integrity/verdicts and
+  https://developer.android.com/google/play/integrity/overview ; October 2025 update:
+  https://android-developers.googleblog.com/2025/10/stronger-threat-detection-simpler.html .
+  Counter-evidence that it is not absolute: a live bypass ecosystem exists (Zygisk modules marketed
+  precisely as making rooted devices pass) — see https://playintegrityfix.com/ and
+  [Approov's limitations write-up](https://approov.io/blog/limitations-of-google-play-integrity-api-ex-safetynet).
+- **WebAuthn / passkeys with attestation** — **this one does not work for consumer flows, and that
+  is important.** The two authenticators that mint most of the world's passkeys — Apple iCloud
+  Keychain and Google Password Manager — **do not return usable device attestation**, and WebAuthn
+  Level 2 makes `attestation: "none"` the default conveyance. Syncable passkeys cannot assert a
+  single hardware instance *by design*, because the credential is synced across the user's devices.
+  **Enterprise attestation** (which can return uniquely-identifying data like a serial number) is
+  restricted to managed deployments with an RP-ID allowlist and cooperating authenticator firmware —
+  not available to a consumer relying party.
+  Primary spec: https://www.w3.org/TR/webauthn-2/#enum-attestation-convey ;
+  MDN: https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API/Attestation_and_Assertion .
+  **Conclusion: passkeys give us phishing-resistant authentication, not device evidence.** Do not
+  put "WebAuthn attestation" in a personhood score. This is a common and wrong assumption.
+
+**What hardware attestation is genuinely worth:**
+
+The honest framing is that it is a **cost floor with a hard ceiling on precision**:
+
+1. It proves *"a real, unmodified, current-generation device"* — that is real and it is expensive to
+   fake at volume, because it requires **physical devices**. A device farm of 10,000 iPhones is a
+   capital expense of millions of dollars and a logistics operation.
+2. It does **not** prove one human. A single device can install and reinstall an app arbitrarily
+   many times, producing many App Attest keys. Only DeviceCheck's two persistent bits push back on
+   that, and only for two bits, and only until factory reset.
+3. It does **not** prove one device per human either — a real human with three devices can present
+   three attestations.
+4. **Device farms are a real, industrialised counter.** Physical racks of hundreds or thousands of
+   handsets are standard equipment in the click-farm and account-farm industries; documented cases
+   belong in `landscape/sybil-incidents-antipatterns.md`, but the existence of the industry is not
+   in dispute. Attestation raises the price per identity from ~$0 to the amortised cost of a
+   handset-slot; it does not make it prohibitive.
+5. It **excludes populations**: users on old Android (no strong integrity), rooted/de-Googled
+   devices (a privacy-conscious minority we should not want to exclude), desktop-only users, and
+   anyone in a region where recent-patch devices are uncommon. This is a real equity cost.
+6. It creates a **hard dependency on Apple and Google** — a two-company trust root, exactly the
+   centralisation this product category exists to avoid, and revocable at their discretion.
+
+**Verdict: build it, weight it moderately, and be honest about what it is.** Specifically: use
+Play Integrity / App Attest as a **rate-limiting and cost-floor primitive** (a device may support at
+most k credential issuances) rather than as a personhood assertion. Combined with DeviceCheck's
+persistent bits it is the cheapest available mechanism for making bulk issuance cost real money.
+Recommended weight: **meaningful but capped, and only in the native-app flow** — it is unavailable
+in a pure-web flow, which is where most of our users will be.
+
+---

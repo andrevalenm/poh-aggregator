@@ -120,7 +120,93 @@ is a documented population of people whose biometrics do not enrol or authentica
 (manual labourers with worn fingerprints, the elderly) — the exclusion problem, see §3.
 
 ### Estonia + the Nordic/Baltic model (mobile-ID, Smart-ID, BankID)
+
+(Estonia, Sweden, Norway, Finland and Denmark are all in the EU/EEA and therefore also inside the
+eIDAS 2.0 story — see `eidas2-eudi-wallet.md`. Here I cover the *national* schemes as they exist
+today, because eIDAS 2.0 does not replace them in the 2-3 year window.)
+
+**Sweden — BankID.** The highest-usage consumer digital identity per capita in the world.
+- **~8.5–8.6m active users** in a country of ~10.5m; commonly cited as **~99% of adults aged
+  18–67**. **7.1 billion uses in 2023** (~840 authentications per user per year). ~7,500 connected
+  services. (Figures are 2023–2025 vintage from secondary sources; BankID's own statistics page is
+  the primary to check. `UNVERIFIED:` a 2026 figure.)
+- **Ownership:** BankID is *not* a government system. It is run by **Finansiell ID-Teknik BID AB**,
+  owned by the large Swedish banks. This matters: it is a private consortium credential that
+  happens to be universal, which is why Swedish public authorities consume it rather than issue it.
+- **Consumability: NO, hard no.** To become a relying party you must sign a contract with a
+  **BankID-issuing bank**, which issues you an RP certificate (mutual-TLS client cert) used to call
+  the RP API. Banks require a Swedish organisation number, KYB on the business, and a commercial
+  agreement; there is per-transaction pricing set by the bank, not published centrally. The BankID
+  Relying Party Guidelines additionally **prohibit "ID switching"** — you may not use BankID to
+  authenticate on behalf of another identity scheme, which is *precisely* what an aggregator does.
+  (Relying Party Guidelines v3.4, 2020-06-08, mirrored at
+  https://webapp.sebgroup.com/mb/mbcc.nsf/alldocsbyunid/2708B7754A045A6DC12585E5002DEC10/$FILE/bankid-relying-party-guidelines-v3.4.pdf
+  — check for a newer version at bankid.com; the bankid.com "connect" page 404'd for me on
+  2026-07-24.) `UNVERIFIED:` whether the current guidelines still contain the ID-switching clause
+  verbatim — but the commercial logic (RPs fund the scheme, so reselling access is banned) is
+  structural and will persist.
+- **Practical route:** aggregators like **Criipto** (https://www.criipto.com/pricing) and Signicat
+  resell BankID/Nordic eIDs — but they are themselves accredited, contractually bound RPs. Using
+  them means we are a *sub-processor* of an accredited RP, inheriting all the same restrictions plus
+  a per-verification fee. That is a legitimate product path but it is not permissionless and it does
+  not give us a credential we can verify without the vendor.
+- **Uniqueness:** BankID is bound to the Swedish **personnummer** — a stable, national,
+  cross-relying-party unique identifier. Excellent sybil resistance in principle, catastrophic
+  privacy properties, and completely walled off from us.
+
+**Norway BankID / Finland Trust Network (FTN) / Denmark MitID:** same architecture, same answer.
+All are bank-federation or bank+state schemes where the relying party contracts with an accredited
+broker. Norway publishes pricing (https://bankid.no/en/company/pricing). Finland's FTN and Denmark's
+MitID require a broker agreement. **Consumability: NO.**
+
+**Estonia — ID-card, Mobile-ID, Smart-ID, e-Residency.**
+- Estonian ID-card and Mobile-ID are **PKI smartcards/SIMs issued by the state** (via SK ID
+  Solutions as CA). Because they are plain X.509 + qualified signatures, **anyone can verify an
+  Estonian qualified signature offline** against the published CA chain and the EU Trusted List.
+  This is a genuine partial exception: signature *verification* is permissionless, even though
+  *authentication* against the OCSP/auth service is contracted.
+- **Smart-ID** (SK ID Solutions, launched 2017): **~3.3–3.4m users across EE/LV/LT**, ~5m accounts,
+  ~**79m transactions/month**, 700+ services (SK's own figures; https://www.skidsolutions.eu/ ).
+  It is a QSCD, so Smart-ID signatures are Qualified Electronic Signatures under eIDAS. Mobile-ID by
+  contrast is small: ~230k users in Estonia, ~260k in Lithuania.
+- **e-Residency**: ~120k+ e-residents issued a digital ID card since 2014 (`UNVERIFIED:` 2026
+  figure; check e-resident.gov.ee/statistics). Important caveat for us: **e-Residency is not
+  residency and involves no biometric de-duplication against the Estonian population** — it is a
+  business-identity credential. It is also *purchasable* (~€100–150 state fee), which makes it a
+  poor sybil root: a well-funded attacker can obtain many identities only if they have many
+  underlying passports, so it is really a *proxy for holding a passport*, i.e. the same trust root
+  as ICAO chips.
+- **Consumability of an Estonian qualified signature: PARTIAL YES.** If a user signs a challenge
+  with their Estonian ID-card/Smart-ID, we can verify the signature and read the certificate, which
+  contains their **isikukood (personal ID code)** — a stable national identifier — with no
+  agreement with anyone. Revocation checking (OCSP) is the part that may require an agreement.
+  `UNCLEAR:` SK's OCSP terms for high-volume unregistered use; SK historically required a contract
+  for production OCSP. Next step: SK ID Solutions' "OCSP service" terms page.
+  **This is the second-loudest exception in this file after QuarkID.** Scale is small (~1.3m
+  Estonians + 3.4m Baltic Smart-ID users), but the pattern — *a state-rooted certificate the user
+  can present and anyone can verify* — is exactly the shape we want, and it generalises to every
+  EU/EEA qualified-certificate scheme.
+
 ### Singapore — Singpass
+
+- **Scale:** effectively universal for citizens and PRs (>97% of eligible residents;
+  `UNVERIFIED:` exact 2026 figure — GovTech publishes it). Products: **Myinfo** (verified personal
+  data), **Singpass Login**, **Verify**, **Sign**, **Identiface** (face verification).
+- **Consumability: NO.** Private-sector access to Myinfo/Singpass APIs requires onboarding as a
+  Singpass partner through GovTech, an application and approval process, and (since Apr 2022)
+  **paid charges for Myinfo API usage** with a pricing table that is itself behind a Singpass login.
+  Developer docs: https://docs.developer.singpass.gov.sg/ ; business product page:
+  https://www.tech.gov.sg/products-and-services/for-businesses/corporate-transactions/singpass-api/
+  There is no offline, self-contained, user-held signed artefact equivalent to Aadhaar's offline
+  e-KYC. Everything is an OIDC redirect where GovTech sees the verification.
+- **Face Verification** is explicitly **restricted to high-risk use cases only** (e.g. bank digital
+  token setup) — so even accredited partners cannot get the strongest signal on demand.
+- **Issuer-side breaking changes (the rotation risk class again):** Myinfo v3/v4 partners must
+  migrate to **v5 by end-Sep 2026**, and all partner apps must be **FAPI 2.0 compliant by
+  2026-12-31**. Unilateral, deadline-driven, non-negotiable.
+- **Uniqueness:** Singpass is bound to **NRIC/FIN**, a stable national identifier, and Myinfo
+  returns it to accredited partners. So the uniqueness is strong and the access is closed.
+
 ### Australia — myGovID / myID and the Digital ID Act 2024
 ### New Zealand — DISTF
 ### UK — GOV.UK One Login and the mandatory digital ID debate
@@ -156,14 +242,28 @@ https://github.com/ssi-quarkid/Nodo-QuickStart :
 - **zkSync Sepolia testnet (chain ID 300)**, contract **`0x2535412fA22D9ad83384D7Ab7b636DDA37eFA872`**
 - Node stack is `docker pull`-able: `api-proxy`, `api-zksync`, MongoDB, IPFS. **Anyone can run a
   resolver node**; resolution is `GET /resolve/:did` on the api-proxy.
-- `UNVERIFIED:` I could not load the zkSync Era explorer page for the anchor contract through
-  WebFetch (returned an empty SPA shell), so I have **not** confirmed on-chain transaction counts or
-  the date of the most recent anchor write. **This is the highest-value next step for anyone
-  continuing this work**: query `0xe0055B74422Bec15cB1625792C4aA0beDcC61AA7` on zkSync Era via RPC
-  (`eth_getLogs`) or the block-scout API and get first/last activity. If it stopped being written to
-  in 2025, QuarkID is functionally dead regardless of the press releases.
+**ON-CHAIN VERIFICATION — I checked the contract directly, and it is very much alive.**
+Queried 2026-07-24 against `https://mainnet.era.zksync.io` (JSON-RPC) and
+`https://block-explorer-api.mainnet.zksync.io` (public explorer API, no key required):
 
-**Did it survive? Evidence says: degraded, and possibly wound down.** This is a genuine finding:
+| Fact | Value |
+|---|---|
+| Anchor contract | `0xe0055B74422Bec15cB1625792C4aA0beDcC61AA7` (zkSync Era, chain 324) |
+| Deployed | **2023-04-28T16:56:59Z**, block 2,424,399, creator `0x9CAA73a4865fa9dbb696758b6C7B2f03b6620712` |
+| `totalTransactions` (explorer) | **190,030** |
+| Most recent tx at time of check | **2026-07-24T22:12:13Z** — i.e. *the same day*, minutes before I looked |
+| Throughput | **100 anchor txs in a 9h21m window (12:51Z→22:12Z on 2026-07-24) ≈ 250–260 batches/day** |
+| Distinct anchor operators (in that 100-tx sample) | **4**: `0xCd340E92a3588532bc879e4E68f9E0c7C2c95549` (nonce 39,859), `0x88a5db8ae0AFAFc85b8F00d0Fb664D6a47779c62` (26,458), `0xFa3098642CE05674F49e52DD1F722b0A899b12f6` (8,321), `0x15C279404d72e33BB3FdfFD818e9DDa8E6Ea1b78` (140) |
+| Method | one selector only: **`0x4cd27ad5`**, args `(bytes32 anchorHash, uint256 numOperations)` — a Sidetree batch anchor |
+| DID operations | **1,786 operations across 100 batches** (min 1, max 89 per batch) → **~4,500–4,700 DID operations/day**; extrapolating 190,030 batches × ~17.9 ops ≈ **~3.4m lifetime DID operations**, consistent with the claimed 3.6m citizen DIDs |
+
+`UNVERIFIED:` the 4 operator accounts are almost certainly QuarkID/Extrimian/GCBA batch-writers, not
+independent third parties — do not read "4 operators" as decentralisation. Next step: label them.
+Also note the contract's only balance is a spam airdrop token ("Claim on: zk-official.live"),
+which is noise, not signal.
+
+**Did it survive the change of administration? Yes on-chain, no on the website.** This split is the
+real finding:
 - The GCBA QuarkID pages now live under **`buenosaires.gob.ar/gcaba_historico/...`** — the city's
   *historical/archive* path. `https://buenosaires.gob.ar/innovacionytransformaciondigital/protocolo-quarkid`
   issues a **301 redirect into `/gcaba_historico/jefaturadegabinete/innovacionytransformaciondigital/quarkid/...`**
@@ -178,22 +278,34 @@ https://github.com/ssi-quarkid/Nodo-QuickStart :
   Model but does not publish the concrete credential format, signature suite, DID-method spec
   details, or revocation mechanism a third party would need. (Checked
   `.../documentacion/credenciales-verificables`, 2026-07-24.)
-- `UNCLEAR:` whether miBA still issues QuarkID-backed credentials today. Next step: install/inspect
-  the miBA app, or check GCBA's current digital-identity page for what replaced it.
 - Nuance on "change of administration": the relevant change is **city-level**, not Milei. QuarkID was
   conceived under Horacio Rodríguez Larreta and launched under Jorge Macri (both PRO), so it did not
-  face a hostile handover in 2023. The archiving therefore reads as a *programme* wind-down /
-  reorganisation rather than a political purge — which, for us, is worse news, not better: it
-  suggests the thing lost its internal champion rather than being killed by opponents who might be
-  voted out.
+  face a hostile handover. The archiving therefore reads as a marketing/comms reorganisation, not a
+  political kill — and the on-chain data says the machine is still running at ~250 anchors/day.
+- `UNCLEAR:` whether *new credential issuance* continues or whether the daily anchor traffic is
+  routine DID key rotation / update operations for an existing installed base. The op counts
+  (1–89 per batch, avg ~18) look like ordinary create+update mix, but I cannot distinguish create
+  from update from the anchor tx alone — you would have to fetch the Sidetree anchor file from IPFS
+  and decode it. Next step: resolve one anchorHash through a QuarkID node's `/resolve` or pull the
+  CAS file.
 
-**Consumability verdict:** **The only near-permissionless state credential I found — but it is
-probably not worth building against today.** Architecturally it is exactly what we want: an open DID
-method, a public L2 anchor, a self-hostable resolver, W3C VCs, no accreditation gate for verifiers.
-Practically: single-city scale, no published issuance/verification numbers, no published verifier
-spec, archived government pages, and no 2026 code activity. **Treat as "watch, don't integrate."**
-If someone confirms the zkSync anchor contract is still being written to in 2026, revisit
-immediately — it would be the first genuinely permissionlessly-verifiable government credential.
+**Consumability verdict:** **This is the exception. Flagging it loudly.** QuarkID is, as far as I can
+establish, the only *government-issued* identity credential in the world that a permissionless third
+party can verify today with no accreditation, no contract with the issuer, and no API key:
+- open DID method (`did:quarkid`), public spec-ish repo, Sidetree operations
+- anchored on a **public L2 anyone can read** — no gatekeeper can stop you resolving a DID
+- **self-hostable resolver** (`docker pull` the api-proxy + api-zksync + MongoDB + IPFS,
+  `GET /resolve/:did`) — you do not need GCBA's servers
+- W3C Verifiable Credentials, so signature verification is standard once you have the issuer DID doc
+- the contract is **provably live in July 2026**
+
+The blockers are quality, not permission: single-city scale (~3.6m people, ~0.04% of humanity), a
+public documentation set that is conceptual rather than a verifier spec (no published signature
+suite, credential schema, or revocation semantics), a status-list repo (`VCSL`) with 0 stars, and
+essentially no third-party ecosystem. **Verdict: integrate later / build a spike now.** Concretely:
+a 1–2 day spike to stand up a QuarkID resolver node, resolve a real `did:quarkid`, and verify one
+real GCBA-issued VC end-to-end would tell us more about "can a crypto stack read a government
+credential" than any amount of eIDAS reading. Do that spike.
 
 **Uniqueness value even if live:** weak-to-moderate. A `did:quarkid` DID asserts "GCBA had an active
 miBA account for this person." One human could plausibly hold only one miBA account (it is tied to a

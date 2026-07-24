@@ -218,6 +218,130 @@ its credit score as *the thing that lets an AI agent be trusted with money*.
 
 ---
 
+### Nomis — alive, consumer-side, **sells to the user, not the protocol**
+
+**What it scores and for whom.** A wallet "reputation score" minted by the user as a **soul-bound
+NFT**, across 50+ chains and 29 mainnet deployments. The commercial twist: the primary customer is
+the **end user**, who mints/updates their score to unlock **ScoreFront** perks — Discord roles,
+partner discounts, allowlists, airdrop eligibility. Protocols consume the score as a gating input.
+([nomis.cc, fetched 2026-07-24](https://nomis.cc/))
+
+**Metrics (vendor-stated, 2026-07-24):** 1.3M+ unique score holders, 2M+ wallets scored, $8.6M+ in
+rewards distributed through the system, 7 named score products (zkSync, LayerZero, Linea, zkEVM,
+Starknet, Manta, Core…).
+
+**Business model and pricing.** **Mint fees and update fees paid by the end user in gas/native
+token** — the only genuinely *transactional consumer* model in this cohort. No published price
+list (`UNVERIFIED:` exact mint/update fee). Also an API for wallet metrics/balances/activity;
+a "Nomis Pass" subscription was roadmapped for Q1 2025. `UNCLEAR:` whether Nomis Pass shipped.
+No token; the score itself is the SBT.
+
+**Customers.** "Investors" listed include Solana, Aave, Polygon, LayerZero, Linea, Galxe, zkSync,
+1inch; "active users" listed: Sides, Galxe, Legion, QuickSwap, Fearless Wallet, Pentagon Games,
+Eywa, MemeFi, TLend. Note again that these are mostly small ecosystem projects. Recent posts:
+Nomis × Sides (prediction markets), Nomis × Pundi AI, Nomis × Demos; a Feb-2026 OptiView
+collaboration.
+
+**Liveness (2026-07):** **alive and actively maintained** — roadmap extends to Q4 2026, multiple
+2026 partnership posts, site 200.
+
+**Integration surface for us.** The most interesting of the cohort *because the score is on-chain*:
+an SBT minted to the user's address on each supported chain. If we can read a Nomis SBT's
+`balanceOf`/`tokenURI` directly we can consume Nomis **without their cooperation or an API key** —
+the only vendor here where that appears possible. `UNVERIFIED:` contract addresses and the exact
+read function; do not guess them. Next step: pull `nomis.cc` app JS or their docs for the
+ScoreSBT/`NomisScore` contract address on Linea/zkSync and confirm the score is stored on-chain
+(vs. a `tokenURI` pointing at their server, which would defeat the point).
+
+---
+
+### Chaos Labs — sybil work is a **side-line of a risk-management business**
+
+Chaos Labs is a risk-management/parameter-optimisation firm for lending protocols (Aave, GMX et al.)
+whose sybil work appears as an engagement, not a product line. Its most-cited deployment is the
+**LayerZero ZRO airdrop (June 2024)**, run jointly with **Nansen**: LayerZero applied six detection
+techniques, filtered **803,093 of ~2.08M** wallets, and left ~1.28M qualifying wallets sharing a
+distribution valued at **>$700M**
+([Crypto Briefing, secondary](https://cryptobriefing.com/layerzero-airdrop-fairness/),
+[Coincu, secondary](https://coincu.com/layerzero-sybil-detection-report/)).
+
+The structurally important detail: **LayerZero's most effective filter was not a vendor score.** It
+was a **self-report bounty** — admitted sybils kept 15% of their allocation, the other 85% was
+redistributed — plus a public bounty for reporting others. Mechanism design outperformed
+machine learning, and the vendors were a supporting input. That is bad news for anyone selling a
+score into this exact use case.
+
+**Business model.** Enterprise consulting/retainer for risk parameters; sybil detection sold as part
+of a bespoke engagement. `UNVERIFIED:` any published price for a sybil engagement.
+**Liveness:** alive; the core business is risk management, so sybil detection can be dropped at zero
+cost to them. Not a scoring company. **Ignore** as a competitor.
+
+---
+
+### Nansen — sybil detection as a **feature of an analytics subscription**
+
+Nansen is a wallet-labelling/analytics subscription business. Its sybil work is contracted, notably:
+- **LayerZero ZRO** (with Chaos Labs), above.
+- **Linea**: Nansen's analysis flagged **516,960 of 1,297,203** eligible addresses as sybils,
+  cutting the eligible set to **780,243**
+  ([The Block, secondary](https://www.theblock.co/post/335979/linea-filters-over-half-a-million-sybil-addresses-from-upcoming-token-airdrop)).
+
+**Why Nansen matters to this file:** it is the **only company here with proven, durable recurring
+revenue** — and that revenue comes from **analytics seats sold to traders**, not from sybil scores.
+Sybil detection is a marketing-visible add-on riding on a labelled-address dataset built for another
+purpose. The lesson is that the sybil-scoring capability was viable only as a **by-product**; nobody
+in this file built a standalone business on it.
+
+**Integration surface.** Nansen API exists (paid, subscription-tiered) but is a general analytics
+API, not a sybil-score endpoint. `UNVERIFIED:` whether a sybil/cluster score is exposed via API at
+all, versus delivered as a bespoke report. **Consume-adjacent / ignore** for us: the label data would
+be useful, the commercial terms are not aggregator-shaped.
+
+---
+
+### Bello (Bello Labs) — **dead**
+
+Web3 creator/collector analytics (no-code wallet insights for NFT creators), backed by
+Tachyon/Consensys Mesh, a16z (via accelerator), Palm Tree Crew Crypto, Plug and Play
+([PitchBook profile, secondary](https://pitchbook.com/profiles/company/528297-04)).
+
+**Liveness evidence, checked 2026-07-24:** `https://bello.lol` **fails the TLS handshake**
+(`tlsv1 alert internal error`) with DNS pointing at the same Netlify anycast IPs as ARCx —
+an abandoned deploy. `www.bello.lol` likewise dead. No product news, funding, or announcement found
+after ~2023. `UNVERIFIED:` no shutdown post located.
+
+Bello was never really a *scoring* product — it was audience analytics — but it belongs here as
+part of the same 2021–22 cohort of "wallet intelligence" startups, and it went the same way.
+Adjacent datapoint: **DappRadar shut down in 2025**, i.e. even the largest free-standing web3
+analytics brands did not sustain.
+
+---
+
+### Chainlink — identity/reputation efforts
+
+`UNVERIFIED / thin:` Chainlink's relevant work is **DECO** (privacy-preserving oracle proofs over
+TLS data, from the Cornell/Ari Juels line) and, more recently, compliance-oriented identity
+plumbing (the Automated Compliance Engine / CCIP-linked identity work aimed at institutional
+tokenised assets). Chainlink does **not** sell a wallet reputation score. Its posture is
+*infrastructure for institutions to attach off-chain verified attributes to on-chain transactions*,
+which puts it in the regulated-finance lane, not the airdrop-sybil lane.
+Next step if this matters: chain.link/education/ACE and the DECO papers. For our purposes Chainlink
+is **not a competitor** and not a usable input today; if a Chainlink-brokered attestation standard
+becomes the institutional default it becomes a distribution channel question, not a scoring one.
+
+---
+
+### Arkham / Zerion / Etherscan-class analytics — **inputs, never competitors**
+
+Arkham (entity-attribution and deanonymisation, with a bounty marketplace and a token), Zerion
+(portfolio wallet), Etherscan/Dune (explorer and query layers) all sell **raw or attributed
+behavioural data**, not a personhood or sybil verdict. They are upstream of everyone in this file:
+the signals another agent is cataloguing come from here. Arkham's entity clustering is the closest
+to sybil-relevant, but it is sold to traders and investigators as intelligence, not to protocols as
+a gate. Treat as **consume / ignore**, and see the raw-signals file rather than this one.
+
+---
+
 ## 1. Market structure — who actually buys
 ## 2. Competitor / input / acquisition-comparable, per company
 ## 3. Exit and failure comparables

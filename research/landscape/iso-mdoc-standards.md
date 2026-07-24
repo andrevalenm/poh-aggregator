@@ -14,9 +14,294 @@ whatever the issuer asserted)
 ## What it proves
 ## Trust root & failure modes
 ## 1. ISO/IEC 18013-5 mdoc in detail
+
+**ISO/IEC 18013-5:2021** — "Personal identification — ISO-compliant driving licence — Part 5:
+Mobile driving licence (mDL) application". It defines a *data model* (the `mdoc` / mDL), a
+*credential format*, and *proximity presentation protocols*. It is a paid ISO standard (~CHF 200),
+which is itself a friction point: the normative text is not free, so most implementers work from
+vendor explainers, the CDDL in public libraries, and the free ISO OBP preview.
+
+### 1.1 Wire format — CBOR + COSE
+
+Everything is CBOR; all signatures are COSE. A presentation is a `DeviceResponse`:
+
+```
+DeviceResponse = {
+  "version": "1.0",
+  "documents": [ Document ],
+  "status": 0
+}
+Document = { "docType": "org.iso.18013.5.1.mDL",
+             "issuerSigned": IssuerSigned,
+             "deviceSigned": DeviceSigned }
+IssuerSigned = { "nameSpaces": { "org.iso.18013.5.1": [ IssuerSignedItem, ... ] },
+                 "issuerAuth": COSE_Sign1 }
+IssuerSignedItem = { "digestID": 0,
+                     "random": h'<salt>',
+                     "elementIdentifier": "age_over_18",
+                     "elementValue": true }
+```
+
+Source (concrete structures, worked example):
+[abhvio.us — Mobile Driver License format](https://abhvio.us/posts/mdoc/) (secondary but technically
+detailed and consistent with the standard's CDDL).
+
+**Selective disclosure = salted hashes.** Each attribute is a `IssuerSignedItem` with a random
+salt. The issuer hashes each item and puts the digests in the MSO. To disclose an attribute, the
+holder sends the full pre-image item; the verifier recomputes `SHA-256(CBOR(IssuerSignedItem))` and
+matches it against `valueDigests`. Undisclosed attributes leave only an unmatched digest. Note the
+consequence: **the verifier always sees the *number* of attributes in the credential and their
+digest IDs**, even undisclosed ones. Same basic construction as SD-JWT, different serialisation.
+
+### 1.2 The MSO and its signature chain
+
+```
+MobileSecurityObject = {
+  "version": "1.0",
+  "digestAlgorithm": "SHA-256",
+  "docType": "org.iso.18013.5.1.mDL",
+  "valueDigests": { "org.iso.18013.5.1": { 0: h'…', 1: h'…', … } },
+  "deviceKeyInfo": { "deviceKey": COSE_Key },
+  "validityInfo": { "signed": …, "validFrom": …, "validUntil": … }
+}
+```
+
+The MSO is wrapped in `issuerAuth`, a `COSE_Sign1`:
+`[ protected_headers, {x5chain: certs}, payload=MSO_bytes, signature ]`, typically ES256.
+The signing certificate is a **Document Signer (DS)** certificate, chained to an
+**IACA (Issuing Authority Certificate Authority)** root held by the issuing state. A verifier
+therefore needs a **trusted IACA root list** — the equivalent of the passport world's ICAO PKD
+master list. Google's docs are explicit: *"You must use the `issuerSigned` data and validate it
+against the official IACA certificates."*
+([Google](https://developers.google.com/wallet/identity/verify/accepting-ids-from-wallet-online))
+`UNCLEAR:` there is no single global public IACA trust list comparable to the ICAO PKD; in the US
+AAMVA operates the Digital Trust Service. Confirm access terms — this is a real gating question
+(see assessment).
+
+### 1.3 Issuer data authentication vs device authentication — two distinct proofs
+
+This distinction is load-bearing and routinely conflated:
+
+- **Issuer data authentication** — verify `issuerAuth` (COSE_Sign1 over MSO) up to an IACA root,
+  then verify each disclosed item's digest is in `valueDigests`. Proves: *a recognised state
+  authority signed these attribute values, and they have not been altered.* Proves nothing about
+  who is presenting them. **A copied/replayed `IssuerSigned` blob passes this check.**
+- **Device authentication** — the MSO commits to a `deviceKey` (COSE_Key) whose private half lives
+  in the phone's secure element. At presentation the holder signs a `DeviceAuthentication`
+  structure (which embeds the `SessionTranscript`, i.e. the verifier's nonce and the session's
+  handover data) producing `deviceSigned.deviceAuth.deviceSignature` (`COSE_Sign1`) or
+  `deviceMac` (`COSE_Mac0`, used when an ECDH session key exists in proximity flows). Proves:
+  *this presentation came from the device the issuer bound the credential to, freshly, for this
+  session.*
+
+Both are required for a meaningful check. Skipping device authentication is the classic
+implementation bug — it turns an mDL into a bearer token that any leaked blob replays.
+`elementValue` is not proof of anything without both.
+
+Note the asymmetry: device auth binds to *a device*, not to *a human*. A rented phone, or a
+credential provisioned onto a device controlled by a farm operator, still passes. For our purposes
+this matters — see "What it proves".
+
+### 1.4 Presentation flows
+
+**Proximity (18013-5)** — device engagement via **QR code or NFC**, then data transfer over
+**BLE** (most common), **NFC**, or **Wi-Fi Aware**. Session keys are established by ECDH; the
+`SessionTranscript` binds the device signature to that specific engagement so a signature cannot be
+replayed into another session. Reader authentication (`COSE_Sign1` over the reader request) is
+supported so the mDL app can know who is asking. In 18013-5 reader auth is a *capability*, and
+whether it is mandatory is an issuing-authority policy decision. `UNVERIFIED:` normative
+"MUST/MAY" wording for reader auth in 18013-5:2021 — paywalled; check clause 9.1.4 if a copy is
+available.
+
+**Online / unattended (18013-7)** — **ISO/IEC TS 18013-7** is a *Technical Specification*, not yet a
+full International Standard. Current published edition: **ISO/IEC TS 18013-7:2025** (2nd ed.,
+cancelling and replacing TS 18013-7:2024)
+([ISO OBP](https://www.iso.org/obp/ui#!iso:std:iso-iec:ts:18013:-7:ed-2:v1:en)). A **3rd edition is
+expected around end of Q3 2026 (planned 2026-09-30)** per the EU's standards tracking issue
+([eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications#1](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/issues/1)).
+Its annexes profile how mdoc rides existing web protocols: an **OpenID4VP over HTTP redirect**
+annex, and an annex for the **W3C Digital Credentials API**. Chrome's implementation names
+**"ISO 18013-7 Annex C"** as the `org-iso-mdoc` protocol; the EU tracker refers to Annexes B and D.
+`UNCLEAR:` annex lettering differs between editions — pin the edition before citing an annex
+letter. The practically important fact is stable: **the online mdoc profile is defined in 18013-7
+and it delegates transport to OpenID4VP and/or the DC API.** OIDF and ISO agreed that ISO owns the
+mdoc profile of OpenID4VP, which is why the mdoc-specific profile was *removed* from the OpenID4VP
+spec itself.
+
+**ISO/IEC 23220 series** generalises 18013-5 beyond driving licences to arbitrary mobile
+eID documents (23220-1 building blocks, -2 issuance, -3 protocols, -4 protocols for remote/online).
+It is the base the EUDI Wallet's mdoc profile leans on and it adds *holder* authentication concepts
+beyond 18013-5's device binding.
+([MATTR Learn — ISO mdoc standards](https://learn.mattr.global/docs/concepts/iso-mdoc-standards))
+`UNVERIFIED:` publication status of individual 23220 parts as of 2026-07 — several were still DIS.
+
 ## 2. The mdoc linkability problem, batch issuance, and ZK
+
+### 2.1 The problem
+
+The MSO is a **fixed, static ECDSA signature over fixed salted digests**. Every presentation of the
+same credential re-sends:
+
+- the same `issuerAuth` signature bytes,
+- the same `valueDigests` (all of them, disclosed or not),
+- the same per-attribute `random` salts for whatever *is* disclosed,
+- the same `deviceKey`.
+
+Any one of those is a **global correlator**. Two verifiers who compare notes — or one verifier
+across two sessions — trivially link presentations to the same credential instance. The EUDI ARF
+says this plainly:
+
+> "every attestation that is presented to a Relying Party contains a number of elements having a
+> unique value. These elements include: The salt of every attribute that is presented, The hash
+> values of all attributes…"
+> — [EUDI ARF, Privacy risks and mitigations](https://eudi.dev/2.9.0/discussion-topics/a-privacy-risks-and-mitigations/)
+
+Both *Relying Party linkability* (colluding verifiers) and *Attestation Provider linkability*
+(issuer recognises its own signature if a verifier reports it) are in scope. Selective disclosure
+does **not** fix this; it limits *what attributes* are shown, not *whether the showings link*.
+
+### 2.2 The standardised mitigation: batch issuance of single-use credentials
+
+The only mitigation that is actually standardised today is **brute force: issue many copies**.
+OpenID4VCI supports batch issuance; the wallet holds N credential instances, each with fresh salts
+and (importantly) **a distinct device key per instance**, and burns one per presentation.
+
+From the ARF's mitigation catalogue:
+- **Method A — once-only attestations**: *"the Wallet Unit must store a batch of attestations… must
+  have a lower limit for the number of unused attestations"*. This *"fully mitigates Relying Party
+  linkability"* but "creates unpredictable loads on issuers proportional to user activity."
+- **Method C — rotating batches**: illustrative example of *"a batch of 20 attestations"* each used
+  for *"5% of all transactions"* — partial mitigation, explicitly framed as illustrative, not
+  normative. The ARF **does not prescribe a batch size.**
+- OpenID4VCI's guidance is that the batch size should be **constant over time and independent of
+  usage**, precisely so the refill request itself does not leak activity level.
+
+**Operational cost, honestly:** batch issuance turns a one-time issuance into a metered
+subscription. The issuer must stay online forever, must sign N× as much, must be re-contacted
+whenever the wallet runs low (a refill request that itself leaks "this user is active"), and the
+wallet must manage secure-element key material for every instance — which is the real bottleneck,
+because each instance wants its own hardware-backed device key and secure elements have limited key
+slots and slow key generation. And the whole scheme collapses if the wallet ever reuses an
+instance. It is a mitigation, not a solution.
+
+**And it does not stop issuer-verifier collusion.** If the issuer and verifier compare data, or the
+issuer *is* the verifier, presentations link back to issuance regardless of batching.
+
+### 2.3 Unlinkable alternatives — what is real
+
+- **BBS / BBS+**: multi-message signature scheme with native selective disclosure *and*
+  unlinkable proof-of-knowledge presentation (each showing is a fresh randomised proof). This is
+  the "right" cryptographic answer for VC-style credentials. Status: IRTF CFRG draft
+  (`draft-irtf-cfrg-bbs-signatures`) + W3C `bbs-2023` Data Integrity cryptosuite — **not adopted by
+  ISO mdoc at all**, and notably **BBS+ is not even mentioned** in the ARF privacy-mitigations
+  document. It also has no hardware-secure-element story (secure elements do ECDSA, not BBS), which
+  is the practical reason governments have not taken it up.
+- **ZK proofs over mdoc — the live thread.** Google's **Longfellow ZK** (a.k.a. `google-zk`,
+  `libzk`) proves statements *about an existing ECDSA-signed mdoc* in zero knowledge, so the ECDSA
+  signature never leaves the device and presentations become unlinkable *without changing the
+  issuance format*. Based on Frigo & Shelat, "Anonymous credentials from ECDSA". Claimed
+  performance: **ECDSA proof ~60 ms; full mdoc presentation proof ~1.2 s on mobile**.
+  - Standardisation: **IETF CFRG Internet-Draft `draft-google-cfrg-libzk`** (rev -01), presented at
+    IETF 125 (March 2026) — an **individual draft, not an RFC, not yet a CFRG work item** as far as
+    I can confirm.
+    ([datatracker](https://datatracker.ietf.org/doc/draft-google-cfrg-libzk/),
+    [IETF 125 CFRG slides](https://datatracker.ietf.org/meeting/125/materials/slides-125-cfrg-longfellow-zk-00))
+  - Implementations: [google/longfellow-zk](https://google.github.io/longfellow-zk/) (C++),
+    a **European fork** [dyne/longfellow-zk](https://github.com/dyne/longfellow-zk), and — telling —
+    an official EU wallet repo
+    [eu-digital-identity-wallet/av-lib-ios-longfellow-zkp](https://github.com/eu-digital-identity-wallet/av-lib-ios-longfellow-zkp)
+    (Swift bindings for ZKP generation/verification over mdoc, for the EU **age-verification** app).
+    So the EU is shipping Longfellow in its AV app, not merely studying it.
+    `UNVERIFIED:` licences of each repo — check `LICENSE` before use (Google's is `UNVERIFIED:`
+    likely Apache-2.0).
+  - Google Wallet documents a ZKP path for age verification in production
+    ([Google online acceptance docs](https://developers.google.com/wallet/identity/verify/accepting-ids-from-wallet-online)).
+- **ISO adding ZK to mdoc**: work is under way but the ARF's own position as of the cited version is
+  merely *"Zero-Knowledge Proofs (ZKP) offer strong potential… This topic will be revisited in
+  Topic G"* — i.e. **not yet specified**. `UNVERIFIED:` the exact ISO work item number for ZKP in
+  18013-5/23220 (there is an amendment effort; I could not confirm its designation). Look at the
+  ISO/IEC JTC1/SC17 WG10 programme of work.
+
+**Precise summary of standardised vs proposed:**
+
+| Mechanism | Status 2026-07 |
+|---|---|
+| Salted-hash selective disclosure (mdoc, SD-JWT) | **standardised, deployed** |
+| Batch issuance of single-use credentials | **standardised** (OpenID4VCI), recommended by ARF, no prescribed size |
+| BBS / BBS+ unlinkable presentation | IRTF draft + W3C cryptosuite; **not in mdoc, not in EUDI mitigation doc** |
+| ZK over mdoc (Longfellow) | **IETF individual draft**, shipping in Google Wallet AV + EU AV app; **not an ISO standard** |
+| ISO-native ZKP profile for mdoc | **proposed / future work**, not published |
+
 ## 3. W3C VC 2.0
+
+**VCDM 2.0 became a W3C Recommendation on 2025-05-15**, together with a family of seven RECs
+([W3C news](https://www.w3.org/news/2025/the-verifiable-credentials-2-0-family-of-specifications-is-now-a-w3c-recommendation/),
+[spec](https://www.w3.org/TR/vc-data-model-2.0/)). v1.1 was a REC from 2022-03-03.
+
+What actually changed for an implementer:
+
+- **Securing is now explicitly pluggable and out of the core data model.** VCDM 2.0 defines the
+  *data model*; how you sign it is a separate REC. Two families:
+  - **Data Integrity 1.0** (`proof` object; JSON-LD canonicalisation; cryptosuites incl.
+    `eddsa-2022`, `ecdsa-2019`, and the selective-disclosure/unlinkable `bbs-2023`).
+  - **Securing VCs using JOSE and COSE** ("VC-JOSE-COSE") — wrap the credential as a JWT/CWT, or
+    use SD-JWT. This is the option that interoperates with the OAuth world and with wallets.
+- Terminology cleanup, `validFrom`/`validUntil` replacing `issuanceDate`/`expirationDate`, media
+  types (`application/vc`, `application/vp`), better extensibility, and companion RECs for
+  **Bitstring Status List** and controller documents.
+- JSON-LD remains in the core, and remains the thing implementers complain about: canonicalisation
+  (RDFC) is a heavy dependency, and `@context` resolution is a live availability/security concern.
+  The JOSE/COSE path lets you avoid most of it.
+
+**Ecosystem reality.** VC and mdoc are two competing stacks with different constituencies: mdoc is
+the ISO/government/DMV/ICAO lineage (CBOR, X.509, IACA); VC is the W3C/decentralised-identity
+lineage (JSON-LD, DIDs). The EU did not pick one — the EUDI ARF mandates support for **both**
+mdoc *and* SD-JWT VC, and OpenID4VP carries all of them as format identifiers (`mso_mdoc`,
+`dc+sd-jwt`, `jwt_vc_json`). Practically, **W3C VC 2.0 with Data Integrity/JSON-LD is losing the
+wallet layer to SD-JWT VC and mdoc**: those are the two formats named in the EUDI profile and the
+two the DC API's allowed protocols carry. See the EUDI agent's file
+(`research/landscape/eidas2-eudi-wallet.md`) for the policy story; do not treat the coexistence as
+a technical convergence — it is a political one, and it doubles our verifier work.
+
 ## 4. SD-JWT and SD-JWT VC
+
+**SD-JWT is now RFC 9901** (Selective Disclosure for JWTs), published **November 2025**
+([RFC 9901](https://datatracker.ietf.org/doc/html/rfc9901); commentary:
+[Sakimura, "Congratulations on RFC 9901"](https://www.sakimura.org/en/2025/11/7764/)). That is a
+significant maturity marker: the format layer for online credentials is a *finished Internet
+Standard-track RFC*, while the ISO online-presentation profile (18013-7) is still a TS.
+
+**SD-JWT VC** — `draft-ietf-oauth-sd-jwt-vc`, at **draft-17** as of late 2025 / 2026, Standards
+Track, **still a draft** ([datatracker](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/)).
+It adds credential semantics on top of SD-JWT: `vct` (verifiable credential type), issuer
+identification/`iss` + JWT VC Issuer Metadata (`/.well-known/jwt-vc-issuer`), type metadata, and
+status references.
+
+Mechanics:
+
+- **Serialisation**: `<Issuer-signed JWT>~<Disclosure1>~<Disclosure2>~…~[<KB-JWT>]`.
+- **Disclosures**: each is base64url(JSON `[salt, claim_name, claim_value]`); the JWT payload holds
+  `_sd: [ <hash>, … ]` in place of the claims, plus `_sd_alg`. Structurally identical idea to
+  mdoc's `IssuerSignedItem`/`valueDigests` — salted hashes — just JSON-and-`~` instead of CBOR.
+  Decoy digests are permitted to hide how many claims exist (mdoc has no equivalent).
+- **Key binding**: `cnf` claim in the issuer-signed JWT holds the holder's public key; the holder
+  appends a **KB-JWT** signed over `aud`, `nonce`, and `sd_hash` (a hash of the presented
+  SD-JWT+disclosures). RFC 9901 defines the `SD-JWT+KB` form where key binding is **required**,
+  explicitly to resist credential copying. This is the SD-JWT analogue of mdoc device
+  authentication, and the same rule applies: **without verifying the KB-JWT you are accepting a
+  bearer token.**
+
+**Why it is winning online:** JSON not CBOR, plain JOSE not COSE, no JSON-LD, no BLE state machine,
+trivially transported over HTTP, and it is a real RFC. Every OpenID4VP implementation supports
+`dc+sd-jwt`.
+
+**Linkability, honestly:** SD-JWT is *exactly as linkable as mdoc*. The issuer's JWS signature is a
+fixed byte string presented identically every time; so are the `_sd` digest array and the salts of
+whatever you disclose; so is the `cnf` public key. Two verifiers comparing the issuer signature link
+the user instantly. RFC 9901's own security considerations say unlinkability requires batch-issued
+single-use credentials (or a different cryptographic scheme). **Selective disclosure is not
+unlinkability.** The only structural advantage over mdoc is decoy digests, which hide claim *count*,
+not identity.
 ## 5. OpenID4VCI / OpenID4VP / Digital Credentials API
 
 This is the layer we would actually implement. OpenID4VCI is issuance (wallet ← issuer);

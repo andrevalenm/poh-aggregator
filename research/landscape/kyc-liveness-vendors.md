@@ -1,6 +1,6 @@
 # KYC / Identity-Verification / Liveness Vendor Layer
 
-> STATUS: in progress
+*Last updated 2026-07-24.*
 
 **One-liner:** The commercial IDV/biometrics vendors (FaceTec, iProov, Sumsub, Jumio, Persona,
 Onfido/Entrust, Veriff, Incode, Au10tix, Trulioo, Socure, Regula, IDnow, Shufti) that sit *underneath*
@@ -344,8 +344,23 @@ IDV chain.
 | **Synaps** (itself a reseller) | **Anima Protocol** (`AnimaProofOfUniqueness` on Verax) | Synaps *is* Anima's operator — Synaps launched Anima Protocol in 2022: https://www.globenewswire.com/news-release/2022/04/12/2421095/0/en/Synaps-Launches-Novel-Decentralized-Identity-Solution-Anima-Protocol-In-Partnership-with-Aleph-im.html | **Confirmed** |
 | **FaceTec (via Synaps)** | **Anima Protocol**, **Linea/Privado ID/Billions "Proof of Uniqueness"** | Synaps states it "employs … FaceTec" for liveness, **self-hosted on Synaps' own servers**: https://medium.com/@anima_protocol/inside-proof-of-personhood-cde68ec84784 . The Linea private biometric PoU is Synaps + Verax + Privado ID: https://billions.network/blog/first-private-biometric-proof-of-uniqueness-on-linea-blockchain | **Confirmed → this is the big collapse** |
 | FaceTec (via Synaps) | **Verida** (Synaps partnership for private IDV) | https://www.linkedin.com/posts/synaps-id_synaps-verida-team-up-for-private-identity-activity-7131307885204004864-7dtw | Likely (LinkedIn/vendor post) |
-| Persona | **Coinbase** (biometric collection vendor) | Coinbase's own third-party-verification-vendor disclosure names **Persona Identities, Inc.** as a vendor collecting/processing biometric information: https://www.coinbase.com/legal/privacy/third-party-verification-vendors (page 403s to automated fetch; content surfaced via search index 2026-07-24 — **re-confirm by hand in a browser**) | Likely-confirmed, needs manual re-read |
+| **Persona** | **Coinbase** (biometric collection vendor) | Coinbase's own *Third Party Identity Verification Service Vendors* disclosure names **Persona** as the vendor that "collect[s] and process[es] biometric information to verify identity, identify fraud, and improve Persona's platform." Same page also names **Unico** (Brazil users) and **Refinitiv** (facial recognition / biometric verification). https://www.coinbase.com/legal/privacy/third-party-verification-vendors (page 403s to automated fetch; text confirmed via Coinbase-domain-restricted search index, 2026-07-24) | **Confirmed** (issuer's own legal disclosure) |
+| Unico | **Coinbase** (Brazil) | same page | Confirmed |
+| Refinitiv (LSEG) | **Coinbase** (facial recognition / biometric verification) | same page | Confirmed |
 | Persona | **Chainlink CCID / ACE** (named partner) | https://withpersona.com/industry/cryptocurrency (403 to automated fetch; surfaced via search index) | Likely, needs manual re-read |
+| **Fractal ID** (itself an IDV operator) | **Polygon ID, Ripple/XRP Ledger, Avalanche, Gnosis, Near, Aurora, Acala, Polymath, BNB Chain, Lukso, Aleph Zero, Arbitrum Foundation, idOS** | Customer list surfaced by the July-2024 breach disclosures: https://cryptoslate.com/web3-kyc-vendor-fractal-id-loses-over-50k-users-passport-info-in-data-breach/ ; https://cointelegraph.com/news/blockchain-identity-platform-fractal-id-suffers-data-breach ; https://www.biometricupdate.com/202407/data-breach-raises-questions-about-fractal-ids-decentralized-identity-architecture | **Confirmed** (breach notice — an unusually reliable customer list) |
+| Prenetics / CircleDNA (genomics, not IDV) | **Humanity Protocol** ("Identity Validator") | https://www.biometricupdate.com/202502/humanity-protocol-partners-with-genomics-firm-on-blockchain-based-idv | Confirmed, but not a liveness/doc vendor |
+| Mastercard (Open Finance — financial attributes, not IDV) | **Humanity Protocol** | https://www.biometricupdate.com/202511/humanity-protocols-reusable-biometric-id-adds-mastercard-open-finance-capability | Confirmed, but not a liveness/doc vendor |
+| **UNKNOWN** | **Humanity Protocol** `kyc_passed` | Their API defines `is_human` = "passed a KYC check OR palm enrollment", `kyc_passed` "derived from provider results"; provider unnamed; privacy policy names no sub-processor (checked 2026-07-24). | `UNVERIFIED:` **highest-value open item** — see attribution section for how to crack it |
+| **In-house (no third-party vendor found)** | **World / Worldcoin** — Orb iris capture, and the World ID **Passport Credential** (NFC chip read on device) | https://www.biometricupdate.com/202412/world-id-keeps-growing-with-passport-credential-option ; https://support.world.org/hc/en-us/articles/34408020222099-What-are-World-ID-Credentials-and-how-do-I-use-them | Likely in-house; `UNVERIFIED:` whether a commercial NFC/doc SDK (e.g. Regula) is embedded in the World App — **grep the APK** |
+
+### Interpreting this table
+- **Two dedup buckets are already forced.** Anything Sumsub-rooted is one bucket; anything
+  FaceTec/Synaps-rooted is another. Within a bucket, credentials are **correlated, not independent**.
+- **Fractal ID's customer list is the single best-sourced vendor→web3 mapping in existence**, precisely
+  because a breach notice has to be honest about who was affected. Look for equivalents.
+- Do not read absence from this table as absence of a vendor. Most protocols simply don't say.
+
 
 ## The 2025-2026 deepfake / injection reality
 
@@ -417,6 +432,201 @@ Tier 3 plus camera injection is the 2026 state of the art, and it is what the +7
 measuring.
 
 ## Data-protection exposure (GDPR Art. 9, BIPA, Fractal ID precedent)
+
+**Read this before designing the embedded flow. It constrains the product more than anything else in
+this file.**
+
+### GDPR
+- Face/palm/vein templates used to *uniquely identify* a person are **Art. 9 special-category data**.
+  Lawful basis is effectively limited to **explicit consent** (Art. 9(2)(a)) for a consumer product —
+  and consent must be freely given, which is legally awkward when the verification is a gate on access.
+- The exposure question is **controller vs. processor vs. joint controller**. If our aggregator merely
+  *links out* to a protocol which then runs its own vendor flow, we are plausibly outside the biometric
+  processing entirely. If we **embed** the flow, choose the vendor, or determine the purpose of
+  processing, we risk being a **joint controller** (Art. 26) — which drags in DPIA obligations
+  (Art. 35, mandatory for large-scale Art. 9 processing), Art. 28 processor contracts, a sub-processor
+  register, and breach-notification duty.
+- **Design implication (strong recommendation):** architect so that **we never receive, store or route
+  raw biometrics or document images**. Ingest only *assertions* (attestations, VCs, signed booleans)
+  produced by someone else's flow. If we must host an embedded flow, host it as a redirect/iframe where
+  the protocol or vendor is the controller and we are explicitly not.
+
+### BIPA (Illinois) — and its 2026 update, which materially changes the risk
+- BIPA gives a **private right of action**, statutory damages **$1,000 negligent / $5,000
+  reckless-or-intentional**, and requires written notice + written release before collecting biometric
+  identifiers. It is the reason many vendors geofence Illinois.
+- **Cothron v. White Castle** (Ill. 2023) held claims accrue **per scan**, producing "annihilative"
+  exposure. The Illinois legislature amended BIPA in **August 2024** to make repeated collection of the
+  same person by the same method **one violation**.
+- **2026-04-01: the Seventh Circuit held the 2024 amendment applies retroactively**, ending per-scan
+  exposure in pending cases. https://www.foley.com/insights/publications/2026/04/bipa-alert-seventh-circuit-ruling-applies-bipa-amendments-retroactively-ending-per-scan-exposure-for-companies-operating-in-illinois/ ;
+  https://privacymatters.dlapiper.com/2026/04/seventh-circuit-holds-bipas-2024-damages-amendment-applies-retroactively/ ;
+  https://www.biometricupdate.com/202604/bipa-damage-limitation-applies-retroactively-to-pending-class-actions-court
+- **Net for us:** BIPA is now a *per-user*, not per-scan, risk. Still material at aggregator scale
+  ($1,000 × affected Illinois users), but no longer existential. Texas CUBI and Washington HB 1493 are
+  the other US statutes; Texas has **no** private right of action but AG enforcement has been active.
+  `UNVERIFIED:` current Texas AG posture in 2026.
+
+### The Fractal ID precedent — the exact failure mode we should fear
+- **2024-07-14**: an unauthorised party obtained an **operator account** and ran an API script that
+  exfiltrated user data over ~2h14m (05:14–07:29 UTC).
+- **Exposed:** names, emails, **wallet addresses**, phone numbers, physical addresses, **facial images
+  and uploaded ID documents (passports, driving licences)**.
+- **Scale is disputed in the reporting:** Fractal's own accounting was ~**5,000–6,300 users of 1.1M**
+  (~0.5%) per https://www.biometricupdate.com/202407/data-breach-raises-questions-about-fractal-ids-decentralized-identity-architecture ;
+  contemporaneous coverage reported **>50,000** users' passport info
+  (https://cryptoslate.com/web3-kyc-vendor-fractal-id-loses-over-50k-users-passport-info-in-data-breach/ ;
+  https://cointelegraph.com/news/blockchain-identity-platform-fractal-id-suffers-data-breach). Flag the
+  discrepancy; do not cite a single number.
+- **Downstream blast radius:** Fractal ID served **Polygon ID, Ripple/XRP Ledger, Avalanche, Gnosis,
+  Near, Aurora, Acala, Polymath, BNB Chain, Lukso, Aleph Zero, Arbitrum Foundation** and is a building
+  partner of **idOS**. One vendor compromise leaked users of a dozen "decentralized" ecosystems at once
+  — **the exact concentration risk this file is about, realised.**
+- **In Oct 2024 the Stormous ransomware group claimed 10GB+ of Fractal customer data**
+  https://www.cyberdaily.au/security/11251-exclusive-stormous-ransomware-claims-hack-of-blockchain-identity-firm-fractal-id
+  `UNVERIFIED:` whether that claim was substantiated.
+- **The architectural lesson:** Fractal marketed "selective data access and revocation at a user level"
+  while a **single operator credential** unlocked bulk export. Decentralised branding, centralised
+  honeypot. Assume the same is true of every protocol in our set until proven otherwise.
+- **Also note what wasn't there:** Humanity Protocol's privacy policy (retrieved 2026-07-24) collects
+  palmprint **and vein images**, states data may be transferred to "our service providers' servers" and
+  used to train ML models, names **no sub-processor**, gives **no Art. 9 lawful-basis statement**, and
+  contains **no BIPA notice/release language**. For a product processing raw vein imagery at 8M-user
+  scale, that is a conspicuous gap. https://www.humanity.org/privacy-policy
+
 ## Trust-root dedup table
+
+**How to use this:** protocols sharing a row share evidence. In an aggregate score, apply the row's
+weight **once**, not once per protocol. Rungs refer to the taxonomy table above.
+
+| Trust root (vendor) | Evidence class it actually produces | Rung | Protocols known / suspected to sit on it | Confidence |
+|---|---|---|---|---|
+| **Sumsub** | document (OCR + NFC) + passive liveness + 1:1 match + AML screening. Multi-account/face-search dedup **exists but scope unconfirmed** | 2/4/5, possibly 6 | **Galxe Passport v3**; **Linea Proof of Humanity V2** (Verax portal `0xe8a3…3922`, `ownerName` "Sumsub", attester `0xc5db…1c0d`, `modules: []` = **no on-chain validation**); **idOS** (consortium + governance seat); **Solana Attestation Service** Sumsub attestations; **Chainlink ACE / CCID**; **Reown/WalletConnect** wallet KYC | Confirmed |
+| **FaceTec** (via **Synaps**, self-hosted) | 3D FaceMap liveness + 1:1 match; dedup by FaceGraph comparison, **population scope unconfirmed** | 3/4/5, possibly 6 | **Anima Protocol** `AnimaProofOfUniqueness`; **Linea / Privado ID / Billions "private biometric Proof of Uniqueness"**; **Verida** (Synaps partnership) | Confirmed (vendor named by Synaps/Anima) |
+| **FaceTec** (direct) | same, plus OCR/NFC document | 1/2/3/4/5, 6 if `3d-db` dedup enabled | **Civic** — Civic Pass / "Proof of Personhood" | Confirmed |
+| **Persona** (+ Unico in BR, Refinitiv) | document + selfie/liveness + database checks + Graph link-analysis | 1/2/4/5, partial 6 | **Coinbase** biometric processing → therefore, transitively, **Coinbase Verifications** EAS attestations (720,503 lifetime, 406,022 revoked) and the **Coinbase Stamp** in Gitcoin/Human Passport; **Chainlink CCID** | **Confirmed** by Coinbase's own vendor disclosure (2026-07-24). Note the ~56% revocation rate on Coinbase Verifications is a separate signal-quality problem, not a vendor problem |
+| **Fractal ID** (operator, own stack + unknown sub-vendors) | document + selfie KYC, centrally stored | 1/2/5 | **Polygon ID, Ripple/XRPL, Avalanche, Gnosis, Near, Aurora, Acala, Polymath, BNB Chain, Lukso, Aleph Zero, Arbitrum Foundation, idOS** | Confirmed via breach disclosure |
+| **UNKNOWN KYC provider** | whatever it is, it is sufficient to set `kyc_passed` → `is_human` **without any palm enrollment** | ≤5 — **no uniqueness** | **Humanity Protocol** | `UNVERIFIED:` provider identity. **Until resolved, treat Humanity `is_human` as a liveness/KYC signal, not a uniqueness signal**, and treat it as potentially correlated with *any* of the above buckets |
+| **In-house biometrics (no commercial IDV vendor)** | iris (Orb) with genuine large-scale 1:N; passport NFC credential | 2 + 6 (real) | **World / Worldcoin** | Likely; `UNVERIFIED:` embedded doc-SDK identity |
+| **No vendor at all** | social graph / Turing test / video + vouching | n/a — different evidence class entirely, **safe to count independently** | Proof of Humanity, BrightID, Idena, and other non-KYC protocols | n/a |
+
+### Suspicions to run down (all `UNVERIFIED:`)
+1. `UNVERIFIED:` **Humanity Protocol → Sumsub or Persona.** Would be confirmed by: an APK grep for
+   `com.sumsub.sns` / Persona widget strings; a proxied verification flow showing `api.sumsub.com` or
+   `withpersona.com`; or a sub-processor list obtained by asking them as a prospective integrator.
+2. `UNVERIFIED:` **Anima PoU and Linea/Billions PoU share one FaceGraph population.** Would be
+   confirmed by enrolling the same face in both and seeing whether the second rejects as duplicate —
+   a cheap, decisive experiment we can run ourselves.
+3. `UNVERIFIED:` **Sumsub's face-search dedup is cross-client.** Would be confirmed by Sumsub's own
+   documentation/DPA, or by the same two-account experiment across two Sumsub-rooted protocols
+   (e.g. Galxe Passport and Linea PoH V2). **If it *is* cross-client, Sumsub-rooted credentials
+   collapse to a single global uniqueness set — which is simultaneously the strongest and the most
+   concentrated result in this whole landscape.**
+4. ~~`UNVERIFIED:` **Coinbase → Persona.**~~ **RESOLVED 2026-07-24** — Coinbase's own legal disclosure
+   names Persona (biometrics), Unico (Brazil) and Refinitiv. Remaining sub-question: does Coinbase run
+   1:N face dedup across its own user base? If yes, Coinbase Verifications is a genuine uniqueness
+   signal within Coinbase's population; if no, it is KYC-grade liveness only. `UNVERIFIED:`
+5. `UNVERIFIED:` **World App embeds a commercial document-reading SDK** (Regula is the most likely).
+   Confirmed by APK inspection.
+
+### The decisive experiment
+Most of the above collapses can be settled empirically and cheaply: **enroll one real identity across
+N protocols and observe which ones reject the second enrollment.** That single test measures the thing
+we actually need — whether these credentials are independent — better than any amount of vendor
+documentation. Budget for it.
+
+## Direct answer: can we consume any of this as a credential?
+
+**No — with one narrow, conditional exception.**
+
+1. **These vendors do not issue credentials to third parties.** Sumsub, FaceTec, Persona, iProov et al.
+   return a result **to their paying integrator**, under contract. There is no public verification
+   endpoint, no signed artifact a user can carry to us, and no way for us to verify a claim without the
+   integrator's cooperation. They fail BRIEF.md criterion 4 ("can we verify *without* the vendor's
+   cooperation") completely. **They are upstream dependencies of other people's credentials.**
+2. **Therefore this file is not an integration target — it is a scoring and dedup input.** Its output is
+   (a) the dedup buckets above, and (b) a discount factor on any credential that resolves to a vendor
+   check.
+3. **The narrow exception — becoming a vendor customer ourselves.** We could sign with one vendor
+   (Shufti at ~$0.20/check as a floor, Sumsub/Persona at ~$1–$3 for quality) and offer our *own*
+   verification as a fallback tier when a user holds no protocol credential. This is a real product
+   option, but it is a *different business*: we become a data controller for Art. 9 biometrics, inherit
+   BIPA/GDPR exposure and Fractal-ID-shaped breach risk, and — crucially — **we would be adding an
+   Nth correlated copy of exactly the evidence we're trying to deduplicate.** Recommend: not in v1.
+4. **The one artifact that could in principle be user-presentable** is FaceTec's **UR Code** (digitally
+   signed, contains biometric data, designed for offline presentation). If any protocol issues UR
+   Codes, we could verify one without the issuer being online. `UNVERIFIED:` whether any web3 protocol
+   actually issues them, and whether verification requires a FaceTec licence.
+
 ## Open questions for us
+
+1. **Who is Humanity Protocol's KYC provider?** Blocks correct scoring of an 8M-user protocol.
+2. **Is Sumsub's dedup per-client or cross-client?** Determines whether four Sumsub-rooted credentials
+   are four signals or one.
+3. **Is the Synaps FaceGraph population shared across Anima and Linea/Billions PoU?** Same question,
+   different bucket.
+4. **Does Coinbase run 1:N dedup across its own users?** (Vendor is settled — Persona.) Determines
+   whether Coinbase Verifications is uniqueness or just liveness+KYC.
+5. **Which protocols enable 1:N dedup at all?** Absent this, most "proof of personhood" branding on
+   vendor-rooted protocols is liveness with a marketing layer.
+6. **Legal:** can we structure the embedded flow so we are never a controller/joint controller for
+   Art. 9 data? Needs a lawyer before the flow is designed, not after.
+7. **Vendor-era decay:** what discount curve should a liveness credential get given the +741% injection
+   trend? Needs a decision, not more research.
+
 ## References
+
+**Vendor primary**
+- FaceTec product page — https://www.facetec.com/ (retrieved 2026-07-24)
+- FaceTec 1:N Search / ABIS — https://dev.facetec.com/1-to-n-search
+- FaceTec Server dedup & fraud-list guide — https://dev.facetec.com/technical-support-server-sdk-guides-fraud-deduplication
+- FaceTec configuration options — https://dev.facetec.com/configuration-options
+- iProov liveness products — https://www.iproov.com/liveness-detection
+- iProov Threat Intelligence Report 2026 — https://www.iproov.com/reports/threat-intelligence-report-2026
+- iProov press release (2026-04-08) — https://www.businesswire.com/news/home/20260408812610/en/iProov-Issues-Annual-Threat-Intelligence-Report
+- Sumsub multi-accounting prevention — https://sumsub.com/multi-accounting/ ; https://sumsub.com/blog/multi-accounting/
+- Sumsub Identity Fraud Report 2025-2026 — https://sumsub.com/fraud-report-2025/
+- Sumsub AI fake ID analysis — https://sumsub.com/blog/ai-fake-id-challenge-for-kyc/
+- Persona crypto vertical — https://withpersona.com/industry/cryptocurrency (403 to automated fetch)
+- Coinbase third-party verification vendors — https://www.coinbase.com/legal/privacy/third-party-verification-vendors (403 to automated fetch; **read manually**)
+- Humanity Protocol privacy policy — https://www.humanity.org/privacy-policy (retrieved 2026-07-24)
+- Shufti Pro — https://shuftipro.com/
+- Anima Protocol, "Inside Proof of Personhood" — https://medium.com/@anima_protocol/inside-proof-of-personhood-cde68ec84784
+- Billions Network, Linea private biometric PoU — https://billions.network/blog/first-private-biometric-proof-of-uniqueness-on-linea-blockchain
+- Synaps launches Anima (2022) — https://www.globenewswire.com/news-release/2022/04/12/2421095/0/en/Synaps-Launches-Novel-Decentralized-Identity-Solution-Anima-Protocol-In-Partnership-with-Aleph-im.html
+
+**Standards / independent testing**
+- NIST FATE Part 10 (PAD), NISTIR 8491, 2023-09-20 — https://www.nist.gov/publications/face-analysis-technology-evaluation-fate-part-10-performance-passive-software-based ; PDF https://nvlpubs.nist.gov/nistpubs/ir/2023/NIST.IR.8491.pdf
+- NIST FATE PAD leaderboard — https://pages.nist.gov/frvt/html/frvt_pad.html
+- iBeta approved-solutions table coverage — https://idtechwire.com/ibeta-publishes-table-approved-liveness-detection-solutions-050407/
+- Identy.io ISO 30107-3 L2 — https://idtechwire.com/identy-io-secures-nist-iso-30107-3-level-2-pad-certification/
+- Facia iBeta L2 — https://facia.ai/news/facia-ibeta-level-2-compliant-with-iso-30107-3-presentation-attack-detection-protocols/
+
+**Attacks / supply side (secondary)**
+- iProov dark-web KYC-bypass operation — https://hackread.com/dark-web-operation-entirely-focused-on-kyc-bypass/ ; https://idtechwire.com/dark-web-operation-discovered-farming-biometric-data-to-bypass-kyc-systems/ ; https://www.technadu.com/research-unmasked-identity-fraud-operation-on-dark-web-to-bypass-kyc-systems/562939/
+- iOS injection surge coverage — https://www.biometricupdate.com/202604/biometric-injection-attack-surge-spreads-to-ios-iproov-report ; https://www.intelligentciso.com/2026/04/08/ios-injection-attacks-increase-741-in-2025-as-new-report-reveals-true-scale-of-genai-threats/
+
+**Breach / legal**
+- Fractal ID breach analysis — https://www.biometricupdate.com/202407/data-breach-raises-questions-about-fractal-ids-decentralized-identity-architecture
+- Fractal ID breach coverage — https://cryptoslate.com/web3-kyc-vendor-fractal-id-loses-over-50k-users-passport-info-in-data-breach/ ; https://cointelegraph.com/news/blockchain-identity-platform-fractal-id-suffers-data-breach
+- Stormous ransomware claim — https://www.cyberdaily.au/security/11251-exclusive-stormous-ransomware-claims-hack-of-blockchain-identity-firm-fractal-id
+- BIPA 2024 amendment retroactive (7th Cir., 2026-04-01) — https://www.foley.com/insights/publications/2026/04/bipa-alert-seventh-circuit-ruling-applies-bipa-amendments-retroactively-ending-per-scan-exposure-for-companies-operating-in-illinois/ ; https://privacymatters.dlapiper.com/2026/04/seventh-circuit-holds-bipas-2024-damages-amendment-applies-retroactively/ ; https://www.biometricupdate.com/202604/bipa-damage-limitation-applies-retroactively-to-pending-class-actions-court
+- Entrust completes Onfido acquisition (2024-04) — https://www.businesswire.com/news/home/20240409800662/en/Entrust-Completes-Acquisition-of-Onfido-Creating-A-New-Era-of-Identity-Centric-Security
+
+**Web3 vendor attributions**
+- Civic + FaceTec — https://www.biometricupdate.com/202310/civic-introduces-proof-of-personhood-with-facetec-biometrics-and-liveness ; https://www.biometricupdate.com/202412/civic-launches-tool-to-ease-web3-onboarding-and-sign-ins
+- Galxe Passport v3 + Sumsub — https://www.barchart.com/story/news/32238122/galxe-launches-passport-v3-with-sumsub-to-supercharge-web3-onboarding ; https://help.galxe.com/en/articles/9424571-introducing-galxe-passport
+- Sumsub + idOS — https://financefeeds.com/reusable-kyc-comes-to-web3-as-sumsub-joins-idos-consortium/ ; https://idtechwire.com/sumsub-joins-idos-consortium-to-advance-reusable-identity-for-web3/
+- Sumsub + Verax/Linea — https://ffnews.com/newsarticle/fintech/sumsub-on-chain-identity-attestations-verax/
+- Sumsub + Chainlink ACE — https://www.prnewswire.com/news-releases/sumsub-partners-with-chainlink-to-power-cross-chain-identity-for-on-chain-compliance-302762707.html
+- Sumsub + Solana Attestation Service — https://idtechwire.com/sumsub-launches-reusable-digital-id-verification-on-solana-blockchain/
+- Humanity Protocol pivot to Proof-of-Trust — https://www.biometricupdate.com/202602/humanity-protocol-pivots-from-proof-of-personhood-but-sticks-with-palm-biometrics
+- Humanity + Mastercard — https://www.biometricupdate.com/202511/humanity-protocols-reusable-biometric-id-adds-mastercard-open-finance-capability
+- Humanity + Prenetics/CircleDNA — https://www.biometricupdate.com/202502/humanity-protocol-partners-with-genomics-firm-on-blockchain-based-idv
+- World ID passport credential — https://www.biometricupdate.com/202412/world-id-keeps-growing-with-passport-credential-option
+
+**Pricing (secondary / aggregator sites — treat as indicative only)**
+- https://primebiometry.com/blog/kyc-pricing-guide-2026 (KYC pricing $0.55–$3/check)
+- https://www.vendr.com/marketplace/veriff (Veriff from ~$0.80/verification; $2–6 typical)
+- https://beverified.org/providers/shufti-pro/ (Shufti PAYG ~$0.20/check)
+
