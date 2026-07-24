@@ -1,8 +1,6 @@
 # Long tail & newer entrants: Billions, Holonym/Silk, Unitap, Sismo, Intuition
 
-> STATUS: in progress
-
-Covers six small/newer/legacy projects. Deep coverage of EAS/Disco, Privado ID/Verax, and
+Researched 2026-07-24. Covers six small/newer/legacy projects. Deep coverage of EAS/Disco, Privado ID/Verax, and
 Human Passport/Civic/zkMe/Galxe lives in sibling files; overlaps noted by pointer only.
 
 ---
@@ -265,10 +263,63 @@ a stable action-id, and cannot cross-reference a user across apps (by design).
 
 ## Trust root & failure modes
 
-- **`gov-id`/`kyc`:** the trust root is Holonym's chosen KYC vendor, not Holonym. UNVERIFIED: the
-  exact vendor in 2026-07 — historically Holonym used third-party IDV providers (Persona /
-  Vouched have both been named in older material). Look in
-  `github.com/holonym-foundation/id-server` for the vendor SDK calls to confirm.
+- **`gov-id`/`kyc`: the trust root is a commercial IDV vendor, and there are four of them.**
+  Confirmed by reading `github.com/holonym-foundation/id-server` (pushed 2026-07-23):
+  `src/routes/onfido.ts`, `src/routes/sumsub.ts`, `src/routes/idenfy.ts`,
+  `src/routes/veriff-kyc.ts`, plus `src/constants/onfido.ts` and `src/constants/sumsub.ts`.
+  So **Onfido, Sumsub, iDenfy and Veriff** are all wired in. A Holonym `gov-id` credential means
+  "one of four IDV vendors said yes" — its strength is the *weakest* of the four, and it shares a
+  root with every other protocol using those same vendors.
+- **`biometrics`: the vendor is FaceTec**, self-hosted by Holonym.
+  `src/routes/facetec.js`, `src/services/facetec/**`, and
+  `src/constants/misc.ts` which defines `facetecServerBaseURL = https://facetec-server.holonym.io`
+  (commented: *"We use this FaceTec server for silksecure.net. This server will be shut down
+  eventually"*) and `facetecServer2BaseURL = https://facetec-server-2.holonym.io` (*"for
+  id.human.tech"*). Uniqueness comes from FaceTec **`/3d-db/search`** (1:N gallery search) followed
+  by **`/3d-db/enroll`**. So Holonym *does* retain a face gallery — which is what makes its
+  biometrics credential genuinely deduplicating, unlike Billions' unaudited "no face data stored"
+  claim.
+
+### 🚩 Holonym ships an explicitly **non-sybil-resistant** biometric credential
+
+`src/routes/facetec.js` mounts **two parallel production routes**:
+
+```js
+router.post("/v2/no-sybils/process-request",   processRequest);
+router.get ("/v2/no-sybils/credentials/:_id/:nullifier", getCredentials);
+router.post("/v2/allow-sybils/process-request", processRequestAllowSybils);
+router.get ("/v2/allow-sybils/credentials/:_id/:nullifier", getCredentialsAllowSybils);
+```
+
+and `src/services/facetec/allow-sybils/credentials.js` enrolls into FaceTec 3d-db
+`groupName "2"` with the inline comment *"reference to 3d-db groupName for non-sybil resistant
+biometrics"*. There is an equivalent `src/services/biometrics-sessions/allow-sybils/endpoints.js`.
+
+**Meaning: a "Holonym biometrics" credential may have been issued through a path that deliberately
+skips deduplication.** `src/constants/misc.ts` appears to declare only one
+`biometricsIssuerAddress` and one `v3BiometricsSybilResistanceCircuitId`, so **UNCLEAR** whether
+allow-sybils credentials are distinguishable on-chain from no-sybils ones. If they are not, the
+Holonym biometrics SBT proves *liveness only*, not uniqueness, and we must score it accordingly.
+**Next step: diff `src/services/facetec/v2/allow-sybils/credentials.js` against
+`.../v2/no-sybils/credentials.js` for the issuer/circuit/`sessionType` they sign, and ask Holonym
+directly.** This is the highest-value unresolved question in this file.
+
+### Documented production incident, 2026-04-28 (severity: high, their own classification)
+
+`docs/solutions/security-issues/sandbox-kyc-endpoints-leak-into-live-userverifications-2026-04-28.md`
+in `holonym-foundation/id-server`: there is only one global `UserVerifications` collection and no
+`SandboxUserVerifications`, so **sandbox KYC issuance wrote into live sybil-resistance state**.
+Affected paths: `POST /zk-passport/verify-and-issue`, `POST /off-chain-attestations/zk-passport`,
+`GET /onfido/credentials/v3/...`, `GET /sumsub/credentials/v3/...`. Symptoms in their own words:
+*"Sandbox KYC issuance writes to the live UserVerifications collection, polluting prod
+sybil-resistance state"* and *"A user who verified in live cannot exercise the sandbox flow with
+the same passport."* Fixed by gating reads/writes on `config.environment === "live"`.
+
+Two things we should take from this. (1) Credit for publishing it — most protocols in this file
+publish nothing. (2) The doc itself states **"AML sessions (`src/services/aml-sessions/endpoints.ts`)
+still call `saveUserToDb(uuid)` unconditionally… likely have the same bug"** — i.e. a known,
+unfixed variant as of that write-up. And structurally: *uniqueness state lives in a MongoDB
+collection*, not in the ZK system. The on-chain proof is only as sound as that database.
 - **`zk-passport`:** trust root is the issuing state's passport-signing PKI (ICAO DSC/CSCA). This
   is the same root as Rarimo/zkPassport/Self, so **do not double-count** a Holonym zk-passport
   against a Self.xyz or Rarimo passport credential — it is literally the same document.
@@ -590,14 +641,262 @@ free to fork.
 
 # Intuition
 
-**One-liner:** TBD
+**One-liner:** A token-curated knowledge graph — "Atoms" (identifiers) and "Triples"
+(subject-predicate-object claims) that anyone can create and that anyone can **stake $TRUST on** —
+marketed as "the trust layer for the internet and AI."
+**Category:** **none of the five.** It is a *claim substrate*, not a personhood credential. Any
+personhood semantics would come from whoever issues the triple, not from Intuition.
+**Chains:**
+- **Intuition Mainnet L3, chainId 1155** — confirmed live 2026-07-24
+  (`eth_chainId` at `https://rpc.intuition.systems` → `0x483` = 1155). Blockscout explorer at
+  `https://explorer.intuition.systems` (HTTP 200).
+- **Base mainnet (8453)** — $TRUST ERC-20.
+- Testnets: Base Sepolia (84532), Intuition Testnet L3 (13579).
+**Status (2026-07): LIVE, mainnet since 2025-10-29, very actively developed.** GitHub org
+`0xIntuition` had pushes **on 2026-07-24 (today)** across `intuition-contracts-v2`,
+`intuition-docs`, and `intuition-core`; `agent-skills` 2026-07-20; `intuition-rs` 2026-07-14.
+Raised **$8.5M** (Shima Capital, Superscrypt, ConsenSys, Polygon, F-Prime, CoinList, Legion).
+Claimed beta/testnet activity before mainnet: **244,000 participants, 5M+ transactions and
+attestations on Base** (secondary: https://cryptobriefing.com/intuition-mainnet-launch-trust-token/,
+2025-10-29).
+
+**Aggregator verdict: SKIP as a personhood source; consider LATER as a publication venue.**
+Intuition does not and cannot tell us a user is human. Its economic layer adds **cost**, not
+**uniqueness** — see below. It is potentially interesting as a place to *publish* our aggregated
+humanity assertions as triples so that other apps can read them, but that is a distribution
+decision, not a data-source decision, and it costs gas plus $TRUST.
+
+## What it proves
+
+Nothing about personhood. The primitives are:
+- **Atom** — a token-curated identifier for any entity (a person, a URL, a contract, a concept).
+  Each Atom gets an **AtomWallet** (ERC-4337 account) via `AtomWalletFactory`.
+- **Triple** — `[subject] - [predicate] - [object]`, e.g. from their own docs
+  (`docs/_data/intuition-concepts/trust-mechanisms.md`):
+  `[Address X] - [is controlled by] - [Person Y]`, `[Account] - [verified by] - [KYC Provider]`.
+- **Staking** — users deposit into a **MultiVault** position on an Atom or Triple along a
+  **bonding curve** (`LinearCurve`, `ProgressiveCurve`, `OffsetProgressiveCurve`) and receive
+  shares. Signal = aggregate stake for/against a triple.
+
+Their trust model is explicitly **"many-to-one non-deterministic attestations"**: no authority,
+"truth emerges from collective validation," with explicit (staked), implicit (usage) and transitive
+(web-of-trust, "Reality Tunnels") trust.
+
+## Does the staking layer add real sybil resistance? — No. It adds cost.
+
+This is the question we were asked and the answer is unambiguous:
+
+- Staked signal is **capital-weighted**, not person-weighted. One whale outvotes ten thousand
+  humans. That is plutocracy, and plutocracy is the *opposite* of sybil resistance: a sybil farm
+  with capital simply buys the position it wants. Bonding curves make it *more* expensive to move
+  a heavily-staked triple, which raises the price of an attack but never bounds the number of
+  identities.
+- Because Atom creation is permissionless and paid, a sybil can mint **unbounded Atoms** for
+  unbounded fake "people" — the cost is linear in identities, exactly the thing personhood
+  protocols exist to break.
+- The only sybil resistance it could ever carry is **borrowed**: if the entity staking
+  `[address] - [is a unique human]` is itself a credential issuer with a real trust root, then the
+  triple is worth exactly what that issuer's credential is worth, and Intuition contributes
+  nothing beyond storage and discoverability. In aggregation terms it is a **transport, not a
+  source** — and we must never let a triple's stake weight inflate a score, or we have built a
+  pay-to-be-human oracle.
+- Useful reframe for us: Intuition is a decentralized *EAS-with-a-market* (compare the EAS/Disco
+  file). Same "who attested it" question, plus a price signal we should treat as noise for
+  personhood purposes.
+
+## On-chain surface
+
+From https://www.docs.intuition.systems/docs/intuition-smart-contracts/deployments (2026-07-24):
+
+**Base mainnet (8453)** — `Trust` (ERC-20): `0x6cd905dF2Ed214b22e0d48FF17CD4200C1C6d8A3`
+
+**Intuition Mainnet L3 (1155)** — $TRUST is the native gas token:
+- `MultiVault`: `0x6E35cF57A41fA15eA0EaE9C33e751b01A784Fe7e`  ← the core Atom/Triple + staking contract
+- `WrappedTrust`: `0x81cFb09cb44f7184Ad934C09F82000701A4bF672`
+- `TrustBonding`: `0x635bBD1367B66E7B16a21D6E5A63C812fFC00617`
+- `BondingCurveRegistry`: `0xd0E488Fb32130232527eedEB72f8cE2BFC0F9930`
+- `LinearCurve`: `0xc3eFD5471dc63d74639725f381f9686e3F264366`
+- `OffsetProgressiveCurve`: `0x23afF95153aa88D28B9B97Ba97629E05D5fD335d`
+- `AtomWalletFactory`: `0x33827373a7D1c7C78a01094071C2f6CE74253B9B`
+- `AtomWalletBeacon`: `0xC23cD55CF924b3FE4b97deAA0EAF222a5082A1FF`
+- `AtomWarden`: `0x98C9BCecf318d0D1409Bf81Ea3551b629fAEC165`
+- `SatelliteEmissionsController`: `0x73B8819f9b157BE42172E3866fB0Ba0d5fA0A5c6`
+- Upgrades TimelockController: `0x321e5d4b20158648dFd1f360A79CAFc97190bAd1`;
+  Parameters TimelockController: `0x71b0F1ABebC2DaA0b7B5C3f9b72FAa1cd9F35FEA`
+- `EntryPoint` (4337): `0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`; `Multicall3` at the canonical
+  `0xcA11bde05977b3631167028862bE2a173976CA11`
+
+**Base Sepolia (84532)**: `TestTrust` `0xA54b4E6e356b963Ee00d1C947f478d9194a1a210`,
+`BaseEmissionsController` `0xC14773Aae24aA60CB8F261995405C28f6D742DCf`.
+**Intuition Testnet L3 (13579)**: `MultiVault` `0x2Ece8D4dEdcB9918A398528f3fa4688b1d2CAB91`, etc.
+
+Contracts are **timelock-upgradeable** (two TimelockControllers). ABIs are published in
+https://github.com/0xIntuition/intuition-contracts-v2/tree/main/abis, and there are two
+**Consensys Diligence audit reports** committed in `audits/`
+(`Diligence-Audit-Report-1.pdf`, `Diligence-Audit-Report-2.pdf`) — better audit hygiene than most
+protocols in this file.
+
+### Documented production incident (good, they publish these)
+
+`intuition-contracts-v2/POST-MORTEM.md`: on **2025-11-18**, ~1 minute after epoch 0 ended, an
+`increase_amount(50e18)` call created a VotingEscrow checkpoint past the epoch boundary and caused
+an **unsigned underflow (`Panic(0x11)`) in `VotingEscrow._supply_at`**, so **every `claimRewards`
+call reverted** thereafter. Breaking tx
+`0xd239a60b0d3f24b4384657184cd8256ae9d15fbf6c3e7bc450dd19d232f3b5f6`, block 115261, on
+`TrustBonding` `0x635bBD1367B66E7B16a21D6E5A63C812fFC00617`; fix in PR #126. Reward-claiming, not
+graph data, was affected. Three weeks into mainnet. Relevant to us only as a liveness/maturity
+datapoint.
+
+## Integration surface
+
+- **Off-chain indexer/backend:** `0xIntuition/intuition-rs` (Rust + Postgres, 38 stars,
+  last push 2026-07-14) — this is how you actually read the graph at scale rather than via RPC.
+- **TypeScript monorepo:** `0xIntuition/intuition-ts` (33 stars, 2026-06-30) and
+  `0xIntuition/packages`. UNVERIFIED: exact npm package names/versions — read
+  `intuition-ts/packages/*/package.json`.
+- **GraphQL API:** UNVERIFIED endpoint URL; the docs site (`www.docs.intuition.systems`) has an
+  API section — check there and in `intuition-rs`'s hasura config.
+- **MCP server:** `0xIntuition/intuition-mcp-server` (2026-03-31) and `agent-skills` (2026-07-20,
+  21 stars) — they are aggressively courting the AI-agent integration path, plus
+  `vital-agent-registry` and `intuition-github-action`.
+- **Chrome extension:** `0xIntuition/chrome-extension` (153 stars, 2026-05-05) — "Building a Safer
+  Web, Together." Their consumer surface.
+- Portal: https://portal.intuition.systems (HTTP 200, 2026-07-24).
+
+## Privacy model
+
+**None. This is the opposite of ZK.** Atoms, Triples, and stake positions are public on a public
+chain, attributable to the staking address. Publishing `[wallet] - [is a unique human] - [true]`
+to Intuition **deanonymizes the very fact that Holonym/Billions went to great lengths to keep
+app-scoped and private.** If we ever publish humanity assertions here, they must be about
+pseudonymous, app-scoped identifiers and never about a user's main wallet. Flagging this loudly
+because "publish our score to Intuition" is a superficially attractive idea that quietly destroys
+the privacy properties of every upstream credential.
+
+## Scoring-relevant facts
+
+- No personhood tiers, no expiry semantics for personhood, no revocation of a "human" claim beyond
+  people un-staking.
+- 244k beta participants / 5M+ pre-mainnet attestations (their number, secondary source,
+  pre-2025-10-29). UNVERIFIED: post-mainnet actives. Computable ourselves from `MultiVault` events
+  on chain 1155 if we ever care.
+- $TRUST is required for Atom/Triple creation and staking ⇒ a real per-claim cost to any writer.
 
 ---
 
-# Cross-cutting: trust roots
+# Cross-cutting: what these credentials actually bottom out in
 
-TBD
+The brief asked us to flag anything whose credential is ultimately **a KYC vendor check** or
+**a face scan**. Answer, with evidence:
+
+| Protocol | Credential | Real trust root | Class |
+|---|---|---|---|
+| Billions | Proof of Uniqueness | **Face liveness scan** (vendor UNVERIFIED) | **face** |
+| Billions | Verified Human | Face scan + **identity document check** | **face + KYC vendor** |
+| Holonym/Human ID | `biometrics` | **FaceTec** 3D liveness + `/3d-db/search` 1:N dedup, self-hosted at `facetec-server*.holonym.io` | **face** |
+| Holonym/Human ID | `gov-id` / `kyc` | **Onfido, Sumsub, iDenfy, Veriff** (all four wired into `id-server`) | **KYC vendor** |
+| Holonym/Human ID | `zk-passport` | ICAO passport PKI (NFC chip, no vendor) | **state PKI** — genuinely independent |
+| Holonym/Human ID | `phone` | Telco / SMS | weak |
+| Holonym | Clean Hands | AML/sanctions screening | compliance, not personhood |
+| Silk / Human Wallet | — | none of its own; a wallet UI over the above | n/a |
+| Sismo | ZK Badge / `vaultId` | **Commitment Mapper** (a trusted AWS Lambda) over ECDSA/OAuth account proofs | account control, dead |
+| Unitap | — | consumes **BrightID** (social graph) + **Gitcoin/Human Passport** + captcha | n/a |
+| Intuition | Triple + stake | **whoever staked it**, weighted by capital | none |
+
+### Correlation warnings for the scoring model
+
+1. **The face cluster.** Billions PoU, Holonym `biometrics`, and (per the sibling file) zkMe are
+   all "a camera looked at you." Different vendors, but the same attack surface: presentation
+   attacks, deepfake injection, and paid-farmer enrolment. They are **not** independent evidence.
+   Cap the combined contribution of the whole cluster at roughly what one good face credential is
+   worth, plus a small bonus for vendor diversity.
+2. **The IDV-vendor cluster.** Holonym `gov-id`, Billions "Verified Human", Civic and zkMe KYC all
+   resolve to a small set of commercial vendors — and Holonym alone uses four of them. A user who
+   passed Onfido for Holonym and Onfido for someone else has one piece of evidence, not two. If we
+   can learn *which* vendor signed, we should; if we cannot, assume overlap.
+3. **The passport-PKI cluster.** Holonym `zk-passport` shares its root with Self.xyz, Rarimo and
+   zkPassport — the same physical document and the same CSCA/DSC signatures. Never additive.
+   But note this is the *only* root in this file that does not depend on a company staying
+   solvent, which makes it the most durable thing we can build on.
+4. **Sismo and Intuition contribute no root at all.** Sismo is dead; Intuition's stake weight is
+   capital, and capital is the thing sybils have.
+5. **Every "trustless ZK identity" here has exactly one centralized issuance oracle**: Sismo's
+   Commitment Mapper (AWS Lambda), Holonym's `UserVerifications` MongoDB collection + issuer key,
+   Billions' issuer DID on a chain Billions runs. ZK protects the *verifier* from learning who you
+   are; it never removes the issuer's power to mint. Any claim we make about decentralization must
+   be scoped to the verification path, not issuance.
+
+### Liveness triage summary (2026-07-24)
+
+| Project | Verdict | Hardest evidence |
+|---|---|---|
+| **Billions** | **Live, well-funded, shipping** | org pushes through 2026-07-09; chain 45056 live; TGE 2026-05-04 |
+| **Holonym / human.tech** | **Live**, rebranded, identity is no longer the focus | `id-server` push 2026-07-23; `api.holonym.io` answers today; legacy `*.holonym.id` sites dead/502 |
+| **Silk / Human Wallet** | **Live**, now "WaaP" | npm `@silk-wallet/silk-wallet-sdk` 1.0.2, 2025-10-08; docs redirect to `docs.waap.human.tech` |
+| **Unitap** | **Semi-abandoned** | backend last commit 2025-06-30; `/gastap` returns HTTP 500; footer "© 2025" |
+| **Sismo** | **Dead** | `sismo.io` is a parked-domain lander; docs/apps subdomains do not resolve; capital returned to investors in 2023 Q4 |
+| **Intuition** | **Live**, mainnet 2025-10-29 | pushes 2026-07-24; chain 1155 answers `eth_chainId`; two Diligence audits |
+
+### If we only do one thing from this file
+
+**Integrate `api.holonym.io`.** It is the only credential here we can read permissionlessly from a
+wallet address in a single unauthenticated GET, with an on-chain fallback we control
+(`isUniqueForAction` on Optimism). Weight it as a KYC/face credential, prefer `zk-passport` when
+present, resolve the allow-sybils question before trusting `biometrics`, and score `phone` at
+approximately zero.
+
+---
 
 # References
 
-TBD
+**Holonym / human.tech / Silk**
+- https://github.com/holonym-foundation — org repo listing with push dates (via `gh api`), 2026-07-24
+- https://github.com/holonym-foundation/holonym-api — REST API README, endpoints
+- https://github.com/holonym-foundation/holonym-api/blob/main/src/constants/contractAddresses.js
+- https://github.com/holonym-foundation/holonym-api/blob/main/src/constants/misc.ts (issuers, circuit IDs, Stellar SBT)
+- https://github.com/holonym-foundation/id-server — KYC vendor routes (`onfido`, `sumsub`, `idenfy`, `veriff-kyc`), `facetec` routes, `allow-sybils` services
+- https://github.com/holonym-foundation/id-server/blob/main/docs/solutions/security-issues/sandbox-kyc-endpoints-leak-into-live-userverifications-2026-04-28.md
+- https://github.com/holonym-foundation/id-hub-contracts/blob/main/contracts/Hub.sol
+- https://docs.id.human.tech/ (was `docs.holonym.id`, 301) and https://docs.waap.human.tech/ (was `docs.silk.sc`, 307→301)
+- https://www.npmjs.com/package/@silk-wallet/silk-wallet-sdk — v1.0.2, 2025-10-08 (registry metadata)
+- Live probes 2026-07-24: `GET https://api.holonym.io/attestation/attestor` → `{"address":"0xa74772264f896843c6346ceA9B13e0128A1d3b5D"}`; `GET https://api.holonym.io/sybil-resistance/gov-id/optimism?...` → `{"result":false}`
+
+**Billions Network**
+- https://billions.network/ — homepage + embedded schema.org (user counts, founder, founding date), 2026-07-24
+- https://github.com/BillionsNetwork/docs — developer docs source (`billions-wallet/overview.mdx`, `agents/identity-overview.mdx`, `billions-wallet/login-with-billions.mdx`)
+- https://github.com/BillionsNetwork/verified-agent-identity/blob/main/scripts/shared/constants.js — chainId 45056, RPC, state contract, issuer DIDs, schema ID
+- https://github.com/BillionsNetwork/x402-human-proof-js , https://github.com/BillionsNetwork/erc-8004-contracts
+- https://www.privado.id/blog/privado-id-introduces-billions-the-first-global-human-ai-network (2025-02-28, primary-ish/vendor blog)
+- https://billions.network/blog/proof-of-uniqueness-on-token-distribution-billions-x-lagrange (vendor blog; "Liveness Face Verification")
+- https://venturebeat.com/business/billions-network-launches-universally-accessible-verification-platform-for-humans-and-ai (secondary)
+- https://www.biometricupdate.com/202511/billions-network-ceo-calls-blockchain-powerful-tool-for-age-assurance-privacy (secondary, 2025-11)
+- Live probes 2026-07-24: `eth_chainId` @ `https://rpc-mainnet.billions.network` → `0xb000`; `eth_blockNumber` → `0x62d35d`
+- $BILL TGE 2026-05-04 — secondary only: https://www.coingabbar.com/en/crypto-currency-news/billions-network-airdrop-listing-date-may-4-claim-bill-tokens , https://coinmarketcap.com/currencies/billions-network/
+
+**Unitap**
+- https://github.com/UnitapApp — repo push dates
+- https://github.com/UnitapApp/unitap-backend/blob/main/core/constraints/__init__.py — full constraint registry
+- https://github.com/UnitapApp/unitap-backend/blob/main/core/constraints/bright_id.py , `.../gitcoin_passport.py`
+- Live probes 2026-07-24: `unitap.app/gastap` → HTTP 500; `/tokentap`, `/prizetap`, `/about` → 200
+- https://forum.metacartel.org/t/grant-proposal-unitap-the-gateway-to-web3-networks-and-communities/2725 (historical, secondary)
+
+**Sismo**
+- https://github.com/sismo-core — repo push dates (last meaningful activity 2024-12-31)
+- https://github.com/sismo-core/sismo-docs/blob/main/data-vault/vault-and-proof-identifiers.md — `vaultId` formula and properties
+- https://github.com/sismo-core/sismo-docs/blob/main/data-vault/commitment-mapper.md — trusted-service security model
+- https://github.com/sismo-core/sismo-badges — badge contracts (last commit 2023-10-03)
+- https://github.com/sismo-core/sismo-connect-packages — SDK (dead end-to-end)
+- https://www.thebigwhale.io/article/exclusive-sismo-in-difficulty-could-soon-be-shut-down (2023-11-16, secondary — the post-mortem reporting)
+- https://www.coinlive.com/news-flash/389359 (secondary; $10.5M / 130 investors / 51% returned)
+- https://sismo.mirror.xyz/MimvqFv45hohMwDBD9rGqY4XGZIHRR8On7nx6q9YFRc (ZK Badges sunset post — **403 to automated fetch**, Cloudflare; read manually if you need the exact numbers)
+- https://dune.com/martingbz/sismo-zk-badges (historical usage)
+- Live probes 2026-07-24: `sismo.io` body contains `window.LANDER_SYSTEM="PW"` / `{ap:"parking"}`; `docs.sismo.io` and `apps.sismo.io` → HTTP 000
+
+**Intuition**
+- https://www.docs.intuition.systems/docs/intuition-smart-contracts/deployments — all addresses/chain IDs
+- https://github.com/0xIntuition/intuition-contracts-v2 — ABIs, `audits/Diligence-Audit-Report-{1,2}.pdf`, `POST-MORTEM.md` (2025-11-18 incident)
+- https://github.com/0xIntuition/intuition-docs/blob/main/docs/_data/intuition-concepts/trust-mechanisms.md
+- https://github.com/0xIntuition/intuition-rs , https://github.com/0xIntuition/intuition-ts , https://github.com/0xIntuition/intuition-mcp-server
+- https://github.com/0xIntuition/intuition-whitepaper
+- https://cryptobriefing.com/intuition-mainnet-launch-trust-token/ (2025-10-29, secondary — mainnet date, $8.5M raise, 244k beta participants)
+- Live probes 2026-07-24: `eth_chainId` @ `https://rpc.intuition.systems` → `0x483` (1155); `explorer.intuition.systems` (Blockscout) HTTP 200

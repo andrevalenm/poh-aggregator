@@ -1,6 +1,7 @@
 # EAS & Disco.xyz — the attestation substrate
 
-> STATUS: in progress (started 2026-07-24)
+*Researched 2026-07-24. All contract addresses, counts and gas figures below were pulled from
+primary sources (GitHub source files, RPC, EASSCAN GraphQL) on that date.*
 
 **One-liner:** EAS (Ethereum Attestation Service) is a permissionless, schema-based attestation
 registry deployed on ~20 EVM chains; Disco.xyz was a W3C-Verifiable-Credential "data backpack" for
@@ -10,8 +11,11 @@ personhood claim can be published, read and composed.
 `attester` said `data` about `recipient` at time `t`. All trust is in the attester.
 **Chains:** EAS — Ethereum L1, OP Mainnet, Base, Arbitrum One + Nova, Polygon, Scroll, zkSync,
 Celo, Linea, Blast, Telos, Soneium, Ink, Unichain (+ testnets). Disco — off-chain, DID-based.
-**Status (2026-07):** EAS **live and actively maintained** (last commit to `eas-contracts`
-2026-07-16). Disco.xyz — see the Disco section; evidence points to **dead/wound-down**.
+**Status (2026-07):** EAS **live and actively maintained** — last commit to `eas-contracts`
+2026-07-16; 3.57M attestations on Base, 1.32M on OP Mainnet, issuing today.
+Disco.xyz — **DEAD**: merged into Privado ID 2024-09-19, GitHub org silent since 2024-04-30,
+`docs`/`api`/`app`/`issuer.disco.xyz` all NXDOMAIN, and the `disco.xyz` domain is now an SEO-spam
+site owned by a third party.
 **Aggregator verdict:** **EAS = integrate now, as an optional output rail.** Publish our aggregate
 humanity assertion as an *off-chain* EAS attestation by default (free, portable, privacy-preserving),
 with opt-in on-chain anchoring for consumers who need a `getAttestation()` read from a smart
@@ -44,15 +48,40 @@ aggregator's perspective this cuts both ways:
 
 ## Trust root & failure modes
 
-**EAS's own trust root** is the immutability of the deployed contracts. `EAS.sol` and
-`SchemaRegistry.sol` are **non-upgradeable, non-owned** — there is no admin key, no pause, no
-proxy, no fee switch. That is the single strongest argument for using it: once deployed, the
-EAS org cannot rug the registry. (Verify per-chain before relying on this: on OP-Stack chains EAS
-lives at predeploy addresses `0x42...0021` / `0x42...0020`, which are set by the chain's genesis /
-L1 upgrade process, i.e. **the chain governance can in principle replace the predeploy
-implementation**. On Ethereum/Arbitrum/Polygon/etc. it is a plain immutable deployment.)
-`UNVERIFIED:` whether any OP-Stack chain has ever actually upgraded the EAS predeploy — worth
-checking the OP `L2 predeploys` upgrade history before trusting a Base/OP attestation as immutable.
+**EAS's own trust root** is the immutability of the deployed contracts. The `EAS.sol` /
+`SchemaRegistry.sol` source has no owner, no pause, and no fee switch. But **"EAS is immutable" is
+only true on some chains, and it is FALSE on exactly the chains we care about.** Verified directly
+against RPC, 2026-07-24:
+
+| Chain | `EAS` address | EIP-1967 impl slot | Verdict |
+|---|---|---|---|
+| Ethereum L1 | `0xA1207F3B…Ce587` | `0x0` (no proxy); 19,971 bytes of real code | **Truly immutable** |
+| **Base** | `0x42…0021` | `0xbeb5fc579115071764c7423a4f12edde41f106ed` | **Upgradeable proxy** |
+| **OP Mainnet** | `0x42…0021` | (proxy) | **Upgradeable proxy** |
+
+On both Base and OP Mainnet the predeploy is a **2,055-byte EIP-1967 transparent proxy** whose
+**admin slot** (`0xb531…6103`) reads
+**`0x4200000000000000000000000000000000000018`** — the OP-Stack **`ProxyAdmin`** predeploy. In other
+words, **on every OP-Stack chain (Base, OP, Blast, Soneium, Ink, Unichain) the EAS contract can be
+upgraded by whoever controls that chain's ProxyAdmin owner** — the Optimism Security Council /
+Coinbase-side multisig, not the EAS org and not us.
+
+This materially changes the pitch. The correct statement is: *"EAS on L1 is immutable; EAS on
+OP-Stack chains inherits the chain's own upgrade trust assumptions, which you are already accepting
+by using that chain."* That is defensible — you already trust Base's ProxyAdmin for the bridge — but
+we should never tell a customer that a Base attestation is protected by an unownable contract. It
+is not.
+
+`UNVERIFIED:` whether any OP-Stack chain has ever actually exercised this upgrade path, and the
+current owner of `0x42…0018` on Base. Next step: `ProxyAdmin.owner()` on Base and the OP
+`superchain-registry`.
+
+Repro:
+```bash
+# admin slot -> 0x...4200000000000000000000000000000000000018 (ProxyAdmin predeploy)
+cast storage 0x4200000000000000000000000000000000000021 \
+  0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103 --rpc-url https://mainnet.base.org
+```
 
 Failure modes that matter to us:
 
@@ -343,17 +372,25 @@ tutorial), or a plain vendor database (i.e. ours).
 - The SDK exposes `verifyOffchainAttestationSignature()` for off-chain (JS) verification, which is
   the realistic path for API/backend consumers.
 
-**Cost implications.** Off-chain = **zero gas** for issuance and revocation-by-omission. On-chain
-attest cost is dominated by calldata + one storage write of the packed `Attestation` struct plus the
-`bytes data`. The EAS docs' own
+**Cost implications — measured, not guessed.** Off-chain = **zero gas** for issuance. For on-chain,
+I pulled real `eth_getTransactionReceipt` gas for live Base attestations (2026-07-24):
+
+| Path | `gasUsed` |
+|---|---|
+| Coinbase Verified Account (`bool` payload) via their attester contract → resolver + indexer writes | **282,312 – 328,031** (modal **282,312**) |
+| Direct `attest()` to the EAS predeploy `0x42…0021`, larger payloads | **374,303** and **513,570** |
+
+So the honest planning number is **~280k gas for a minimal resolver-backed attestation, ~375k+ for
+anything with a real payload** — roughly 1.5–2× higher than a naive "it's just one SSTORE" estimate,
+because EAS writes the whole `Attestation` struct (uid, schema, 3× uint64, refUID, 2 addresses,
+bool, bytes) plus the resolver/indexer hop. Note the *docs' own*
 [gas-efficiency tutorial](https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/tutorials/gas-efficiency.md)
-gives the components (21k base tx, 16 gas/non-zero calldata byte, 4 gas/zero byte, plus execution)
-but **does not publish a headline gas number for `attest()`**. `UNVERIFIED:` exact gas for
-`attest()` — measure it. Rough expectation from the struct shape is on the order of **~150k-250k
-gas** for a small (one-word `data`) attestation, higher with a resolver. Next step: run
-`forge test --gas-report` against `eas-contracts`, or read a real Base tx for a Coinbase Verified
-Account attestation on BaseScan. At Base L2 prices this is fractions of a cent; on Ethereum L1 it is
-a few dollars per user, which rules L1 out for per-user attestations at any scale.
+gives only the components (21k base, 16 gas/non-zero calldata byte, 4/zero byte) and **publishes no
+headline `attest()` figure** — hence measuring.
+
+Implication: negligible on Base/OP (fractions of a cent at typical L2 fees), but at ~300k gas
+Ethereum L1 is **decisively** out for per-user attestation at any scale. This is consistent with
+L1's 14,151 lifetime attestations (below).
 
 Docs' own recommendations that we should follow: keep `data` minimal (attest the *result*, not the
 evidence), use `uint64` for timestamps and `uint8` for enums, use `refUID` for modular composition
@@ -547,7 +584,9 @@ Arguments that EAS is credibly neutral infrastructure:
   [FAQ](https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/quick--start/faqs.md):
   *"EAS is a tokenless protocol and does not have plans to launch a token. Being a tokenless protocol
   is critical to our design as to remain credibly neutral."*
-- **No fees, no admin, non-upgradeable core contracts.** MIT licence.
+- **No protocol fees, no admin key in the source, no rent extraction.** MIT licence. (But see Trust
+  root: the *deployment* on OP-Stack chains sits behind the chain's own upgradeable proxy. Only the
+  Ethereum L1 deployment is literally non-upgradeable.)
 - **Audited by Spearbit** (per FAQ). `UNVERIFIED:` public link to the Spearbit report — worth
   obtaining before we put material value behind a resolver.
 - **Forkability:** the whole thing is ~800 lines of Solidity across two contracts. If the EAS org
@@ -573,12 +612,324 @@ Arguments against, which we should weigh honestly:
 services* are not, and we must not depend on them. That distinction should be explicit in our
 architecture: read from RPC + our own index; use EASSCAN only for debugging and for links in a UI.
 
-## Privacy model
+---
 
-## Scoring-relevant facts
+# Disco.xyz — **DEAD.** Do not integrate.
 
-## Overlap with other protocols
+**Verdict: skip.** Disco.xyz merged into Privado ID in September 2024, wound down through 2025, and
+its domain has since been dropped and re-registered by an SEO spam operator. There is no API, no
+docs, no app, no maintained SDK. Any integration work here is wasted.
 
-## Open questions for us
+## Evidence of death (all checked 2026-07-24)
 
-## References
+| Signal | Finding |
+|---|---|
+| **Merger announcement** | [Privado ID blog, **2024-09-19**](https://www.privado.id/blog/privado-id-and-disco-xyz-announce-merger-to-launch-unified-identity-across-blockchains-and-legacy-systems): "Privado ID and Disco.xyz Announce Merger…". Founder **Evin McMullen** joined Privado ID as cofounder & Chief Strategy Officer; combined entity operates under the **Privado ID** banner. The announcement is conspicuously silent on what happens to existing Disco users, credentials, or the API. |
+| **GitHub org `discoxyz`** | Last push to *any* repo: **2024-04-30** (`disco-schemas` v2.2.0). Every other repo last touched 2022–2023. `disco-api-docs` is **archived**. Zero activity for ~27 months. |
+| **`docs.disco.xyz`** | **NXDOMAIN** — DNS record removed entirely. |
+| **`api.disco.xyz`** | **NXDOMAIN**. |
+| **`app.disco.xyz`** | **NXDOMAIN** — the "data backpack" app itself is gone. |
+| **`issuer.disco.xyz`** | **NXDOMAIN**. |
+| **`disco.xyz` apex** | Resolves (Cloudflare) and returns HTTP 200 — but it is now a **WordPress SEO-spam site** titled *"Spy Apps 2025: Best Monitoring Software for Smartphones."* |
+| **npm** | `disco-js`, `@disco-xyz/disco-js`, `@discoxyz/disco-js` — all **404 Not Found** on the npm registry. `UNCLEAR:` the exact historical package name; regardless, nothing under an obvious Disco scope is published. |
+| **Blog `disco.mirror.xyz`** | Returns **403 / Cloudflare challenge**; content not retrievable. Not evidence of life. |
+
+### Domain-decay timeline (Wayback Machine captures of `disco.xyz`)
+
+| Capture | Page title / behaviour |
+|---|---|
+| 2025-04-23 | **"Disco (now privado.id)"** — official wind-down redirect banner |
+| 2025-07-16 | JS redirect to `/lander` — **domain parked** |
+| 2025-10-04 | **"Disco.xyz — Social Discovery Platform & Community"** — domain re-registered, unrelated content |
+| 2025-12-11 → 2026-05-11 → today | **"Spy Apps 2025: Best Monitoring Software for Smartphones"** — WordPress SEO spam |
+
+This is an unusually clean death certificate: an official "now privado.id" notice, then parking,
+then a third party taking the domain. **The `disco.xyz` domain is now hostile.** Anything in our
+codebase or docs pointing at `disco.xyz` should be treated as a supply-chain/reputation risk — and
+note that any historical Disco credential whose `credentialSchema`, `issuer` DID, or `@context`
+resolves to a `disco.xyz` URL is now resolving into an attacker-controlled domain. That is a real
+argument against URL-resolved VC contexts in general.
+
+## What Disco actually shipped (historical, for context only)
+
+- **W3C Verifiable Credentials** issued to **DIDs**, with the user's collection framed as a
+  "**data backpack**" — a portable, user-held bundle of credentials rather than an on-chain registry.
+- DIDs were **`did:3`** (Ceramic 3ID) — e.g. the app profile URL form
+  `app.disco.xyz/did:3:kjzl6cwe1jw14b7xqq94oiy0lcnndgyt0p3vtlnsscpljosx6gom46qkxcv8sjb`. Storage was
+  Ceramic/IPFS-backed, i.e. off-chain with on-chain anchoring, not EVM contract state.
+- **`discoxyz/disco-schemas`** — "JSON Schema schemas for Verifiable Credentials" (8★), the closest
+  thing to a durable artifact. Credential types included `Attendance`, `BetaUser`, `Completion`,
+  `Membership`.
+- Ecosystem experiments now abandoned: `disco-gitcoin-passport-score` (a Gitcoin Passport score as a
+  VC — note the overlap with our Gitcoin work), `disco-credit-score-issuer`,
+  `selective-disclosure-nextjs`, `Disco-GM-Faucet`, `poc-programatic-did`.
+- **Verifiability without Disco:** in principle yes — a W3C VC is a signed JSON-LD/JWT document
+  verifiable against the issuer's DID document. In practice, DID resolution for `did:3` requires a
+  working **Ceramic** node and 3ID resolver, and `js-3id` / `js-ceramic` in the Disco org were last
+  touched in early 2023. 3ID itself was deprecated by Ceramic in favour of `did:pkh` + CACAO. So
+  **old Disco credentials are probably not practically verifiable today** without standing up
+  archaeological infrastructure. Treat any Disco VC a user presents as unverifiable.
+
+## Where Disco's people went — and why the orchestrator should care
+
+- **Privado ID** (ex-Polygon ID) absorbed Disco in 2024-09 — Iden3/circom-based ZK credentials.
+- **Evin McMullen** then co-founded **Billions Network** (launched ETH Denver **2025**), which
+  markets itself as a *"mobile-first identity layer that verifies both humans and AI agents —
+  proving uniqueness, KYC/AML status, location, age…while preserving privacy"*
+  ([billions.network](https://billions.network/); secondary sources: LinkedIn, RootData, IQ.wiki).
+- **⚠️ Cross-cutting note:** *Billions Network* and *Privado ID* are live personhood/uniqueness
+  claimants that appear on none of the other research files in `research/protocols/`. If Billions
+  really claims uniqueness proofs at scale, it belongs in the aggregator's protocol list. **Someone
+  should own a `billions-and-privado-id.md`.** This write-up does not cover them — the claims above
+  are unverified marketing copy from secondary sources.
+
+---
+
+# Privacy model
+
+## EAS
+
+EAS itself has **no** privacy features. It is a public append-only log. Privacy is entirely a
+function of *what you choose to put in it*. From
+[`docs/core--concepts/privacy.md`](https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/core--concepts/privacy.md)
+the sanctioned patterns are:
+
+1. **Off-chain attestations** — nothing published at all; the signed blob lives in a URL fragment
+   (never sent to a server), IPFS, Ceramic, or our DB. Maximum privacy, minimum composability.
+2. **Private data attestations** — build a Merkle tree over the underlying evidence and attest only
+   the **root**; the holder selectively discloses leaves + proofs.
+   ([tutorial](https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/tutorials/private-data-attestations.md))
+3. **Off-chain computation, on-chain result** — the docs' own example is precisely ours: *"a platform
+   could verify a user's age offchain and then only attest to whether the user is over 18 on-chain,
+   without revealing the exact birthdate, or even that the verification had to do with a birthdate."*
+4. **Encryption** of off-chain payloads.
+5. **ZKPs** derived from attestation data. There is a whole `zk--playbook` docs section
+   (`overview`, `core-concepts`, `recommended-tooling`, `interoperability`, `zk-roadblocks`,
+   `myths`, `roadmap`) — `UNVERIFIED:` how much of it is implemented vs aspirational; it reads as
+   guidance for builders, not shipped EAS functionality. **EAS ships no ZK primitives itself.**
+6. **`salt`** in off-chain attestation v2 — makes the UID unguessable, so a published hash can't be
+   brute-forced back to `(recipient, schema)`.
+
+### The unavoidable problem with our on-chain output
+
+**A public on-chain attestation `attester=us, recipient=0xUser, schema="is verified human"` is
+itself a privacy harm, and it is permanent.** Specifically:
+
+- It **links the address forever**. Blockchain data is immutable and globally indexed. Revoking the
+  attestation does not delete it; `revocationTime` is just another field. Anyone who ever indexed
+  the `Attested` event has the linkage in perpetuity.
+- It **creates a de-anonymisation oracle**. Anyone can enumerate our schema's `Attested` events and
+  get the complete set of addresses we consider human. Combined with any one off-chain leak
+  (an exchange deposit, an ENS name, a Farcaster handle), it becomes a real-identity mapping.
+- It **enables adversarial exclusion**. A censor can now cheaply distinguish "verified human" from
+  everyone else, and discriminate in either direction. Regimes and platforms both.
+- It **leaks a fresh timestamp** on every re-attestation, which is a behavioural signal.
+- `refUID` evidence graphs make this dramatically worse: publishing *which* protocols contributed
+  (World ID + Coinbase + a passport check) leaks the user's KYC posture and, via country schemas,
+  approximate jurisdiction. **If we publish an aggregate on-chain, publish only the scalar result —
+  never the evidence set.**
+
+Mitigations, in decreasing order of how much we should like them:
+
+- **Default to off-chain.** Sign an EAS off-chain attestation, hand it to the user, publish nothing.
+- **On-chain but pseudonymous per-app.** Attest to an app-scoped address/nullifier rather than the
+  user's main address. This is the standard World-ID-style unlinkability property and EAS does not
+  give it to us — we have to construct it, and it is our design decision, not EAS's.
+- **On-chain Merkle root only.** Attest a root over the evidence; disclose leaves off-chain.
+- **`recipient = address(0)` + data-encoded commitment.** Attest a hiding commitment to the address
+  rather than the address itself, so only someone holding the opening can verify. Loses the
+  "consumer reads by address" convenience entirely — which is the whole point of on-chain. Honest
+  assessment: **on-chain composability and address-privacy are close to mutually exclusive here.**
+- Short `expirationTime` limits the *claim*'s life but not the *linkage*'s.
+
+**Bottom line:** on-chain publication should be **opt-in per user and per consumer**, never a
+default, and the consent copy must say plainly that it is permanent and public. This is the single
+most important product decision in this document.
+
+## Disco
+
+n/a — dead. Historically the model was strictly better on privacy (user-held VCs, off-chain,
+selective disclosure) and strictly worse on availability and verifiability. Its death is itself the
+lesson: **a credential whose verifiability depends on a startup's DNS is a credential with a
+shutdown clock.** EAS's non-upgradeable on-chain contracts have no such clock; our own off-chain
+signed attestations have one only as long as our signer key and public key registry survive — which
+argues for anchoring our *public key* (not our users) on-chain.
+
+# Scoring-relevant facts
+
+EAS contributes no score of its own. What it contributes to *our* scoring:
+
+- **Coinbase Verified Account is worth a moderate, capped amount** — it is KYC-account-linked, not
+  unique-human. One KYC'd person can hold many. Score it as *state-identity evidence with unknown
+  multiplicity*, and cap it well below a true uniqueness proof. `UNCLEAR:` per-account address
+  limit — this single unknown swings its weight by a lot.
+- **Revocation churn is enormous and must be handled.** 406,022 of 720,503 (56.4%) Verified Account
+  attestations are revoked (Base, 2026-07-24). Any integrator naively counting `Attested` events
+  overstates the population by ~2.3×. Always filter `revocationTime == 0`.
+- **Population sizes (Base, 2026-07-24):** ~314k live Verified Account, 305k Verified Country ever
+  issued, 161k Verified Coinbase One ever issued. For scale, Base carries 3.57M EAS attestations
+  total and OP Mainnet 1.32M; Ethereum L1 has just 14,151 across 395 schemas.
+- **Geography is directly readable** from the Verified Country schema
+  (`0x1801901f…01ca065`, ISO 3166-1 alpha-2). Useful for regional weighting, and simultaneously the
+  clearest example of the privacy leak above.
+- **Cost/friction to obtain a Coinbase verification:** free to the user apart from L2 gas; requires
+  an existing KYC'd Coinbase account. So it is high-friction for the unbanked/non-US and near-zero
+  for existing Coinbase customers — a strong geographic and demographic skew we should model.
+- **No expiry:** sampled Coinbase attestations have `expirationTime = 0` (never expires). Freshness
+  is managed purely by revoke-and-reissue, so *absence of revocation is the only liveness signal*,
+  and Coinbase's own disclaimer says status changes "may not be reflected immediately."
+- **Cost for us to publish:** ~0 for off-chain; on-chain roughly **~150k–250k gas** (`UNVERIFIED:`
+  measure it) — negligible on Base/OP, prohibitive on L1.
+
+# Overlap with other protocols
+
+- **Coinbase Verified Account ↔ every other KYC-document-based protocol.** Its trust root is a
+  government ID checked by Coinbase's KYC vendor. That is the *same* root as Civic, zkMe, Fractal,
+  Sumsub-backed flows, and (partially) passport-NFC protocols. **Do not add Coinbase KYC and a
+  document-KYC protocol as independent evidence** — they largely share a failure mode (a forged or
+  rented government ID defeats both). Deduplicate at the *trust-root* level, not the protocol level.
+- **Coinbase Verified Country ↔ any protocol asserting jurisdiction** — same root again.
+- **EAS itself overlaps with nothing** — it is a transport. But note the reverse hazard: **the same
+  underlying claim can appear multiple times on EAS under different schemas and attesters**
+  (e.g. a Gitcoin Passport score republished as an EAS attestation by a third party). Our ingestion
+  must key on the *original* trust root, not on "how many EAS attestations does this address have" —
+  which is a trivially inflatable metric since attesting is permissionless.
+- **Disco ↔ Gitcoin Passport** (historically): `discoxyz/disco-gitcoin-passport-score` republished
+  Passport scores as VCs. Irrelevant now, but the pattern — credential laundering through a second
+  format — is exactly what we must not let inflate a score.
+- **Disco → Privado ID → Billions Network:** shared team lineage. If Billions is ever integrated,
+  note that its founders' prior product died; that's an operational-risk data point, not a technical
+  one.
+
+# Open questions for us
+
+1. **Does Coinbase limit Verified Account attestations per Coinbase account?** This determines
+   whether it's worth ~0.2 or ~0.6 of a uniqueness unit in our score. Ask Coinbase via their
+   [builder form](https://app.deform.cc/form/69d6f46e-426a-4bcd-bfe6-d3b3678bf4bf/); or measure by
+   clustering recipients by funding source.
+2. ~~Actual `attest()` gas cost~~ — **ANSWERED**: ~282k gas (Coinbase-style, resolver + indexer),
+   374k–514k direct with larger payloads, measured on Base 2026-07-24. Remaining sub-question: cost
+   of *our* resolver design specifically.
+3. ~~Are the OP-Stack EAS predeploys upgradeable?~~ — **ANSWERED: YES.** `0x42…0021` on Base and OP
+   Mainnet is an EIP-1967 proxy with admin = the `ProxyAdmin` predeploy `0x42…0018`. Remaining
+   sub-question: **who owns `ProxyAdmin` on Base today**, and has the EAS implementation ever been
+   upgraded? Check `ProxyAdmin.owner()` and the `superchain-registry`.
+4. **Where is the Spearbit audit report for EAS?** The FAQ claims it; find the PDF.
+5. **Distinct live recipients for Coinbase Verified Account** — `groupByAttestation` failed
+   (maintenance page). Get this from our own log index; it is the real denominator.
+6. **Is `eas-sdk-v2` the successor to `eas-sdk`?** Last push 2025-10-15, 6★. Ask in the EAS
+   Telegram before choosing an SDK.
+7. **Do we want a resolver at all?** It buys attester-restriction + auto-indexing + uniqueness
+   enforcement, but it is permanently baked into the schema UID. Decide before registering anything.
+8. **Off-chain verification burden for smart-contract consumers.** If a meaningful share of our
+   customers are contracts, off-chain-first forces each of them to write EIP-712 recovery. Do we
+   ship a canonical verifier library (Coinbase-style `forge install`) to remove that?
+9. **Which chain(s)?** Base has the identity gravity and OnchainKit distribution; OP has predeploy
+   parity. Multi-chain means the same schema string with different resolver addresses → **different
+   UIDs per chain**, which integrators will get wrong. Consider a resolver-free schema (identical
+   UID everywhere) and enforce attester-checking in a library instead. Trade-off worth a decision
+   record.
+
+---
+
+# Recommendation: where should our aggregate humanity assertion live?
+
+**Both, layered — with off-chain as the default and on-chain strictly opt-in.**
+
+### Primary: EAS **off-chain** attestation (EIP-712, v2 with `salt`)
+
+This should be what the aggregator returns by default.
+
+- **Zero gas**, zero chain choice, instant, works before the user has any on-chain footprint.
+- **No permanent public linkage** — the single biggest risk in this whole design is avoided.
+- **Portable**: it's a signed blob the user holds; we don't custody it.
+- Verifiable in JS via `eas-sdk`'s `verifyOffchainAttestationSignature()`, and by anyone who knows
+  our signer key — **no vendor cooperation required, including ours.**
+- Revocation via `revokeOffchain(bytes32)` on a cheap L2 if we ever need hard revocation; otherwise
+  short `expirationTime` + reissue.
+- Cost of the format choice is essentially zero: it's EIP-712 typed data, the most widely supported
+  signing format in the ecosystem.
+
+### Secondary: EAS **on-chain** attestation on **Base**, opt-in per user
+
+- Needed only when the consumer is a **smart contract** (airdrop gate, governance, lending) and
+  can't call an API.
+- Publish on **Base**: 3.57M attestations, Coinbase Verifications gravity, OnchainKit's
+  `getAttestations` already in wallets. OP Mainnet as the second target (same predeploy addresses,
+  so one code path).
+- Copy the Coinbase architecture: a **resolver** that allowlists our attester, an **indexer**
+  contract giving `(recipient, schemaUID) -> uid`, and a small **Foundry-installable verifier
+  library** so integrators write three lines, not thirty.
+- Publish **only the scalar** (e.g. `uint8 humanityScore, uint64 issuedAt`) — never the evidence set,
+  never the country, never source protocol names.
+- Gate it behind explicit consent that says: *permanent, public, and links this address forever.*
+
+### Tertiary: W3C VC — **on demand only, and issue it ourselves**
+
+- Emit a plain **VC-JWT** signed by our key when an enterprise/EU-flavoured customer requires the
+  format. This costs us a few hundred lines, not an integration.
+- Use `did:pkh` or `did:web` — **never** a DID method whose resolution depends on someone else's
+  live infrastructure. Disco's `did:3` is the cautionary tale: its DIDs are effectively unresolvable
+  today, and its `disco.xyz` context URLs now point at a spam domain owned by strangers.
+- **Do not integrate Disco.** It has no API, no docs, no DNS, and no team.
+
+### Trade-off table
+
+| | Off-chain EAS | On-chain EAS (Base) | W3C VC |
+|---|---|---|---|
+| Cost per user | **$0** | ~$0.001–0.01 (L2); $ dollars on L1 | $0 |
+| Smart-contract readable | ✗ (integrator writes `ecrecover`) | **✓ `getAttestation()`** | ✗ |
+| Privacy / linkage | **✓ nothing published** | ✗ **permanent public linkage** | ✓ |
+| Portability | ✓ user holds blob | ✓ but chain-bound | ✓ |
+| Revocation | needs on-chain `revokeOffchain` or expiry | **✓ native, instant** | status-list infra we'd run |
+| Availability if we die | ✓ if user kept the blob + our pubkey is anchored | ✓ forever on L1; on Base/OP contingent on the chain's `ProxyAdmin` | ✓ if DID method is self-contained |
+| Ecosystem distribution | low | **high (OnchainKit, Base)** | enterprise / EU eIDAS-adjacent |
+| Vendor lock-in | none | none (immutable contracts) | none if `did:pkh`/`did:web` |
+
+**One-line answer:** publish as an **EAS off-chain attestation by default, an EAS on-chain
+attestation on Base by explicit user opt-in, and a self-issued VC-JWT only when contractually
+required** — and treat the on-chain path as a privacy liability to be minimised, not a feature to be
+maximised.
+
+# References
+
+**EAS — primary**
+- `eas-contracts` repo (MIT, 318★, last commit 2026-07-16): https://github.com/ethereum-attestation-service/eas-contracts
+- Deployment addresses: https://github.com/ethereum-attestation-service/eas-contracts#deployments
+- `IEAS.sol`: https://github.com/ethereum-attestation-service/eas-contracts/blob/master/contracts/IEAS.sol
+- `Common.sol` (`Attestation` struct): https://github.com/ethereum-attestation-service/eas-contracts/blob/master/contracts/Common.sol
+- `ISchemaRegistry.sol`: https://github.com/ethereum-attestation-service/eas-contracts/blob/master/contracts/ISchemaRegistry.sol
+- `SchemaRegistry.sol` (`_getUID`): https://github.com/ethereum-attestation-service/eas-contracts/blob/master/contracts/SchemaRegistry.sol
+- `ISchemaResolver.sol`: https://github.com/ethereum-attestation-service/eas-contracts/blob/master/contracts/resolver/ISchemaResolver.sol
+- Example resolvers: https://github.com/ethereum-attestation-service/eas-contracts/tree/master/contracts/resolver/examples
+- `eas-sdk` (TS, MIT, 140★, last commit 2026-05-29, v2.9.1): https://github.com/ethereum-attestation-service/eas-sdk
+- Off-chain EIP-712 types: https://github.com/ethereum-attestation-service/eas-sdk/blob/master/src/offchain/offchain.ts
+- `eas-indexing-service`: https://github.com/ethereum-attestation-service/eas-indexing-service
+- Docs — on-chain vs off-chain: https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/core--concepts/onchain-vs-offchain.md
+- Docs — privacy: https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/core--concepts/privacy.md
+- Docs — credible neutrality: https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/core--concepts/credible-neutrality.md
+- Docs — FAQ (tokenless, funding, Spearbit audit): https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/quick--start/faqs.md
+- Docs — gas efficiency: https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/tutorials/gas-efficiency.md
+- Docs — private data attestations: https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/tutorials/private-data-attestations.md
+- Docs — GraphQL API + endpoints: https://github.com/ethereum-attestation-service/eas-docs-site/blob/main/docs/developer-tools/api.md
+- Live GraphQL queried 2026-07-24: `https://base.easscan.org/graphql`, `https://optimism.easscan.org/graphql`, `https://easscan.org/graphql`
+
+**Coinbase Verifications — primary**
+- https://github.com/coinbase/verifications (contracts, schema UIDs, legal disclaimer)
+- Base OnchainKit `getAttestations`: https://docs.base.org/onchainkit/identity/get-attestations
+- Coinbase onchain verification help page: https://help.coinbase.com/en/coinbase/getting-started/verify-my-account/onchain-verification
+
+**Optimism — secondary**
+- https://www.optimism.io/blog/building-a-decentralized-identity-ecosystem-together
+- CoinDesk 2023-05-04 (secondary/news): https://www.coindesk.com/tech/2023/05/04/layer-2-network-optimism-to-use-ethereum-attestation-service-to-promote-user-trust
+- `community.optimism.io/identity/about-attestations` → **301 to `docs.optimism.io/governance`** (2026-07-24)
+- `docs.optimism.io/chain/identity/schemas` → **404** (2026-07-24)
+
+**Disco.xyz**
+- Merger announcement, 2024-09-19 (primary, Privado ID): https://www.privado.id/blog/privado-id-and-disco-xyz-announce-merger-to-launch-unified-identity-across-blockchains-and-legacy-systems
+- GitHub org (last push 2024-04-30): https://github.com/discoxyz
+- `disco-schemas`: https://github.com/discoxyz/disco-schemas
+- Wayback captures of `disco.xyz`: 2025-04-23 ("Disco (now privado.id)"), 2025-07-16 (parked), 2025-10-04 (re-registered), 2025-12-11→2026-05-11 (SEO spam)
+- DNS checks 2026-07-24: `docs/api/app/issuer.disco.xyz` all NXDOMAIN
+- Billions Network (secondary, marketing): https://billions.network/
+

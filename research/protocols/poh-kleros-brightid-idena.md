@@ -151,6 +151,7 @@ block **47,373,525**, for these topics:
    `0xf49aB03E980BD27ecf9352cAF4A65921DD70a554` (start block 43,089,534 ≈ 2025-11).
    A live money faucet appearing right before a 20x registration surge is the obvious
    hypothesis and must be treated as a **sybil-incentive red flag**, not as organic demand.
+   **→ CONFIRMED below. It is a PNK airdrop.**
 2. **The adversarial layer has essentially never fired.** `HumanityRevoked` has been emitted
    **once, ever** (2025-07-21, humanityId `0xcf3c78a77ff01b451a21301a522c48b92a029e70`).
    With `requiredNumberOfVouches() == 1` and a 3.5-day challenge window, PoH v2's Sybil
@@ -173,16 +174,191 @@ flows were started and never executed — pending, withdrawn, or abandoned. **Do
 
 # Kleros (as arbitration trust root)
 
-_TBD_
+**One-liner:** Token-weighted, randomly-drawn juror panels ("courts") that rule on evidence;
+PoH's entire Sybil resistance ultimately rests on this.
+**Status (2026-07):** live and used, but economically thin — PNK market cap **$6.0M**
+
+## What PoH actually points at — read live from the contracts 2026-07-24
+
+`arbitratorDataHistory(0..3)` on the PoH v2 proxies decodes to:
+
+| Chain | Arbitrator | subcourtID | jurors | `arbitrationCost` |
+|---|---|---|---|---|
+| Gnosis | KlerosLiquid **`0x9C1dA9A04925bDfDedf0f6421bC7EEa8305F9002`** | **18** | **1** | **6 xDAI** |
+| Ethereum | KlerosLiquid **`0x988b3A538b618C7A603e1c11Ab82Cd16dbE28069`** | **0** (General Court) | **23** | **0.1242 ETH** |
+
+`courts(18)` on Gnosis KlerosLiquid returns:
+`parent=0, hiddenVotes=false, minStake=1,200 PNK, alpha=10000, feeForJuror=6 xDAI,
+jurorsForCourtJump=14`.
+
+### Does arbitration actually catch Sybils? Blunt answer: not empirically.
+
+- The **Gnosis registry — where ~99% of PoH v2 users are — resolves a challenged claim with a
+  single drawn juror** whose minimum stake is **1,200 PNK ≈ $9.94 at $0.00828/PNK (2026-07-24,
+  CoinGecko)**. Appeal escalates toward 14 jurors (`jurorsForCourtJump`), but the *first*
+  decision is one person.
+- Empirically the mechanism has fired essentially never: **exactly one `HumanityRevoked` event
+  in the entire history of the Gnosis v2 registry** (2025-07-21) against 1,357 successful
+  claims. Whatever the theoretical deterrent, in practice nobody is challenging.
+- The economic security of the whole thing is bounded by PNK: market cap **$6.0M**, 24h volume
+  **$21,245** (CoinGecko, 2026-07-24), price **-97.8% from the 2021-05 ATH of $0.380**. A 24h
+  volume of $21k means an attacker cannot buy a controlling stake quickly *on market* — but it
+  also means the security budget is tiny and illiquid, which cuts both ways.
+- `UNVERIFIED:` total PNK staked in Gnosis subcourt 18. That, not market cap, is the real
+  number to compute for an outvote-cost estimate (draw probability ∝ stake). Next step:
+  read PNK `balanceOf(KlerosLiquid)` on Gnosis, or the Kleros subgraph's court stake totals.
+
+### Documented incidents (secondary sources)
+
+- **2023-12** — an attempt to drain >46 ETH (reported as >$100,000) from the PoH DAO's Kleros
+  Governor contract; caught by the Kleros community before execution.
+  https://blog.kleros.io/how-kleros-prevented-more-than-100-000-from-being-stolen-from-proof-of-humanity-dao-a-detailed-analysis/
+  (secondary source, Kleros's own blog — self-reported, treat accordingly.)
+- The known theoretical attack on Kleros is the classic **p+ε bribe / Schelling-point attack**
+  on token-weighted juries, plus **appeal-fee exhaustion** (an attacker with more capital keeps
+  appealing until the honest side cannot fund the next round). Neither is unique to PoH.
+
+## The Democracy Earth / PoH fork drama and UBI token
+
+Corrective on a widely-repeated claim: **there was no successful registry fork.** Per Clément
+Lesaege (Kleros co-founder, PoH's actual author) —
+https://medium.com/@ClementLesaege/making-sense-of-recent-drama-in-proof-of-humanity-ccf3082eb0fa
+(secondary, and a partisan account from one side):
+
+- 2021: Kleros Cooperative built PoH; **Democracy Earth** (Santiago Siri) integrated the **UBI**
+  token that streams to registered humans.
+- Mid-2022: governance war. **HIP-49**, which would have replaced Kleros as PoH's arbitrator
+  with a UBI-token-based alternative, **was voted down by ~21 votes**. The registry stayed
+  under Kleros arbitration throughout.
+- The UBI token round-tripped from ~$110 to near zero after a large holder dumped.
+
+**UBI token today (CoinGecko, 2026-07-24): price $0.0000832, market cap $0, 24h volume $21.26,
+ATH $1.39 on 2021-10-19 → −99.994%.** The UBI stream is economically irrelevant. It is *not*
+what is driving the 2026 registration surge.
+
+The mainnet **ForkModule `0x068a27Db9c3B8595D03be263d52c813cb2C99cCB`** exists in the v2
+deployment and, per Blockscout, its only external transaction is its own **contract creation
+on 2024-09-05**. It is the v1→v2 migration shim (letting v2 read/retire v1 registrations),
+not evidence of a community fork.
 
 ---
 
 # BrightID
 
-**One-liner:** _TBD_
-**Category:** social-trust
-**Status (2026-07):** _TBD_
+**One-liner:** Off-chain social graph on a dedicated chain (IDChain); "connection parties" build
+the graph, graph-analysis algorithms label nodes as unique humans.
+**Category:** social-trust (explicitly NOT uniqueness — see below)
+**Chains:** its own **IDChain** (EVM sidechain); optional on-chain relays to Ethereum/Gnosis
+**Status (2026-07):** infrastructure UP, product hollowed out — see live probes
 **Aggregator verdict:** _TBD_
+
+## Liveness evidence — live probes 2026-07-24
+
+| Probe | Result |
+|---|---|
+| `https://app.brightid.org/node/v6/state` (the node the mobile app used) | **502 Bad Gateway** (nginx) |
+| `https://forum.brightid.org/` | **503** — forum down |
+| `https://www.brightid.org/` | 200 |
+| `https://node.brightid.org/brightid/v6/state` | **200**, node version **6.18.0**, `lastProcessedBlock` 38,897,099 |
+| `https://aura-node.brightid.org/brightid/v6/state` | **200**, node version 6.17.2 |
+| IDChain RPC `https://idchain.one/rpc/` `eth_blockNumber` | **0x25185d5 = 38,899,157** — chain producing blocks |
+| `https://explorer.brightid.org`, `https://aura.brightid.org` | 200 (SPAs) |
+
+GitHub org https://github.com/BrightID — **still being committed to**:
+`aura` pushed **2026-07-24** (today), `BrightID-Node-Backup-Script` 2026-07-22,
+`BrightID-Alert` 2026-06-18, `BrightID-Node` 2026-05-03, `aura-frontend` 2026-04-03.
+But the *core* repos are stale: the main mobile app repo `BrightID` last pushed **2025-10-20**,
+`BrightID-Docs` **2025-01-19**, `BrightID-SmartContract` **2023-11-08**,
+`brightid-javascript-sdk` **2023-03-10**, `BrightID-Soulbound-Token` **2022-09-30**.
+Read: a small crew keeps the nodes and the Aura sub-project breathing; the client, the SDK and
+the on-chain integration layer are abandoned.
+
+## Verification methods and what each proves
+
+From `verificationsHashes` in the live `/state` response, the verification sets the node
+actually computes at block 38,896,800 are:
+`Seed`, `SeedConnected`, `SeedConnectedWithFriend`, `BrightID`, `DollarForEveryone`,
+`SocialRecoverySetup`, `predefined` (main node) plus `Aura` (aura node).
+
+- **Meets** (`BrightID` / `SeedConnected*`) — you attend a video "connection party" with seed
+  members and get connected. Proves *social trust*, i.e. "some existing member vouched after
+  seeing your face live." It does **not** prove uniqueness — the graph can be gamed by anyone
+  who can be at multiple parties or who buys connections.
+- **Bitu** — graph-analysis scoring; nodes inside dense honest regions get verified, outliers
+  are called Sybils (https://brightid.gitbook.io/brightid/getting-verified/bitu-verification).
+  **`Bitu` does not appear in the live `verificationsHashes` at all on either public node
+  (2026-07-24)** — i.e. the node is not currently producing a Bitu verification set. Some apps
+  still *ask* for it (`Manna` requires `"BrightID and Bitu and Bitu.score>0"`), which means
+  those apps are presumably unsatisfiable today. `UNCLEAR:` whether Bitu was deliberately
+  retired or is simply broken — check the BrightID-Node release notes / Discord.
+- **Aura** — a human-reviewer-based reputation layer meant to replace Bitu
+  (https://forum.brightid.org/t/aura-a-new-verification-for-brightid/393). On the aura node the
+  `Aura` verification hash is **`47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU`**, which is
+  base64url(SHA-256("")) — **the hash of the empty set. Zero Aura-verified users at that
+  block.** Aura is the most actively developed BrightID repo and has no users.
+
+## On-chain surface
+
+BrightID is fundamentally **off-chain**: the social graph and verification sets live on
+BrightID nodes (ArangoDB) with consensus anchored to IDChain. There is no permissionless
+Ethereum contract you can just `eth_call` to ask "is this address a unique human." Relays exist
+(`BrightID-SmartContract`, `BrightID-Soulbound-Token`) but both repos are **abandoned (2023-11
+and 2022-09 last push)** — treat any address you find in them as stale.
+`UNVERIFIED:` current canonical BrightID verifier contract addresses on Ethereum/Gnosis. I did
+not find a maintained deployment list. Next place to look: the `dev-guides` repo and
+https://brightid.gitbook.io/brightid/linking-brightid-to-applications.
+
+## Integration surface
+
+Node REST API, **no API key, permissionless read** (confirmed live 2026-07-24):
+
+```
+GET https://node.brightid.org/brightid/v6/state
+GET https://node.brightid.org/brightid/v6/apps                 -> 58 registered apps
+GET https://node.brightid.org/brightid/v6/apps/{appId}
+GET https://node.brightid.org/brightid/v6/verifications/{appId}/{appUserId}
+```
+Error shape confirmed: querying an unknown id returns
+`{"error":true,"errorNum":61,"errorMessage":"... app generated id is not found.","code":404}`.
+
+**The catch:** `verifications/{appId}/{appUserId}` is keyed by an *app-scoped* user id. To
+verify anyone we would have to be registered as a BrightID **app/context** — which requires
+BrightID's cooperation (app registration is an operation on IDChain performed by BrightID
+admins). So verification is *permissionlessly readable* but **not permissionlessly issuable to
+us**. We cannot bootstrap without the (barely-staffed) BrightID team.
+
+Apps registered: **58** (`/brightid/v6/apps`), including `Gitcoin` (context "Gitcoin",
+`verifications: ["BrightID"]`), `1hive`, `clr.fund`, `unitap`, `Manna`, `RabbitHole`, `Muon`,
+`Discord`. **Gitcoin/Passport historically carried a BrightID stamp** — the app registration is
+still present in the node. `UNVERIFIED:` whether Human Passport (ex-Gitcoin Passport) still
+scores the BrightID stamp in 2026; see the passport/Gitcoin write-up.
+
+Blind-signature mode (`usingBlindSig: true`, used by `Manna`, `clr.fund`, `clrfund-arbitrum`)
+is BrightID's unlinkability feature — a WI-Schnorr blind signature (the node's
+`wISchnorrPublic` p/q/g/y params are in `/state`), so the node signs a credential it cannot
+link back to the user's BrightID.
+
+`brightid-python-sdk` (pushed 2025-11-18) is the least-stale SDK.
+`UNVERIFIED:` its PyPI package name and license.
+
+## Privacy model
+
+App-scoped ids → **nullifiers are app-scoped, not global**, so a user is unlinkable across
+apps by default. With `usingBlindSig` the node additionally cannot link the issued credential
+to the graph identity. This is genuinely better privacy than most protocols in this space.
+Downside: because ids are app-scoped, **we cannot dedupe a BrightID user against our own
+records across contexts**, and we cannot verify anyone in an app context we don't own.
+
+## Scoring-relevant facts
+
+- `UNVERIFIED:` current count of BrightID-verified humans. The node API exposes no public
+  aggregate count endpoint (`/verifications`, `/users`, `/groups` all 404). Next place to look:
+  https://explorer.brightid.org (SPA — would need browser rendering) or the node's ArangoDB
+  dumps / `BrightID-Node-Backup-Script`.
+- Cost to obtain: free, but requires attending a scheduled live connection party — **high
+  friction, low cost**. That is the wrong shape for sybil resistance: a farm with time and
+  cheap labor can attend many parties.
+- Aura verified users: **0** (empty-set hash, 2026-07-24).
 
 ---
 

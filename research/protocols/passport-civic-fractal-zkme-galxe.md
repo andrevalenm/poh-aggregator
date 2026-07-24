@@ -1,6 +1,6 @@
 # Commercial identity/sybil-score products: Human Passport, Civic, Fractal ID, zkMe, Galxe Passport
 
-> STATUS: in progress
+*Researched 2026-07-24. All URLs and HTTP statuses checked on that date.*
 
 This file covers five commercial "identity score / credential as a product" vendors. These are the
 closest thing to **direct competitors and prior art** for the poh-aggregator. Privado ID and Verax
@@ -101,6 +101,78 @@ Notes for us:
   gets farmed and re-issued the stamp at a lower weight. Useful precedent for our own decay design.
 - Max possible ≈ 100 by construction (docs say max 100), but no single user realistically stacks
   everything.
+
+## Stamp-by-stamp trust roots, and what we would double-count (coordinator request)
+
+**Direct answer on World ID: Human Passport does NOT have a World ID / Worldcoin stamp.**
+Verified 2026-07-24 three ways: (a) `gitcoin_passport_weights.py` on `main` contains no `World*`,
+`Orb*` or Worldcoin key; (b) no `platforms/src/Worldcoin/` or `platforms/src/WorldID/` directory
+exists in `passportxyz/passport` (all four candidate paths 404); (c) the authoritative platform
+registry `platforms/src/platforms.ts` on `main` lists exactly:
+`GtcStaking, Gitcoin, Discord, Google, Github, Linkedin, Ens, Brightid, ETH, Snapshot, NFT, ZkSync,
+Lens, GnosisSafe, Coinbase, GuildXYZ, Idena, Civic, TrustaLabs, Outdid, AllowList, Binance,
+CustomGithub, CustomNFT, CleanHands, HumanIdKyc, HumanIdPhone, Biometrics, ZKEmail, X, Steam`
+(+ `POAP` behind the `NEXT_PUBLIC_FF_NEW_POAP_STAMPS` feature flag). No Worldcoin.
+So **there is no World-ID-through-Passport double-count path today.** If Worldcoin were ever added
+it would be a re-check point; World ID 4.0's `rp_context` / Developer-Portal signing key
+requirement (2026-04-17) would in any case force Passport to register as a relying party, which is
+visible if it happens.
+
+**Important discrepancy to be honest about:** the open-source `gitcoin_passport_weights.py` is
+**stale relative to the shipped app**. It has no entry for `Outdid`, `ZKEmail#*`, `Steam`,
+`AllowList`, `CustomGithub` or `CustomNFT`, all of which are live platforms in `platforms.ts`. So
+the published weight file is a *good* but not *complete* picture; live weights presumably come from
+the scorer's database/admin. `UNVERIFIED:` current weights for Outdid / ZKEmail / Steam — would
+need an API key and a call to `GET /registry/stamp-metadata` (which returns
+`401 {"error":"Invalid API Key"}` unauthenticated, tested 2026-07-24).
+
+### Trust-root classification (⚠ = overlaps something we would plausibly consume directly)
+
+| Stamp (provider key) | Weight | Real evidence underneath | Overlap risk |
+|---|---|---|---|
+| `HolonymGovIdProvider` (UI: "Government ID", $5 + gas) | 16.026 | **Holonym / human.tech** gov-ID + camera check via `@holonym-foundation/human-id-sdk` | ⚠⚠ Holonym/Human ID — and Passport's **owner** |
+| `Biometrics` ($5 + gas) | 6.001 | **Holonym**, `id.human.tech/biometrics`, **FaceTec** 3D facial liveness | ⚠⚠ Holonym; also same FaceTec vendor as several others |
+| `CleanHands` ("Proof of Clean Hands", $5 + gas) | 3 | **Holonym** sanctions screening on top of a gov-ID check | ⚠⚠ Holonym; not personhood at all — it is an AML screen |
+| `HolonymPhone` ("Phone Verification", $5) | 1.521 | **Holonym** phone/SMS | ⚠⚠ Holonym; SMS is rentable |
+| `BinanceBABT` / `BinanceBABT2` (~$1) | 16.021 / 10.021 | Binance Account Bound Token = Binance's own KYC | ⚠ if we read BABT on BNB Chain directly |
+| `CoinbaseDualVerification` / `...2` (free) | 16.042 / 10.042 | Coinbase account + on-chain attestation (Coinbase Verifications, Base EAS) | ⚠ if we read Coinbase Verifications directly |
+| `CivicUniquenessPass` / `CivicLivenessPass` / `CivicCaptchaPass` | 5.005 / 3.038 / 0.823 | Civic — **all three retired mid-2025** (see §2). Dead weight in the file. | ⚠ same vendor thrice; also now stale |
+| `IdenaState#Newbie / #Human / #Verified` | 5.892 / 1.921 / 1.924 | Idena synchronous flip-test ceremony | ⚠ if we consume Idena directly |
+| `Brightid` | 0.202 | BrightID social graph verification | ⚠ if we consume BrightID directly |
+| `TrustedCitizen` | 4.009 | `UNCLEAR:` which issuer — not resolved; likely a partner allow-list | ⚠ unknown |
+| `TrustaLabs` | 0.511 | Trusta.AI MEDIA sybil score — **itself an ML aggregate score** | ⚠⚠ an aggregate inside an aggregate |
+| `ETHScore#50/75/90`, `ETHDaysActive#50`, `ETHGasSpent#0.25`, `ETHnumTransactions#100` | 16.021 + 2.399 + 2.926 + 0.207 + 0.778 + 0.21 | Passport's own ML model over L1 activity | ⚠⚠ all six read the **same wallet history** |
+| `NFT`, `NFTScore#50/75/90` | 1.032 + 16.246 + 2.362 + 2.413 | NFT holdings model — same wallet | ⚠⚠ same wallet history again |
+| `ZkSyncEra`, `zkSyncScore#5/20/50` | 0.606 + 1.67×3 | zkSync activity — same wallet, different chain | ⚠⚠ |
+| `SelfStakingBronze/Silver/Gold`, `Beginner/ExperiencedCommunityStaker` | 0.897/2.066/2.7, 0.673/2.161 | $GTC staking — **capital, not personhood** | — (buyable) |
+| `GitcoinContributorStatistics#…10/100/1000` | 0.223 / 1.017 / 4.997 | Past Gitcoin donations — capital + history | ⚠ same wallet |
+| `githubContributionActivityGte#30/60/120` | 1.879 / 1.888 / 2.259 | One GitHub account, three thresholds | ⚠⚠ one account counted thrice |
+| `X` | 3.2 | One X/Twitter account | — (cheap to farm) |
+| `Linkedin` / `Google` / `Discord` | 1.531 / 0.525 / 0.516 | web2 account ownership | — |
+| `Ens` / `GnosisSafe` / `Lens` / `SnapshotProposalsProvider` / `GuildAdmin` | 0.208 / 0.222 / 0.23 / 0.239 / 0.468 | on-chain artefacts, all purchasable | ⚠ same wallet |
+| `Outdid`, `ZKEmail#Amazon*/Uber*`, `Steam` | **no published weight** | Outdid = ZK ID verification; ZK Email = DKIM-proved receipts; Steam account | `UNVERIFIED` |
+
+**The killer number:** four of the highest-weight stamps — `HolonymGovIdProvider` (16.026),
+`Biometrics` (6.001), `CleanHands` (3), `HolonymPhone` (1.521) — are **all issued by Holonym /
+human.tech through one SDK (`@holonym-foundation/human-id-sdk`)**, and Holonym **owns Passport**.
+That is **26.548 points, 1.33× the "human" threshold, from a single vendor**, largely from a single
+gov-ID-plus-selfie session, priced at **$15–20 + gas** in the UI's own copy. A sybil farm needs one
+document and ~$10 (Gov ID $5 + Biometrics $5 → 22.03 points) to mint a "verified human" Passport
+per identity — and identity documents are rentable.
+
+**Therefore: Passport's aggregate score cannot be fed into our aggregate as a single signal.**
+It is internally correlated (six wallet-activity stamps, four Holonym stamps, three Civic stamps,
+three GitHub thresholds), and it contains at least one other aggregate score (TrustaLabs). We must
+consume `GET /v2/stamps/{address}` or `Decoder.getPassport(address)` — **the stamp list, not the
+number** — de-duplicate by trust root, and apply our own weights. Passport's scalar is useful only
+as a coarse prior and as competitive intelligence.
+
+**Also worth noting for our own decay model:** `platforms/src/HumanID/shared/utils.ts` documents a
+free **ZK Passport off-chain attestation** served from `https://id-server.holonym.io`, keyed by
+wallet address, `attestationType: "zk-passport"`, `payload.uniqueIdentifier` (a nullifier-like
+value), with an explicit **7-day lifetime** (`expiresAt = issuedAt + 7 days`). So Holonym itself
+treats an ePassport-derived personhood attestation as expiring weekly. Any protocol that treats the
+same evidence as permanent is mis-modelling it.
 
 ## Trust root & failure modes — where the scoring model proved wrong
 
@@ -575,6 +647,262 @@ document.
 
 # 5. Galxe Passport
 
-## Cross-cutting: shared KYC/liveness vendors (double-counting risk)
-## Aggregator verdicts (summary table)
+**One-liner:** A KYC-backed, ZK-provable credential (currently v2.1, with a v3 KYC pipeline) issued
+by Galxe after a third-party IDV check, stored as password-encrypted PII in Galxe's vault plus a
+non-transferable SBT, and verifiable on-chain through Galxe's own **Identity Protocol** (a
+BabyJubjub/Groth16 "babyzk" stack with registries deployed on five chains).
+**Category:** **state-identity** (government ID) + **liveness** (selfie, with a re-verification
+counter). **Not** uniqueness-by-construction: uniqueness is enforced by the IDV vendor's dedupe and
+Galxe's database, not by anything in the credential schema.
+**Chains (Identity Protocol registries):** Gravity Alpha Mainnet, Ethereum mainnet, Ethereum
+Sepolia, BNB Chain, Polygon.
+**Status (2026-07): live, and the most institutionally healthy of the five after Human Passport.**
+Galxe claims **1M+ Passport users** and 33M+ platform users (Galxe PR, May 2025 — marketing figure,
+treat sceptically). **Passport V3 launched 2025-05-07 with Sumsub** as the KYC vendor. Docs are
+current (`docs.galxe.com`, Terms/Privacy last updated 2025-09-10). **But the ZK layer looks
+becalmed:** npm `@galxe-identity-protocol/sdk` latest **1.0.9, published 2024-07-02** (MIT), and the
+aggregated verifier is still "Sepolia only, pending NEBRA mainnet". `UNCLEAR:` whether v3's Sumsub
+pipeline still issues the babyzk credential or whether Passport has quietly become a plain
+KYC-as-a-service product with an SBT.
+**Aggregator verdict: integrate later, low weight.** It is a real, deduped, document-backed
+credential with a genuinely well-specified schema, and on-chain verification is permissionless once
+you have the proof. But **the user must generate the proof for you** (their PII is
+password-encrypted client-side), so we cannot passively read "is this address Galxe-verified" —
+and the evidence underneath is a Sumsub/Persona check we may already be counting elsewhere.
+
+## What it proves — read the schema, not the marketing
+
+Galxe markets Passport as "proof of personhood". The credential schema (primary source:
+`https://docs.galxe.com/identity/use-cases/galxe-passport.md`) says what it really contains.
+
+**Galxe Passport v2.1** — registered on-chain as custom primitive **type ID 10001**:
+```
+birthdate:uint<64>; gender:prop<8,c,1>; id_country:prop<16,c,1>; id_class:prop<8,c,1>;
+document_expiration_date:uint<64>; proof_of_time:uint<64>; last_revoke_time:uint<64>;
+last_selfie_date:uint<64>; total_sefie_verified:uint<8>
+```
+(v2.0 is type ID **10000**, with `issue_date` and `first_verification_date` instead of
+`document_expiration_date` / `proof_of_time` / `last_revoke_time`.)
+
+Three fields are genuinely good ideas we should steal:
+- **`proof_of_time`** — the delta between first and most recent verification. "If a user first
+  verified their government ID in 2022 and re-verified their selfie in 2024, the time delta is 2
+  years, increasing confidence in the user's authenticity." **This is an age-of-identity signal
+  that a freshly-minted sybil cannot fake**, and it is the single cheapest anti-farm heuristic in
+  this whole document.
+- **`total_sefie_verified` + `last_selfie_date`** — a *count* of liveness re-checks and a
+  freshness timestamp. Repeated liveness over time is much stronger than one selfie.
+- **`last_revoke_time`** — revocation is in the schema, so a verifier can penalise a
+  re-registered identity.
+
+What is **absent**: any nullifier, uniqueness flag, or dedupe assertion. The `id_class` enum is
+extremely permissive — 27 document types including `MunicipalID`, `VoterID`, `WorkPermit`,
+`CanadaHealthInsuranceCard`, `ImmigrationVisa`, and `IndiaPermanentAccountNumberCard`. **A
+Galxe Passport does not mean "passport"**; it can mean a municipal ID. If we score it, we should
+read `id_class` and `id_country` and weight by document strength and by the issuing country's
+document-security level — Galxe hands us those fields precisely so we can.
+
+## Trust root — and a straight answer on the vendor question
+
+**Galxe does not do identity verification. It resells someone else's.**
+- **Persona (`withpersona.com`)** — v2/v2.1. The `id_class` enum links directly to
+  `docs.withpersona.com/reference/government-id-verifications#government-id-types`, and the
+  credential's `attachments` block contains a literal **`persona_id`** field.
+- **Sumsub** — v3 (announced 2025-05-06/07). The Galxe Passport data-flow doc
+  (`docs.galxe.com/galxe-id/galxe-passport/introduction.md`) now describes the flow end-to-end as:
+  Galxe generates a UUID → passes it to **Sumsub** as `externalUserId` → Sumsub does the ID check
+  and dedupes under that UUID → on `reviewAnswer: "GREEN"` Galxe pulls the full applicant record
+  (name, dob, country, `idDocs[]` with document number) via the Sumsub API and builds the credential.
+
+So the **trust root of Galxe Passport is a Sumsub (formerly Persona) applicant record**, and the
+uniqueness property is "Sumsub says this applicant is not a duplicate". That is the same trust root
+as an unknown number of other products (see cross-cutting section).
+
+**Failure modes:**
+- Whatever defeats Sumsub defeats Galxe Passport: document forgery (Galxe's competitor zkMe openly
+  says document verification is "the lowest assurance level… as generative AI makes document
+  forgery increasingly trivial"), injection attacks on the selfie step, and **document rental**
+  markets in low-cost jurisdictions.
+- **Galxe holds the join key.** Galxe stores a "Vendor Reference ID" (the Sumsub UUID) in its own
+  database mapping a Galxe account to a Sumsub applicant. The PII itself is client-side encrypted
+  under a user password, which is good — but the *linkage* wallet↔applicant is Galxe's plaintext.
+  Compare the Fractal ID breach: the linkage is the dangerous asset.
+- **Password loss = credential loss.** User-chosen password encryption with no recovery is a real
+  support/attrition failure mode and a reason claimed user counts overstate live credentials.
+- Galxe Passport was heavily used for Galxe's own quest/airdrop ecosystem, which is *the* natural
+  habitat of airdrop farmers. Assume adversarial pressure on it has been high.
+
+## On-chain surface
+
+Source: `https://docs.galxe.com/identity/resources/contracts.md` (fetched 2026-07-24). Same
+addresses across **Gravity Alpha Mainnet, Ethereum mainnet, Ethereum Sepolia, BNB Chain, Polygon**:
+
+| Contract | Address |
+|---|---|
+| Type Registry | `0x77dA3Cf4418009D171B4963db815Ca46d6F2E79D` |
+| Context Registry | `0x42D6444840842F0484C1624899c9a3E835738592` |
+| Issuer Registry | `0xc4525dA874A6A3877db65e37f21eEc0b41ef9877` |
+| BabyzkDefaultPublicSignalGetter | `0x1418b5e79eE53396dE4a454d78DF2ab522CE24CC` |
+| **BabyzkStatefulVerifier** | `0xF3D3404eb75D076Ab8A0F728C7FAA3c0A5e6549F` |
+| AggregatedBabyzkStatefulVerifier | `0x217F3a88653F84C26ce159BC5417d9A54e6eA7F1` — **Sepolia only**, pending NEBRA mainnet |
+
+Source: `github.com/Galxe/identity-protocol/tree/main/packages/evm-contracts` (MIT).
+Type artifacts (circuit/verification key) for v2.0 are pinned on IPFS:
+`ipfs.io/ipfs/QmZ4UghikEohVtpJaiAQorBeHNPFZ9vq5TfnE8jTAyLU9k`.
+
+**How verification works, and the decisive limitation:** the on-chain `BabyzkStatefulVerifier`
+checks a Groth16 proof against the type/context/issuer registries and the issuer's public key —
+this is **permissionless**: anyone can verify a Galxe Passport proof without Galxe's cooperation,
+and the registries are public. **But the proof is generated client-side from the user's decrypted
+credential.** There is no public mapping `address → hasGalxePassport` that we can index. So:
+- **Interactive integration (user present, in our flow): yes, no vendor cooperation needed.** We
+  define a context, ask the user's Galxe credential to produce a proof, verify against
+  `BabyzkStatefulVerifier`. This is the good path.
+- **Passive/background scoring of an arbitrary address: no.** Would require Galxe's API.
+`UNVERIFIED:` the Galxe Passport **SBT** contract address(es) — the docs describe an SBT minted to
+the user's wallet, but I did not find a published address. If such an SBT is a standard
+non-transferable ERC-721 it *would* give us a passive read. Next place to look: `app.galxe.com/passport`
+mint transaction on BNB Chain / Gravity explorer, or the `evm-contracts` package.
+
+## Integration surface (Galxe platform API — separate from the ZK protocol)
+
+- GraphQL endpoint `https://graphigo-business.prd.galaxy.eco/query`, access-token auth.
+- **Free tier: 10 QPS, 100,000 requests/month.** `HTTP 429` on breach of either.
+  Enterprise: "up to 1000+ QPS", 10M requests/month, SLA. (Primary source:
+  `docs.galxe.com/galxe-integration/resources/rate-limits.md`.) **This is the most concretely
+  documented rate limit of any vendor in this file** — useful benchmark for our own tiering.
+- `@galxe-identity-protocol/sdk` (MIT, npm, v1.0.9 2024-07-02) for credential/proof handling;
+  monorepo also ships a CLI, a GRPC `issuer` microservice, and `sstyper` (self-sovereign credential
+  type setup). **The issuer service being open source means we could in principle become an issuer
+  of our own credential types on Galxe's registries** — interesting as a distribution channel.
+- "Sign in with Galxe" OAuth exists (`docs.galxe.com/galxe-id/galxe-id-integration/galxe-id-oauth.md`),
+  claiming 14M Galxe ID users — that is Galxe *accounts*, not verified humans. Do not confuse them.
+
+**Usable outside the Galxe quest ecosystem?** Technically yes — the Identity Protocol is a general
+ZK credential system, the contracts are deployed on Ethereum/BNB/Polygon, and Galxe cites Transak
+and Banxa as non-Galxe consumers. Practically, adoption outside Galxe looks thin and the SDK has
+not shipped in two years.
+
+## Privacy model
+
+Better than average. PII never sits in Galxe plaintext: it is fetched from Sumsub, signed by a
+"Galxe witness" for integrity, then **encrypted client-side under a user-chosen password** before
+being handed back to Galxe for storage. Sharing requires a non-replayable signature plus client-side
+decryption. Proofs are Groth16 over BabyJubjub with selective disclosure of schema fields (e.g.
+prove `birthdate` implies 18+ without revealing it). `identity_commitment` binds the credential to a
+key. Caveats: (1) Galxe still holds the wallet↔Sumsub-UUID linkage; (2) Sumsub holds the raw
+documents regardless; (3) no app-scoped nullifier in the schema, so cross-app linkage prevention
+depends on how the verifier defines `context`.
+
+---
+
+## Cross-cutting: shared KYC/liveness vendors — the double-counting problem
+
+Another agent covers the IDV vendors themselves. What this file adds is **which of our five sits on
+which vendor**, established from primary sources:
+
+| Product | Underlying IDV / biometric vendor | Evidence |
+|---|---|---|
+| **Galxe Passport v3** | **Sumsub** | Galxe data-flow docs name Sumsub explicitly, with the applicant-record JSON and `externalUserId` UUID mechanic |
+| **Galxe Passport v2 / v2.1** | **Persona** (`withpersona.com`) | `id_class` enum links to Persona's government-ID-types reference; credential `attachments` contains `persona_id` |
+| **Human Passport → Biometrics stamp** | **FaceTec** (3D facial liveness), run by Holonym at `id.human.tech/biometrics` | `platforms/src/Biometrics/Providers-config.ts` in `passportxyz/passport` |
+| **Human Passport → Gov ID / Phone / Clean Hands** | Holonym's own pipeline (`@holonym-foundation/human-id-sdk`); `UNVERIFIED:` which IDV vendor Holonym uses underneath | `platforms/src/HumanID/shared/utils.ts` |
+| **Civic Pass (retired)** | Civic's own 3D face map for Uniqueness; `UNVERIFIED:` the document-check subcontractor for the IDV pass | Civic support docs (now partly 404) |
+| **Fractal ID** | `UNVERIFIED:` — developer docs offline; historically a mix of in-house review and third-party IDV | — |
+| **zkMe** | In-house FHE face matching; documents via own pipeline; **ePassport NFC/national PKI**; **government eIDs**: eIDAS 2.0 wallets, HK iAM Smart, Singapore SingPass/Myinfo | `docs.zk.me/hub/what/zkkyc/zkpoc/supported-eid-providers.md` |
+
+**Two concrete double-count traps this creates:**
+
+1. **The passport-chip trap (biggest).** zkMe's zkPassport, Holonym/Human ID's gov-ID and
+   `zk-passport` attestation, and every NFC-passport protocol in our set (Rarimo, zkPassport, Self,
+   …) all read **the same ICAO chip signed by the same national PKI**. One passport ⇒ N
+   "independent" credentials. **Our score must key uniqueness off a document-derived nullifier
+   where one is available, and cap the total contribution of the ePassport trust-root class**,
+   rather than summing per-protocol.
+2. **The Sumsub/Persona trap.** Galxe Passport and any other vendor reselling the same IDV provider
+   dedupe against *that provider's* applicant DB. Two products on the same provider are one check.
+   Conversely, two products on *different* providers genuinely are two checks against the same
+   document — better, but still one document.
+
+**And the intra-product trap, which is the one Human Passport actually fell into:** four Holonym
+stamps (26.5 pts), three Civic stamps (8.9 pts), six wallet-activity stamps (~22 pts), three GitHub
+thresholds (6.0 pts) — each cluster is one piece of evidence sold as three or four. **A weighted sum
+over correlated signals is the failure mode of this entire product category, and it is the exact
+mistake we are being paid not to make.**
+
+---
+
+## Aggregator verdicts (summary)
+
+| Product | Category | Consume without vendor cooperation? | Verdict |
+|---|---|---|---|
+| **Human Passport** | aggregate (behavioral-heavy) | **Partly** — `Decoder.getPassport/getScore/isHuman` on 7 mainnets, but only for users who paid to mint, and stale | **Integrate now**, decomposed into stamps, never the scalar. Also our closest competitor. |
+| **Civic Pass** | liveness + uniqueness + state-ID | Moot | **Skip** — retired 2025-07; docs 404, DNS dead, API dead |
+| **Fractal ID** | state-identity | No — dev docs offline | **Skip**; revisit as idOS (storage layer, not a personhood claim) |
+| **zkMe (MeID)** | liveness + uniqueness | **Mostly no** — `hasApproved(dappAccount, user)` is verifier-scoped; MeID may not touch chain at all | **Integrate later**, medium weight, pending the dappAccount question |
+| **Galxe Passport** | state-identity + liveness | **Interactively yes** (permissionless Groth16 verify); **passively no** | **Integrate later**, low-medium weight; read `id_class`/`proof_of_time`, not the badge |
+
+## Open questions for us
+
+1. **Passport API commercials.** Rate limits and pricing are behind `developer.passport.xyz`
+   signup. We need real numbers before assuming Passport is a cheap input. *(Action: register.)*
+2. **Passport live weights vs. repo weights.** The public `gitcoin_passport_weights.py` omits
+   `Outdid`, `ZKEmail#*`, `Steam`, `AllowList`. Get `/registry/stamp-metadata` with a key and diff.
+3. **On-chain Passport coverage.** What fraction of the ~2M Passport users have actually minted
+   on-chain, and how stale are those attestations? Answer by indexing EAS on Optimism/Base for the
+   score schema — this determines whether the free on-chain read is worth anything.
+4. **zkMe `hasApproved` without a dappAccount.** Test against
+   `0x399488687fc3618FFaf1f5d0f61397c8E0360c02` on Ethereum whether any global/MeID-scoped read
+   exists. If not, zkMe is API-only and drops in priority.
+5. **Galxe Passport SBT address.** If a passively-readable SBT exists, Galxe becomes far more
+   attractive. Find the mint tx from `app.galxe.com/passport`.
+6. **Does Galxe v3 still issue the babyzk ZK credential?** The SDK has not shipped since Jul 2024.
+   If v3 is just Sumsub + a badge, the ZK story is dead and the credential is worth less.
+7. **Who does Holonym use for document IDV?** Passport's highest-weighted stamp (16.026) rests on
+   it, and it determines overlap with everything else in our set.
+8. **Legal status of Fractal ID GmbH**, and whether any surviving Fractal credentials are readable.
+9. **Cap design.** Concretely: what is the maximum score contribution we allow from (a) the
+   ePassport/national-PKI trust root, (b) any single vendor, (c) wallet-behavioural evidence? Human
+   Passport's failure says these caps are the core of the product.
+
 ## References
+
+**Human Passport**
+- Stamp weights (primary, MIT): https://github.com/passportxyz/passport-scorer/blob/main/api/scorer/settings/gitcoin_passport_weights.py
+- Platform registry (primary): https://github.com/passportxyz/passport/blob/main/platforms/src/platforms.ts
+- Holonym-backed stamps: https://github.com/passportxyz/passport/blob/main/platforms/src/HumanID/shared/utils.ts , `.../Biometrics/Providers-config.ts` , `.../HumanIdKyc/Providers-config.ts`
+- Civic provider with retirement dates: https://github.com/passportxyz/passport/blob/main/platforms/src/Civic/Providers/civic.ts
+- Civic slot IDs / gatekeeper networks: https://github.com/passportxyz/passport/blob/main/platforms/src/Civic/Providers/types.ts and `util.ts`
+- Docs: https://docs.passport.human.tech/ — Stamps API, Embed, Models, Individual Verifications, Smart contracts → Contract reference
+- Scoring-20 convention: https://support.passport.human.tech/passport-knowledge-base/using-passport/scoring-20-for-humans
+- Acquisition by Holonym: https://human.tech/blog/from-gitcoin-passport-to-human-passport-we-re-now-part-of-human-tech (first-party blog) ; https://finance.yahoo.com/news/digital-identity-startup-holonym-acquires-203241993.html (secondary)
+- Critique of stamp strength (secondary, FDD): https://hackmd.io/@jmcook/SJpaeH_3q
+- Gitcoin sybil defense evolution (secondary): https://www.gitcoin.co/blog/streamlining-sybil-defense
+
+**Civic**
+- Gateway Protocol source (primary): https://github.com/identity-com/on-chain-identity-gateway — `ethereum/smart-contract/README.md` (`IGatewayTokenVerifier.verifyToken`, `Gated.sol`), `solana/gateway-ts/src/lib/constants.ts` (program ID)
+- Current Civic docs sitemap (no Pass section): https://docs.civic.com/sitemap.xml
+- npm: https://www.npmjs.com/package/@civic/ethereum-gateway-react , https://www.npmjs.com/package/@civic/auth
+- Historical pricing (secondary, page now 404): https://www.civic.com/pricing/pass-pricing
+
+**Fractal ID / idOS**
+- Breach analysis (secondary): https://www.infostealers.com/article/infostealer-infection-results-in-data-breach-of-blockchain-identity-platform-fractal-id/ ; https://cointelegraph.com/news/blockchain-identity-platform-fractal-id-suffers-data-breach ; https://cryptoslate.com/web3-kyc-vendor-fractal-id-loses-over-50k-users-passport-info-in-data-breach/
+- Fractal's own post-mortem (first-party, host now dead): https://web.fractal.id/fractal-id-data-breach-post-mortem/
+- idOS: https://docs.idos.network/ ; https://github.com/idos-network
+
+**zkMe**
+- Contracts + addresses (primary): https://docs.zk.me/hub/how-built/id-infra/smart-contracts.md
+- MeID: https://docs.zk.me/hub/what/zkkyc/meid.md
+- Nullifiers: https://docs.zk.me/hub/how-built/credential-sys/anti-sybil-mech.md
+- eID providers: https://docs.zk.me/hub/what/zkkyc/zkpoc/supported-eid-providers.md
+- SDK (primary): https://github.com/zkMeLabs/zkme-sdk-js — `packages/widget`, `packages/verify-abi`
+- DID method (ZetaChain testnet only): https://github.com/zkMeLabs/zkme-did-method-spec
+- Docs index: https://docs.zk.me/llms.txt
+
+**Galxe**
+- Passport v2/v2.1 credential schema (primary): https://docs.galxe.com/identity/use-cases/galxe-passport.md
+- Sumsub data flow (primary): https://docs.galxe.com/galxe-id/galxe-passport/introduction.md
+- Contracts (primary): https://docs.galxe.com/identity/resources/contracts.md
+- Rate limits (primary): https://docs.galxe.com/galxe-integration/resources/rate-limits.md
+- Source (MIT): https://github.com/Galxe/identity-protocol
+- Passport V3 + Sumsub launch (secondary press release, 2025-05-06): https://chainwire.org/2025/05/06/galxe-launches-passport-v3-with-sumsub-to-supercharge-web3-onboarding/
