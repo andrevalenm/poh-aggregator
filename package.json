@@ -28,5 +28,8 @@
   "homepage": "https://github.com/andrevalenm/poh-aggregator#readme",
   "dependencies": {
     "viem": "^2.55.8"
+  },
+  "devDependencies": {
+    "solc": "^0.8.26"
   }
 }

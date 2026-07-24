@@ -16,3 +16,7 @@ sources/
 node_modules/
 dist/
 .pnpm-store/
+contracts/out/
+contracts/forge-out/
+contracts/lib/
+cache/
