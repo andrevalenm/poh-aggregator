@@ -26,8 +26,18 @@ Renovation** (formerly/also GETTING-Plurality Research Group, Edmond J. Safra Ce
 https://gettingplurality.org/2023/03/15/puja-ohlhaver/ . She states she "advise[s] a handful of
 experiments, nonprofits and startups" without naming them. Also listed as a RadicalxChange speaker
 (https://www.radicalxchange.org/speakers/puja-ohlhaver/) and a Foresight Institute affiliate
-(http://foresight.org/people/puja-ohlhaver/). **UNVERIFIED:** no evidence found of any Flashbots
-affiliation; she is not an employee of any protocol, and explicitly disclosed holding no IDNA.
+(http://foresight.org/people/puja-ohlhaver/). Her January 2025 SSRN paper lists her affiliation
+simply as **"Independent."** She is not an employee of any protocol and explicitly disclosed holding
+no IDNA.
+
+**On the rumoured Flashbots role — do not repeat it.** The *only* source is RocketReach
+(https://rocketreach.co/puja-ohlhaver-email_45934866), a contact-data broker, listing "Strategy
+Counsel, Flashbots." Her own about page, her SSRN affiliation and the Harvard listings make no
+mention of it. `UNVERIFIED and probably stale.`
+
+`UNVERIFIED:` her X/Twitter @pujaohlhaver could not be read — x.com blocks automated access,
+xcancel served an anti-bot challenge and nitter instances were unusable. That is the one channel
+of her output nobody checked; if she has been thinking out loud anywhere in 2026, it is there.
 
 Her own one-line statement of the research programme (About page): *"My work supports a third way:
 leveraging social ties to define context, cryptography to secure communication, and AI to bridge
@@ -513,70 +523,118 @@ introducing a different set of challenges."*
 So: promised in a March 2024 paper, re-promised in an August 2024 keynote, and **~2 years have
 since elapsed**.
 
-### 3.2 Evidence of absence
+### 3.2 Evidence of absence — comprehensive, and it converges
 
-The decisive negative evidence is **primary and from the author herself**. Her personal site's
-writings index (https://www.pujaohlhaver.com/writings-resesearch, retrieved 2026-07-24) is a
-curated, complete-looking list of her output. It contains exactly **three** papers — Community
-Currencies (Jan 2025), Compressed to 0 (2024), DeSoc (2022) — and **"Between Zero and One" is not
-among them**, nor is any paper on sublinear identity staking, nor is anything on social identity.
-An author who maintains a writings page and lists a January 2025 paper on it would list a Z1 paper
-if one existed.
+| Channel checked (2026-07-24) | Result |
+|---|---|
+| **OpenAlex**, `raw_author_name.search:Ohlhaver` (48 works) | Only **3** are hers: DeSoc `10.2139/ssrn.4105763`, Compressed to 0 `10.2139/ssrn.4749892`, Community Currencies `10.2139/ssrn.5136037` |
+| **OpenAlex**, `title.search:"between zero and one"` (75 hits) | All unrelated (maths/physics/medicine). No Ohlhaver, no Nikulin |
+| **Crossref**, `query.author=Ohlhaver` (21 works) | Same 3 works only |
+| **arXiv** API, `all:Ohlhaver` | Zero results |
+| **Her writings index** (https://www.pujaohlhaver.com/writings-resesearch) | 3 papers; outbound links only to SSRN 4105763 and 4749892 |
+| **Her own Jan 2025 bibliography** (Community Currencies, pp.61-62) | Cites **only** DeSoc and Compressed to 0 |
+| **Idena Medium blog** RSS | Last post **2024-07-22**; nothing since |
+| SSRN author page | HTTP 403 to automated fetch — not counted either way |
+| Semantic Scholar API | HTTP 429 throughout — inconclusive, not counted |
 
-Corroborating negatives from my own searching (2026-07-24): searches for
-`"Between Zero and One" Ohlhaver sublinear identity staking` and
-`Ohlhaver "social identity" paper 2025 plural identity` return **only** *Compressed to 0*, DeSoc,
-the Community Currencies paper and podcast/talk pages — no Z1. Her Substack has **one** post, and
-it is not Z1 (§4.1). Her post-2024 talks are all about **community currencies**, not staking (§4.2).
+**The decisive datum is her own bibliography.** The January 2025 paper is written *directly
+downstream* of the sublinear-staking work — it thanks Nikulin and Idena for it by name — and its
+85-reference bibliography contains **no** self-citation to a forthcoming companion, and the paper
+contains **no forward references to future work at all**. An author does not omit her own
+forthcoming paper from the bibliography of its sequel.
 
-*A sibling agent was tasked with an exhaustive sweep of SSRN, arXiv, Google Scholar, Semantic
-Scholar, Idena's Medium/docs/forum and Nikulin's own output, plus the status of Idena's IIP-5/6/7
-sublinear-staking implementation and whether Idena is still alive. **That sweep did not return
-before this document was completed** — so the channels above are the extent of what I personally
-verified. `UNVERIFIED:` the arXiv/SSRN/Idena-forum channels specifically, and the current state of
-Idena itself. Next place to look: Idena's IIP index at `docs.idena.io/docs/iip/` and
-`github.com/idena-network`, plus Nikulin's authorship record.*
+**Date correction to the transcript header:** the ETHBerlin04 keynote was delivered **24-26 May
+2024**; the video was *uploaded* 2024-08-16, which is where the "August 2024" date comes from. Her
+own site lists it as "EthBerlin Keynote (May 2024)."
 
-### 3.3 What we know about the mechanism anyway, and why it mattered
+### 3.3 What "Between Zero and One" actually became: PCARE
 
-Even without the paper, *Compressed to 0* tells us the shape and the motivation:
+This is the real finding, and it resolves the mystery. The author footnote of the January 2025
+Community Currencies paper (p.1, †) reads:
 
-- The **name** encodes the mechanism: influence scaling as `stake^k` for some `0 < k < 1` — strictly
-  between zero (personhood: everyone equal regardless of stake) and one (proof of stake: influence
-  linear in capital). It is a **degressive proportionality** rule, the same family as quadratic
-  voting's square root. `UNVERIFIED:` the actual exponent and formula Idena shipped.
-- The **motivation** is the one empirical result in §1.6 that we should care about: Idena survived
-  because pooled accounts were *already* being discounted. One-node-one-vote meant large pools held
-  61% of accounts but only ~2.4% of votes, while solo accounts held 27% of accounts and ~89% of
-  votes — and that discount is what let solo accounts vote through the fix.
-- The paper reports that the "unknown network" of 5 puppeteered pools (peak 1,280 accounts)
-  **died after IIP-5**, the sublinear staking change (Appendix B). That is a real, if anecdotal,
-  datum that sublinear staking damaged puppeteering economics.
-- Ohlhaver flags in the ETHBerlin Q&A that sublinear rules have a known failure mode: *"if you're
-  doing it in a distributed system like a DAO, that sublinear discrimination is actually a financial
-  incentive to buy accounts."* Any concave-in-stake rule pays you to split holdings across
-  identities — which is why sublinear staking and personhood have to be co-designed.
+> *"A special thanks to **Mikhail Nikulin and the Idena Community for their pioneering work in
+> sublinear identity staking, which provided valuable inspiration and initial steps toward the
+> development of the PCARE model.**"*
 
-### 3.4 Why the non-publication matters to us
+**Z1 was not abandoned; it was absorbed.** The sublinear-staking idea reappears inside PCARE as the
+generalized exponent (§4.2): `V_i = s_i^p`, with `p = 0.5` (quadratic, "PCARE"), `0.5 < p < 1`
+("SCARE"), and `p = 1` (linear, "CARE"). The Idena experiment became one point on a parameterised
+family rather than a paper of its own.
 
-Three things follow, and the third is the important one.
+### 3.4 The mechanism Idena actually shipped — and what it did
 
-1. **We cannot borrow the mechanism.** There is no specification to implement. Anything we build
-   that claims lineage from "sublinear identity staking" would be our own invention.
-2. **The direction is still sound and available.** Concave weighting of evidence is the same family
-   as correlation discounting (§2.3, §6.1) and we do not need her paper to adopt it. The general
-   lesson — *make the second, third and fourth unit of a thing worth less than the first* — is the
-   entire defence against economies of scale, and it applies to credentials as naturally as to
-   stake. **Concretely for us: the Nth credential sharing a trust root should be worth
-   dramatically less than the first, which is just root-deduplication with a concave curve on top.**
-3. **The gap in the corpus is itself a finding.** Her published trajectory goes: diagnose the
-   problem (2024) → *skip the constructive mechanism paper* → move to community currencies and
-   attention pricing (2025). The mechanism that was supposed to answer her own critique is the one
-   piece she never shipped. Read charitably, she concluded that a staking tweak to a global identity
-   game does not fix a problem she had just argued is *social*, and went where she thought the real
-   answer was. Read less charitably, the constructive half of this research programme does not
-   exist yet. **Either way we should not wait for it, and we should be suspicious of anyone —
-   including us — who claims a clean mechanism fix to the puppeteering problem.**
+The exponent is **0.9**, not 0.5. Despite being branded "Quadratic Staking" throughout Idena's
+docs, every IIP uses `stake^0.9` — a mild discount, nothing like a square root.
+
+- **IIP-4, "Quadratic Staking"** (https://docs.idena.io/docs/iip/iip-4, created 2022-03-10, Final):
+  rewards ∝ `stake^0.9`; stake withdrawable **only by terminating the identity**; rationale
+  *"quadratic staking that discriminates against large coin holders."* Note explicitly: *"The
+  amount of staked coins does not affect the voting power of the identity."*
+- **IIP-5, mining rewards** (https://docs.idena.io/docs/iip/iip-5, created 2022-07-12, Final), the
+  formula our transcript's "sublinear identity staking" refers to:
+  ```
+  Proposer weight     = Proposer stake ^ 0.9 * N / 5
+  Validator weight[i] = Validator stake[i] ^ 0.9          # N = 100
+  W = Proposer weight + Σ Validator weight[i]
+  Proposer block reward     = (Proposer weight / W) * 6 iDNA
+  Validator block reward[i] = (Validator weight[i] / W) * 6 iDNA
+  ```
+  Stated motive: *"Due to the large stake discrimination (stake^0.9), we will provide resistance to
+  the capture of the network by large stakeholders."* Hard fork activated at **block 4,871,136**
+  (~Sept 2022). IIP-6 (invitation rewards) and IIP-7 (extra-flip rewards) extend `^0.9` to other
+  reward streams. IIPs live in https://github.com/idena-network/idena-docs (`docs/iip/`) and run to
+  IIP-13; there is no separate `IIPs` repo.
+
+**And here is the part that should shape our thinking. It worked, and the patient died.**
+
+Identity counts from `api.idena.io/api/Epoch/{n}/IdentityStatesSummary` (retrieved 2026-07-24):
+
+| Epoch | Validation date | Total identity states | **Human** |
+|---|---|---|---|
+| 91 | 2022-09-10 (IIP-5 fork) | 18,810 | **4,164** |
+| 110 | 2023-06-05 | 2,449 | 851 |
+| 130 | 2024-03-02 | 2,949 | 826 |
+| 160 | 2025-04-26 | 905 | 431 |
+| 180 | 2026-01-15 | 412 | 171 |
+| 200 | 2026-05-12 | 245 | 109 |
+| **214** | **2026-07-21** | **180** | **98** |
+
+A **97.6% collapse in Human identities** since the fork. The paper itself notes the intended effect
+approvingly — the "unknown network" of 5 puppeteered pools *"eventually died after IIP-5"*
+(Appendix B). Sublinear staking did kill the puppeteer pools. It also killed the user base.
+
+**And it produced the plutocracy IIP-4 was written to prevent.** From `api.idena.io/api/Staking`
+and `/api/Coins` (2026-07-24): total network stake 39,069,776 iDNA; total mining weight 8,256,539;
+`maxMinerWeight` 1,807,760 — i.e. **one miner holds 21.89% of all mining weight**, implying ~22.9%
+of network stake (*derived by inverting `weight = stake^0.9`; my derivation, not a published
+figure*). One entity takes ~22% of block rewards on a one-node-one-vote personhood chain.
+
+**Idena's status (2026-07-24): a live chain that is substantively moribund.** Last block 11,080,806
+at 2026-07-24T22:18:35Z; current epoch 215; **122 online identities, 78 online miners, 13 pools, 9
+candidates** for the next validation. `idena-go` last commit and last release both **2025-12-22**
+(v1.1.2); `idena-docs` last commit 2024-09-04; blog silent since 2024-07-22. Per BRIEF.md's
+"note if a project appears dead": **Idena is not dead, but it is not a going concern, and no
+aggregator should weight an Idena credential as evidence about a population of ~100 people.**
+
+### 3.5 What this means for us
+
+1. **We can borrow the mechanism after all — but we now know its price.** `stake^0.9` is a
+   specified, shipped, measurable design. Concave weighting *works*: it destroyed the farms. It also
+   made participation unattractive enough to shrink the network 97.6%, and it still ended in
+   one-actor concentration because the discount was too mild (0.9) to bite on a large holder.
+   **The lesson for our scoring curve is not "use a concave rule"; it is "a concave rule is a tax on
+   your honest users too, and the exponent decides who leaves."** If we discount the Nth credential
+   sharing a trust root, we should model what that does to legitimate multi-credential users before
+   picking the curve.
+2. **The one design detail worth stealing outright** is IIP-4's separation: stake affects *rewards*
+   but explicitly **not voting power**. Two different quantities, two different rules, deliberately
+   decoupled. That is the same instinct as §6.3's insistence that "how much evidence backs this
+   identity" and "how much should it count here" are different objects.
+3. **Ohlhaver's own warning still stands.** In the ETHBerlin Q&A she flags that in a distributed
+   system *"sublinear discrimination is actually a financial incentive to buy accounts"* — any
+   concave-in-stake rule pays you to split across identities. Idena's `^0.9` was mild enough that
+   this pressure was weak; a genuine square root would have made it strong. **Concavity and
+   personhood have to be co-designed, and the aggregator sits exactly where that co-design happens.**
 ## 4. Later work: social identity / plural identity (2024-2026)
 
 ### 4.1 "Common Knowledge Machines: From Community Notes to Community Posts" (Substack, 2024-10-01)
@@ -631,35 +689,110 @@ SSRN 5136037, posted **2025-01-02** —
 https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5136037 . **This is her most recent paper and
 the actual successor to *Compressed to 0*** — not a personhood paper at all.
 
-`UNVERIFIED — I could not obtain the full text.` SSRN returns HTTP 403 to automated fetching on both
-the abstract page and the `Delivery.cfm` endpoints, and the paper is not on her own site, arXiv or
-the archive.org mirror that hosts her other two papers. *A sibling agent was tasked with locating
-the full text via the Harvard Allen Lab, gettingplurality.org, Google Scholar and ResearchGate and
-did not return before completion.* **Everything below is from the SSRN abstract and secondary
-podcast summaries, and should be treated as second-hand until someone reads the PDF.** Next step:
-download it manually from SSRN with a browser session, or ask the author.
+**64 pages. Date written 2025-01-02, posted 2025-04-10, last revised 2025-02-13** (SSRN's own dates
+are mutually inconsistent; quoted as-is). Author affiliation on SSRN: "Independent." 85 references.
+Full text obtained and read.
 
-What the abstract and summaries say:
-- It proposes a **dual-currency model called PCARE**, per-community. `UNVERIFIED:` what the acronym
-  expands to — I could not confirm it and will not guess.
-- The two currencies separate **non-transferable, irrevocable stake conferring influence** from a
-  **transferable currency for exchange and attention**. The stated purpose is to break the identity
-  that one-token-one-vote systems assume between *money* and *votes* — resolving them to the same
-  unit of account is the flaw, and splitting them introduces a deliberate trade-off.
-- The goal is explicitly the one from *Compressed to 0*'s conclusion: **a Gaussian distribution of
-  power**, achieved either locally or globally through the interaction of many local communities —
-  i.e. §1.9(e)'s "plurality of identity games," now with a currency design attached.
-- Composability into "broader networked currencies" as a substrate for decentralised coordination;
-  and an AI angle about embedding social context into neural networks.
+**PCARE = "Plural Community Asset Resource Exchange."** It is a per-community dual-currency model.
 
-**Why this matters to us even unread.** Non-transferable influence + transferable value is the same
-structural move as Idena's identity stake (§1.10) and MACI's deposit (§5.2) — and Ohlhaver's own
-paper showed that non-transferability of the *token* does not survive a willing *human*
-(§2.4 point 4). So the obvious question to put to this paper is whether it answers her own Idena
-result or repeats it at community scale. **I could not answer that without the text, and it is the
-single most useful follow-up read in this whole corpus.** If PCARE genuinely prices influence in a
-way that survives puppeteering, that is directly transferable to how we weight credentials; if it
-does not, then her constructive programme still has no answer to her own critique (cf. §3.4).
+**The mechanism (§2.1, p.9).** *"A community has a currency distributed across an association set of
+n members. Each member i, at their discretion, irrevocably locks some portion as non-transferable
+'community stake' s and holds the remainder r as transferable tokens t."*
+
+```
+s_i + r_i = t_i                                    for all i = 1..n
+s_i = α_i·t_i ,  r_i = (1−α_i)·t_i ,  α_i ∈ [0,1]
+V_i = √s_i = √(α_i·t_i)          voting power      V = Σ_i √(α_i·t_i)
+V_i = s_i^p                      generalized (p.12)
+```
+
+The α slider spans the designs we already know (pp.9-10): *"All members receiving tokens and not
+irrevocably staking any token is equivalent to an ERC-20 airdrop (α_i = 0), while all members
+receiving the same numbers of tokens and irrevocable staking them is equivalent to all members
+holding one 'soulbound' token (α_i = 1)."* **DeSoc and a plain airdrop are the two endpoints of one
+dial** — a genuinely elegant unification of her own prior work.
+
+The exponent `p` names the family: `p = 0.5` quadratic ("PCARE"), `0.5 < p < 1` ("SCARE"),
+`p = 1` linear ("CARE"). *"To the extent enforcement is weak, some communities may adopt a lesser
+discrimination."* Idena's shipped `^0.9` (§3.4) is a SCARE parameterisation.
+
+**Correction to a claim in circulation.** Secondary summaries assert PCARE's goal is "a Gaussian
+distribution of power." **It is not the paper's stated goal.** The phrase appears once, hedged, as
+the closing sentence of §5.2 (p.48): *"Even if each community currency succumbs to Pareto's Law,
+overlapping, recombining communities open the possibility for power to cancel out in a normal
+(Gaussian) distribution."* It is a hoped-for emergent property of many overlapping currencies, not
+a designed guarantee. (Also: the widely-repeated line about the attention token paying for
+"bandwidth — posting in high-reach channels, initiating appeals, requesting human review" **appears
+nowhere in the paper**; it is search-engine confabulation. Do not reuse it.)
+
+### The passages that bear directly on our product
+
+**Account splitting and consolidation — she names our exact attack (§3.3.2, p.25):** *"a more
+covert way to game influence is through **account splitting**—bypassing the square root's
+discrimination with multiple accounts—or **account consolidation**—banding together with other
+participants to split stake across their pool to gain more influence."*
+
+**Her answer is locality, and it is bad news for us (p.26):** *"Under subsidiarity, 'higher-
+bandwidth' local communities benefit from lower monitoring costs because of periodic in-person
+voting and verified peer-to-peer interactions. Heightened scrutiny over a smaller surface area
+makes detection easier; **one-person cannot physically show up as two.**"* This is Bryan Ford's
+pseudonym party returning as the answer — **and it is precisely the property a global, remote,
+API-mediated aggregator cannot have.** Her solution to sybil resistance is small-scale and physical.
+
+**The single most damaging sentence in the corpus for our thesis (p.27):**
+
+> *"Ironically, whereas **global sybil resistance makes participants the same and reduces the cost
+> of influence**, the pursuit of local sybil resistance makes participants more unique, raising the
+> cost of influence."*
+
+Read that carefully. It is not merely that global personhood systems fail to stop capture — it is
+that **they actively make capture cheaper**, by compressing distinguishable people into
+interchangeable units. A universal credential is a standardisation of humans, and standardised
+things are cheaper to buy in bulk. See §6.2.
+
+**De jure vs de facto, restated (§3.3.3, p.26):** *"even assuming perfect enforcement of de jure
+sybil resistance, a deeper challenge emerges: deterring human beings from being informationally
+controlled as if they were programmable bots (de facto sybil resistance). The same UBI incentive
+that motivates participants to verify a global credential also gives other participants a strong
+incentive to corral and control other human accounts for more income and influence."* And: global
+currencies *"invite global enforcement… a challenge that invites global surveillance."*
+
+**The surveillance singularity (p.27):** *"As global currencies edge towards more perfect
+enforcement, a narrow set of idiosyncratic and technology biases universalize into systemic risk.
+Unchecked, the surveillor's gaze—however benevolent its intentions—expands into a force that bends
+communication, compressing the information function of money and votes into compliance, **until all
+participants become the same, leaving no differences to coordinate around.**"*
+
+**Identity, formally redefined (p.39):** *"community currencies encourage us to view 'identity' as
+a **changing constellation of stakes to different communities**… **Under plural voting, actors with
+the same composition are treated as a single entity and receive a discount.**"* She applies this to
+the Big 5 asset managers, calling their nominal separateness *"'account-splitting,' bypassing the
+square root's discrimination"* (fn.29, p.39). **This is the §6.5 data model stated by the author:
+identity = a weighted vector of community stakes, and sameness of composition is the discount
+trigger.**
+
+**Credentials appear — as membership gates, not scores (§2.1.4, p.13):** *"a community might limit
+transfers to specific participants or purposes; require **qualifications such as credentials,
+location, or affiliations**; or impose taxes or bonds based on social distance."*
+
+**And the adversarial point we must design against (pp.12-13):** ex-post behaviour such as voting
+history is needed to mitigate gaming via **"artificial affiliations ('anti-correlation palaces')"**
+that in practice vote uniformly. **If affiliation diversity earns a higher score, affiliations will
+be manufactured.** See §6.5.
+
+**Plural staking is explicitly unsolved (p.12).** Quadratic staking *"presumes participants are
+informationally independent, where in practice, many participants share beliefs and desires because
+of overlapping, shared communication… even weakly coordinating, informationally similar small
+stakeholders (**'humans acting like bots'**) can overwhelm large stakeholders in influence."* The
+fix is a **"bridging bonus" / "correlation discount"** — and then: *"**How to quantify informational
+diversity or 'consensus across difference' in plural voting is an open, active research
+question.**"* **No closed form is given.** That confirms §6.4: four years on, nobody in this
+lineage has a graded correlation measure, including her.
+
+*Extraction caveat: several displayed equations are vector graphics that `pdftotext` dropped
+(the α=0/α=1 boxed cases pp.9-10, the Community Based Income equation p.11). `V_i = √s_i` extracts
+as `Vi = 𝑠𝑖` with the radical lost, though the prose states it explicitly; `V_i = s_i^p` extracted
+cleanly. Anyone relying on the exact forms should open the PDF.*
 
 ### 4.3 Talks and interviews (from her own index, 2026-07-24)
 
@@ -682,28 +815,39 @@ That is not a detour — on her own account (§1.9e, §2.2) personhood was alway
 communities were always the right one. **She has moved on from the problem our product is in, and
 she moved on because she concluded it was the wrong problem.** We should sit with that.
 
-### 4.4 Did the promised "social identity" work ever appear? — No, not under that name
+### 4.4 Did the promised "social identity" work ever appear? — Yes, but folded in, not standalone
 
-She promised at ETHBerlin to write about social identity as the more promising solution "beyond
-Z1." As of 2026-07-24 **no paper by that description exists** on her writings index, her Substack,
-or in search. What exists instead is the substance scattered across three places, none of them the
-promised paper:
+*Compressed to 0* makes four specific promises of future work: *"social identity systems rich in
+subsidiarity (e.g., federalism)… are key to surfacing bona fide commitments and bias, **challenging
+the utility of global identity protocols for democratic governance**"* (p.~30); a sketch of
+*"plural attention mechanisms"* and their conditions (*"subsidiarity, privacy as contextual
+integrity, social identity"*, p.~33); how *"the social layer (off-chain social encumbrances)"* can
+reinforce on-chain security (p.~35); and *"identity systems which seek to avert these weaknesses…
+without a surveillance god's-eye-view"* (p.43).
 
-- **"Common Knowledge Machines"** (§4.1) — the mechanism design (polarity subsets, correlation
-  grouping by behaviour, credentials as context) without the identity theory.
-- **"Community Currencies"** (§4.2) — the economics of community-scoped influence, without a
-  personhood story.
-- ***Plurality*, chapters 3-2 / 4-1 / 5-6** (§5.4) — the actual social-identity theory, written by
-  Weyl and Tang with Ohlhaver as a credited writer (28.08 pts) and cited author. **If you want the
-  "social identity" argument she promised, read those three chapters; that is where it lives.**
+**No standalone paper by that description exists.** But the argument was delivered — as
+**§3.3.3 of the Community Currencies paper** ("From Sybil Resistance to Surveillance Singularity",
+pp.26-27), which is exactly the promised thesis: subsidiarity plus plurality as the alternative to
+global credentials *and* to global surveillance, with identity redefined at p.39 as *"a changing
+constellation of stakes to different communities."* Notably, that paper contains **no forward
+references to future work at all** — the thread stops there.
 
-So: two of the three promised follow-ups (Z1, and a social identity paper) never shipped, one
-unpromised paper did (Community Currencies), and the theoretical content migrated into someone
-else's book. **The critique in *Compressed to 0* is complete and devastating; the constructive
-programme it promised is, four years on, still not assembled in one place.** That is the honest
-state of the corpus, and it is why §6 relies on DeSoc's Appendix A and Gitcoin's COCM — the two
-things in this lineage that are actually specified and running — rather than on anything she
-published after 2024.
+So the corpus is more complete than it first appears. The map:
+- **"Common Knowledge Machines"** (§4.1) — the attention/bridging mechanism, in outline.
+- **"Community Currencies" §3.3.3 and p.39** (§4.2) — *the social identity argument*, and the formal
+  redefinition of identity as a stake-vector over communities.
+- ***Plurality* ch. 3-2 / 4-1 / 5-6** (§5.4) — the fuller social-identity theory, written by Weyl and
+  Tang with Ohlhaver as a credited writer and cited authority.
+
+**The honest summary of the whole trajectory:** the critique (2024) is complete and devastating; the
+constructive programme exists but is scattered across a currency paper, a blog post and someone
+else's book, and its central technical question — how to *quantify* informational diversity — is
+stated by the author herself as **open and unsolved** (§4.2). That is why §6 leans on DeSoc's
+Appendix A and Gitcoin's COCM: they are the only pieces of this lineage that are both specified and
+running.
+
+**She has been quiet since ~September 2025** — one Substack post and one paper since August 2024,
+and nothing verifiable in 2026 (OpenAlex, Crossref and her own index all show no 2026 output).
 ## 5. Surrounding lineage
 
 Brief, and deliberately built from *her own citation graph* (all references below are ones she
@@ -1100,6 +1244,26 @@ Four mechanisms by which we make it worse:
 4. **We make credentials liquid.** A heterogeneous pile of credentials is not fungible; a normalised
    score is. Liquidity is the property a farming operation most needs and least has today.
 
+**And there is a fifth mechanism, which she only stated in January 2025 and which is the single most
+damaging sentence in the corpus for our thesis** (Community Currencies, p.27):
+
+> *"Ironically, whereas **global sybil resistance makes participants the same and reduces the cost
+> of influence**, the pursuit of local sybil resistance makes participants more unique, raising the
+> cost of influence."*
+
+This is a stronger claim than "global personhood systems fail." It is that they **actively make
+capture cheaper**. A universal credential standardises humans into interchangeable units, and
+interchangeable units are cheap to acquire in bulk — you no longer have to understand each person,
+their community or their context; you need only the credential. Every protocol we add to the
+aggregate pushes further in that direction, and *an aggregator is a standardisation layer by
+definition* — normalising heterogeneous credentials into one comparable assertion is literally the
+product description. Her converse is worse news still: the property that raises the cost of
+influence is **locality**, and her stated mechanism for it (p.26) is *"periodic in-person voting and
+verified peer-to-peer interactions… one-person cannot physically show up as two."* That is Bryan
+Ford's pseudonym party (§5.1) returning as the answer — **a property that a global, remote,
+API-mediated aggregator structurally cannot have.** We should be honest that her constructive
+programme does not have a place for us in it.
+
 **The one honest counter-argument** — and it is the only one — is that an aggregator which
 **discounts correlated evidence** destroys the return to farming *multiple credentials that share a
 trust root*. This is not speculative: roughly **40 rostered protocols collapse to about 6 distinct
@@ -1230,6 +1394,16 @@ shipped a graded, cross-context correlation measure.** A continuous overlap meas
 roots and acquisition cohorts — Jaccard at the crude end, eigen-decomposition at the sophisticated
 end — is unclaimed territory that sits exactly on our natural data.
 
+**Ohlhaver confirms the gap in her own most recent paper**, which is as close to an invitation as
+this literature offers. Community Currencies p.12 sets up plural staking as the fix for the fact
+that *"even weakly coordinating, informationally similar small stakeholders ('humans acting like
+bots') can overwhelm large stakeholders in influence"* — and then concedes: *"**How to quantify
+informational diversity or 'consensus across difference' in plural voting is an open, active
+research question.**"* No closed form is given. Four years after DeSoc named the correlation score,
+the author's own position is that the central measurement problem is unsolved. **That is the
+strongest available argument that there is real technical work here for us to own — and, equally,
+a warning that it is unsolved for reasons, and we should not assume we will solve it in a quarter.**
+
 **Concrete recommendation:** stop saying "is this a unique human?" and start saying **"how much
 independent evidence supports the claim that this is a distinct person, and how correlated is this
 identity with the others in your cohort?"** That is honest, it is differentiated, it is what the
@@ -1266,6 +1440,33 @@ assertion should carry structure, not collapse to a scalar.** Sketch:
 - **Affiliations, if we ever carry them, must be consented and app-scoped.** DeSoc's unsolved
   problem was that publicly legible affiliations are a targeting list (§2.4). We should treat any
   affiliation data as high-toxicity: derive correlation from it, never expose it.
+
+**She has since given the formal version of this data model herself** (Community Currencies, p.39):
+identity is *"a changing constellation of stakes to different communities,"* and *"under plural
+voting, actors with the same composition are treated as a single entity and receive a discount."*
+Identity as a **weighted vector of affiliations**; **sameness of composition** as the discount
+trigger. That is the target schema, and it is close to what `pluraltools` actually implements
+(§5.5) — with the important refinement that her version is *weighted* where pluraltools' is a set.
+
+**The attack this data model invites, named by her (Community Currencies, pp.12-13):
+"anti-correlation palaces."** If affiliation diversity earns a higher score, **affiliations will be
+manufactured** — clusters of accounts constructed to look maximally unaffiliated with each other
+while in fact voting or acting uniformly. This is the reflexivity problem that kills naive
+diversity scoring, and it is the strongest objection to §6.4's recommendation. Her own mitigation
+is to score on **ex-post behaviour** (voting history, revealed action over time) rather than on
+**ex-ante declared affiliation**, precisely because declarations are cheap and behaviour is not.
+
+**Three design consequences follow, and they are the practical core of this section:**
+1. **Prefer behavioural correlation over declared affiliation.** This also happens to solve the
+   privacy problem (§2.4 point 3) and the toxicity problem — we never need to hold the affiliation,
+   only the co-movement. It is what COCM does (§2.4), what Pol.is does (§5.6), and what she does in
+   "Common Knowledge Machines" (§4.1: *"followers with similar behavior are grouped as the same
+   entity"*).
+2. **Never let a diversity score be purely additive in declared affiliations**, or we are paying
+   people to build anti-correlation palaces.
+3. **Trust-root diversity is comparatively robust to this attack** — you cannot manufacture a new
+   biometric issuer or a new government — which is a further argument for making root-dedup the
+   headline number rather than affiliation breadth.
 
 The honest framing of this pivot: **we sell the correlation structure, not the score.** That is the
 only version of this product that survives her critique, and it happens to be the only part that
@@ -1343,8 +1544,19 @@ Ordered by how much they should change what we build.
 8. **Does the "independence" framing survive contact with a customer?** §6.4 recommends replacing
    "is this a unique human?" with an evidence-diversity claim. That is more honest and less
    sellable. Test it on a real buyer before committing the README to it.
-9. **UNRESOLVED: is sublinear staking a mechanism we should borrow?** See §3 — whether the promised
-   paper exists determines whether there is anything here to borrow at all.
+9. **What exponent?** §3.4 settles that sublinear weighting is real, shipped and measurable — Idena
+   used `stake^0.9`, it destroyed the puppeteer pools, and the network fell 97.6% (4,164 → 98 Human
+   identities) while still ending with one actor holding ~22% of stake. If we apply a concave curve
+   to Nth-credential-per-trust-root, **what does it cost our honest multi-credential users, and is
+   any exponent simultaneously harsh enough to bite and mild enough to keep them?** Idena suggests
+   the window may be narrow or empty. Model this before choosing.
+10. **Do we score declared affiliations at all?** §6.5: her "anti-correlation palaces" attack means
+    any additive reward for affiliation diversity pays attackers to manufacture diversity. The
+    behavioural-correlation alternative is more robust and more privacy-preserving but needs data we
+    may not be able to collect. Which side do we build on?
+11. **Should we tell users the honest answer about locality?** Her constructive programme
+    (in-person, local, small-scale — §6.2) has no place for a global remote aggregator in it. If we
+    believe she is right about that and build anyway, we should be able to say why in one paragraph.
 
 ## 8. Quotable lines (with locators)
 
@@ -1408,7 +1620,28 @@ Center PDF of *Compressed to 0*
     coordination (at best) or intentional collusion (at worst)."* — ibid., §4.6, p.8.
 15. **Making a credential unsellable.** *"because a Seller would need to prove selling the recovery
     relationships, any attempt to sell a Soul lacks credibility."* — ibid., §4.3.
-16. **Sybil-ness as a continuum** (Miller, Weyl & Erichsen, quoted approvingly by her at p.33 n.82).
+16. **The sharpest single line against our thesis.** *"Ironically, whereas global sybil resistance
+    makes participants the same and reduces the cost of influence, the pursuit of local sybil
+    resistance makes participants more unique, raising the cost of influence."*
+    — *Community Currencies*, §3.3.3, p.27 (SSRN 5136037).
+17. **Identity as a vector, and the discount rule, in her own words.** *"community currencies
+    encourage us to view 'identity' as a changing constellation of stakes to different communities…
+    Under plural voting, actors with the same composition are treated as a single entity and receive
+    a discount."* — ibid., p.39.
+18. **The de facto sybil problem restated in 2025.** *"even assuming perfect enforcement of de jure
+    sybil resistance, a deeper challenge emerges: deterring human beings from being informationally
+    controlled as if they were programmable bots (de facto sybil resistance). The same UBI incentive
+    that motivates participants to verify a global credential also gives other participants a strong
+    incentive to corral and control other human accounts for more income and influence."*
+    — ibid., §3.3.3, p.26.
+19. **Why enforcement is not the answer.** *"Unchecked, the surveillor's gaze—however benevolent its
+    intentions—expands into a force that bends communication, compressing the information function
+    of money and votes into compliance, until all participants become the same, leaving no
+    differences to coordinate around."* — ibid., p.27.
+20. **The measurement problem is open — her words, not ours.** *"How to quantify informational
+    diversity or 'consensus across difference' in plural voting is an open, active research
+    question."* — ibid., p.12.
+21. **Sybil-ness as a continuum** (Miller, Weyl & Erichsen, quoted approvingly by her at p.33 n.82).
     *"What makes Sybil agents Sybils is that the will of one entity centrally coordinates them. They
     should be recognized as precisely the same because they all listen to that same entity and that
     entity alone."* — "Beyond Collusion Resistance," https://ssrn.com/abstract=4311507.
@@ -1435,8 +1668,9 @@ All retrieved 2026-07-24 unless stated.
   https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4105763 · Free PDF (read in full):
   https://www.radicalxchange.org/updates/papers/desoc.pdf
 - **"Community Currencies: The Price of Attention and Cost of Influence in a Networked Age"**,
-  Ohlhaver, 2025-01-02. SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5136037
-  (SSRN 403s on automated fetch; see §4)
+  Ohlhaver, written 2025-01-02, posted 2025-04-10, 64pp. SSRN:
+  https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5136037 · DOI `10.2139/ssrn.5136037` —
+  **SSRN 403s all automated fetching; retrieve via a browser session.** Read in full for §4.2.
 - **"Common Knowledge Machines: From Community Notes to Community Posts"**, Substack, 2024-10-01:
   https://pujaohlhaver.substack.com/p/common-knowledge-machines
 - Personal site: https://www.pujaohlhaver.com — writings index
@@ -1485,6 +1719,13 @@ All retrieved 2026-07-24 unless stated.
 - Idena forensic surface used by the paper: indexer
   https://github.com/idena-network/idena-indexer · API https://api.idena.io · explorer
   https://scan.idena.io · the key-masking client fork https://github.com/haritowa/idena-mirror
+- Idena sublinear-staking specs (all `stake^0.9`): IIP-4 https://docs.idena.io/docs/iip/iip-4 ·
+  IIP-5 https://docs.idena.io/docs/iip/iip-5 · IIP-6 https://docs.idena.io/docs/iip/iip-6 ·
+  IIP-7 https://docs.idena.io/docs/iip/iip-7 · index (to IIP-13)
+  https://github.com/idena-network/idena-docs (`docs/iip/`) · node
+  https://github.com/idena-network/idena-go (last release v1.1.2, 2025-12-22)
+- Live Idena network state used in §3.4: `api.idena.io/api/Epoch/{n}/IdentityStatesSummary`,
+  `api.idena.io/api/Staking`, `api.idena.io/api/Coins` (all retrieved 2026-07-24)
 
 ### In-repo
 - `research/BRIEF.md` — shared research brief

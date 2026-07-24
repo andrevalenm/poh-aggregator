@@ -6,7 +6,9 @@
 delivery date, not the upload date — the YouTube metadata only carries the latter, and an earlier
 draft of this file conflated them.
 **Video:** https://www.youtube.com/watch?v=-mwUQp2qwjk (27:02)
-**Underlying paper:** *Compressed to Zero: The Silent Strings of Proof of Personhood* (Ohlhaver & Nikulin, 2024)
+**Underlying paper:** *Compressed to **0**: The Silent Strings of Proof of Personhood* — Puja Ohlhaver,
+**Paula Berman** (COO, RadicalxChange) and Mikhail Nikulin, 2024. Note the title is "0", not "Zero",
+and there are **three** authors, not two; an earlier draft of this file got both wrong.
 **Retrieved:** 2026-07-24
 
 > **Source quality.** This is YouTube's *auto-generated* English caption track, lightly cleaned
@@ -27,6 +29,17 @@ draft of this file conflated them.
 | mere articulation | **mirror articulation** |
 | information Providence | **information provenance** |
 | John Jones network *(unclear)* | ASR failure — meaning uncertain, check audio |
+
+**Numbers the ASR got wrong** — checked against the paper by the corpus research. Use these, not the
+figures in the text below:
+
+| Transcript says | Paper says |
+|---|---|
+| UBI paid to puppets "$2 to $4" every few weeks | **$2–$14** |
+| 23 entities were "less than 1%" of distinct entities | **&lt;0.6%** |
+
+This is exactly why the file carries the do-not-quote warning above. See
+[`ohlhaver-corpus.md`](ohlhaver-corpus.md) for the verified figures and the full argument.
 
 ---
 
