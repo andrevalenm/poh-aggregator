@@ -1,6 +1,31 @@
 # Prior art: combining heterogeneous, correlated evidence into a single trust score
 
-> STATUS: in progress
+**Type:** landscape / theory file. **Written:** 2026-07-24.
+
+**Recommendation in one line:** score the **adversary's bill, not the user's evidence** — a
+latent-factor (testlet/copula) model whose production form is a **root-cost aggregation** where each
+trust root is paid once and each credential's enrolment session is paid every time, reported as a
+continuous cost-denominated score with an uncertainty interval, categorical root-shaped reason codes,
+and a ZK threshold bit for verifiers. Details in §7; the argument in §1.3, §1.5 and §1.6; the proof
+of necessity in §8.
+
+**The four things to take away if you read nothing else:**
+
+1. **Additive scoring fails *in the adversary's favour*.** A farm's credentials are maximally
+   correlated; an honest user's are diverse. Both score `n`; the truth is `d_eff`. On live Human
+   Passport weights, **one government document yields 51.089 points against a threshold of 20** (§8.1),
+   and in a three-credential toy the farm outscores the honest user **48 to 26** under additive
+   scoring and loses **2.34 to 2.87** under root-cost scoring (§8.2).
+2. **Correlation is a property of the credential *class*, not of the user** — so we can price it from
+   a trust-root ontology we maintain, **without any cross-protocol linkability**. This is what makes
+   the model implementable given that four incompatible nullifier schemes make per-user dedup
+   impossible (§1.5, §8.3).
+3. **Circles' relative sybil-resistance theorem is the strongest formal result in our research set,
+   and it does not generalise** — but its *shape* does: express security as a bound on adversary
+   reach per unit of irreproducible work. Attack cost is the conserved quantity that is commensurable
+   across protocols; max-flow is not (§5.2).
+4. **Nothing in the roster attests independent control.** A puppeteered but genuinely-verified human
+   scores legitimately high. Say so in the output, every time (§1.0, §5.5, §7.6).
 
 **Scope:** the mathematics and prior art behind our core product decision — how to turn N
 heterogeneous personhood credentials into one humanity assertion (score, confidence, uniqueness
