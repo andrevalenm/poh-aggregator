@@ -199,7 +199,7 @@ Methods most relevant to us:
 | `circles_query` / `circles_paginated_query` | generic SQL-like queries over indexed tables |
 | `circles_tables` | schema discovery |
 | `circlesV2_findPath` | **pathfinder max-flow between two avatars** |
-| `circles_getScoreGroupMintLimits` | see "score groups" below — TBD |
+| `circles_getScoreGroupMintLimits` | mint headroom for "score groups" — see Scoring-relevant facts |
 
 Queryable namespaces via `circles_query`: `V_Crc` (v1), `CrcV2`, `CrcV2_ScoreGroup`; event families
 `CrcV1_*`, `CrcV2_*`, `CrcV2_ScoreGroup_*`.

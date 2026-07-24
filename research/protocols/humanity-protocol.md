@@ -1,15 +1,44 @@
 # Humanity Protocol
 
-> STATUS: in progress
+*Researched 2026-07-24. All on-chain values, RPC probes, npm stats and API probes in this document were
+executed by me on that date against live endpoints, not recalled.*
 
-**One-liner:** Palm-biometric "proof of personhood" network with its own EVM L2, a $H token, a node-sale
-("zkProofer") operator economy, and a W3C-VC-flavoured credential (Human ID).
-**Category:** claims *uniqueness*; in practice **liveness + weak uniqueness** (see below)
-**Chains:** Humanity Protocol mainnet L2 (chain ID **6985385**), Humanity testnet (Rome / chain ID TBC)
-**Status (2026-07):** ⚠️ **Mainnet is OFFLINE as of the current docs** — "The Mainnet is temporarily offline
-following a security incident. It will be relaunched in the coming weeks with updated infrastructure."
-(https://docs.humanity.org/build-with-humanity/build-on-chain/network-information-mainnet — fetched 2026-07-24)
-**Aggregator verdict:** TBD (leaning **skip / integrate later**)
+**One-liner:** Palm-biometric "proof of personhood" network — in practice now a **credential aggregator**
+(OAuth links + Mastercard open-finance data + KYC) with its own EVM L2, an $H token, and a nine-figure
+retail node-license sale.
+
+**Category:** markets itself as **uniqueness**; actually delivers a mix of
+**state-identity** (`is_human` is true on KYC pass), **behavioral/account-linking** (`*_connected`), and a
+small, unquantified **liveness/weak-uniqueness** biometric tier (`palm_verified`).
+
+**Chains:** Humanity mainnet L2 — **chain ID 6985385**, RPC `https://humanity-mainnet.g.alchemy.com/public`,
+explorer `explorer.humanity.org` → `humanity-mainnet.explorer.alchemy.com` (Blockscout).
+Humanity testnet — **chain ID 7080969**, RPC `https://humanity-testnet.g.alchemy.com/public`.
+
+**Status (2026-07):** **Degraded and pivoting.**
+- Docs banner: *"The Mainnet is temporarily offline following a security incident. It will be relaunched in the
+  coming weeks with updated infrastructure."*
+  (https://docs.humanity.org/build-with-humanity/build-on-chain/network-information-mainnet)
+- I probed it: the **chain is producing blocks** (~1.24 s) and the oracle is **not paused** — what is down is
+  the token/bridge/user-facing layer pending the post-hack migration.
+- **$36M stolen 2026-06-08/09** via 7 private keys leaked from a malware-infected developer laptop.
+- Founder has publicly **pivoted the company toward enterprise AI**; the company had already pivoted from
+  "Proof-of-Personhood" to "Proof-of-Trust" in **Feb 2026**.
+- **The mainnet verification oracle has processed 28 verifications in its entire life, all on 9–10 Feb 2026,
+  and zero since.** The chain has **16,863 total addresses**.
+- npm SDKs are pre-1.0 with **137 combined downloads/month**.
+
+**Aggregator verdict: SKIP for now. Revisit no earlier than a stable mainnet relaunch + a published
+`palm_verified` population.**
+Three independent reasons, any one of which is sufficient: (1) the credential we'd want (`palm_verified`) has
+**no published population and no published accuracy**, while the credential they'd hand us (`is_human`) is
+**KYC-rooted and would double-count** other protocols in our basket; (2) the **on-chain surface is
+effectively unused** — 28 lifetime verifications, and issuance is controlled by unmultisig'd EOAs on an
+upgradeable proxy at a company that just lost $36M to key mismanagement; (3) the vendor is **pivoting away
+from consumer personhood**, so integration cost is unlikely to amortise. Their SDK is also **not
+permissionless** — every read requires an OAuth client and a per-verification fee — so we would be buying a
+dependency, not aggregating an open credential. If we integrate later, consume **only `palm_verified` +
+`app_scoped_user_id`**, never `is_human`.
 
 ---
 
@@ -130,7 +159,7 @@ attestations.
 
 ## On-chain surface
 
-### Mainnet (currently offline)
+### Mainnet (docs say "offline"; chain is in fact producing blocks — see liveness probe below)
 | Field | Value |
 |---|---|
 | Network name | Humanity |
@@ -397,6 +426,17 @@ From the whitepaper (https://docs.humanity.org/whitepaper, read 2026-07-24):
 
 ## Scoring-relevant facts
 
+### Published score semantics
+There **is** a numeric tier signal: the preset **`humanity_score` — "Confidence score for 'human + unique'
+status"** (live API config, 2026-07-24). But **no scale, no bands, no methodology, and no documentation page**
+for it exists. `UNCLEAR:` range and interpretation. Consuming an undocumented black-box confidence score into
+our own score would launder an unknown model into ours — do not do it without their spec.
+
+Practical tier ladder we can actually reason about, strongest to weakest:
+`palm_verified` (hardware) > `palm_verified` (mobile) > `kyc_passed` > `age_over_18` > `mc_*`/`proof_of_*`
+> `*_connected`. Note `is_human` is **not** on this ladder — it is a disjunction that collapses to `kyc_passed`
+for most holders.
+
 ### The user-count story — read it carefully
 
 The headline numbers are **reservations, not verifications**:
@@ -526,10 +566,58 @@ Consequences for the aggregator:
 
 ## References
 
-Primary — Humanity docs:
-
-- https://docs.humanity.org/llms.txt (full docs index)
+**Primary — Humanity docs** (all fetched 2026-07-24; every page is also available as `.md` and supports a
+`?ask=` query parameter, which is the fastest way to re-check anything here):
+- https://docs.humanity.org/llms.txt — full docs index
 - https://docs.humanity.org/build-with-humanity/build-on-chain/network-information-mainnet
+- https://docs.humanity.org/build-with-humanity/build-on-chain/network-information-testnet
 - https://docs.humanity.org/build-with-humanity/build-on-chain/canonical-contracts
 - https://docs.humanity.org/build-with-humanity/build-on-chain/canonical-contracts/iverificationoracle
+- https://docs.humanity.org/build-with-humanity/build-on-chain/canonical-contracts/ifeeescrow
+- **https://docs.humanity.org/build-with-humanity/build-on-chain/credentials-verification-service** — the only
+  page with real contract addresses + the claim-type catalogue
+- https://docs.humanity.org/build-with-humanity/build-with-the-sdk-api/sdk-oauth-scopes-and-presets
+- https://docs.humanity.org/api-reference/reference/api-reference
 - https://docs.humanity.org/understanding-humanity/how-biometric-proof-of-humanity-works
+- https://docs.humanity.org/understanding-humanity/core-concepts-verifiable-credentials-and-ssi
+- https://docs.humanity.org/understanding-humanity/overall-system-architecture
+- https://docs.humanity.org/whitepaper
+- https://docs.humanity.org/zkproofer-node/what-is-the-zkproofer-node
+- https://docs.humanity.org/zkproofer-node/kyc-and-eligibility
+- https://docs.humanity.org/zkproofer-node/how-to-purchase-zkproofer-nodes/tiers-and-pricing
+
+**Primary — live endpoints I queried myself (2026-07-24):**
+- `https://api.humanity.org/.well-known/hp-configuration` ← **the `presets_available` list, incl. the
+  `is_human` definition and `rate_limit_default: 300 requests_per_minute`**
+- `https://api.humanity.org/.well-known/openid-configuration`, `/health`
+- `https://api.sandbox.humanity.org/.well-known/hp-configuration`, `/health`
+- JSON-RPC `https://humanity-mainnet.g.alchemy.com/public` and `…-testnet…` — `eth_chainId`,
+  `eth_getBlockByNumber`, `eth_getCode`, `eth_getStorageAt` (EIP-1967 slot
+  `0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc`), `eth_call`
+  (`owner()`, `paused()`, `verificationFee()`, `eas()`, `requestSchemaUID()`, `resultSchemaUID()`)
+- Blockscout `https://humanity-mainnet.explorer.alchemy.com/api/v2/stats`,
+  `/api/v2/addresses/{addr}/counters`, `/api/v2/addresses/{addr}/transactions`
+- `https://registry.npmjs.org/@humanity-org/{connect-sdk,react-sdk}` and
+  `https://api.npmjs.org/downloads/point/last-month/…`
+- GitHub API: `humanity-org` (30 public repos), `humanity-developers` (8 repos)
+
+**Primary — Humanity's own blog:**
+- https://www.humanity.org/blog/palm-scanning-begins-on-humanity-protocol
+- https://www.humanity.org/blog/how-do-palm-scans-work-on-the-humanity-protocol
+- https://www.humanity.org/blog/humanity-protocol-mainnet-live-bridging-web2-and-web3
+
+**Primary — code:**
+- https://github.com/humanity-developers/verification-airdrop-dapp — `apps/web/src/config/wagmi.ts` (chain IDs),
+  `apps/web/src/constants/claim.ts` (`ClaimType.IS_HUMAN`), `docs/DEPLOYMENT.md` (stale HashKey addresses)
+- https://github.com/humanity-org/humanity-sdk , https://github.com/humanity-developers/react-sdk
+
+**Secondary — incident & pivot (labelled: news/analysis, not primary):**
+- https://www.halborn.com/blog/post/explained-the-humanity-protocol-hack-june-2026 (best technical post-mortem)
+- https://www.coindesk.com/tech/2026/06/09/humanity-protocol-token-crashes-more-than-80-after-a-usd32-million-private-key-hack
+- https://cryptobriefing.com/humanity-protocol-blames-h-token-exploit-on-developer-machine-compromise/
+- https://cryptobriefing.com/humanity-protocol-pivots-enterprise-ai-36m-hack/
+- https://en.cryptonomist.ch/2026/06/17/humanity-protocol-token-swap/
+- https://www.biometricupdate.com/202602/humanity-protocol-pivots-from-proof-of-personhood-but-sticks-with-palm-biometrics
+- https://decrypt.co/219390/worldcoin-rival-humanity-protocol-nets-funding-from-polygon-animoca-founders
+- https://protos.com/how-humanity-protocol-ceo-drove-his-previous-firm-to-insolvency/ (adversarial)
+- https://messari.io/report/understanding-humanity-protocol-a-comprehensive-overview (paywalled/partial)

@@ -417,6 +417,162 @@ be the same Sumsub/Jumio session on the same passport.
 ---
 
 # 4. zkMe
+
+**One-liner:** A compliance-first credential vendor: **zkKYC** (document/ePassport/eID-backed KYC as
+a ZK credential) plus **MeID**, a "One Face, One DID" proof-of-personhood built on FHE-encrypted
+face embeddings, delivered as SBTs on ~15 mainnets and checkable on-chain via `hasApproved()`.
+**Category:** MeID = **liveness + uniqueness** (biometric dedupe inside zkMe's enrolment DB);
+zkKYC/PoC = **state-identity**.
+**Chains (mainnet, per docs 2026-07-24):** Ethereum, Polygon, Arbitrum, Base, BNB Chain, Manta,
+Ronin, Kaia, X Layer, ZetaChain, BounceBit, Aptos, Solana, TON, Neutron (Cosmos). Many more on
+testnet only ("coming soon": Optimism, Scroll, zkSync, Linea, Avalanche, Mantle, Berachain, Sui,
+Fantom, Plume, Lumoz, Midnight, Sei).
+**Status (2026-07): live and actively developed, but pivoting toward AI-agent credentials.**
+Evidence: `docs.zk.me` is current (references eIDAS 2.0 wallets due 2026, an example
+`nullifierSessionID` of "Airdrop-2026-Q1", and a whole **zkKYA "Know Your Agent"** product line —
+APC/ACC/AIC/ARC/APF). zk.me homepage tagline 2026-07: *"Reusable Zero-Knowledge KYC for the Agentic
+Economy."* GitHub `zkMeLabs`: `zktls-*-sdk` repos updated Jan 2026, a Blockscout `frontend` fork
+updated Mar 2026 — but `zkme-contracts` last updated **Dec 2024** and `zkme-circuits` **Feb 2024**.
+npm `@zkmelabs/widget` latest **0.3.6, published 2025-05-16** (MIT). So: company alive, *identity
+core* not much touched in 18 months, effort has moved to zkTLS and agents.
+**Aggregator verdict: integrate later, and only via the on-chain read.** MeID is a genuine
+uniqueness claim with a good nullifier design, and the `ZKMEVerifyUpgradeable` contracts are
+deployed and publicly readable. But (a) `hasApproved(dappAccount, user)` is scoped to a *dapp
+account*, so we likely need to be a registered zkMe customer for the read to mean anything about
+*us*; (b) the SDK/API path requires `mchNo` + `apiKey` from `dashboard.zk.me`; (c) MeID adoption
+numbers are unpublished. Low priority relative to Passport.
+
+## What it proves — and what is actually ZK
+
+**MeID ("One Face, One DID"), per `docs.zk.me/hub/what/zkkyc/meid.md`:**
+1. liveness check → 2. face graph generation → 3. **fully homomorphic encryption** of the face
+graph → 4. **encrypted face-graph cross-check** against prior enrolments → 5. unique zkMe DID
+creation → 6. final report.
+
+Assessment:
+- The **uniqueness guarantee is a centralised biometric dedupe**, exactly like Civic Uniqueness or
+  World ID's iris — the FHE only changes *who can read the template*, not *who decides uniqueness*.
+  zkMe's servers still run the 1:N comparison. **Trust root = zkMe's enrolment database and its
+  face-matching thresholds.** If it FNs, one human gets many MeIDs.
+- **The FHE claim is the real cryptographic content and it is unusual** (most competitors just
+  store templates encrypted at rest). But we have no audit or paper link confirming the 1:N match
+  is done homomorphically at production scale. `UNVERIFIED:` there is a `zkme-python-seal` repo
+  (Microsoft SEAL demo, last touched Sep 2023) and a `zkme-circuits` repo (Feb 2024) — thin
+  evidence for a claim this strong. **Treat "even zkMe can't see your face" as marketing until
+  audited.**
+- Attack surface is the standard biometric one: presentation/injection attacks against the liveness
+  step, and — relevant to the Fractal ID section — a corpus of leaked passport photos and selfies
+  makes deepfake injection cheaper every year.
+
+**Nullifiers — the best-designed part, and app-scoped (good for us):**
+Per `docs.zk.me/hub/how-built/credential-sys/anti-sybil-mech.md`, the circuit's `NULLIFY` operator
+(**operator code 17**) computes `Hash(userKey, credential, verifierID, nullifierSessionID)` and
+emits it as a public signal. The verifier sets `nullifierSessionID` (e.g. `"Airdrop-2026-Q1"`) via
+`setZkpRequest`. The contract enforces:
+```solidity
+function _checkNullify(uint256 nullifier, uint256 nullifierSessionID) internal pure {
+    require(nullifierSessionID == 0 || nullifier != 0, "Invalid nullify pub signal");
+}
+mapping(uint256 => bool) public usedNullifiers;
+```
+So nullifiers are **scoped to (user, credential, verifier, session)** — i.e. **unlinkable across
+apps**, which is the property we want. The uniqueness *registry* is explicitly left to the
+application layer, not maintained by zkMe. **This is directly reusable design for our own
+per-app nullifier scheme.** Note the vocabulary (`setZkpRequest`, operator codes, circom circuits)
+is straight from **iden3 / Privado ID** — zkMe's GitHub carries forks of `circom`, `circuits`,
+`circomlib`, `snarkjs` and `polygonId-contract`. **zkMe is an iden3 derivative**; the other agent's
+Privado ID write-up covers the shared upstream.
+
+**The "Certify" backdoor — read this before calling zkMe private.** From
+`docs.zk.me/hub/how-built/id-infra/smart-contracts.md`: after Verify, a verifier may optionally
+trigger **Certify**, which (with the holder's one-time signature) mints a verifier-specific SBT copy
+containing **the Holder's private key shard**, "enabling the Verifier to identify the Holder when a
+regulator initiates bad-actor proceedings, **even without the Holder's approval**." That is a
+by-design deanonymisation escrow. It is opt-in per verifier, but it means "zkMe credential" does not
+uniformly mean "unlinkable". If we surface zkMe to users we must disclose this.
+
+## On-chain surface
+
+Two contract families, both with published mainnet addresses (source:
+`https://docs.zk.me/hub/how-built/id-infra/smart-contracts.md`, fetched 2026-07-24).
+
+**zkMe Verify & Certify (`ZKMEVerifyUpgradeable`)** — the one an aggregator reads:
+
+| Chain | Mainnet |
+|---|---|
+| Ethereum / Arbitrum / X Layer / BounceBit | `0x399488687fc3618FFaf1f5d0f61397c8E0360c02` |
+| BNB Chain / Manta / Ronin / Kaia / ZetaChain | `0x3919BdCe285E82CDC6585979cfd71636b33A5582` |
+| Base | `0x8c81bbc5cC9B6cdbb5c0e5DD8b9D5bfaF3575710` |
+| Polygon | `0x78D247ff4543Ef08488A1127034c2cE54B12A926` |
+| Solana | `6tVnLV3qrA7HddTzRGmeZs1cy5rAcTFs9sQiaoLbENAM` |
+| Aptos | `0xc1e0d1fb6178f444f763bc55bda9df32b4354859925191d634a74a97924397d9` |
+| TON | `EQBLZJv_DGlRJ-HqSY2yjmmGiRspStQ2G-akZVQWAcr7pUFt` |
+| Neutron | `neutron19t7s6aa9289e563mu9qrx5nh80xtn4vr5afdu8yctej6f7w6k9usv87acp` |
+
+**zkMe Mint / Delegate (the SBT itself):** Polygon Mint `0x5c2bfcf9c17CD53d55033769727196736CD188b3`
+(same address reused as the Delegate on Ethereum, Base, BNB, Manta, Kaia, Ronin, ZetaChain,
+BounceBit); Polygon Delegate `0x3b3364656BbB7A23133e3f26D7F6850acfaAc394`; Arbitrum/X Layer Delegate
+`0x1E3D352CA8E843AC59FdE9AD605Ba1C57813Fa0b`; Solana Delegate
+`6tVnLV3qrA7HddTzRGmeZs1cy5rAcTFs9sQiaoLbENAM`.
+
+**The read we would make** (from `@zkmelabs/verify-abi` README — primary source,
+`github.com/zkMeLabs/zkme-sdk-js/tree/main/packages/verify-abi`):
+```typescript
+import zkMeVerifyAbi from '@zkmelabs/verify-abi'
+const zkMeContract = new Contract(ZKME_VERIFY_ADDRESS, zkMeVerifyAbi, provider)
+const results: boolean = await zkMeContract.hasApproved(dappAccount, userWalletAddress)
+```
+**Critical caveat:** `hasApproved` takes a **`dappAccount`** — approval is per-verifier, not global.
+So we cannot ask "is this address a unique human per zkMe?"; we can only ask "has this address been
+approved *for dapp X*". To get a meaningful answer we would need either our own registered
+`dappAccount` (i.e. vendor cooperation) or to enumerate known integrators' dappAccounts and read
+those. `UNCLEAR:` whether a MeID-only approval is queryable without a dappAccount — worth testing
+against a live contract.
+
+Also note the zkMe **DID method** (`did:zkme:`) registry is documented as deployed **only on
+ZetaChain testnet** (`github.com/zkMeLabs/zkme-did-method-spec`, README last touched May 2023). The
+production identity anchor is the SBT, not the DID registry. Don't build on `did:zkme:`.
+
+## Integration surface
+
+- `@zkmelabs/widget` (MIT, v0.3.6, 2025-05-16) — embedded widget, `new ZkMeWidget(appId, name,
+  chainId, provider, {lv: "zkKYC" | "MeID", programNo, theme, locale})`; events `kycFinished` /
+  `meidFinished`. Also `@zkmelabs/kyb-widget`, `@zkmelabs/verify-abi`.
+- Helper off-chain checks: `verifyKycWithZkMeServices(appId, userAccount, {programNo})` and
+  `verifyMeidWithZkMeServices(...)` → `{ isGrant }`.
+- REST: `POST https://agw.zk.me/zkseradmin/openapi/kyc/getUsersList` etc., body carries
+  `{mchNo, apiKey, programNo, page}` — paged 50 at a time. **Requires a `dashboard.zk.me` account.**
+- Mobile SDK (zkOBS), zkTLS verifier SDKs for iOS/Android (repos updated Jan 2026).
+- **Notably, for MeID and cross-chain zkKYC the SDK explicitly says you do *not* need to implement
+  the `delegateTransaction` methods** — meaning **MeID does not require an on-chain write**. That
+  strongly implies a MeID result may exist only in zkMe's backend for many users, making the
+  on-chain read useless for them. This is the key unresolved question for integrating zkMe.
+- Pricing: not published. `UNVERIFIED:` per-verification cost; requires sales contact
+  (`contact@zk.me`).
+
+**Can we consume without vendor cooperation?** **Mostly no.** Contracts are public but the
+`hasApproved(dappAccount, …)` scoping and the likely off-chain-only MeID make the API the real
+integration path, and that is gated by `mchNo`/`apiKey`.
+
+## Identity sources (matters for double-counting)
+
+zkMe accepts three identity roots, documented at
+`docs.zk.me/hub/what/zkkyc/zkpoc/supported-eid-providers.md`:
+1. **Document verification** — zkMe itself calls this "the lowest assurance level, particularly as
+   generative AI makes document forgery increasingly trivial". Their words, worth quoting to
+   anyone who wants us to weight document KYC highly.
+2. **ePassport NFC / national PKI** (their "zkPassport") — static data signed at issuance.
+3. **Government eID** — eIDAS 2.0 EU Digital Identity Wallets, Hong Kong **iAM Smart**, Singapore
+   **SingPass/Myinfo**. Highest assurance, live-registry check.
+
+Note (2) puts zkMe on the **same trust root as every other ePassport/NFC protocol** (Rarimo,
+zkPassport, Self/Holonym's passport flows, and Human Passport's `HolonymGovIdProvider`). One
+passport chip can produce a zkMe credential *and* a Holonym credential *and* a Self credential —
+three "independent" stamps, one document. This is the single most important overlap in this
+document.
+
+---
+
 # 5. Galxe Passport
 
 ## Cross-cutting: shared KYC/liveness vendors (double-counting risk)

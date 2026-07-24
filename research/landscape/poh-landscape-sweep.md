@@ -1,6 +1,10 @@
 # Proof-of-personhood landscape sweep
 
-> STATUS: in progress (started 2026-07-24)
+**Written:** 2026-07-24. All volatile facts date-stamped; `?` / `UNVERIFIED:` marks what I could
+not confirm.
+
+**Format note:** this is a landscape file, not a single-protocol write-up, so it does not use the
+per-protocol headings from `../BRIEF.md`. It is the orienting map those files hang off.
 
 **Scope:** the map of the whole proof-of-personhood (PoP) / sybil-resistance space, the theory
 underpinning it, and the 2025-2026 repositioning of the field around AI agents. This is the
@@ -518,6 +522,18 @@ current agent covers. Items already assigned to another agent are listed for com
   proof-of-work / social graph / identity proofs) is close to ours.
 - **Trade press worth monitoring:** https://www.biometricupdate.com/tag/proof-of-personhood is the
   single best-maintained news source on this category. Recommend it as a standing feed.
+- **Holonym Foundation acquired Gitcoin Passport in February 2025** (now Human Passport /
+  passport.human.tech). Reported in
+  https://www.biometricupdate.com/202505/proof-of-personhood-protocols-jockey-to-establish-networks-of-verified-humans
+  (2025-05-09). Relevant because the incumbent aggregator changed owner and strategy recently —
+  the Passport agent must not describe it as a Gitcoin product.
+- **Regulatory status of World, as of the May 2025 sweep** (secondary, same article): **fully
+  banned in Hong Kong**, **suspended in Indonesia**, with objections raised by **Germany, Kenya
+  and Brazil**; US operations only launched May 2025. UNVERIFIED whether any of these were lifted
+  by 2026-07. This is coverage-defining and belongs in its own file.
+- **Also named in that sweep and otherwise invisible:** **HumanCode** (palm biometrics, partnered
+  with TON Society Apr 2024) and **IDNTTY** — both `?`, both possibly dormant; check GitHub/docs
+  before including in any scoring table.
 
 ---
 
@@ -572,13 +588,27 @@ token-funded:
   - **What it proves:** that a request came from a keyholder claiming to be a named agent
     operator, untampered. **What it does not prove:** that a human is behind it, that the
     operator is honest, or anything about the end user. It is *attribution*, not personhood.
+- **World AgentKit + x402 (beta, announced 2026-03-17)** — the concrete delegation credential that
+  already exists. An SDK for e-commerce sites: a user registers their AI agent against their
+  World ID, and the site is told "a distinct and verified human approves of this agent's
+  purchasing decisions." It is wired into **x402 v2**, the payment protocol built by **Coinbase
+  and Cloudflare**. Secondary:
+  https://techcrunch.com/2026/03/17/world-launches-tool-to-verify-humans-behind-ai-shopping-agents/
+  - **This is the shape to copy.** Agentic commerce is the first place where someone is actually
+    paying for a personhood assertion, and the assertion is *delegated*, not direct. An aggregator
+    that can back an x402-style flow with *any* of N personhood roots — rather than only an Orb —
+    is directly substitutable for AgentKit and strictly more available (AgentKit's strongest tier
+    requires an Orb, which is unavailable or banned in several large markets).
 - **Okta "Human Principal"** (beta, announced with World 2026-04) — binds an agent's actions to a
-  verified human principal. This is the join point between the two markets and the single most
-  commercially interesting pattern for us: *delegation credentials*. UNVERIFIED: technical
-  detail; next step: okta.com developer blog / "Auth for GenAI".
+  verified human principal. UNVERIFIED technical detail; next step: okta.com developer blog /
+  "Auth for GenAI".
 - UNVERIFIED / to chase in a dedicated pass: Google **AP2** (Agent Payments Protocol), **Visa
-  Trusted Agent Protocol**, Coinbase **x402**, Skyfire, Catena Labs, and "KYA / know-your-agent"
-  vendors. These matter because they carry a *delegation* field that an aggregator could consume.
+  Trusted Agent Protocol**, Skyfire, Catena Labs, and "KYA / know-your-agent" vendors. These
+  matter because they carry a *delegation* field that an aggregator could consume.
+- **Market note:** an agent-funding survey (2026) observes that "human approval is conspicuously
+  underfunded as a standalone category" — oversight is being bundled into agent platforms rather
+  than bought separately. Read that two ways: thin standalone budgets today, but also no
+  entrenched incumbent. Secondary: https://aifundingtracker.com/top-ai-agent-startups/
 - **C2PA / Content Credentials** — provenance for *content*, not accounts:
   https://c2pa.org/ , https://contentcredentials.org/ . Signs "this media came from this
   device/tool with this edit history." Adjacent but orthogonal: it answers "was this
@@ -650,7 +680,7 @@ Scale figures are **as of 2026-07-24** and are self-reported by the projects unl
 | Fractal ID | DOC (KYC) | state | ? | Alive `?` — check for 2021 breach history |
 | zkMe | DOC + BIO, ZK-wrapped | state, uniq `?` | ? | Alive |
 | Silk / Human Wallet | AGG (wallet-embedded) | composite | ? | Alive |
-| Sismo | ZKTLS/attestation aggregation | attributes | — | **Wound down** `?` — verify; widely reported sunset |
+| Sismo | ZK attestation aggregation (Sismo Connect) | attributes | — | **Dormant** — no shutdown notice found, but github.com/sismo-core repo activity trails off in 2023 (checked 2026-07-24) |
 | Disco.xyz | AGG (VC data backpack) | none native | — | `?` likely dead/pivoted — verify last release |
 | EAS | infra (attestation registry) | none native | wide | Alive; a substrate, not a credential |
 | Verax | infra (attestation registry, Linea) | none native | — | Alive `?` |

@@ -5,8 +5,16 @@ each, and what that implies for a proof-of-humanity aggregator. Written for poh-
 `../BRIEF.md`). This is a *landscape* file: compact per-project subsections (status / what it was /
 cause of death or survival mechanism / lesson), then a hard synthesis.
 
-**Out of scope (covered by other agents):** BrightID, Idena, Proof of Humanity, World ID, Gitcoin
-Passport-as-a-protocol.
+**Out of scope (covered by other agents):** BrightID, Idena, Proof of Humanity, World ID as
+protocols. Gitcoin/Human Passport *is* covered here, but only as an **aggregator business
+case study** (§9a) — its protocol mechanics belong to whoever owns that write-up.
+
+**TL;DR for the impatient.** Nine of the ten projects below died or pivoted out of identity. The
+survivors survived by being a *format* (SIWE), a *library* (Veramo), a *primitive* (EAS), a
+*by-product of a used app* (Farcaster), or by *leaving crypto for government compliance* (Spruce).
+The one product that was structurally identical to what we are proposing — Gitcoin Passport — had
+2M users, 35M credentials, **under $1M revenue**, and sold for ~$10M. Read §9a and §10 before
+writing any code.
 
 ## Repo vitals snapshot (via GitHub API, 2026-07-24)
 
