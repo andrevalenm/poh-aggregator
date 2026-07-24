@@ -46,7 +46,7 @@ Written incrementally; each file is committed and pushed as it lands.
 | 2 | Circles | `a5fe8e1a11cbe3fe7` | **done** — [circles.md](protocols/circles.md) (no adoption numbers) |
 | 3 | Humanity Protocol | `a66a8ecf7a50419be` | **done** — [humanity-protocol.md](protocols/humanity-protocol.md) (mainnet offline after hack) |
 | 4 | ZK passport & eID | `aaca5c458e0b44670` | **done** — [zk-passport-and-eid.md](protocols/zk-passport-and-eid.md) (ZKPassport deep; Self thin; Aadhaar/Rarimo absent) |
-| 5 | PoH v1/v2, Kleros, BrightID, Idena | `aea9689e84c6782bd` | pending |
+| 5 | PoH v1/v2, Kleros, BrightID, Idena | `aea9689e84c6782bd` | **done** — [poh-classics.md](landscape/poh-classics.md) |
 | 6 | Passport, Civic, Fractal, zkMe, Galxe, Privado | `acffae4773e27fceb` | pending |
 | 7 | Billions, Silk, Unitap, Disco, Sismo, EAS, Intuition | `a11058a55ef29219b` | pending |
 | 8 | EAS & Disco.xyz | `a75d4b295ff0369b5` | pending |
