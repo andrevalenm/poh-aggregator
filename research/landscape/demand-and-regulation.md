@@ -145,20 +145,340 @@ age wave does not automatically become personhood demand:
 consumer tolerance for IDV friction, and it puts an IDV vendor relationship inside every consumer
 platform. That lowers our integration friction later. It does not, by itself, create a buyer.
 ### 1.2 EU AI Act — synthetic content & bot disclosure
+
+**Article 50 transparency obligations become applicable 2026-08-02** — nine days after this file was
+written. This is the nearest-term regulatory event in the whole landscape.
+
+- Text: https://artificialintelligenceact.eu/article/50/ ; Commission FAQ (primary):
+  https://digital-strategy.ec.europa.eu/en/faqs/transparency-obligations-under-article-50-ai-act
+- Obligations, in the order they matter to us:
+  1. **Art. 50(1) — chatbot disclosure.** Providers of AI systems intended to interact directly with
+     natural persons must design them so that persons are **informed they are interacting with an
+     AI**, unless obvious from context.
+  2. **Art. 50(2) — machine-readable marking** of synthetic audio/image/video/text output
+     (watermarks, metadata, provenance signals), "effective, reliable, robust and interoperable".
+     Commission guidance/Code of Practice on transparent AI was being finalised through June–July
+     2026 (Greenberg Traurig, June 2026 — secondary:
+     https://www.gtlaw.com/en/insights/2026/6/deepfakes-chatbots-ai-generated-text-european-commission-details-transparency-obligations-under-the-ai-act).
+     `UNVERIFIED:` reports of a grandfathering window pushing 50(2) to 2026-12-02 for systems already
+     on the market come from trade press (techtimes.com) only — confirm against the Commission's own
+     guidance before relying on it.
+  3. **Art. 50(4) — deepfake disclosure** by deployers.
+  4. **Art. 50(3)** — notice when emotion-recognition or biometric-categorisation systems are used.
+- Penalties: up to **€15m or 3% of global annual turnover**, whichever is higher (AI Act Art. 99(4)),
+  enforced by national market surveillance authorities.
+
+**Why this creates far less demand for us than it looks like it should.** Article 50 is a
+**self-disclosure** regime aimed at the *AI provider/deployer*. It says "the robot must announce
+itself." It does **not** impose on any platform a duty to *detect* undisclosed bots or to verify that
+a counterparty is human. The compliance product it creates is watermarking and provenance (C2PA,
+SynthID, content credentials) — a **content**-provenance market, not a **person**-verification
+market. Honest adversaries comply by adding a label; dishonest ones ignore it, and no one is fined
+for failing to catch them. Our score is not a compliance artefact for Art. 50.
+
+Second-order effect that *is* real: Art. 50 legitimises "is this AI?" as a first-class question in
+product UX and pushes provenance metadata into media pipelines. If personhood ever becomes a
+purchased signal, it will most plausibly ride the same rails ("provenance of the *actor*" next to
+"provenance of the *content*"). That is a 2027+ bet, not a 2026 budget line.
+
 ### 1.3 DSA — VLOP obligations on inauthentic behaviour
+
+- **Art. 34/35 systemic risk assessment and mitigation** applies to Very Large Online Platforms
+  (≥45m monthly EU users). "Inauthentic use, automated exploitation of the service" and
+  coordinated inauthentic behaviour are explicitly named in the systemic-risk framing, and
+  mitigation measures may include "adapting… algorithmic systems", content moderation, and
+  **"taking awareness-raising measures"**. Penalties up to **6% of global annual turnover** (Art. 74).
+- Also relevant: **Art. 40** data access for researchers, and the **Code of Practice on
+  Disinformation**, converted into a DSA **Code of Conduct** effective 2025-07-01, whose commitments
+  include reducing manipulative behaviours (fake accounts, bot-driven amplification).
+- `UNVERIFIED:` I did not find a DSA enforcement action in which the remedy imposed on a VLOP was
+  *user-level human verification*. Every publicised DSA proceeding to date (X, TikTok, AliExpress,
+  Temu, Meta) has concerned ads repositories, dark patterns, minors, illegal products or researcher
+  data access. Where to look next: the Commission's DSA enforcement page
+  (https://digital-strategy.ec.europa.eu/en/policies/dsa-enforcement) and the VLOPs' own
+  Art. 42 transparency reports, which do publish fake-account-removal counts.
+
+**Assessment:** Art. 34/35 is the strongest *theoretical* hook for personhood — it is the only rule
+that makes a platform, not a bot operator, answerable for inauthentic accounts. But it is an
+open-textured "assess and mitigate" duty with no prescribed method, and VLOPs already answer it with
+in-house behavioural detection they have spent a decade building (and report in the hundreds of
+millions of accounts removed per quarter). A VLOP's DSA answer is "we removed 1.3bn fake accounts";
+it is not "we bought a personhood score." Treat DSA as a door-opener for enterprise conversations,
+not a mandate.
+
 ### 1.4 US and other bot-disclosure laws
+
+- **California B.O.T. Act (SB 1001, 2018)**, Bus. & Prof. Code §§17940–17943, in force since
+  **2019-07-01**. Primary text:
+  https://leginfo.legislature.ca.gov/faces/billTextClient.xhtml?bill_id=201720180SB1001
+  - Unlawful to use a bot to communicate with a person in California **with intent to mislead**, in
+    order to incentivise a sale/transaction or influence an election vote, **without disclosure**.
+  - "Bot" = an automated online account where all or substantially all actions are not the result of
+    a person.
+  - Scope limited to public-facing sites/apps/networks with **≥10m monthly US visitors**.
+  - **Expressly imposes no duty on platform service providers**; no private right of action;
+    enforced by the AG, reported as up to ~$2,500/violation under UCL.
+    (Secondary law-firm summaries: https://perkinscoie.com/insights/update/i-am-robot-californias-new-law-requires-disclosure-use-bots ,
+    https://natlawreview.com/article/california-s-bot-disclosure-law-sb-1001-now-effect)
+  - **In ~7 years I found no publicised AG enforcement action under the B.O.T. Act.**
+    `UNVERIFIED:` absence of evidence, but a search of the California AG press-release archive would
+    settle it. A law with no enforcement history creates no budget.
+- Successors: state AI-companion / chatbot disclosure laws (California SB 243-type, and comparable
+  bills in several states) continue the same pattern — disclosure by the bot, not detection by the
+  platform.
+
+**The structural point, and it applies to every bot law in the world:** these statutes place the duty
+on the **honest bot** to identify itself. None of them place a duty on a platform to **prove its
+users are human**. The regulatory arrow points at self-labelling, not at personhood proof. Anyone
+pitching "bot laws will force platforms to buy humanity verification" is reading the statutes
+backwards.
+
 ### 1.5 MiCA / travel rule / crypto AML — and why personhood ≠ KYC
 
+**Read this section before writing any pitch deck. It kills the most common naive positioning in
+this category.**
+
+- **Regulated AML/CFT obligations require *identification*, not *uniqueness*.** Under FATF R.10 /
+  EU AMLD & the 2024 AML package (AMLR, AMLD6, AMLA) and the **Transfer of Funds Regulation
+  (EU) 2023/1113** ("crypto travel rule", applicable 2024-12-30), a CASP must obtain and verify the
+  **name, address/DOB/national identifier, and account/wallet identifier** of originator and
+  beneficiary, screen against sanctions lists, retain records for 5 years, and be able to produce a
+  named natural person on demand to an FIU.
+- **A personhood credential structurally cannot satisfy any of that.** The whole value of a
+  proof-of-personhood credential is that it asserts "a distinct human" while revealing **no
+  identifying attributes**. Sanctions screening requires a name. SAR filing requires a name.
+  Travel-rule messaging (IVMS101 payload) has mandatory name and address fields. A nullifier is not
+  a name. **Personhood credentials are, by construction, useless for KYC/AML** — and the better the
+  privacy properties, the more useless.
+- Narrow exceptions where uniqueness has real AML-adjacent value, and they are *risk* tools not
+  *compliance* tools:
+  - **Sybil-resistant rate limiting** on faucets, promos, referral bonuses and airdrops (fraud loss,
+    not regulatory loss).
+  - **Duplicate-account detection** *inside* an already-KYC'd population — but a CASP that has done
+    KYC already has a better dedup key (the document + the biometric), which is exactly why IDV
+    vendors sell 1:N dedup and personhood protocols don't get a look-in.
+  - **"Same human across two regulated entities" claims** — attractive, but reusable-KYC schemes
+    (and, in the EU, the EUDI wallet + eIDAS2 attestations) are the sanctioned answer, and they carry
+    identity, not just uniqueness.
+- **MiCA** itself (Reg. (EU) 2023/1114, fully applicable 2024-12-30) is a market-conduct and
+  authorisation regime; the identity duties on CASPs come from AMLR/TFR, not MiCA. `UNVERIFIED:`
+  I have not re-checked the 2026 state of AMLA's technical standards; if a specific claim about
+  2026 AML rules is needed, go to https://www.eba.europa.eu and the AMLA site directly.
+
+**Consequence for our positioning:** never sell into a compliance budget. Compliance buyers need
+identification; they already buy it; and their regulator will not accept a pseudonymous uniqueness
+proof. Sell into **fraud/abuse-loss budgets**, which are discretionary, ROI-measured, and where
+"one human, one account" is genuinely the thing being bought.
+
 ## 2. Where money is actually spent today
+
+The honest summary before the detail: **the value at risk is enormous, the amount actually paid to
+sybil-defence vendors is tiny, and almost all of it is one-off consulting rather than recurring
+licence revenue.** That gap — huge losses, no budget line — is the central commercial fact of this
+category, and it is the same gap that left Human Passport at <$1M revenue on 2M users.
+
 ### 2.1 Airdrop sybil filtering
+
+**Value at risk: very large. Documented spend on defence: near-zero in recurring terms.**
+
+- **LayerZero ZRO (2024)** is the best-documented case. LayerZero ran sybil detection **with Chaos
+  Labs and Nansen**; an initial snapshot flagged **>2 million** candidate sybil addresses, narrowed to
+  **803,093** identified sybils between self-reporting and the Chaos Labs/Nansen analysis. Final
+  distribution: **11.5% of supply (~85.8m ZRO) to ~1.28m qualified wallets**.
+  (Secondary: https://cryptobriefing.com/layerzero-airdrop-fairness/ ,
+  https://crypto.news/layerzero-spots-800k-sybil-addresses-airdrop-scheme/ ,
+  https://coincu.com/layerzero-sybil-detection-report/ — LayerZero's own posts are the primary
+  source; `UNVERIFIED:` I did not re-fetch layerzero.network/blog for this run.)
+- **The mechanism LayerZero actually used was not a vendor product — it was an incentive design.**
+  Self-report and keep **15%** of your allocation, or be reported by a bounty hunter who earns **10%**
+  of your allocation (minimum 20 addresses per report). LayerZero crowdsourced sybil detection by
+  paying in the airdrop's own token. **Marginal cash cost to LayerZero: approximately zero.** This is
+  the competitive reality for anyone selling sybil filtering to token issuers: the buyer can pay in
+  inflation instead of dollars, and has a strong incentive to do so.
+- **Value at risk, order of magnitude:** 803k sybil addresses at a per-wallet allocation in the
+  hundreds of dollars implies **nine figures of misdirected token value** in that single event.
+  `UNVERIFIED:` precise dollar figure depends on ZRO price at claim, which varied; do not quote a
+  number without pinning it.
+- **Who the buyers hire:** Nansen and Chaos Labs (LayerZero), Trusta Labs (widely used for
+  MEDIA/TrustScore sybil scoring across L2 airdrops), Chainalysis/TRM for the AML overlay. All of
+  these are **engagement-priced consulting or analytics subscriptions**, sold to a **one-off event**.
+  `UNVERIFIED:` no published contract values for any of these engagements. Where to look next:
+  Chaos Labs and Trusta have posted public methodology reports; procurement values are not public
+  and probably never will be.
+- **Why this is a bad segment to build a company on:** (a) demand is episodic — one TGE per project,
+  maybe once ever; (b) the buyer's willingness to pay is capped by the fact that mis-allocating
+  tokens costs them *dilution*, not cash; (c) buyers prefer post-hoc forensics on their own on-chain
+  data (which they already have) over front-loaded user friction that suppresses the farming activity
+  their growth metrics depend on. Airdrop farming is simultaneously the abuse *and* the KPI.
+
 ### 2.2 Quadratic funding / public goods
-### 2.3 Bot mitigation & CAPTCHA (incumbent spend)
-### 2.4 Fraud / AML tooling (adjacent market)
+
+**This segment is too small to matter. Say so plainly.**
+
+- **Gitcoin Grants 23 (GG23, 2025) distributed a total of ~$1.3M** across quadratic and retro funding.
+  (https://www.gitcoin.co/blog/gitcoin-grants-23-retro)
+- Sybil defence for the round is Passport scoring (eligibility threshold) plus **COCM**
+  (Connection-Oriented Cluster Matching), an *algorithmic* mitigation applied to the donation graph.
+  (https://gitcoin.co/research/quadratic-funding-sybil-resistance)
+- **Even a generous 10% of a $1.3M matching pool spent on sybil defence is $130k of TAM per round.**
+  The entire QF ecosystem — Gitcoin, Optimism RetroPGF, Octant, Giveth, clr.fund — is plausibly a
+  **low-single-digit-millions annual** market for sybil tooling, most of which is done in-house or by
+  volunteers.
+- This is the segment that Human Passport actually served, and it is exactly why Human Passport made
+  **under $1M in revenue** on 2M users and 35M credentials. **The reference case for our category is
+  the reference case for this segment, and it is a warning.**
+- Structural note: COCM matters strategically. It shows that QF's answer to sybils has drifted from
+  "verify each human" to "**make the mechanism robust to unverified humans**". Mechanism design is a
+  substitute good for personhood credentials, and it is free.
+
+### 2.3 Bot mitigation & CAPTCHA — the incumbent spend we would have to displace
+
+**This is the real money, and it is not ours.**
+
+- **The scale of the problem is now confirmed by the biggest possible operator.** Cloudflare CEO
+  Matthew Prince, **2026-06-03**, citing Cloudflare Radar: **automated requests generate 57.5% of
+  HTML traffic — the first time machines have been the majority.**
+  (Secondary reporting of Cloudflare Radar data; primary would be https://radar.cloudflare.com and
+  Cloudflare's blog. `UNVERIFIED:` I did not re-fetch Radar directly.)
+- **Incumbents:** Cloudflare (Turnstile, Bot Management, WAF), Akamai Bot Manager, Imperva/Thales
+  Advanced Bot Protection, DataDome, HUMAN Security (ex-White Ops), Kasada, Arkose Labs, hCaptcha,
+  Google reCAPTCHA Enterprise, F5 Distributed Cloud Bot Defense.
+- **Real revenue figures are almost all private.** `UNVERIFIED:` I could not find credible published
+  revenue for Arkose Labs or hCaptcha; Arkose's only hard public datapoint is **1,005% growth on the
+  2023 Deloitte Technology Fast 500 (rank #142)** — a growth rate with no base, which is not a
+  revenue number. Cloudflare is public but does **not** break out bot management as a segment. Where
+  to look next: HUMAN Security's disclosed funding/valuation (~$1bn+ post-Goldman-led round),
+  DataDome's Series C/D, and Gartner's Magic Quadrant for Bot Management for share estimates.
+- **What they charge (the number that actually constrains our pricing):**
+  - **Cloudflare Turnstile: free** at ordinary volumes; a paid Enterprise tier exists.
+    **This is the price floor for "not a bot" and it is zero.**
+  - Google **reCAPTCHA Enterprise**: free tier then roughly **$1 per 1,000 assessments** at published
+    list price, i.e. **$0.001 per check**. `UNVERIFIED:` re-check
+    https://cloud.google.com/recaptcha/pricing before quoting.
+  - Enterprise bot management (Cloudflare/DataDome/HUMAN): typically **five- to six-figure annual
+    contracts**, priced on traffic volume, not per-human.
+- **The displacement problem, stated bluntly:** the incumbent buys a *traffic-level* verdict for
+  ~$0.001 per request, needs no user account, no consent flow, no PII, and no user friction. We
+  would sell a *user-level* verdict that requires an onboarding flow, a consent record, and probably
+  a document or biometric. **We are two to four orders of magnitude more expensive and dramatically
+  higher friction.** The only place that trade is rational is where the *consequence* per account is
+  large — money movement, high-value marketplace listings, one-per-person entitlements — not where
+  the consequence is a spam comment.
+
+### 2.4 Fraud / AML tooling — the adjacent market that works
+
+- The commercially proven adjacent categories are **identity verification / KYC orchestration**
+  (Persona, Trulioo, Alloy, Sumsub, Veriff, Jumio, Onfido/Entrust, Socure, Incode) and
+  **transaction-fraud** (Sift, Sardine, Unit21, Feedzai, Forter, Signifyd).
+- **Why they work and we might not:** every one of them sells into either (a) a legal obligation with
+  fines attached (AML/KYC, sanctions) or (b) a P&L line the CFO already tracks in dollars
+  (chargebacks, fraud loss, disputes). Persona and Alloy are, structurally, *exactly our product
+  shape* — an orchestration/routing layer over many underlying verification vendors returning a
+  normalised decision. **The pattern works. What makes it work is the buyer's dollar-denominated
+  loss, not the routing.**
+- **The lesson for us is precise and uncomfortable:** "aggregator over many verification providers"
+  is a validated business model — it is Persona, Alloy, Trulioo GlobalGateway, IDVerse/Au10tix
+  orchestration. It is validated **for identification**, where the buyer is compelled. Nobody has
+  demonstrated it for **uniqueness**, where the buyer is not.
+- `UNVERIFIED:` no reliable single figure for global fraud/IDV tooling spend; vendor-sponsored market
+  reports put IDV at roughly $12–20bn growing ~15%/yr, but these are marketing artefacts. Do not
+  quote them as fact. Use Persona's and Socure's disclosed valuations/ARR statements instead if a
+  number is needed.
 
 ## 3. The AI-agent demand shift
-### 3.1 Agent payments (x402 and friends)
-### 3.2 Cloudflare Web Bot Auth / pay-per-crawl
+
+**This is the only genuinely new demand vector, and it is the best argument for the category. It is
+also, right now, revenue-tiny. Both things are true.**
+
+The shift in the question being asked is real and important. The old question was *"is this a bot?"*
+(answered by traffic-level heuristics, ~$0.001/request). The new question is *"which human is
+accountable for this agent?"* — and that question **cannot** be answered by traffic heuristics,
+CAPTCHAs, or passkeys, because the agent is *supposed* to be automated. It can only be answered by a
+**delegation credential rooted in a verified person**. That is a genuinely new product surface, and
+it is the one place where the incumbents in §2.3 structurally cannot compete.
+
+### 3.1 Agent payments — x402
+
+- **x402** is an open payment protocol from **Coinbase and Cloudflare** using HTTP **402 Payment
+  Required** to embed stablecoin payments in web requests. Coinbase and Cloudflare announced an
+  **x402 Foundation** (https://www.coinbase.com/blog/coinbase-and-cloudflare-will-launch-x402-foundation).
+  **V2 is the recommended baseline spec.** Cloudflare and AWS have embedded x402 at the edge
+  (InfoQ, July 2026: https://www.infoq.com/news/2026/07/cloudflare-aws-x402-micropayment/).
+- **Adoption numbers (date-stamped, and read them carefully):** Coinbase reported **~69,000 active
+  agents, 165m transactions, and ~$50m cumulative volume by late April 2026**; and **>169m payments
+  across 590,000 buyers and 100,000 sellers in the protocol's first year**.
+  (Secondary aggregation: https://wavect.io/blog/x402-payments-comparison-2026/ — `UNVERIFIED:`
+  these should be re-confirmed against Coinbase's own x402 posts / a public dashboard before use.)
+- **Do the arithmetic before getting excited.** $50m *cumulative* volume across a year, at 165m
+  transactions, is an **average transaction size of about $0.30**. Even a 1% take of total volume is
+  ~$500k of *protocol-wide* value, split across every participant. **If we charged $0.01 per
+  personhood check on every x402 transaction we would gross more than the entire payment volume of
+  the network** — which is another way of saying no one can pay per-transaction prices here yet. The
+  agent-payments market is enormous in narrative and microscopic in dollars as of mid-2026.
+- **World's AgentKit** binds World ID into this: agents "carry cryptographic proof that they are
+  backed by a unique human," linking multiple agents to one verified person via ZK proofs over
+  Orb-based biometrics, so "a platform can allow someone to run several agents while still enforcing
+  limits based on the underlying person" — e.g. one free trial or N bookings per day **per human**.
+  Beta as of 2026-03-17.
+  (https://www.coindesk.com/tech/2026/03/17/sam-altman-s-world-teams-up-with-coinbase-to-prove-there-is-a-real-person-behind-every-ai-transaction)
+- **This is the single clearest articulation of a paying use case in the entire landscape:**
+  *per-human rate limiting and entitlement enforcement in a world where each human runs N agents.*
+  Free trials, promo abuse, API quota, seat licensing, marketplace listing limits — all of these are
+  "one per human" problems that agents break, and all of them are already dollar-denominated losses
+  that companies track. **If we have a wedge, it is here.**
+- **The strategic threat is equally clear.** World is not selling a component into an aggregator; it
+  is building the whole stack — identity, agent kit, payment rail integration, and named enterprise
+  partners (per the sibling landscape file: Tinder, Zoom, DocuSign, Okta, Browserbase, Exa, Vercel),
+  with a reported **$52.5m Pantera-led raise on 2026-07-24**. A vertically integrated incumbent with
+  distribution into x402 is the most likely reason an aggregator becomes unnecessary: if World ID is
+  natively in the payment rail, the merchant does not need a router.
+  **Counter-argument for us:** the merchant *does* need a router the moment they must serve users who
+  will not or cannot get orbed — which, given World's geographic and regulatory restrictions
+  (multiple national bans), is most of the addressable population. Coverage is our wedge against
+  World, not accuracy.
+
+### 3.2 Cloudflare — Web Bot Auth, signed agents, pay-per-crawl
+
+- **Web Bot Auth**: crawlers/agents register with Cloudflare, present **Ed25519 key pairs**, and sign
+  every request using **HTTP Message Signatures**, so a bot can prove *which* bot it is.
+  (https://blog.cloudflare.com/introducing-pay-per-crawl/ ,
+  https://blog.cloudflare.com/introducing-ai-crawl-control/ ,
+  https://developers.cloudflare.com/changelog/2025-12-10-pay-per-crawl-enhancements/)
+- **Pay-per-crawl**: publishers charge crawlers (private beta launched at **$0.01+/page**), enforced
+  via **HTTP 402** plus signed request headers; Cloudflare has said it will evolve into "pay per
+  use". Cloudflare made default-blocking of AI crawlers its policy in July 2026
+  (https://techcrunch.com/2026/07/01/cloudflares-new-policy-pushes-ai-companies-to-pay-for-publishers-content/).
+- **Read the architecture, because it is a direct competitive fact:** Cloudflare's answer to
+  "who is this automated agent" is **cryptographic bot identity + payment**, not human identity.
+  The bot proves it is *Perplexity's crawler*, and then it *pays*. **Payment is being used as the
+  sybil resistance.** This is the single most credible substitute for personhood in the agent
+  economy: if an agent can pay $0.01, you do not care whether a human is behind it.
+- **Where that substitute fails, and it is exactly where our value lives:** payment cannot enforce
+  *fairness* or *one-per-person* semantics. It cannot allocate a free trial, a vote, a UBI claim, a
+  government benefit, a "one review per customer" rule, or a scarce allocation. Anything where the
+  point is that money **must not** be able to buy more of it is immune to the pay-to-play defence and
+  requires personhood. **That set of use cases is real but small, and notably includes very few
+  commercial buyers** — it is disproportionately governance, public goods, and regulated allocation.
+
 ### 3.3 Identity vendors' agent products
+
+- **Okta** has shipped **Cross App Access (XAA)** for agent-to-app delegation inside the enterprise
+  identity perimeter, plus **Auth for GenAI**, with **25+ early adopters including Anthropic, Asana,
+  Atlassian, Canva, Cloudflare, Datadog, Docker, Figma and Slack**.
+  (https://www.okta.com/newsroom/press-releases/okta-announces-cross-app-access-partners/ ,
+  https://www.okta.com/solutions/cross-app-access/)
+  `UNVERIFIED:` I could not confirm a product or feature literally named **"Human Principal"** on
+  Okta's own site; the concept appears in the World/x402 partner framing. Do not attribute that name
+  to Okta without checking https://www.okta.com/newsroom/ and Okta's Oktane 2026 announcements.
+- **The crucial detail about Okta's approach:** XAA roots agent authority in an **enterprise
+  directory identity** — an employee record in Okta/Entra. In the enterprise, the "human principal"
+  problem is **already solved by HR onboarding**. Nobody needs a biometric uniqueness proof for an
+  employee whose passport their employer photocopied on day one.
+  **Therefore the enterprise agent market — the segment with actual budget — does not need us.**
+  Personhood is only required where there is **no pre-existing relationship**: consumer signup,
+  open marketplaces, public networks, permissionless protocols. That is the segment with the least
+  willingness to pay. This inversion is the core commercial problem of the category and it recurs
+  in every segment analysed in this file.
 ### 3.4 Reddit human verification — **PARTIALLY REFUTED** (important)
 
 **Verdict: the "Reddit will mandate human verification" story is real but materially overstated,

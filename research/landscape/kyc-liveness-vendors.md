@@ -13,7 +13,38 @@ uniqueness requires 1:N biometric dedup, which most of these products do not do 
 of other people's credentials** and the primary source of **double-counting risk** in our aggregate.
 
 ## Why this file exists
+
+Several protocols we score are thin wrappers over these vendors. If four protocols in our aggregate
+all bottom out in one Sumsub or one FaceTec check, our "four independent signals" is **one signal
+counted four times**. Two collapses are already confirmed:
+
+- **Sumsub** is the trust root for **Galxe Passport v3**, **Linea Proof of Humanity V2**, **idOS**, and
+  Sumsub's own attestations on **Solana (SAS)**, **Linea (Verax)** and **Chainlink ACE**.
+- **FaceTec** is the trust root, via **Synaps**, for **Anima Protocol's Proof of Uniqueness** and the
+  **Linea/Privado ID/Billions "private biometric Proof of Uniqueness"** — and separately, directly, for
+  **Civic's "Proof of Personhood."**
+
+Everything else in this file exists to let us (a) detect these collapses for protocols that don't
+disclose their vendor, and (b) price what a vendor-derived credential is actually worth.
+
 ## Taxonomy: what each capability actually proves
+
+Read every vendor datasheet through this ladder. Vendors deliberately blur rungs 2-5.
+
+| # | Capability | What it proves | Sybil-resistance |
+|---|---|---|---|
+| 1 | **Document OCR / visual authentication** | a document *image* looked right | ~none — AI-generated ID images cost ~$15 |
+| 2 | **NFC / chip document read (ICAO 9303 passive auth)** | the document's chip is genuinely government-signed | strong *for the document*; says nothing about who's holding it. Also defeated by a **rented genuine passport** |
+| 3 | **Active liveness** (blink/turn/read-a-number) | a responsive agent was in front of *some* camera | broken by real-time deepfake + camera injection (2026) |
+| 4 | **Passive liveness / PAD** (single frame or short video, no user action) | no *presentation* artefact detected | good vs. print/replay/mask; **blind to injection by construction** |
+| 5 | **1:1 face match (selfie ↔ document portrait)** | the live face matches the document | strong; but passes trivially when the document is legitimately rented |
+| 6 | **1:N biometric dedup against an enrolled population** | **this human has not enrolled before *in this population*** | **the only rung that yields uniqueness** — and only within one integrator's database |
+| 7 | **Cross-customer / global 1:N** | this human has not enrolled anywhere in the vendor's network | would be genuinely strong. **Effectively nobody offers this for privacy/legal reasons.** |
+
+**Rule for our scoring: unless a protocol can demonstrate rung 6, its KYC-derived credential is a
+liveness/bot-filter signal, not a uniqueness signal.** Marketing copy saying "proof of personhood"
+does not establish rung 6.
+
 ## Vendor-by-vendor profiles
 
 ### FaceTec (US, Las Vegas) — the liveness engine under much of web3
@@ -45,9 +76,259 @@ of other people's credentials** and the primary source of **double-counting risk
   I did not locate the underlying iBeta report PDFs for the higher levels.
 - **Pricing:** monthly billing on 3D Liveness usage with a minimum monthly commitment; per-check rate
   not published. `UNCLEAR:` public per-verification price.
+- **Distribution matters for attribution:** FaceTec sells heavily through resellers/integrators who
+  self-host FaceTec Server. Synaps is exactly this. **A FaceTec-powered flow can emit zero
+  FaceTec-owned network traffic** — attribution must come from SDK bundle strings, not DNS.
+- **Litigation note:** FaceTec and iProov have been in a mutual patent fight over selfie-based liveness
+  (FaceTec sued; iProov counter-sued, 2022).
+  https://www.biometricupdate.com/202204/iproov-brings-counter-suit-against-facetec-in-biometric-liveness-ip-dispute
+
+### Synaps (France) — the web3 *reseller* layer, not a biometrics company
+- **This is the most under-appreciated node in the graph.** Synaps is an IDV platform sold to crypto,
+  and it **runs FaceTec on its own servers** for liveness
+  (https://medium.com/@anima_protocol/inside-proof-of-personhood-cde68ec84784).
+- Synaps **launched Anima Protocol** (2022, with Aleph.im) — Anima is not an independent protocol that
+  chose a vendor; it *is* the vendor's web3 front-end.
+  https://www.globenewswire.com/news-release/2022/04/12/2421095/0/en/Synaps-Launches-Novel-Decentralized-Identity-Solution-Anima-Protocol-In-Partnership-with-Aleph-im.html
+- The **Linea "first private biometric Proof of Uniqueness"** is Synaps + Verax + Privado ID; it
+  produces a "non-reversible hash of the user's face … compared with others to confirm uniqueness"
+  anchored to Verax. https://billions.network/blog/first-private-biometric-proof-of-uniqueness-on-linea-blockchain
+- Anima's model: the raw liveness capture is deleted; a **"FaceGraph"** (face vector) is encrypted and
+  stored on **Storj**; uniqueness is asserted by comparing FaceGraphs.
+  `UNCLEAR:` **the scope of that comparison** — is the FaceGraph population global across all Synaps
+  deployments, or per-integrator? This determines whether Anima/Linea PoU is rung 6 or rung 7, and it is
+  the single most valuable follow-up for pricing those two credentials.
+- **Consequence for dedup:** Anima PoU and Linea/Billions PoU are almost certainly **the same
+  underlying biometric evidence** (same FaceTec extractor, same Synaps FaceGraph pipeline). Treat them
+  as one bucket unless Synaps confirms separate populations.
+
+### Sumsub (UK/global) — the most-embedded vendor in web3
+- **Full-stack:** document verification (OCR + NFC), liveness, 1:1 face match, AML/PEP/sanctions
+  screening, KYB, transaction monitoring, crypto travel-rule tooling.
+- **1:N-ish dedup: yes, but marketed as anti-multi-accounting, not uniqueness.** Sumsub's
+  "Multi-Accounting Prevention" uses liveness results to check whether *the user already exists in its
+  database*, plus a **Fraud Network Detection** graph over IP, selfie background, location, proof of
+  address. https://sumsub.com/multi-accounting/ ; https://sumsub.com/blog/multi-accounting/
+  `UNCLEAR:` whether the face-search population is per-client or cross-client. Sumsub's wording ("its
+  database") hints cross-client, which would be unusually strong — **this needs a direct answer from
+  Sumsub before we credit any Sumsub-rooted credential with uniqueness.** Highest-value question we can
+  ask any vendor in this file.
+- **Web3 footprint is by far the largest** — see reverse index. Sumsub has deliberately positioned as
+  *the* reusable-KYC layer for web3 (idOS consortium seat, Solana Attestation Service, Verax, Chainlink
+  ACE, Reown/WalletConnect).
+- **Pricing:** no public rate card; third-party comparison sites quote roughly **$0.80–$3.80 per check**
+  depending on bundle. Secondary/unreliable: https://primebiometry.com/blog/kyc-pricing-guide-2026
+- **Publishes an annual fraud report** used widely as industry data (see deepfake section) — vendor-sourced.
+
+### iProov (UK) — liveness specialist, best public threat telemetry
+- **Genuine Presence Assurance (GPA)** — a one-time-biometric flow using controlled illumination
+  ("Flashmark") from the device screen; **Liveness Assurance (LA)** — passive, for re-authentication.
+  The illumination approach is specifically designed to resist *injection*, not just presentation,
+  because the challenge is unpredictable and physically reflected. https://www.iproov.com/liveness-detection
+- **Not a document vendor first**; often paired with a separate doc-verification provider.
+- **1:N dedup:** `UNCLEAR:` iProov's core products are 1:1/liveness; I found no public 1:N ABIS offering.
+- **Operates iSOC**, a monitored security operations centre over live traffic — the source of the
+  threat report numbers below. This is the closest thing to real-world attack telemetry in the market,
+  and it is still vendor-sourced.
+- **Web3 customers:** `UNVERIFIED:` I found **no** confirmed web3/personhood-protocol customer for
+  iProov. If a protocol claims "iProov-grade liveness" treat it as unsubstantiated until fingerprinted.
+
+### Persona (US, withpersona.com)
+- Configurable orchestration platform: government ID (200+ countries), selfie + liveness, database
+  checks, AML screening, and a **Graph** product for link-analysis/duplicate detection across
+  identities. Popular because it is self-serve and composable.
+- **Crypto footprint:** **Coinbase** names *"Persona Identities, Inc."* in its published third-party
+  verification vendor list as a processor of **biometric information**
+  (https://www.coinbase.com/legal/privacy/third-party-verification-vendors — 403s to automated fetch;
+  **re-read manually**). Persona also markets a crypto vertical and is named around **Chainlink CCID**
+  (https://withpersona.com/industry/cryptocurrency — also 403 to automated fetch).
+- **Pricing:** free tier ~500 government-ID verifications/month, then per-check custom contracts;
+  comparison sites quote ~$2–$5/verification. Secondary: https://primebiometry.com/blog/kyc-pricing-guide-2026
+- **Why it matters to us:** if Coinbase's KYC is Persona-rooted, then **Coinbase Verifications** EAS
+  attestations and the **Coinbase Stamp** in Gitcoin/Human Passport are Persona-rooted too — a single
+  vendor under a credential many aggregators treat as independent.
+
+### Onfido → **Entrust** (UK/US)
+- Acquired by **Entrust, completed 2024-04**; folded into "Entrust Identity Security"; the Onfido brand
+  is being retired into Entrust product naming.
+  https://www.businesswire.com/news/home/20240409800662/en/Entrust-Completes-Acquisition-of-Onfido-Creating-A-New-Era-of-Identity-Centric-Security
+- Onfido had itself acquired **Airside** (2024) for a "verify once, share anywhere" reusable-ID play —
+  the same reusable-credential thesis as ours, from the incumbent side.
+  https://www.entrust.com/company/newsroom/onfido-acquires-airside
+- Capabilities: document (OCR + NFC), motion/passive liveness, 1:1 match, "Known Faces"-style repeat
+  detection. `UNVERIFIED:` current 1:N product naming post-rebrand.
+- **Web3 customers:** `UNVERIFIED:` none confirmed in this pass. Historically common in EU exchanges.
+- **Status flag:** brand consolidation means old "Onfido-powered" claims in protocol docs may now be
+  stale — check whether the integration still exists.
+
+### Jumio (US/Austria)
+- Long-standing document + selfie IDV; **iBeta Level 2 PAD confirmed** (trade-press sourced).
+- Strong in regulated exchanges. `UNVERIFIED:` no *personhood-protocol* customer confirmed in this pass.
+- Comparison-site pricing ~$1–$5/check. Secondary only.
+
+### Veriff (Estonia)
+- Document + selfie IDV, 200+ countries. Publishes pricing openly: **from ~$0.80/verification**
+  (Essential, ~$49/mo minimum); real-world spend commonly quoted **$2–$6/session**.
+  https://www.vendr.com/marketplace/veriff (secondary, aggregator data)
+- Has a cross-customer fraud-signal database ("Veriff has seen this face/document before") — closer to
+  rung 6/7 than most, but marketed as fraud prevention, not uniqueness. `UNVERIFIED:` exact scope.
+
+### Incode (US/Mexico)
+- One of the few vendors genuinely built around **1:N ABIS-scale dedup** (national-scale elections and
+  government deployments). If a protocol needs real uniqueness from a commercial vendor, Incode is a
+  plausible choice. `UNVERIFIED:` no confirmed web3 personhood customer found in this pass.
+
+### AU10TIX (Israel)
+- Document forensics + **"Serial Fraudster"/repeat-offender detection** across its client network —
+  one of the few vendors that explicitly advertises cross-customer linkage.
+- `UNVERIFIED:` web3 customers. Worth checking: AU10TIX is a common back-end for social platforms'
+  age/identity checks, which sometimes surface as "verified human" claims.
+
+### Trulioo (Canada)
+- Primarily **data-source aggregation** (GlobalGateway): match name/DOB/address/ID number against
+  authoritative and commercial databases in ~195 countries, plus a document/biometric layer.
+- **Evidence class is different**: it proves *a record exists*, not that a human is present. For us
+  this is rung ~2 at best, and it is trivially satisfied by stolen PII. Low value in a personhood score.
+
+### Socure (US)
+- US-centric identity-graph / fraud risk scoring (Sigma), plus **DocV** document + selfie. Its core
+  output is a **probabilistic risk score**, not a binary human/not-human. Beware protocols that
+  translate a Socure-style score into a boolean "verified human."
+
+### Regula (Latvia/Lithuania)
+- **Component vendor, not a service**: Document Reader SDK — forensic-grade document authentication,
+  MRZ, RFID/NFC chip (ICAO 9303) reading, with one of the largest document template databases. Sold as
+  an SDK others embed. A protocol running Regula is doing document authentication *itself*, which is
+  actually a *better* privacy posture (no third-party data controller) but gives **no liveness and no
+  dedup**.
+
+### IDnow (Germany)
+- EU/DACH focus; **VideoIdent** (a human agent on a video call — genuinely hard to deepfake at scale in
+  2023, meaningfully weaker in 2026), **AutoIdent**, and eID/eIDAS flows. Strong regulatory standing in
+  Germany. `UNVERIFIED:` web3 customers.
+
+### Shufti Pro (UK/Pakistan)
+- The **price floor**: pay-as-you-go **~$0.20 per check**, free tier ~100 verifications/month.
+  https://beverified.org/providers/shufti-pro/ (secondary) ; https://shuftipro.com/
+- **Scoring implication:** the existence of a $0.20 KYC check sets a hard ceiling on what any
+  KYC-derived personhood credential can be worth. If a protocol's "verified human" costs the protocol
+  $0.20 to issue, it costs an attacker roughly that plus a document to obtain one.
+
+### Others encountered
+- **ID R&D, Aware, CyberLink FaceMe, Innovatrics, Identy.io, Facia, 1Kosmos** — component/PAD-algorithm
+  vendors, several of them the actual top performers in NIST FATE PAD. They appear *inside* other
+  vendors' stacks. Relevant only for the certification section.
+- **Didit** — newer low-cost entrant explicitly marketing **biometric de-duplication / face search**
+  https://didit.me/blog/biometric-de-duplication-preventing-multi-account-fraud-with-face-search/
+  `UNVERIFIED:` any web3 customers.
 
 ## Certifications that mean something (iBeta PAD / ISO 30107-3, NIST FRVT/FATE)
+
+Short version: **certification tells you a vendor beat *presentation* attacks in a lab in a given
+year. It tells you nothing about injection attacks, nothing about 1:N accuracy at scale, and nothing
+about whether the integrator turned the feature on.**
+
+### iBeta / ISO-IEC 30107-3
+- iBeta Quality Assurance is NVLAP-accredited by NIST for biometric testing and is the de-facto
+  certifier. It publishes a public table of solutions that have passed since 2018 — **check the table,
+  not the vendor's press release**: https://www.ibeta.com/ (index of approved solutions; see also
+  https://idtechwire.com/ibeta-publishes-table-approved-liveness-detection-solutions-050407/).
+- **Level 1** = cheap/easy PAIs (printed photo, screen replay). **Level 2** = higher-effort PAIs
+  (3D masks, custom silicone, etc.). Both are *presentation* attacks. There is **no ISO Level 3+**;
+  vendors advertising "Level 3/4/5" are using in-house scales (FaceTec is the notable case).
+- Confirmed Level-2 holders encountered in this research: **Jumio**, **Innovatrics**, **1Kosmos**,
+  **Identy.io** (Face SDK v6.3.0), **Facia**; plus 30107-3 certification for **FaceTec**, **ID R&D**,
+  **Aware**, **Acuant**. https://idtechwire.com/identy-io-secures-nist-iso-30107-3-level-2-pad-certification/ ;
+  https://facia.ai/news/facia-ibeta-level-2-compliant-with-iso-30107-3-presentation-attack-detection-protocols/
+  `UNVERIFIED:` I did not open individual iBeta report PDFs; each claim above traces to trade press or
+  vendor announcement, and the *tested version number* matters — a 2021 cert on v7 says nothing about
+  the v11 SDK a protocol ships in 2026.
+- **Certification is per SDK version and per configuration.** Always demand version + date.
+
+### NIST FATE / FRTE
+- The relevant NIST programme for liveness is **FATE Part 10: Passive, Software-based PAD**,
+  first published as **NISTIR 8491, 2023-09-20**, covering **82 passive PAD algorithms**.
+  https://www.nist.gov/publications/face-analysis-technology-evaluation-fate-part-10-performance-passive-software-based ;
+  report PDF https://nvlpubs.nist.gov/nistpubs/ir/2023/NIST.IR.8491.pdf ;
+  ongoing leaderboard https://pages.nist.gov/frvt/html/frvt_pad.html
+- **Important negative finding for our purposes:** the vendors that top NIST PAD are *component*
+  algorithm vendors — **ID R&D, Aware, CyberLink FaceMe**, etc. The consumer-facing IDV platforms most
+  common in web3 (**FaceTec, iProov, Sumsub, Onfido, Persona, Veriff**) are largely **absent** from NIST
+  PAD results, relying on iBeta instead. So for the vendors that actually sit under web3 credentials,
+  **there is no independent, continuously-updated accuracy number.** We are trusting vendor marketing.
+  `UNCLEAR:` whether any of them submitted to FATE PAD after 2023 — worth re-checking the live
+  leaderboard before we publish any scoring weights.
+- **1:N accuracy** is measured by **FRTE/FRVT 1:N** (identification), a *separate* track from PAD. None
+  of the web3-facing IDV platforms publish an FRVT 1:N ranking either. Since 1:N is the only thing
+  that yields uniqueness, this is the largest evidence gap in the whole layer.
+
 ## The attribution problem: how to detect which vendor produced a credential
+
+Protocols rarely name their IDV vendor in marketing, and several actively obscure it ("our
+proprietary biometric engine"). Ranked by reliability, here is how to unmask one:
+
+**Tier 1 — authoritative, cheap**
+1. **The vendor's own customer/case-study pages and press releases.** Vendors need logos far more
+   than protocols need to disclose. This produced Galxe→Sumsub, idOS→Sumsub, Civic→FaceTec.
+2. **Sub-processor / third-party-vendor disclosures.** GDPR Art. 28 + CCPA make a named
+   sub-processor list common and often legally required. Coinbase publishes one at
+   `coinbase.com/legal/privacy/third-party-verification-vendors`. **This is the single highest-yield
+   artifact and should be checked for every protocol we score.** Note: automated fetching of that
+   page 403s — check it in a real browser.
+3. **On-chain attester metadata.** EAS / Verax portals carry `ownerName` and owner addresses. The
+   Linea PoH V2 portal literally has `ownerName = "Sumsub"`. Free, tamper-evident, and the strongest
+   evidence class available to us.
+
+**Tier 2 — technical fingerprinting (do this ourselves, it's the moat)**
+4. **Network calls during the verification flow.** Run each protocol's flow with devtools /
+   mitmproxy and record hostnames. Distinctive endpoints:
+   `api.facetec.com`, `*.facetec.com` (FaceTec Server is usually *self-hosted* by the integrator, so
+   expect the integrator's own host — see the Synaps case, where FaceTec runs on Synaps servers and
+   emits **no FaceTec-owned domain at all**); `api.sumsub.com` / `in.sumsub.com` /
+   `static.sumsub.com` (WebSDK); `api.eu.iproov.com` / `*.iproov.com`; `api.onfido.com` /
+   `*.onfido.com`; `withpersona.com/widget`; `*.veriff.me` / `magic.veriff.me`;
+   `*.incode.id` / `demo.incode.id`; `*.jumio.com` / `netverify.com`; `*.shuftipro.com`;
+   `*.au10tixservicesprod.com`. `UNVERIFIED:` these hostnames are from general familiarity with the
+   SDKs — **verify each against live docs before relying on it**; do not treat this list as sourced.
+5. **JS bundle strings.** Web SDK global names and CSS class prefixes are highly distinctive
+   (FaceTec ships `FaceTecSDK` / `FaceTecStrings` / a `zoom-`-prefixed legacy namespace; Sumsub ships
+   `SumsubWebSdk` / `idensic`; Persona ships `Persona.Client`; Onfido ships `Onfido.init`).
+   `UNVERIFIED:` same caveat — spot-check before publishing.
+6. **Mobile SDK fingerprints.** Unzip the APK and grep for vendor packages/assets:
+   FaceTec ships `FaceTecSDK.framework` / `com.facetec.sdk` plus a large `FaceTec_*` asset bundle;
+   Sumsub ships `com.sumsub.sns`; iProov ships `com.iproov.sdk`; Incode `com.incode.welcome_sdk`;
+   Veriff `com.veriff.sdk`. This is the technique most likely to crack **Humanity Protocol**.
+7. **Certificate transparency / DNS.** `crt.sh` for subdomains like `kyc.<protocol>.tld`,
+   `verify.<protocol>.tld`, and CNAMEs pointing at vendor infrastructure.
+8. **Job listings and LinkedIn.** "Experience with Sumsub/Onfido integrations" in a protocol's
+   backend JD is weak but real signal.
+
+### The Humanity Protocol case — still open, and it matters most
+Humanity Protocol's own `hp-configuration` endpoint defines `is_human` as *"passed a KYC check **OR**
+palm enrollment"*, with `kyc_passed` "derived from provider results" — i.e. **a Humanity "human" may
+be nothing but a third-party KYC pass, with no palm biometric and therefore no uniqueness claim at
+all**. They do not name the provider.
+
+What I checked and found nothing:
+- `https://www.humanity.org/privacy-policy` — collects *"Biometric Data (such as palmprint and vein
+  image) collected through a hardware"*, has a GDPR section (§12), but names **no** sub-processors,
+  **no** Art. 9 lawful-basis statement, and **no** BIPA language. Retrieved 2026-07-24. That absence
+  is itself notable (see data-protection section).
+- Their public docs and 2025-26 press coverage name only **Mastercard** (Open Finance / financial
+  attributes, Nov 2025) and **Prenetics/CircleDNA** (genomics "Identity Validator", Feb 2025) — neither
+  is a document/liveness IDV vendor.
+  https://www.biometricupdate.com/202511/humanity-protocols-reusable-biometric-id-adds-mastercard-open-finance-capability ;
+  https://www.biometricupdate.com/202502/humanity-protocol-partners-with-genomics-firm-on-blockchain-based-idv
+- Note also: Humanity **pivoted away from "Proof-of-Personhood" to "Proof-of-Trust"** (Feb 2026) while
+  keeping palm biometrics, and claims >8M Human IDs issued — with no published dedup methodology.
+  https://www.biometricupdate.com/202602/humanity-protocol-pivots-from-proof-of-personhood-but-sticks-with-palm-biometrics
+
+**Next actions to close it (in order):** (a) pull the Android APK of the Humanity app and grep for
+vendor SDK package names; (b) run the KYC flow with a proxy and log hostnames; (c) request their DPA
+/ sub-processor list directly — as a prospective integrator we can just ask, and under GDPR Art. 28
+they should have one; (d) check any Mastercard press material, which sometimes names the underlying
+IDV chain.
+
 ## Reverse index: vendor -> known web3 customers
 
 *(building incrementally; each row needs a citation)*
@@ -58,6 +339,13 @@ of other people's credentials** and the primary source of **double-counting risk
 | Sumsub | **idOS** (idOS Consortium member + governance committee) | https://financefeeds.com/reusable-kyc-comes-to-web3-as-sumsub-joins-idos-consortium/ ; https://idtechwire.com/sumsub-joins-idos-consortium-to-advance-reusable-identity-for-web3/ | **Confirmed** (press release) |
 | Sumsub | **Solana Attestation Service**, **Linea / Verax**, **Chainlink ACE** on-chain attestations | https://ffnews.com/newsarticle/fintech/sumsub-on-chain-identity-attestations-verax/ ; https://www.prnewswire.com/news-releases/sumsub-partners-with-chainlink-to-power-cross-chain-identity-for-on-chain-compliance-302762707.html ; https://idtechwire.com/sumsub-launches-reusable-digital-id-verification-on-solana-blockchain/ | **Confirmed** (press release) |
 | Sumsub | **Reown** (WalletConnect) — 450+ wallet providers via one SDK | https://reown.com/blog/how-sumsub-leveraged-reown-authentication-to-expand-compliance-offering | Confirmed (Reown case study) |
+| Sumsub | **Galxe Passport v3** | Galxe Passport V3 launched with Sumsub as the KYC engine (Chainwire PR, 2025-05-06): https://www.barchart.com/story/news/32238122/galxe-launches-passport-v3-with-sumsub-to-supercharge-web3-onboarding ; Galxe help centre confirms "Sumsub, a trusted third-party KYC provider" https://help.galxe.com/en/articles/9424571-introducing-galxe-passport | **Confirmed** |
+| Sumsub | **Linea Proof of Humanity V2** | Verax portal `0xe8a3a57e84a27d55e37116af4681abd461b73922` has `ownerName` = "Sumsub"; attester `0xc5db96c1348041c56e455d4cc92bb46027831c0d`; schema `0x39d0…d23f`. Registers `modules: []` — **no on-chain validation whatsoever**, the attestation is a bare Sumsub say-so. (Sourced from the on-chain agent in this research set.) | **Confirmed (on-chain)** |
+| **Synaps** (itself a reseller) | **Anima Protocol** (`AnimaProofOfUniqueness` on Verax) | Synaps *is* Anima's operator — Synaps launched Anima Protocol in 2022: https://www.globenewswire.com/news-release/2022/04/12/2421095/0/en/Synaps-Launches-Novel-Decentralized-Identity-Solution-Anima-Protocol-In-Partnership-with-Aleph-im.html | **Confirmed** |
+| **FaceTec (via Synaps)** | **Anima Protocol**, **Linea/Privado ID/Billions "Proof of Uniqueness"** | Synaps states it "employs … FaceTec" for liveness, **self-hosted on Synaps' own servers**: https://medium.com/@anima_protocol/inside-proof-of-personhood-cde68ec84784 . The Linea private biometric PoU is Synaps + Verax + Privado ID: https://billions.network/blog/first-private-biometric-proof-of-uniqueness-on-linea-blockchain | **Confirmed → this is the big collapse** |
+| FaceTec (via Synaps) | **Verida** (Synaps partnership for private IDV) | https://www.linkedin.com/posts/synaps-id_synaps-verida-team-up-for-private-identity-activity-7131307885204004864-7dtw | Likely (LinkedIn/vendor post) |
+| Persona | **Coinbase** (biometric collection vendor) | Coinbase's own third-party-verification-vendor disclosure names **Persona Identities, Inc.** as a vendor collecting/processing biometric information: https://www.coinbase.com/legal/privacy/third-party-verification-vendors (page 403s to automated fetch; content surfaced via search index 2026-07-24 — **re-confirm by hand in a browser**) | Likely-confirmed, needs manual re-read |
+| Persona | **Chainlink CCID / ACE** (named partner) | https://withpersona.com/industry/cryptocurrency (403 to automated fetch; surfaced via search index) | Likely, needs manual re-read |
 
 ## The 2025-2026 deepfake / injection reality
 

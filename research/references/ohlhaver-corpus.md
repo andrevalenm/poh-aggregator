@@ -10,7 +10,45 @@ thinking. Not a protocol write-up. Citation / date-stamping / honesty rules from
 
 ## 0. Who she is / affiliations
 
-TODO
+**Primary source:** her own site, https://www.pujaohlhaver.com/about-7 (retrieved 2026-07-24).
+Nav is `home / writings & talks / notes`, where *writings & talks* =
+https://www.pujaohlhaver.com/writings-resesearch (note the typo in the slug, it is genuine) and
+*notes* = her Substack https://pujaohlhaver.substack.com .
+
+Career, in her own framing: Stanford JD → corporate law at Skadden, Arps → founded a women's
+healthcare company that secured **two FDA approvals** → pandemic policy (helped steward a bipartisan
+testing bill; co-author on Danielle Allen's *Pandemic Resilience* roadmap at Harvard's Safra Center,
+May 2020) → consensus protocols and computational regulation. She is **not** a cryptographer and
+does not present as one; she is a lawyer-institutionalist who reads mechanism design. That is
+relevant to how to use her: her contribution is problem-framing and political economy, not
+constructions we can implement off the page.
+
+**Current affiliation (2026-07):** Research Affiliate of **Harvard's Allen Lab for Democracy
+Renovation** (formerly/also GETTING-Plurality Research Group, Edmond J. Safra Center for Ethics) —
+https://gettingplurality.org/2023/03/15/puja-ohlhaver/ . She states she "advise[s] a handful of
+experiments, nonprofits and startups" without naming them. Also listed as a RadicalxChange speaker
+(https://www.radicalxchange.org/speakers/puja-ohlhaver/) and a Foresight Institute affiliate
+(http://foresight.org/people/puja-ohlhaver/). **UNVERIFIED:** no evidence found of any Flashbots
+affiliation; she is not an employee of any protocol, and explicitly disclosed holding no IDNA.
+
+Her own one-line statement of the research programme (About page): *"My work supports a third way:
+leveraging social ties to define context, cryptography to secure communication, and AI to bridge
+cooperation."* And: *"I began making the case for **community credentials** as essential to
+decentralization, collusion-resistance, and bottom-up, networked cooperation."* Note the term —
+*community* credentials, not *personhood* credentials. The distinction is the whole argument.
+
+### The complete corpus (from her own writings index, retrieved 2026-07-24)
+
+Papers — there are only **three**:
+1. "Community Currencies: The Price of Attention and Cost of Influence" (January 2025) — SSRN 5136037
+2. "Compressed to 0: The Silent Strings of Proof of Personhood", with Nikulin & Berman (2024-03-06) — SSRN 4749892
+3. "Decentralized Society: Finding Web3's Soul", with Weyl & Buterin (2022-05-10) — SSRN 4105763
+
+Plus one Substack post ("Common Knowledge Machines", 2024-10-01), a set of talks/interviews, four
+2020 COVID op-eds (WaPo, NYT, USA Today, Wired), and a 2009 law-review article on Rwanda's coffee
+sector. **"Between Zero and One" does not appear on her own index** — see §3.
+
+She writes slowly and publishes little. Treat each paper as load-bearing.
 
 ## 1. Compressed to 0: The Silent Strings of Proof of Personhood (2024)
 
@@ -306,9 +344,256 @@ displaced demand reappeared as *puppeteering*. **Hardening one channel priced th
 in.**
 
 ## 2. Decentralized Society: Finding Web3's Soul (2022)
+
+**Ohlhaver, E. Glen Weyl, Vitalik Buterin**, 2022-05-10. SSRN 4105763
+(https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4105763). Free PDF:
+https://www.radicalxchange.org/updates/papers/desoc.pdf — 36pp + appendix, read in full.
+**Ohlhaver is first author.** Widely (and wrongly) remembered as "Vitalik's SBT paper."
+
+### 2.1 What it actually proposed
+
+Primitive (§3): **Souls** = accounts/wallets holding publicly visible, **non-transferable**
+(possibly issuer-revocable) tokens called **Soulbound Tokens (SBTs)** representing "commitments,
+credentials, and affiliations." SBTs may be self-certified (like a CV) but derive their power from
+being **attested by counterparty Souls** — a university, an employer, a conference, another person.
+
+Abstract: *"we illustrate how non-transferable 'soulbound' tokens (SBTs) representing the
+commitments, credentials, and affiliations of 'Souls' can encode the trust networks of the real
+economy … Key to this sociality is decomposable property rights and enhanced governance
+mechanisms—such as quadratic funding discounted by correlation scores—that reward trust and
+cooperation while protecting networks from capture, extraction, and domination."*
+
+The "stairway" of applications (§2): provenance; undercollateralized lending via reputation;
+decentralized key management; thwarting coordinated strategic behaviour; **measuring
+decentralization**; decomposable/shared property rights.
+
+### 2.2 The three parts that matter for us
+
+**(a) Community recovery — identity as the intersection of groups.** Key recovery by "the
+intersectional vote of its social network," with guardians deliberately drawn "from discrete social
+circles to avoid collusion" (§4.3). Security *increases* as a Soul joins more distinct communities.
+The explicit theoretical basis is Georg Simmel: *"individuality emerges from the intersection of
+social groups, just as social groups emerge as the intersection of individuals."* And the
+anti-sale property: *"because a Seller would need to prove selling the recovery relationships, any
+attempt to sell a Soul lacks credibility."* — i.e. **make the credential unsellable by rooting it in
+relationships that cannot themselves be transferred.** This is the deepest idea in the paper and it
+is the direct answer to the credential-rental problem. Note it is a *social* construction, not a
+cryptographic one.
+
+**(b) Correlation-discounted governance (§4.5).** Four ways DAOs could use SBTs against sybils. The
+fourth is the novel one: *"checking for correlations between SBTs held by Souls who support a
+particular vote, and applying a lower vote weight to voters who are highly correlated."* And the
+justification is exactly Ohlhaver's later de-facto-sybil argument, two years early:
+
+> *"A vote supported by many Souls who all share the same SBT(s) is more likely to be a Sybil
+> attack and—even if not a Sybil attack—such a vote is more likely to be a group of Souls who are
+> making the same error in judgment or who share the same bias, and so should reasonably be
+> weighted less than a vote with the same numerical level of support but from a more diverse base
+> of participants."* (§4.5, p.7)
+
+**This single sentence is the design principle we should be arguing about.** It says: *do not try
+to decide whether the correlated voters are fraudulent. Discount them either way.* It dissolves the
+puppeteering-vs-cooperation ambiguity that §1.5 showed is undecidable on-chain — by making the
+distinction **irrelevant to the mechanism**. Fraud and shared bias get the same treatment because
+they do the same damage.
+
+**(c) Measuring decentralization through pluralism (§4.6).** Explicitly attacks the Nakamoto
+coefficient and Herfindahl-Hirschman index as inadequate because they beg the question of what a
+"distinct entity" is: *"even if addresses could be traced back to unique individuals, those
+individuals could be socially correlated groups prone to accidental coordination (at best) or
+intentional collusion (at worst)."* Proposed three-step replacement: (1) limit voting to
+SBT-rich/sybil-resistant Souls; (2) discount votes by Souls sharing many SBTs, "pooling them as
+only partially separate"; (3) measure correlations across *layers of the stack* — voting, token
+ownership, governance communication, control over compute. Illustrated with a photo of the mining
+pool operators controlling 90% of Bitcoin hashpower sitting on one conference panel.
+
+### 2.3 The correlation score — the actual math (Appendix A)
+
+This is the only fully specified mechanism in her corpus, so it is worth stating exactly. It is
+**Pairwise Matching**, credited to Buterin (2019). For every *pair* of agents (A,B) contributing
+`x_A→P` and `x_B→P` to the same project P, the subsidy is:
+
+```
+Match_AB→P  =  2M · sqrt(x_A→P · x_B→P) / (M + CorrelationScore_AB)
+
+CorrelationScore_AB  =  Σ over all projects P  of  sqrt(x_A→P · x_B→P)
+```
+
+Properties the paper states:
+- If A and B always fund different things, `CorrelationScore ≈ 0`, the denominator is ~M, and the
+  formula **reduces to ordinary quadratic funding** (`2·sqrt(x_A x_B)`), i.e. no penalty for being
+  independent.
+- The more two agents co-fund, the more each *further* co-contribution cannibalises subsidy from
+  their own earlier ones. Total subsidy per pair is bounded: `lim(T→∞) 2MT/(M+T) = 2M`.
+- **The key security property:** losses from N colluding/fake agents are bounded above by
+  `M·(N² − N)`, where M is a system parameter. Under naive QF the loss is *unbounded*
+  (`V·(N² − N)`). Under "Cluster Matching" the loss is also unbounded if the clustering
+  misidentifies even one colluding group as independent.
+
+That last point is the one to internalise. **Pairwise correlation discounting is a
+bounded-loss design that does not require you to correctly identify who is colluding.** The paper
+is explicit that it is "second-best, optimized for the case where limited outside information is
+available about which actors are actually colluding" and does not achieve optimality. That is
+precisely our epistemic situation, and it is the strongest argument in the whole corpus that a
+*scoring* product can be made robust without a working puppet-detector. See §6.3.
+
+The paper also flags the generalisation: the correlation score "could attempt to include similar
+terms for all instances where those two actors gained a benefit by cooperating" — i.e. correlation
+measured across *every* observable shared behaviour, not just one funding round. That is the shape
+of a cross-protocol signal.
+
+### 2.4 What happened to it: essentially nothing shipped
+
+Honest assessment. Four years on (paper May 2022 → today 2026-07), the concrete legacy is:
+- **The vocabulary won.** "Soulbound" entered general use.
+- **Attestation infrastructure shipped, the mechanism did not.** Ethereum Attestation Service, EAS
+  schemas, Optimism's attestation work, Gitcoin Passport stamps and POAP all instantiate "Souls
+  holding issuer-attested non-transferable claims." What none of them shipped is the part the paper
+  said was the point: **correlation-discounted governance**. We got the data structure without the
+  mechanism.
+- **Correlation discounting DID ship, and it is the one thing from this lineage that works.**
+  Gitcoin's **COCM (Connection-Oriented Cluster Matching)** is the direct descendant of the
+  Appendix A pairwise formula and is live in production: it supplied sybil resistance for **Gitcoin
+  Grants 24 (GG24)**, whose main QF donation window ran **2025-10-14 to 2025-10-28**
+  (https://gitcoin.co/campaigns/gitcoin-grants-24-gg24). Gitcoin reports COCM has been used across
+  **20+ rounds distributing $5.5M+**, with a claimed **~50% improvement** in allocation quality vs
+  plain QF (https://www.gitcoin.co/blog/leveling-the-field-how-connection-oriented-cluster-matching-strengthens-quadratic-funding
+  — vendor blog, treat the 50% as marketing).
+  Mechanically COCM: (1) identifies overlapping donor clusters, (2) computes pairwise similarity via
+  direct and indirect connections, (3) pays more to projects whose donors span diverse clusters.
+  **Its cluster signal is donation *behaviour* — recipient overlap, donation amounts, wallet
+  creation timing — not credentials.** Gitcoin Passport is used alongside it for a separate,
+  prior sybil-filtering step. Stated limitations: penalises newer projects and genuinely tight-knit
+  communities; works best on large diverse rounds.
+  *Two things to take from this.* First, correlation discounting is **not theoretical** — it has
+  years of production history on real money. Second, its worked example of a caught attack ("Crypto
+  Babes Club": wallets with identical donation amounts, near-simultaneous creation dates, and
+  single-project focus) is **the same co-movement signature Ohlhaver used on Idena**, found
+  independently, on a different chain, against a different attack. That is the strongest existing
+  evidence that the cross-protocol detector in §6.1 is buildable.
+- **No SBT ERC became load-bearing.** ERC-4973 / ERC-5114 exist as standards; neither anchors a
+  significant ecosystem.
+
+**Why did it not ship? Four reasons, and each one is a warning for us.**
+
+1. **It required an issuer ecosystem that did not exist and had no incentive to appear.** SBTs are
+   only useful if universities, employers and institutions issue them. The paper assumed the hard
+   part was the token; the hard part was the *issuers*. Nobody was paid to attest.
+2. **The mechanism needs density to work.** A correlation score over two credentials is noise. The
+   design has increasing returns to coverage — which means it is worthless until it is nearly
+   complete. That is a brutal bootstrapping curve, and it is *our* bootstrapping curve too.
+3. **Public non-transferable credentials are a privacy catastrophe**, which the paper conceded and
+   deferred to future work under the name "programmable privacy." Publicly legible affiliations are
+   a targeting list. The unsolved privacy problem is a large part of why nobody built it.
+4. **Non-transferability is not enforceable.** You cannot make a token non-transferable if the
+   *human* is willing — you can only make the *token* non-transferable. Sell the wallet, sell the
+   phone, sell your time. This is precisely the hole that *Compressed to 0* walked into two years
+   later, empirically. **The 2024 paper is best read as the author auditing her own 2022 proposal
+   and finding the load-bearing assumption false.** That is a mark in her favour, and it is why she
+   is worth taking seriously.
 ## 3. Between Zero and One — sublinear identity staking
 ## 4. Later work: social identity / plural identity (2024-2026)
 ## 5. Surrounding lineage
+
+Brief, and deliberately built from *her own citation graph* (all references below are ones she
+actually cites in *Compressed to 0* or *DeSoc*), so it situates her rather than surveying the field.
+Another agent covers the general PoP literature.
+
+### 5.1 Bryan Ford — pseudonym parties and the origin of "proof of personhood"
+
+The term is Ford's. Two anchors she cites:
+- Borge, Kokoris-Kogias, Jovanovic, Gasser, Gailly & **Ford**, "Proof-of-Personhood:
+  Redemocratizing Permissionless Cryptocurrencies," *IEEE EuroS&PW* (2017), pp.23-26,
+  https://doi.org/10.1109/EuroSPW.2017.46 — the paper that names the concept.
+- **Ford**, "Identity and Personhood in Digital Democracy: Evaluating Inclusion, Equality, Security,
+  and Privacy in Pseudonym Parties and Other Proofs of Personhood" (EPFL, 2020),
+  https://arxiv.org/pdf/2011.02412.pdf . She quotes his framing directly (p.29 n.68): digital
+  democracy needs *"an enforceable assurance that every real, natural human person may participate
+  freely in digital democracy, expressing their true and uncoerced preferences in online governance,
+  while exercising one and only one vote."*
+
+**Pseudonym parties** are the mechanism: physically co-located, simultaneous, periodic in-person
+gatherings, where uniqueness follows from the fact that one body cannot be in two places at one
+time. Idena is essentially a *virtualised* pseudonym party — synchronous global ceremonies at a
+fixed UTC time, with FLIP puzzles standing in for physical presence.
+
+**Note the phrase "true and uncoerced preferences" in Ford's own definition.** Ford already
+specified the requirement that Idena failed. Ohlhaver's contribution is not spotting a new
+desideratum — it is the empirical demonstration that satisfying the *uniqueness* half of Ford's
+definition does nothing for the *uncoerced* half, and may actively undermine it by attaching money
+to the credential. Her originality is evidentiary, not conceptual.
+
+Also cited: Siddarth, Ivliev, Siri & Berman, "Who Watches the Watchmen? A Review of Subjective
+Approaches for Sybil-Resistance in Proof of Personhood Protocols," *Frontiers in Blockchain* 3
+(2020) — note Paula Berman is a co-author on both that survey and *Compressed to 0*.
+
+And the root: J.R. Douceur, "The Sybil Attack" (2002),
+https://doi.org/10.1007/3-540-45748-8_24 — plus Mazorra & Della Penna, "The Cost of Sybils,
+Credible Commitments, and False-Name Proof Mechanisms," https://doi.org/10.48550/arXiv.2301.12813 ,
+which unifies the "sybil-resistance" and "false-name-proofness" literatures around the **relative
+cost of faking an identity**. That cost parameter is what our aggregate score is implicitly a proxy
+for, and it is the right frame for pricing credentials — see §6.2.
+
+### 5.2 MACI — minimal anti-collusion infrastructure
+
+Buterin, "Minimal Anti-Collusion Infrastructure" (EthResearch, May 2019),
+https://ethresear.ch/t/minimal-anti-collusion-infrastructure/5413 . She name-checks it because
+**Idena's identity staking is structurally MACI's deposit**: MACI requires a voter to post a deposit
+that *anyone who learns the private key can steal*, which makes sharing your key
+self-destructive. Idena's locked 20% identity stake does the same job — withdraw it and you lose
+your humanity status.
+
+MACI's core is a coordinator plus ZK proofs enabling **key-switching**: a voter can invalidate an
+earlier vote by re-keying, so a briber can never verify what was finally cast. That is
+*receipt-freeness* — it makes on-chain vote-selling non-credible.
+
+Her critique lands exactly here (§1.10): MACI and Complete Knowledge both bind a **key** to
+**unencumbered use**. Neither binds a key to a **person**. A puppeteer who simply *is* the key
+holder from registration onward satisfies every one of these constructions perfectly. Idena's
+identity staking beat account trading, and the demand reappeared as puppeteering, which identity
+staking does not touch at all. **Anti-collusion crypto raises the cost of the on-chain channel and
+thereby subsidises the meatspace channel.** For the aggregator analogue see §6.6.
+
+Related: Daian, Kell, Miers & Juels, "On-Chain Vote Buying and the Rise of Dark DAOs" (2018),
+http://hackingdistributed.com/2018/07/02/on-chain-vote-buying/ ; and Kelkar, Babel, Daian, Austgen,
+Buterin & Juels, "Complete Knowledge: Preventing Encumbrance of Cryptographic Secrets,"
+https://www.cs.cornell.edu/~babel/papers/ck.pdf .
+
+### 5.3 The collusion-resistance literature she builds on
+
+**Miller, Weyl & Erichsen, "Beyond Collusion Resistance: Leveraging Social Information for Plural
+Funding and Voting"** (SSRN, Dec 2022), https://ssrn.com/abstract=4311507 — the paper she quotes at
+length (p.33 n.82) and the direct theoretical bridge between sybils and collusion:
+
+> *"What makes Sybil agents Sybils is that the will of one entity centrally coordinates them. They
+> should be recognized as precisely the same because they all listen to that same entity and that
+> entity alone. … we might think of a Sybil agent as similar to an individual who identifies very
+> strongly with one specific group, and mostly coordinates their actions with the will of that
+> group… So as we move to the other end of the spectrum, individuals in fewer and fewer social
+> groups begin to look more and more like the type of self-interested agents that economists usually
+> put into their models – i.e., the homo economicus."*
+
+**Read that carefully, because it is the load-bearing claim of the whole programme:** sybil-ness is
+a *continuous* quantity, and it is measured by **how few independent groups an agent belongs to**.
+A bot, a puppet and a true believer sit on one axis. This is what makes an *independence* score
+coherent as an idea (§6.4) — and it is also the claim most open to challenge, since it implies a
+devout, single-community person is legitimately less than one person.
+
+Supporting sociology, both cited by her:
+- **Georg Simmel**, *Conflict & The Web of Group-Affiliations* (1955/1995), p.151 — quoted at p.34
+  n.87: adding group affiliations *"give[s] him a stronger awareness of individuality in general."*
+  Individuality **increases** with diverse sociality. This is the intellectual root of the whole
+  "person = intersection of groups" model, in both DeSoc and *Compressed to 0*.
+- **Granovetter**, "The Strength of Weak Ties" (1973) and "Economic Action and Social Structure: The
+  Problem of Embeddedness" (1985) — the strong/weak tie distinction doing the work in the silent-
+  strings argument (§1.7, strand 3).
+- **Madison, Federalist No. 10** — faction, and the two cures (remove the causes / control the
+  effects). Her whole constructive position is "control the effects," and she reads the
+  remove-the-causes option as ending in surveillance or totalitarian uniformity (p.36).
+- **Posner & Weyl**, *Radical Markets* (2018) — tacit collusion / common ownership, her analogy for
+  "tacit majorities" (p.32 n.78).
+
+### 5.4 *Plurality* (Weyl & Tang) and the plural-identity implementations
 ## 6. Implications for the aggregator
 ## 7. Open questions for us
 ## 8. Quotable lines (with locators)

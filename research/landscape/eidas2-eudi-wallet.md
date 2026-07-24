@@ -41,8 +41,100 @@ understanding. (https://www.biometricupdate.com/202607/eudi-what-as-wallet-deadl
 the single most important missing number for us.
 
 ## Implementing acts
+
+Reg. (EU) 2024/1183 is a framework; the operative technical detail lives in Commission Implementing
+Regulations (CIRs). The ones the ARF v3.0.0 normatively cites:
+
+| CIR | Subject | Adopted | Notes |
+|---|---|---|---|
+| **(EU) 2024/2977** | **PID and electronic attestations of attributes** issued to the wallet | 28 Nov 2024 | Defines PID attribute set incl. the persistent identifier; amended by a later CIR per ARF v3.0.0 release notes |
+| **(EU) 2024/2979** | **Integrity and core functionalities** of the wallet | 28 Nov 2024 | Contains the data-protection/unlinkability obligations; cited by ARF Topic E as a source of pseudonym requirements |
+| **(EU) 2024/2980** | **Notifications to the Commission** re. the EUDI Wallet ecosystem | 28 Nov 2024 | Feeds the trusted lists |
+| **(EU) 2024/2981** | **Certification of European Digital Identity Wallets** | 28 Nov 2024 | Annex 1 is the **Risk Register** referenced by the ARF |
+| **(EU) 2024/2982** | **Protocols and interfaces** | 28 Nov 2024 | The one that mandates ISO/IEC 18013-5 and OpenID4VP/OpenID4VCI profiles; Annex 2 (as amended) carries the registration-certificate transport extension per ARF `RPRC_20` |
+| **(EU) 2025/848** | **Registration of wallet-relying parties** | 6 May 2025 | **Applies from 24 Dec 2026.** See "Relying party registration" below — this is the one that decides whether we can play at all. |
+
+The 28 Nov 2024 batch entering into force is what starts the **24-month clock to 24 December 2026**
+for Member States to offer a wallet. ARF v3.0.0's release notes state it "incorporated amending
+Implementing Regulations (2024/2977, 2024/2979, 2024/2980, 2024/2982, and 2025/848)" — i.e. a
+**second, amending batch of CIRs landed in 2026**. `UNVERIFIED:` I did not obtain the CELEX numbers
+or adoption dates of the 2026 amending CIRs. Next place to look: EUR-Lex search for implementing
+regulations amending 2024/2977 et seq., and the ARF v3.0.0 release notes on GitHub.
+
+There is a separate, later obligation: **regulated relying parties named in eIDAS 2.0 (banks,
+telcos, platforms designated as VLOPs under the DSA, etc.) must *accept* the wallet by
+December 2027** — roughly 12 months after wallets are issued. (secondary source; verify against
+Art. 5f of Reg. 2024/1183.)
+
 ## Architecture and Reference Framework (ARF)
+
+Repo: https://github.com/eu-digital-identity-wallet/eudi-doc-architecture-and-reference-framework
+**Current release: v3.0.0, 23 July 2026** (clone at commit `6373eee`, 2026-07-23 — i.e. one day
+before this file was written; the ARF is a live document, treat any quote here as versioned).
+v2.9.0 was 21 May 2026. Release notes for v3.0.0 say it incorporates the **amending** Implementing
+Regulations 2024/2977, 2024/2979, 2024/2980, 2024/2982 and 2025/848, adds a "Functional Conformance
+Assessment Framework" and shareable functional test cases at `conformance.eudi.dev`, and adds
+support for both ETSI TS 119 612 **Trusted Lists** and **Lists of Trusted Entities (LoTE)**.
+
+The ARF is not itself law; it is the Commission's architecture doc that the CIRs and national
+implementations track. Its Annex 2 High-Level Requirements (HLRs) are the closest thing to a
+normative technical spec and are now maintained as a single CSV
+(`hltr/high-level-requirements.csv`, ~800 requirements) with harmonised IDs of the form
+`PART-CATEGORY-TOPIC-ID` (e.g. `AS-WP-11-004`).
+
+### Roles and trust model (ARF main §6)
+
+- **Wallet Provider** → issues the **Wallet Solution**; a **Wallet Unit** = Wallet Instance +
+  WSCA/WSCD (secure crypto device) + keystore(s). The provider vouches for the unit via a
+  **Wallet Instance Attestation (WIA)** and one or more **Key Attestations (KA)**, and revokes the
+  unit by flipping the WIA/KA revocation status.
+- **PID Provider** → issues **PID** (Person Identification Data). Member State approves it via a
+  *"well-defined policy"* and *"specific vetting processes"* (`Reg_19`).
+- **Attestation Providers** issue three tiers:
+  - **QEAA** — qualified electronic attestation of attributes, from a **qualified trust service
+    provider** (Annex V of Reg. 2024/1183). Carries the strongest legal effect.
+  - **PuB-EAA** — attestation issued by or on behalf of a **public sector body** responsible for an
+    authentic source (Art. 45f / Annex VII).
+  - **(non-qualified) EAA** — anything else. Note `ARB_01a`: non-qualified EAAs may use a
+    **third** format beyond mdoc and SD-JWT VC, and per ARF §6.1 *"Non-qualified EAAs may adopt
+    alternative trust models and verification mechanisms."* **This is the only crack in the wall
+    for a non-state issuer** — see "Integration surface".
+- **Registrar** (Member State) → registers PID Providers, Attestation Providers and Relying
+  Parties; associated **Access Certificate Authority** issues access certificates and an associated
+  **Provider of registration certificates** issues registration certificates.
+- **Trust anchors** live in per-Member-State **Trusted Lists** (ETSI TS 119 612, for qualified
+  services) and Commission-published **Lists of Trusted Entities / LoTE** (ETSI TS 119 602, for
+  Wallet Providers, ACAs, registration-certificate providers, PID Providers). A Wallet Unit
+  *"SHALL accept only the trust anchors in the LoTE(s) … notified by Member States"* (`RPA_04`).
+
+Net: it is a **closed PKI with government-controlled trust anchors at every edge**. Nothing about
+it is permissionless.
+
 ## Credential formats
+
+**Cross-reference:** the mechanics of ISO/IEC 18013-5 mdoc/mDL, SD-JWT VC, OpenID4VCI/OpenID4VP and
+the W3C Digital Credentials API are covered in the sibling research file on mdoc/formats — do not
+duplicate. What matters here is that eIDAS 2.0 **mandates both formats simultaneously**:
+
+- `PID_02`: *"A PID Provider SHALL issue any PID in **both** the format specified in ISO/IEC 18013-5
+  **and** the format specified in [SD-JWT VC]."*
+- `PID_04`/`PID_05`: mdoc doctype and namespace are both **`eu.europa.ec.eudi.pid.1`**.
+- `PID_14`: SD-JWT VC `vct` is **`urn:eudi:pid:1`**.
+- `PID_21`: for SD-JWT VC PIDs, *all* claims SHALL be individually selectively disclosable except
+  those explicitly excluded.
+- `ISSU_01`/`ISSU_15`/`ISSU_26`: issuance is **OpenID4VCI** profiled by **HAIP** sections 4 and 6.
+- `OIA_03b/c`, `OIA_08/08a`: remote presentation is **OpenID4VP**, either by redirect or via the
+  **W3C Digital Credentials API**, profiled by HAIP.
+- `ProxId_01`/`ProxId_02`: proximity is ISO/IEC 18013-5 **device retrieval only** — *server
+  retrieval SHALL NOT be supported* (an explicit anti-phone-home privacy decision).
+- Revocation (`VCR_01`, `VCR_11`, `VCR_11a`): either **short-lived attestations (≤24h)** or an
+  Attestation Status List / Token Status List.
+
+These formats are the same wire formats used by ISO mDL deployments (US mDLs, Google/Apple
+wallets), so an EUDI verifier stack is largely a superset of an mdoc verifier stack — **plus** the
+access-certificate/registration-certificate machinery that is EUDI-specific and is exactly the part
+we cannot obtain.
+
 ## Selective disclosure and unlinkability
 
 ### Where the law sits
@@ -110,6 +202,36 @@ selective disclosure (SD-JWT VC / mdoc) plus **batch issuance of single-use atte
 (ARF Topic B, `b-re-issuance-and-batch-issuance-of-pids-and-attestations.md`). Batch issuance
 gives *presentation* unlinkability but **not** issuer-RP collusion resistance, and it does not
 hide the device-binding public key across a batch unless a fresh key is used per copy.
+
+### The civil-society / cryptographers' pushback, and how it landed
+
+- **"Cryptographers' Feedback on the EU Digital Identity's ARF"** (June 2024, ARF v1.4.0) — an open
+  letter organised after the Commission invited cryptographers to a 5-6 June 2024 meeting. PDF:
+  https://files.dyne.org/eudi/cryptographers-feedback-june2024.pdf ; GitHub discussion #211:
+  https://github.com/eu-digital-identity-wallet/eudi-doc-architecture-and-reference-framework/discussions/211
+  Core argument: mdoc and SD-JWT VC rely on a **conventional issuer signature that is itself a
+  unique identifier**, recognisable across presentations, so the mandated unlinkability is not
+  achieved; they recommended the **BBS family of anonymous credentials**, noting mature standards
+  work and open-source libraries already exist.
+- Open ARF issues on the same point, still worth watching:
+  - Issue #200 "Cryptographers' Feedback on the EU Digital Identity's ARF"
+  - Issue #305 "Not compliant with eIDAS 2.0 unlinkability. No support for pseudonym PID or
+    trustworthy identity"
+  - Issue #572 "**Webauthn / FIDO2 Pseudonyms does not solve the unlinkability problem**" — this is
+    the exact objection to the WebAuthn-only pseudonym design described below.
+- The Spanish DPA (AEPD) has published a critical blog series "eIDAS2, the EUDI wallet and the
+  GDPR" — https://www.aepd.es/en/press-and-communication/blog/eidas2-the-eudi-wallet-and-the-gdpr-ii
+  (secondary source, but a regulator's view).
+
+**Resolution status (2026-07): partially conceded, not delivered.** The Commission responded by
+(a) creating Topic 53 and putting ZKP HLRs into normative Annex 2, (b) writing TS4/TS13/TS14, and
+(c) mandating short-lived + batch-issued technical credentials as an interim mitigation. It did
+**not** adopt BBS as a mandatory scheme; TS13 and TS14 are both explicitly labelled non-final and
+handed off to **ETSI TS 119 476-2**. So the wallets that ship for the December 2026 deadline will
+ship with the linkable signature the cryptographers objected to. `UNVERIFIED:` I did not find a
+2026-dated EFF or noyb position paper specifically on the EUDI ARF; the 2024 cryptographers' letter
+and the GitHub issues are the sourced record. Next place to look: noyb.eu press releases and EDPB
+/ EDPS opinions on the amending CIRs.
 
 ### The "proof of personhood" use case is literally in the ARF
 
@@ -184,15 +306,46 @@ nullifier of the Semaphore / World-ID kind:
 **unimplemented and unspecified**; PA_30 is even marked "Remove" in the refinement round. Timeline
 for it is explicitly tied to ZKP maturity, which TS4 says is not there yet.
 
-### The persistent unique identifier in the PID
+### The persistent unique identifier in the PID — **it is optional and only issuer-scoped**
 
-The PID rulebook mandates a per-person identifier. In the ARF ZKP paper the relevant example is
-`personal_administrative_number` (§4.1.4), used as the thing you would want to prove a match on
-*without revealing*. `UNCLEAR:` I have not yet read the current PID Rulebook text — in ARF v3.0.0
-`docs/annexes/annex-3/annex-3.01-pid-rulebook.md` is a **9-line stub** that redirects to the
-separate `eudi-doc-standards-and-technical-specifications` / attestation-rulebooks repo. Next place
-to look: https://github.com/eu-digital-identity-wallet/eudi-doc-attestation-rulebooks-catalog and
-CIR (EU) 2024/2977 (PID/EAA specification) Annex.
+Read from the live PID Rulebook, which moved out of the ARF into
+https://github.com/eu-digital-identity-wallet/eudi-doc-attestation-rulebooks-catalog
+(`rulebooks/pid/pid-rulebook.md`, repo at commit `36f8adc`, 2026-07-20):
+
+**Mandatory PID attributes (CIR 2024/2977 §2.2):** `family_name`, `given_name`, `birth_date`,
+`birth_place`, `nationality`, `portrait`. Note `portrait` — a **full-frontal facial image**
+(ISO/IEC 39794-5) — becomes mandatory *"as of 24 months after entry into force of the Regulation
+amending [CIR 2024/2977]"*, with a user opt-out.
+
+**`personal_administrative_number` is in §2.3 — OPTIONAL.** Its definition:
+
+> "A value assigned to the user … that is **unique among all personal administrative numbers issued
+> by the provider of person identification data**. **Where Member States opt to include this
+> attribute**, they shall describe in their electronic identification schemes … the policy that
+> they apply to the values of this attribute, including, where applicable, specific conditions for
+> the processing of this value."
+
+Three things follow, and they are decisive for sybil resistance:
+
+1. It is **per-PID-Provider unique, not EU-unique**. A person with two nationalities holding two
+   PIDs has two unrelated numbers.
+2. **Member States may simply not include it**, and several will not (many EU states legally
+   restrict use of a universal personal number — Germany's constitutional position on a single
+   `Personenkennzeichen` is the obvious example). `UNVERIFIED:` I did not find a per-Member-State
+   table of who includes it; that table does not appear to exist publicly yet.
+3. Even where present, an RP may only request it if it is in that RP's **registration certificate**
+   for that intended use (`RPRC_21`), and the User can refuse.
+
+**There is no `age_over_18` attribute in the PID.** The rulebook changelog (v1.1, 4 Sep 2025) says
+explicitly: *"Age verification attributes removed, following CIR 2024/2977."* Age proofs come from
+`birth_date` or from a **separate age attestation** — see the age-verification section.
+
+**Anti-tracking by short-lived credentials.** The rulebook distinguishes a *logical* PID
+(administrative validity, years) from *technical* PIDs (the actual issued credentials). It says the
+technical validity period *"typically is short, a few days or weeks at most, if not shorter, **to
+mitigate challenges regarding tracking of Users by malicious Relying Parties based on the repeated
+presentation of the same PID**"*, and that the provider silently re-issues successive technical
+PIDs. Combined with batch issuance (`ISSU_64`), this is the deployed unlinkability story.
 
 **What an RP learns today (no ZKP):** if it requests PID attributes it gets exactly the attributes
 it asked for, salted-hash-selective-disclosed from an mdoc or SD-JWT VC — but it also gets the
@@ -210,10 +363,26 @@ Verification is a permissioned role, cryptographically enforced by the wallet.**
 Art. 5b(1) of Reg. (EU) 2024/1183: *"Where a relying party intends to rely upon European Digital
 Identity Wallets for the provision of public or private services by means of digital interaction,
 the relying party **shall register in the Member State where it is established**."*
-The operative implementing act is **CIR (EU) 2025/848** (registration of wallet-relying parties),
-cited throughout ARF v3.0.0 — https://data.europa.eu/eli/reg_impl/2025/848/oj. Its provisions on
-RP registration **apply from 24 December 2026** (secondary sources; verify against the CIR's own
-"applies from" article).
+The operative implementing act is **Commission Implementing Regulation (EU) 2025/848 of 6 May 2025
+laying down rules for the application of Regulation (EU) No 910/2014 … as regards the registration
+of wallet-relying parties** — https://eur-lex.europa.eu/eli/reg_impl/2025/848/oj/eng.
+**Article 11: "It shall apply from the 24 December 2026."** (verified against the EUR-Lex text,
+fetched 2026-07-24.)
+
+**Article 3(1) is the killer clause for a non-EU verifier:**
+
+> "Member States shall establish and maintain at least one national register of wallet-relying
+> parties with information regarding registered wallet-relying parties **established in that Member
+> State**."
+
+The CIR contains **no provision for third-country / non-EU-established relying parties**. On the
+face of the text there is no registration path for an entity with no EU establishment, and without
+registration there is no access certificate, and without an access certificate the wallet will not
+present. `UNCLEAR:` whether a Member State's national registration policy (Art. 4) may in practice
+accept a non-EU entity with an EU representative — Art. 4 requires "business registration"
+documentation and a national redress mechanism, which points to "no". Next place to look: the
+national registration policies once published (Art. 4 requires publication), and the Commission's
+guidance/FAQ.
 
 ### How the wallet enforces it (ARF v3.0.0 Annex 2, Topics 6 / 27 / 44)
 
@@ -286,6 +455,35 @@ retain** the credential data we pass through. A pseudonymous crypto aggregator s
 unregistered dApps is **structurally ineligible**.
 
 ## Age verification / mini-wallet
+
+This is the part of the EU stack most likely to touch a real user before 2027, and the closest
+thing to a consumer-grade "over 18 + one per person" primitive.
+
+- **What it is:** the Commission's **age-verification blueprint**, a white-label "mini wallet" app
+  that proves *age over a threshold* and nothing else. Technical portal:
+  **https://ageverification.dev/** ; policy page:
+  https://digital-strategy.ec.europa.eu/en/policies/eu-age-verification
+- **Timeline (secondary sources, Commission news pages):** blueprint published **14 July 2025**;
+  **second, enhanced version** released and declared "feature ready" **15 April 2026**; an EU-wide
+  **coordination mechanism** for accrediting national solutions and cross-border issuance/acceptance
+  of proof-of-age attestations announced **15 April 2026**.
+  (https://digital-strategy.ec.europa.eu/en/news/commission-releases-enhanced-second-version-age-verification-blueprint)
+- **Pilot member states:** **France, Denmark, Greece, Italy, Spain, Cyprus, Ireland** — front-runners
+  intending to fold the app into their national EUDI Wallets. (secondary source; date-stamp 2026-07)
+- **Why it matters technically:** ARF **TS13** (ZK from arithmetic circuits, Longfellow-style) says
+  its approach *"will be tested in the [Age Verification]"* app. So **the age-verification
+  mini-wallet is where EU ZK proofs get their first production trial**, ahead of the full wallet.
+- **Why it matters to us:** "over 18" is a *predicate*, not an identity. It carries **no uniqueness
+  whatsoever** — one human can obtain age attestations from multiple issuers, and the whole design
+  goal is that presentations are unlinkable. As a personhood signal it is worth roughly what a
+  document-scan liveness check is worth, minus the dedup.
+
+`UNVERIFIED:` whether the mini-wallet's relying parties are subject to the same
+access-certificate/registration regime as full EUDI RPs. Given it is being folded into national
+EUDI Wallets and the coordination mechanism speaks of *"accreditation of national solutions"*, the
+working assumption should be **yes, verifiers are accredited**. Next place to look: the
+`ageverification.dev` verifier onboarding docs and the blueprint's own architecture document.
+
 ## Reference implementations and SDKs
 ## The uniqueness question
 ## Trust root & failure modes
