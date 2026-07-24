@@ -1056,6 +1056,158 @@ fails. Two design consequences:
   when we are tempted to believe our feature set is complete.
 
 ## 6. Privacy composition
+
+The README's requirement — "the aggregate must leak less than the sum of its parts" — is achievable,
+but only because of a specific structural fact: **a score is a low-entropy function of a
+high-entropy input.** Everything below is an elaboration of that.
+
+### 6.1 Quantifying the leak: anonymity-set shrinkage is brutal and fast
+
+Model a population of `N = 10⁶` aggregator users, each credential `i` held independently with
+prevalence `qᵢ`. Revealing the full possession vector `x` costs `−log₂ P(x)` bits; the expected
+anonymity set is `N · P(x)`. With illustrative prevalences (World ID Orb 12%, ZKPassport 5%,
+Circles 2%, Coinbase 25%, Binance BABT 8%, GitHub-120d 6%, Idena 0.3%, Humanity palm 1%,
+Google 55%, ENS 18% — **illustrative, not measured**):
+
+| Disclosed credential set | `P(vector)` | bits | E[anonymity set] |
+|---|---|---|---|
+| {Google} | 2.4 × 10⁻¹ | 2.1 | 236,546 |
+| {Google, Coinbase} | 7.9 × 10⁻² | 3.7 | 78,849 |
+| {Google, Coinbase, ENS, GitHub-120d} | 1.1 × 10⁻³ | 9.8 | 1,105 |
+| {World ID, Coinbase, Google} | 1.1 × 10⁻² | 6.5 | 10,752 |
+| **{World ID, ZKPassport, Circles, Idena}** | 8.5 × 10⁻⁸ | **23.5** | **0.085** |
+| {World ID, ZKPassport, Circles, Idena, palm, BABT} | 7.5 × 10⁻¹¹ | 33.6 | ~0 |
+
+Identifying one person in `10⁶` requires **19.9 bits**. So:
+
+- **Four credentials are enough to be globally unique** — if they are *rare* ones. And note the cruel
+  inversion: **the users with the strongest humanity evidence are the most identifiable.** The user
+  who did the most work to prove they are a real human is the one whose credential vector is a
+  fingerprint. Any product that rewards credential breadth is a deanonymisation engine pointed at its
+  best users.
+- The **mean** entropy of the possession vector is only 4.28 bits, which is exactly why averages are
+  the wrong statistic here. The tail is where the harm is, and the tail is where our high scores are.
+
+**Now the good news, and it is the whole argument for shipping a score rather than a bundle:**
+
+| Release | Max leak |
+|---|---|
+| Full credential vector (10 credentials) | up to **33.6 bits** (observed above) |
+| Integer score in 0–100 | ≤ **6.66 bits** (and ~4–5 in practice, given the real distribution) |
+| Single threshold bit `S ≥ T` | ≤ **1.00 bit** |
+
+**The aggregate genuinely does leak less than the sum of its parts — by 20 to 30 bits — provided the
+components are never revealed.** That is the privacy case for our product stated numerically, and it
+is a strong one. It also immediately implies the design constraint: **the moment we return an
+itemised list of contributing attestations "for explainability", we have given back all 30 bits.**
+The reason-code design of §2.3 and §3.3 must therefore be *categorical* ("1 of 6 root families
+present"), never itemised, on the verifier-facing path.
+
+### 6.2 The fundamental tension: dedup scope *is* linkability scope
+
+**Proposition.** For any credential system, the set of contexts across which two presentations can be
+recognised as deriving from one root is *exactly* the set of contexts across which sybil
+deduplication is possible. Cross-context sybil resistance and cross-context linkability are the same
+quantity measured with different signs.
+
+This is not a limitation of current engineering; it is what dedup *means*. And it explains, cleanly,
+every design split in our roster:
+
+| Scoping choice | Dedup reach | Linkability | Examples (from `research/protocols/zk-passport-and-eid.md`) |
+|---|---|---|---|
+| **Global nullifier** | universal | universal — a permanent pseudonymous identifier for that document, on-chain, forever | Self, Rarimo (per-document, unscoped, published) |
+| **App/service-scoped** | none across apps | none across apps | ZKPassport (never publishes an unscoped value); World ID's per-app nullifiers |
+| **Neighbouring-field hash** | partial/accidental | partial | World's document tier |
+| **Instance-scoped** | within one verifier | within one verifier | Human Passport's per-scoring-instance dedup (§4.1) |
+
+The escape hatch is the interesting part, and it is our business model: **a trusted aggregator is a
+mechanism for holding linkability so that verifiers do not have to.** We can dedup globally across
+our own customer base while each verifier learns only a boolean. That is a real, defensible service
+— and it is also a concentration of exactly the data that makes us a target. The strong version,
+which I think should be on the roadmap even if not in v1, is to **remove ourselves from the trust
+assumption**: 
+- **Oblivious PRF / private set intersection** on nullifiers, so we learn "this nullifier is or is not
+  already registered" without learning the nullifier (the standard construction behind
+  compromised-password checking, e.g. `k`-anonymity + OPRF as in HIBP's range API and Cloudflare's
+  password-check protocol).
+- **Rate-Limiting Nullifiers (RLN)** / Semaphore-style constructions, where exceeding a per-epoch
+  quota reveals a secret share and slashes, giving sybil resistance *without* a persistent identifier.
+
+`UNVERIFIED:` I have not costed an OPRF-based nullifier registry at our expected volumes; that is an
+engineering spike, not a research question, but it should be done before promising it.
+
+### 6.3 ZK proof of threshold satisfaction — the key product primitive, with its sharp edge
+
+The primitive: prove `Σᵢ wᵢ xᵢ ≥ T` (or, in our model, prove the root-cost aggregate clears `T`)
+**without revealing which credentials contributed**. Concretely: we issue a signed commitment to the
+user's credential/root vector; the user proves in ZK that the committed vector, evaluated against a
+committed weight table, clears a verifier-chosen threshold. The verifier learns one bit. This is
+mature, cheap circuitry — a Merkle inclusion proof plus a weighted sum plus a comparison — and it is
+the single highest-leverage thing we could build.
+
+Two design details that decide whether it actually works:
+
+1. **The weight table must be committed and versioned** (a published Merkle root per score version),
+   or the verifier cannot trust the claim. Note that this is *not* the same as publishing the
+   weights: we can commit to a table, prove statements about it, and publish only its root plus an
+   audited description. That is the technical mechanism for the asymmetric disclosure of §3.3 — it
+   gives verifiability without gameability, which is otherwise an uncomfortable circle to square.
+2. **Threshold proofs compose badly, and this is the sharp edge.** A single proof at threshold `T`
+   leaks ≤ 1 bit. But an adversarial verifier who can request proofs at thresholds of its choosing
+   performs **binary search** and extracts the full score in `⌈log₂(range)⌉` queries — ~7 queries for
+   a 0–100 score. Mitigations, all of which must be designed in from the start:
+   - **Bind the proof to a verifier-scoped nullifier** so repeat queries are detectable and
+     rate-limited.
+   - **Quantise thresholds** to a small published set (e.g. 5 bands), capping the extractable
+     information at `log₂(bands)`.
+   - **Fresh randomness per epoch** so historical proofs cannot be pooled.
+
+### 6.4 Differential privacy over score release — useful, but not for the thing people assume
+
+Be precise about what DP can and cannot do here, because this is routinely overclaimed:
+
+- **DP protects aggregate statistics**, not an individual's disclosure to a counterparty they are
+  transacting with. Publishing "the distribution of scores by country" with `(ε, δ)`-DP is sound and
+  we should do it (it is also how we would publish the calibration data of §3.2 without leaking).
+- **DP on a per-user score is randomised response**, and it directly trades sybil resistance for
+  privacy: noise of scale `Δ/ε` on the score means an attacker below the threshold passes with
+  positive probability. Worse, **naive noise is defeated by retry** — query `k` times, average, and
+  the noise shrinks as `1/√k`. The fix is standard but must not be forgotten: **sample the noise once
+  per (user, verifier, epoch) and memoise it**, so repeated queries return the identical noisy value.
+  With memoisation, per-user DP noise is actually *desirable* for a different reason — it is the
+  randomised threshold of §1.6, which prevents optimisation to exactly `T`. **The privacy mechanism
+  and the anti-gaming mechanism are the same mechanism.** That is a genuinely nice result and I would
+  build on it.
+- **Composition is the killer over time.** Each release of a user's score spends privacy budget; a
+  score that is queried continuously leaks continuously. Budget per user per epoch, and say so in the
+  API.
+
+### 6.5 Anonymous credentials and selective disclosure — what is actually available
+
+| Scheme | Selective disclosure | Unlinkable multi-show | Notes for us |
+|---|---|---|---|
+| **BBS+ / BBS signatures** | yes | **yes** | The right primitive. Being standardised for W3C VC Data Integrity; the only mainstream option with unlinkable multi-show. |
+| **CL signatures / Idemix / AnonCreds** | yes | yes | Mature (Hyperledger), heavier, RSA-based; deployed in the Sovrin/Indy world. |
+| **SD-JWT (+ SD-JWT VC)** | yes | **no** | Salted-hash disclosure over a *reused issuer signature*: presentations are trivially linkable unless the issuer batch-issues one-time credentials. This is the pragmatic-but-linkable option, and it is what most of the eIDAS2/EUDI stack actually ships. |
+| **mdoc / ISO 18013-5 mDL** | yes | no (same reuse issue) | Same caveat; batch issuance is the mitigation everyone hand-waves at. |
+
+The practical warning: **"selective disclosure" is routinely marketed as if it implied unlinkability,
+and for SD-JWT and mdoc it does not.** If our score consumes a state eID credential presented over
+SD-JWT, that presentation is linkable across verifiers even though only the requested attributes were
+revealed. See `research/landscape/eidas2-eudi-wallet.md` for the standards detail; the scoring-side
+consequence is that some inputs to our score carry a linkability cost we cannot remove, only
+*absorb* — one more reason the aggregator should be the only party that ever sees them.
+
+### 6.6 The synthesis for our design
+
+Three rules, all of which fall out of the above:
+
+1. **Verifiers get a band or a bit, never a vector.** 1–6.7 bits instead of 20–34.
+2. **Reason codes are categorical and root-shaped, never itemised.** "1 of 6 root families" leaks
+   ~2.6 bits; "World ID + ZKPassport + Circles + Idena" leaks 23.5.
+3. **Whatever linkability the system needs, concentrate it in one place, minimise it, and put it on a
+   path to removal** (OPRF/PSI, RLN). The concentration is the product; the removal is the roadmap.
+
 ## 7. Recommended scoring architecture
 ## 8. Worked toy example
 ## References

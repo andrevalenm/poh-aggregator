@@ -153,16 +153,269 @@ zkPass "schema" / "allocator" developer docs. Do not assume an address exists.
 enterprise suite — i.e. the 2026 roadmap items are governance and sales, not core protocol. Has a
 token (ZKP). Alive, commercial.
 
-### A.4 Opacity
-### A.5 Primus (ex-PADO)
-### A.6 Pluto
+### A.4 Opacity Network
+
+**Model:** TEE + restaking. Notaries run inside **Intel SGX enclaves**; the enclave holds plaintext
+but attests to the code that processed it. Layered on **EigenLayer as an AVS** so operators are
+staked and slashable, with a whistleblower bounty: "any user who can prove a notary misbehaved gets a
+share of their slashed stake" (secondary:
+[medium.com/@vinayak_35433 — "Opacity Network: Trust but Verify"](https://medium.com/@vinayak_35433/opacity-network-trust-but-verify-eb819ebb0b0a)).
+
+**The honest read of this design:** it swaps a *cryptographic* trust assumption for a *hardware +
+economic* one. The trust root becomes **Intel**. SGX has a long, well-documented history of practical
+breaks (Foreshadow/L1TF, Plundervolt, SGAxe, ÆPIC, and repeated microcode-revocation cycles). An
+attacker who breaks or extracts an enclave key once can mint unlimited proofs, and — critically —
+**the whistleblower mechanism only works if misbehaviour is provable**, which for a compromised
+enclave producing well-formed attestations it is not. Restaking makes the *ordinary* failure mode
+(operator downtime, obvious equivocation) expensive, and does nothing about the *interesting* one.
+
+Note also the privacy asymmetry vs. Reclaim/TLSNotary: **an Opacity notary sees your plaintext.** It
+is a *policy* promise (enclave code) rather than a *cryptographic* one that it forgets it.
+
+**Status (2026-07):** Alive and shipping hard. `github.com/OpacityLabs` had pushes on **2026-07-24**
+(the day of writing) across `tambour`, `react-native-opacity`, `dcap-verify`, `opacity-ferveo`, plus
+`opacity-ios` / `opacity-android` on 2026-07-15 (GitHub API, checked 2026-07-24). Two signals worth
+naming: `dcap-verify` = Intel DCAP quote verification, i.e. on-chain/programmatic TEE attestation
+verification; `opacity-ferveo` = threshold decryption (Ferveo is a DKG/threshold-crypto library),
+suggesting they are moving off "one enclave sees plaintext" toward threshold custody. Raised **$12M
+seed** (secondary:
+[theblock.co/post/321160](https://www.theblock.co/post/321160/opacity-network-funding-zk-data-verification)).
+AVS is on EigenLayer mainnet (address `0xce06c5fe42d22ff827a519396583fd9f5176e3d3` per EigenExplorer
+URL; `UNVERIFIED:` operator count and restaked TVL — EigenExplorer returned HTTP 402 for me; check
+[app.eigenlayer.xyz](https://app.eigenlayer.xyz) directly).
+
+**Aggregator relevance:** the SDK story (native iOS/Android/React Native) is the best in the category
+for a *mobile* embedded flow, which matters for us. Their customers are DePIN gig-work verifications
+(Nosh, Teleport, Heale, Earnifi) — i.e. *income/employment* attestations, not personhood.
+
+### A.5 Primus (formerly PADO)
+
+**Model:** dual-mode — MPC mode and Proxy mode behind **unified APIs**, and the whole zkTLS protocol
+additionally **deployed inside a Phala TEE**
+([docs.primuslabs.xyz/primus-network/tech-intro](https://docs.primuslabs.xyz/primus-network/tech-intro/);
+secondary: [Primus × Phala](https://medium.com/@primuslabs/primus-x-phala-network-build-trustless-zktls-with-tee-332a26d48c83)).
+So Primus is the one project that offers all three trust models. MPC mode uses **QuickSilver**
+(their own VOLE-based interactive ZK) to cut prover cost. Their docs concede proxy mode "introduces a
+network trust assumption requiring the attestor to verify it communicates with the intended server."
+
+**On-chain surface — real, verified addresses.** From deployment broadcasts in
+[github.com/primus-labs/zktls-contracts](https://github.com/primus-labs/zktls-contracts)
+(`broadcast/PrimusZkTLS.s.sol/<chainId>/run-latest.json`, read via GitHub API 2026-07-24):
+
+| Chain | Chain ID | Implementation (`PrimusZKTLS`) | Proxy (use this) |
+|---|---|---|---|
+| Arbitrum One | 42161 | `0x2b5c792d3897ea759a15d44d9b4f5d585c2ee6cd` | `0x982cef8d9f184566c2bec48c4fb9b6e7b0b4a58b` |
+| BNB Chain | 56 | `0x14f8fb6ac0bd3999f4cffed21ebf1b97733e7ad7` | `0xf3c20a5216d669c521ffe3724c1439ae0897ac33` |
+| opBNB | 204 | `0xc30b99cc6a4bd7628da385fa36bd769a5cd03300` | `0xadd538d8c857072efc29c4c05f574c68f94137ef` |
+
+Also deployed to Sepolia (11155111), Holesky (17000), Taiko Hekla (167009), Scroll Sepolia (534351),
+Scroll (534352), opBNB testnet (5611), Linea Sepolia (59141) — testnets, from the same broadcast dir.
+**Caveat: these are `CREATE` addresses recorded in committed Foundry broadcast artifacts, not
+independently confirmed against a block explorer.** Verify on Arbiscan/BscScan before use. Note the
+contracts are **`TransparentUpgradeableProxy` behind a `ProxyAdmin`** (BNB Chain adds a
+`TimelockController`) — i.e. **Primus can upgrade the verifier**. For an aggregator that is a live
+trust dependency, not a static one.
+
+Interface: `IPrimusZKTLS(primusAddress).verifyAttestation(attestation)` from
+`@primuslabs/zktls-contracts/src/IPrimusZKTLS.sol`. The README's own usage example warns:
+*"Example: Verify that proof.context matches your expectations"* — again, **context binding is the
+integrator's job**, and forgetting it makes proofs replayable.
+
+**Status (2026-07):** very much alive. `primus-labs` org pushes on 2026-07-22 (`primus-emp`, `otls`),
+2026-07-16 (`network-core-sdk`), 2026-07-15 (`zktls-core-sdk`); `zktls-contracts` last commit
+2026-06-11. Also developing `primus-fhe` — the FHE work suggests attention is drifting toward
+confidential compute rather than proofs.
+
+### A.6 Pluto — **appears to have pivoted away from zkTLS**
+
+Pluto pitched three modes: **MPC mode, Origo proxy mode, and TEE mode**
+([pluto.xyz/blog/web-proof-techniques-tee-mode](https://pluto.xyz/blog/web-proof-techniques-tee-mode),
+[…/origo-mode](https://pluto.xyz/blog/web-proof-techniques-origo-mode)), with `caratls` for
+TLS channel-binding to a TEE quote. Team ex-Stripe/Aztec/Uber/HubSpot.
+
+**Evidence of pivot / wind-down (GitHub API, checked 2026-07-24):** the entire `github.com/pluto`
+org's most recent push to *any* repo is **2026-02-12** (`aes-circuits`). The core zkTLS repos are
+older still: `web-prover-circuits` last pushed **2025-04-25**, `solidity-verifier` ("Contract to
+verify notary signatures on chain") **2025-07-03**, `pluto-frame-examples` 2025-04-30. Meanwhile
+[docs.pluto.xyz](https://docs.pluto.xyz/) now describes the product as **"Embedded Automations",
+"Pluto Frame" and "Pluto Functions" (execute arbitrary JavaScript)** — with no mention of MPC/Origo/
+TEE modes in the introduction at all.
+
+Read together: Pluto has repositioned from *web proofs* to *browser automation*, which is the
+commercially honest version of the same underlying tech and quietly drops the cryptographic claim.
+**Do not build on Pluto for verification.** `UNCLEAR:` whether the notary infrastructure is still
+operated; treat as unavailable.
+
 ### A.7 Clique
-### A.8 Other / 2025-26 entrants
-### A.9 Adversarial reality: do platforms break this?
+
+**Model:** TEE-based attestation — "low computation and network overhead but introduces reliance on
+trusted hardware" (secondary:
+[BlockBeats zkTLS overview](https://en.theblockbeats.news/news/57312)). Clique's actual business is
+broader off-chain attestation / campaign infrastructure (social task verification, airdrop
+eligibility) rather than a general zkTLS primitive.
+
+**Status:** `UNVERIFIED:` I could not locate an authoritative Clique GitHub org (`clique2046` 404s)
+or current docs in this session; the references I have are secondary overview articles. Given their
+model is "trust our enclave", their attestations are **functionally a vendor API with a TEE
+marketing layer**, and for our purposes the relevant question is not the cryptography but whether we
+trust Clique the company. Next place to look: `clique.social` / `@Clique2046` on X, and whether any
+verifier contract exists on-chain.
+
+**Aggregator relevance:** low. If we are trusting a company's signature anyway, a plain signed REST
+attestation is simpler and we should price it as "vendor-attested", not "cryptographically proven".
+
+### A.8 Other / adjacent 2025-26 entrants
+
+- **DECO** (Chainlink Labs, the academic ancestor of all of this — Zhang et al. CCS'20). Research
+  lineage, not a product we can integrate. Referenced in
+  [Stanford Blockchain Review #74](https://review.stanfordblockchain.xyz/p/74-cryptography-research-spotlight).
+- **TACEO** — multiparty notaries for zkTLS ([blog.taceo.io/mpc-zktls](https://blog.taceo.io/mpc-zktls)):
+  the interesting research direction, because it attacks the exact weakness above (single bribable
+  notary) by threshold-izing the notary. `UNVERIFIED:` production readiness.
+- **Nillion** — publishing on "evolving zkTLS" as part of privacy-preserving computation
+  ([nillion.com](https://nillion.com/news/evolving-zktls-part-3-of-privacy-preserving-computation-from-decentralized-oracles/)).
+- **Reclaim is adding TEE**: a `reclaim-tee` repo in the Reclaim org was **pushed 2026-07-24**
+  (GitHub API). That the leading proxy-witness vendor is building TEE infrastructure is a tell: the
+  honest-proxy assumption is not selling to serious counterparties.
+- `UNVERIFIED:` I did not find a *new* credible zkTLS entrant founded in 2026. The category looks
+  consolidated around Reclaim (volume), Primus (breadth), Opacity (mobile/TEE), with TLSNotary as the
+  research substrate.
+
+### A.9 Adversarial reality: does this still work in 2026?
+
+This is the section that decides the verdict, and the news is bad.
+
+**1. Anti-bot detection is now baseline and TLS-layer.** TLS fingerprinting "moved from advanced
+anti-bot to baseline in 2024 and is now table stakes in 2026"; **JA4+ is universally adopted by
+Cloudflare, AWS, VirusTotal and NetWitness**
+([proxylabs.app/blog/ja4-tls-fingerprinting-2026](https://proxylabs.app/blog/ja4-tls-fingerprinting-2026),
+[cside.com/blog/tls-fingerprinting](https://cside.com/blog/tls-fingerprinting) — both vendor blogs,
+secondary). A Feb-2026 arXiv paper reports a CatBoost classifier on JA4 features hitting **AUC 0.998
+/ accuracy 0.9863** for bad-bot detection ([arxiv.org/abs/2602.09606](https://arxiv.org/abs/2602.09606)).
+
+Why this hits zkTLS specifically: **proxy-mode zkTLS terminates and re-originates or at minimum
+relays the TLS session from the vendor's server IP**, and MPC-mode zkTLS produces a
+*non-browser ClientHello* by construction (it is a custom Rust/WASM TLS stack). Both are exactly
+what JA4 + IP-reputation systems are built to flag. The user is a real human with real credentials,
+but the connection looks like a bot from a datacenter ASN. Result: CAPTCHAs, 403s, and
+**account-level flags on the user's real account** — the worst possible outcome for a consumer
+onboarding flow.
+
+**2. Post-quantum TLS landed in 2026 and it is a structural problem for MPC-TLS.** PQ key exchange
+became the default for client-to-Akamai connections on **2026-01-31**, with network rollout complete
+in **March 2026** (secondary:
+[scrapfly.io/blog/posts/post-quantum-tls-bot-detection](https://scrapfly.io/blog/posts/post-quantum-tls-bot-detection));
+Cloudflare and the major CDNs are on the same path, and `X25519MLKEM768`
+([draft-ietf-tls-ecdhe-mlkem](https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/)) is now
+the ordinary handshake. Scrapfly's framing is the operative one: traffic that reaches Akamai
+**without a PQ key share now sits outside the baseline of normal browser behaviour** — i.e. failing
+to do PQ is itself a bot signal.
+
+`MY ANALYSIS, NOT A CITED CLAIM:` MPC-TLS three-party handshakes are constructed around *splitting an
+ECDHE secret* between prover and notary inside a garbled circuit. ML-KEM is a lattice KEM with very
+different structure and much larger operands; doing it in 2PC is not a parameter change, it is new
+research. So the PQ transition plausibly forces MPC-TLS either to negotiate down to classical ECDHE
+(which is now itself a fingerprintable anomaly) or to be rebuilt. Proxy-mode is less affected — the
+proxy relays ciphertext and need not touch the key exchange — but proxy-mode is the weak trust model.
+**`UNVERIFIED:` I found no source addressing PQ-TLS × MPC-TLS directly. This is the single highest-value
+open question in Part A and should be put to the TLSNotary maintainers directly.**
+
+**3. Platforms prohibit it by ToS and enforce.** X's Developer Agreement and Terms prohibit scraping
+and accessing the service by automated means without permission; the same is true of Google, Reddit
+(post-2023 API lockdown), and LinkedIn. zkTLS vendors' answer is "the *user* is accessing their own
+data, with their own credentials, so it is not scraping." That argument is legally untested for
+zkTLS specifically, and it does not help operationally: the platform does not need a legal theory to
+ban the account.
+
+**4. So — is proving an X fact practical in 2026?** `UNVERIFIED, and this is the one thing I would
+test before believing any vendor:` Reclaim advertises ~889 data sources and X is certainly among the
+advertised ones, but **the existence of a provider template is not evidence it currently works**.
+Provider templates in this category rot constantly — a DOM/JSON change or a new anti-bot rule kills
+one silently. **Concrete next step for us: take Reclaim's and Primus's X/Twitter providers and
+actually run 50 proof attempts from residential and datacenter IPs, and measure the success rate and
+the account-flag rate.** Any integration decision made without that number is a guess. My prior,
+given the JA4 evidence above and that X is one of the most aggressively defended targets on the
+internet, is that success rates are materially below what the marketing implies and are degrading.
+
+**5. The UX tax, independent of whether it works.** Every design requires the user to authenticate
+to the target platform inside the vendor's surface: zkPass needs the **TransGate Chrome extension**
+or Android app; Reclaim needs its mobile SDK / webview / extension; Opacity ships native iOS/Android
+SDKs. `UNVERIFIED:` no published funnel numbers, but a browser-extension install step in a consumer
+onboarding flow is conventionally a **50–90% drop-off**, and asking a user to type their X or Google
+password into a third-party webview is a phishing-shaped interaction that security-aware users
+should and will refuse. For an aggregator whose pitch is "one embedded flow", this is a serious
+product problem: zkTLS is the highest-friction, lowest-value input in the entire landscape.
+
 ### A.10 Legal exposure
 
+- **CFAA / unauthorised access (US).** *hiQ v. LinkedIn* (9th Cir. 2022) held that scraping *public*
+  data likely does not violate the CFAA — but zkTLS is the opposite case: it operates on
+  **authenticated, non-public** data behind a login, where "exceeds authorized access" bites and where
+  ToS breach is squarely in play. *Van Buren* (SCOTUS 2021) narrowed CFAA to gates-based access, which
+  helps somewhat, but a credentialed session routed through a third-party proxy in violation of an
+  explicit ToS is not the fact pattern *hiQ* blessed. `UNVERIFIED:` no zkTLS-specific case law found.
+- **Where the exposure sits.** In proxy-witness designs the vendor's server is literally in the data
+  path of an authenticated session. If we embed a zkTLS vendor, we are inducing our users to breach
+  the platform's ToS, and we are shipping their credentials-derived traffic through a third party.
+- **Credential handling / DPA and GDPR.** In **TEE mode the notary sees plaintext**, which for
+  EU users means a processor relationship and a data-transfer story over data the user never intended
+  to share with anyone but the platform. Proxy/MPC modes are far better here (ciphertext only).
+- **Practical posture for us:** never take custody of platform credentials; keep the login inside the
+  vendor's SDK; require the vendor to carry the ToS risk contractually; and do **not** market
+  "prove your X account" as a headline feature in a jurisdiction-sensitive product.
+
 ## Part B — The social signals themselves
+
+Framing for the whole of Part B: for each signal, the only question that matters is **what does one
+additional unit cost an attacker**, because a sybil farm buys in bulk and does not care about
+anything else. Where the number exists it is in B.8.
+
 ### B.1 X / Twitter
+
+**Account age.** Priced in B.8: **$1.83 for a 2016-vintage account**, ~$0.20 for anything from
+2023–2025. Account age on X is therefore worth approximately nothing. Worse, it is worth *less* than
+it looks, because a buyer of an aged account inherits genuine-looking history — the signal is not
+merely cheap, it is cheap *and* indistinguishable from the real thing by construction.
+
+**Blue check = X Premium = a purchased subscription, not an identity check.** Pricing (2026, secondary
+sources — [tweethunter.io](https://tweethunter.io/blog/twitter-blue-vs-x-premium),
+[tweetbe.at](https://tweetbe.at/blog/x-verification-guide-2026/), checked 2026-07-24):
+
+| Tier | Price | Gives blue check? |
+|---|---|---|
+| Basic | $3/mo | No |
+| **Premium** | **$8/mo (~$84/yr)** | **Yes** |
+| Premium+ | $16/mo | Yes |
+| Premium Business (org) | from **$200/mo** | Gold/org check |
+| Premium Organizations (gov/multilateral) | **$1,000/mo** | Gold check |
+
+X Premium *does* require a verified phone number, so it inherits the phone-number signal — but that
+is the phone signal, not an X signal, and it is **correlated with every phone-based protocol in the
+aggregate**. At $84–96/yr, blue check is priced comparably to Farcaster Pro ($120/yr) and is a
+similar kind of evidence: real recurring cost, therefore a real (if modest) sybil deterrent, and
+**purchasable at scale by anyone with a budget** — 1,000 blue checks is $84k/yr, which is nothing to
+a serious airdrop farm.
+
+**Rentability is the killer.** Unlike biometric or document-based credentials, a blue-check X account
+can be *rented* — the seller keeps the account and sells access, so the same $84/yr credential can be
+monetised across many verification events. `UNVERIFIED:` I did not find a specific X-account-rental
+price list, but account rental is well-established for Discord/Telegram and there is no structural
+reason X differs. **Any credential whose secret is a password is rentable; any credential whose
+secret is a face or a passport chip is much less so.** This distinction should drive our weighting more
+than anything else in Part B.
+
+**Verification by organisation** (an org vouches for an employee, `affiliates` badge) is
+qualitatively different — it is a *human-in-the-loop attestation by an accountable entity*, and the
+org pays $200–1,000/mo. It is the only genuinely interesting X signal, and it has near-zero recall
+outside corporate accounts. `UNVERIFIED:` there is no public API that cleanly exposes affiliation
+status in a way a zkTLS provider template can reliably match — worth checking.
+
+**Follower graph.** Follows are free and follower counts are directly purchasable (AccsMarket's
+"boosting" catalogue sells engagement "from as low as $0.001 per action", fetched 2026-07-24). Raw
+follower count is worthless. The only defensible reading is the same one as for Farcaster: *inbound
+edges from accounts that independently pass an expensive check*, i.e. trust propagation over a
+verified seed set — not a threshold on a number.
+
 ### B.2 Farcaster
 
 **All numbers in this section were measured by me directly against public RPC on 2026-07-24**

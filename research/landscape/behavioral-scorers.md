@@ -276,12 +276,45 @@ proxyInviter)`, and once you attribute through the proxy layer, **a single `orig
 through **1,687 distinct proxy bot addresses**. Detail and verification path in
 `research/protocols/circles.md` (§ on invitations-at-scale).
 
-**The generalisation, stated once:** *single-hop attribution is defeated by one layer of
-indirection, and one layer of indirection is cheap.* Every detector below must therefore be defined
-over the **transitive closure** of the relevant relation (funding, invitation, delegation,
-attestation), not over its direct edges. A detector that reads only direct edges will report that
-everything is fine, and will be wrong by an order of magnitude — Circles is the measured proof of
-exactly that failure: 47/10,000 vs. 2,754/10,000, a **59×** understatement.
+**Precedent C — Proof of Humanity v2, the counterexample (measured 2026-07-24).** This one is worth
+more than the other two, because it falsifies the obvious generalisation. A sweep of all **1,553
+`VouchRegistered` events** on PoH v2 (`0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc`, Gnosis, from
+deploy block 35,846,827) tested whether the April–July 2026 registration surge was a farm.
+*Direct* concentration was **low** — 828 distinct vouchers for 1,553 vouches, top 23 vouchers =
+**10.4%** (9.0% in the surge cohort alone), against Idena's 23 entities at ≥40%. But applying the
+Circles-style transitive-origin collapse to the same data gave **6 forest roots for 1,542
+identities, one root subsuming 94.4%** — which reads as one entity behind almost the entire
+registry, and is **wrong**. Three checks falsify the farm reading: median vouch-chain depth rises
+monotonically by registration decile (7, 9, 10, 11, 12, 12, 13, 13, 13, 14); the dominant root has
+exactly **one direct child**; and its depth-3 subtree spans **635 days**. It is simply a bootstrapped
+invite tree — every member traces to genesis *by construction*, so root identity carries zero
+information. Full write-up: `research/protocols/poh-kleros-brightid-idena.md` § "ADDENDUM — the
+vouch-graph test"; reproduction script `research/scripts/vouch_sweep.py`.
+
+**The generalisation, corrected.** The naive version — *"single-hop attribution is defeated by one
+layer of indirection, so always work over the transitive closure"* — is right on Circles and
+catastrophically wrong on PoH. The correct statement has two parts:
+
+1. *Single-hop attribution is defeated by one layer of indirection, and one layer of indirection is
+   cheap.* Circles is the measured proof: 47/10,000 direct vs. 2,754/10,000 transitive, a **59×**
+   understatement. Direct-edge detectors will tell you everything is fine.
+2. **But transitive-origin collapse is evidence of farming *only where the protocol's honest
+   topology is not already a tree*.** On Circles, trust edges are unilateral and cheap, so an honest
+   graph should *not* be tree-shaped and a single dominant root is anomalous. On any invite-gated
+   registry — PoH, and by extension most vouch/invite protocols — the tree **is** the intended
+   topology, every identity descends from a genesis seed, and root concentration is a structural
+   artefact carrying no information. A detector keyed on root concentration alone would have
+   **excluded 94% of a legitimate registry.**
+
+**Therefore, the design rule that governs this whole section: every detector must be specified
+together with its *topology precondition* — "what does this look like on an honest population of
+this protocol's shape?" — and must be calibrated against that null, not against an abstract
+intuition about what farms look like.** A detector without a stated null hypothesis is not a
+detector; it is a shape recogniser, and honest populations have shapes too. Each detector below now
+carries an explicit **Topology precondition** line. Where the honest topology *is* a tree, the
+discriminating signals are not root concentration but **subtree width at shallow depth**,
+**time-clustering within a subtree**, and **depth-versus-registration-age correlation** — organic
+trees deepen as they grow; farms stay shallow, wide, and bunched in time.
 
 ### D1. Timing synchrony across identities
 
@@ -292,6 +325,10 @@ exactly that failure: 47/10,000 vs. 2,754/10,000, a **59×** understatement.
   (d) alignment of 24h activity histograms (cosine similarity of hourly-bin vectors — the Béres et
   al. representation, repurposed from deanonymisation to cluster detection).
 - **What it caught:** Idena's simultaneous delegation/termination transactions (all 31 pools).
+- **Topology precondition:** the honest population must have *unsynchronised* arrivals. This fails
+  for any protocol with a **snapshot, deadline, campaign, or scheduled onboarding event** — honest
+  users bunch against deadlines just as hard as farms do. Before deploying, measure the honest
+  arrival process for *this* protocol and use it as the null, not a Poisson assumption.
 - **Cost to defeat:** the farm must **de-synchronise**, which means either a human clicking at
   irregular times per identity (expensive — reintroduces per-identity labour) or a scheduler that
   spreads events over days/weeks with independent jitter (cheap — but it costs the farm *latency*,
@@ -312,6 +349,12 @@ exactly that failure: 47/10,000 vs. 2,754/10,000, a **59×** understatement.
   star-convergence, tree, chain). **Then** — the part that matters — do not stop at direct funding
   edges: compute the *ancestry set* of each identity up to k hops, discounting hops through
   high-fan-out nodes (CEX hot wallets, bridges, routers) which carry no attribution.
+- **Topology precondition:** the honest population must fund itself from *many* independent sources.
+  This holds on general-purpose chains and fails wherever a protocol has a **canonical funding
+  path** — a faucet, a sponsored-gas paymaster, a single bridge, an official onboarding wallet, or a
+  dominant regional on-ramp. In those cases a star-divergence pattern is the *honest* shape and the
+  detector will flag the entire user base. Always exclude high-fan-out infrastructure nodes and
+  check what fraction of the honest cohort the detector claims **before** believing it.
 - **The hard sub-problem:** distinguishing a **laundering hop** (CEX round-trip used to break the
   graph) from a **legitimate CEX withdrawal** is genuinely hard on-chain and requires either
   exchange cooperation or vendor entity labels. Flag this as the main technical dependency.
@@ -332,32 +375,78 @@ exactly that failure: 47/10,000 vs. 2,754/10,000, a **59×** understatement.
   funnelling signatures: operator receives all identity stake on termination; delegated accounts
   funnel pre-delegation rewards to the operator; operator withholds rewards then forwards to a hive
   wallet or exchange (all 31 pools except 2 on the latter two).
+- **Topology precondition:** the honest population must not have a *designed* convergent flow. Fails
+  where a protocol routes value through a common sink — a staking contract, a claim contract, a
+  custodial wallet, a group/treasury account, a remittance corridor, or a savings-circle pattern.
+  Circles' group tokens and PoH's `RewardDistributor` are both legitimate convergent sinks. Whitelist
+  contract sinks; the detector is only meaningful for convergence on an **EOA**.
 - **Cost to defeat:** stagger + vary + hop. **Cheap once known.** Its current efficacy rests on
   farms not being adversarial to *us* yet.
 - **Recommended use:** **Build, and treat as perishable.** Highest signal-to-noise of the on-chain
   detectors today; assume decay after we publish or enforce.
 
-### D4. Invitation / attestation forest concentration after transitive collapse
+### D4. Invitation / attestation forest structure — **topology-conditional**, in two variants
 
-- **Definition:** for any protocol with an invite, vouch, delegation, or attestation relation, build
-  the **forest**, collapse indirection layers (proxy inviters, delegate contracts, factory-deployed
-  bot addresses, relayers), and compute the concentration of the resulting root distribution —
-  Herfindahl index or top-k share of identities per root.
-- **What it caught:** Circles — 27.5% of 10,000 recent registrations from **one** root behind 1,687
-  proxies, versus 0.47% for the top *direct* inviter. **This detector exists specifically because
-  the naive version gave the wrong answer by 59×.**
-- **Indirection layers to unwind (checklist):** proxy/relayer addresses; contract-factory-deployed
-  addresses sharing a deployer or CREATE2 salt pattern; delegation contracts; account-abstraction
-  bundlers and paymasters (a shared paymaster is a strong shared-operator hint); gas-sponsorship
-  relationships; shared session-key infrastructure.
-- **Cost to defeat:** the farm must acquire *genuinely independent roots* — i.e. real separate
-  inviters — which in a social protocol means real separate humans, which is the actual cost the
-  protocol intended to impose. **This is the most expensive detector to defeat in the catalogue**,
-  and not by accident: it attacks the thing that is actually scarce.
-- **False-positive generator:** legitimate onboarding operators. A country lead onboarding 2,754
-  people at meetups produces exactly this shape. Ohlhaver's §1.5 caveat applies in full force.
-- **Recommended use:** **Build first.** Highest value-per-unit-effort in this file. Output a
-  **correlation discount on the subtree**, not an exclusion of the leaves.
+This is the detector the PoH result forced a rewrite of. It splits in two, and **which variant
+applies is determined by the protocol's honest topology, not by preference.**
+
+**Shared preprocessing (both variants).** Build the invite/vouch/delegation/attestation forest and
+collapse indirection layers before doing anything else. Checklist of layers to unwind:
+proxy/relayer addresses; contract-factory-deployed addresses sharing a deployer or CREATE2 salt
+pattern; delegation contracts; account-abstraction bundlers and paymasters (a shared paymaster is a
+strong shared-operator hint); gas-sponsorship relationships; shared session-key infrastructure.
+
+#### D4a. Root concentration — **only where the honest topology is NOT a tree**
+
+- **Definition:** Herfindahl index or top-k share of identities per transitive root.
+- **Topology precondition (binding):** honest edges must be **unilateral, cheap, and many-to-many**,
+  so that an honest graph is a dense web with *many* independent roots. Circles satisfies this:
+  trust edges are unilateral and cheap, so a single root behind 27.5% of registrations is a genuine
+  anomaly.
+- **What it caught:** Circles — 27.5% of 10,000 recent registrations from one `originInviter` behind
+  1,687 proxies, versus 0.47% for the top *direct* inviter (**59×** understatement without the
+  collapse).
+- **Where it catastrophically fails:** Proof of Humanity v2 — 6 roots for 1,542 identities, one root
+  at **94.4%**, and it is a *bootstrapped invite tree*, not a farm. **A detector shipped on root
+  concentration alone would have excluded 94% of a legitimate registry.** Do not run D4a on any
+  invite-gated registry.
+- **How to decide which case you are in, mechanically:** if every identity in the protocol descends
+  from a genesis seed **by construction** (registration requires an existing member's invite/vouch),
+  root concentration is a structural artefact and D4a is invalid. Test it: if the number of distinct
+  roots is `O(1)` rather than `O(N)`, you are in a tree and must switch to D4b.
+
+#### D4b. Subtree shape — **for invite-gated / tree-topology protocols**
+
+The three statistics that *did* falsify the farm hypothesis on PoH, generalised:
+
+1. **Subtree width at shallow depth.** A farm's root fans out immediately; a bootstrap seed does
+   not. PoH's dominant root has **exactly one direct child** — decisive evidence against a farm.
+   Statistic: branching factor at depths 1-3, compared to the protocol's honest distribution.
+2. **Time-clustering within a subtree.** Farms are time-compressed; organic trees are not. PoH's
+   dominant depth-3 subtree spans **635 days** — the whole history of the registry. Statistic:
+   timespan and inter-arrival dispersion of a subtree's registrations, normalised by subtree size.
+3. **Depth-versus-registration-age correlation.** Organic trees *deepen* as they grow because new
+   members are invited by recent members; farms stay shallow because one operator invites everyone
+   directly. PoH's median vouch-chain depth by registration decile: **7, 9, 10, 11, 12, 12, 13, 13,
+   13, 14** — monotone increasing, which is the organic signature. Statistic: Spearman correlation
+   between registration index and chain depth; a flat or negative correlation on a growing registry
+   is the farm signature.
+- **Cost to defeat:** the farm must produce a **deep, time-dispersed, narrow-at-the-top** subtree —
+  which means recruiting real intermediate inviters and waiting. That is genuinely expensive, and
+  it is expensive in the resource the protocol intended to make scarce. **D4b is the most expensive
+  detector to defeat in this catalogue.** D4a, by contrast, is cheap to defeat *and* invalid on tree
+  protocols — a bad trade on both sides.
+- **False-positive generator:** legitimate high-volume onboarding operators (a country lead
+  onboarding thousands at meetups produces a wide, time-clustered subtree and will be flagged).
+  Ohlhaver's caveat (`ohlhaver-corpus.md` §1.5) applies in full: on-chain shape is evidence of
+  coordination, never of exploitation.
+- **Recommended use:** **Build D4b first; build D4a only for non-tree protocols with an explicit
+  precondition check.** Output a **correlation discount on the subtree**, not an exclusion of leaves.
+- **Unsettled:** the PoH sweep did *not* rule out a **distributed** farm that bought many low-value
+  vouches — `requiredNumberOfVouches() == 1` makes each vouch cheap to source, and a broad voucher
+  base is consistent with both an organic community and a diffuse purchase. The next query is the
+  *vouchers' own* registration ages and whether they cluster in registration time. Note the shape of
+  this residual: **broad, cheap, diffuse sourcing defeats every concentration statistic we have.**
 
 ### D5. Cross-protocol co-registration timing — the aggregator's exclusive
 
@@ -375,6 +464,14 @@ exactly that failure: 47/10,000 vs. 2,754/10,000, a **59×** understatement.
      protocol's flow (subject to §3's legal constraints).
   4. **Coverage-profile clustering** — the *set* of protocols held is itself a low-entropy vector;
     identical, unusual coverage profiles appearing in bulk is a farm tell.
+- **Topology precondition — and it is one we control, which makes it a self-inflicted risk.** The
+  ordering fingerprint has power only if honest users acquire credentials in *idiosyncratic* order.
+  **If our own UI presents a recommended sequence, every honest user follows it, entropy collapses to
+  near zero, and the detector dies — or worse, flags the minority who deviated.** Same for
+  coverage-profile clustering: a "recommended bundle" makes the honest coverage vector uniform.
+  Before shipping D5.2/D5.4, measure the realised entropy of orderings and coverage vectors in our
+  own funnel. If we want this signal we may need to *deliberately randomise* the order we present
+  protocols in — which is a product decision with UX cost, and should be made knowingly.
 - **Cost to defeat:** the farm must randomise **order, timing, and coverage** per identity, which
   costs it operational simplicity and, for order/coverage randomisation, real money (some protocols
   are expensive; a farm randomising coverage pays for credentials it did not need). This is the one
@@ -398,6 +495,9 @@ exactly that failure: 47/10,000 vs. 2,754/10,000, a **59×** understatement.
   not the reported metrics; worth reading properly before we copy anything from it).
 - **Cost to defeat:** moderate — requires per-identity behavioural diversity, which costs money
   (§1.5). But this is exactly what farms already learned to do post-LayerZero.
+- **Topology precondition:** honest users must be behaviourally **heterogeneous**. They are not.
+  This precondition fails on essentially every consumer protocol, and fails hardest on exactly the
+  cohort we most need to admit — new users, who all do the same three things.
 - **False-positive generator:** **severe.** Real users are extremely similar to each other. A
   first-time user who bridges to an L2, swaps once, and stops looks identical to 100,000 other
   first-time users *and* to a farm.
@@ -855,3 +955,189 @@ Four constraints, all falling out of the above:
    not evidence of personhood.
 
 ---
+
+## 7. Signal table
+
+Evidence class: **P1** = not-automated, **P2** = costly-to-produce, **P3** = not-correlated
+(cluster-level). Cost to fake is **per sybil identity** to a professional farm.
+"Legal" = usable in EU/UK without a consent gate that an adversary would simply decline.
+
+| # | Signal | Class | Cost to fake | False-positive risk | Legally usable? | **Recommended weight** |
+|---|---|---|---|---|---|---|
+| **On-chain** |
+| 1 | Account age (prospective) | P2 | **$0** (just forethought) | Low but useless | Yes | **Do not use** |
+| 2 | Account age vs. an *unannounced* cutoff | P2 | $0 but requires pre-commitment | Medium (new users) | Yes | Low (tiebreaker only) |
+| 3 | First-funding provenance = KYC'd CEX | P2 | Cost of a rented KYC account | Medium (unbanked, P2P-funded users) | Yes | **Medium — best single on-chain feature** |
+| 4 | Gas-price selection fingerprint | P3 | ~$0 to randomise | High as a per-user signal | Yes | Clustering input only |
+| 5 | Per-address timing "looks human" | P1 | ~$0 marginal (amortised) | **Very high** (sparse honest users) | Yes | **Do not use** |
+| 6 | Cross-address timing synchrony (D1) | P3 | Low eng., moderate ops (deadlines bite) | High at individual level; OK at cluster level | Yes | **Medium — cluster output only** |
+| 7 | Interaction diversity / DeFi sophistication | P2 | **$10s-$100s** (non-amortisable) | **Very high** — excludes new & poor users | Yes | Low; and never as *personhood* |
+| 8 | Counterparty graph position | P3 | Moderate | High per-user | Yes | Clustering input only |
+| 9 | Funding-graph clustering, transitive (D2) | P3 | Low (one CEX/bridge hop breaks it) | High (families, gas gifting) | Yes | **Medium — entity-collapse input** |
+| 10 | Sweep / consolidation detection (D3) | P3 | Cheap once known; **perishable** | Medium | Yes | **Medium-high today, decaying** |
+| 11 | Invitation/attestation forest concentration after transitive collapse (D4) | P3 | **High — needs genuinely independent roots** | Medium (real onboarding operators) | Yes | **Highest in file — build first** |
+| 12 | NFT / DeFi holdings | P2 | Purchasable; wash-tradeable | High | Yes | **Do not use** |
+| 13 | Cross-chain footprint | P2/P3 | Linear multiplier on §7.7 | High | Yes | Input to D5 only |
+| **Cross-protocol (aggregator-exclusive)** |
+| 14 | Co-registration burst detection (D5.1) | P3 | Costs the farm latency | Medium at cluster level | Yes (if we retain timing) | **High — differentiator** |
+| 15 | Credential-acquisition **ordering** fingerprint (D5.2) | P3 | Farm must randomise script order | Medium | Yes (coarse buckets) | **High — likely novel** |
+| 16 | Coverage-profile clustering (D5.4) | P3 | Farm must buy credentials it doesn't need | Medium | Yes | Medium |
+| 17 | Same device/IP across claimed-distinct identities (D5.3) | P3 | **$50-100/mo/identity** (mobile proxy + antidetect) | High (CGNAT, shared devices, family) | **Conditional** — IP yes, device fingerprint needs consent | Medium, with hard ASN check |
+| **Off-chain flow** |
+| 18 | Datacenter / VPN / ASN classification | P1/P3 | Residential+mobile proxies, priced above | High (VPN users, Tor, censored regions) | **Yes** (server-side, IP is necessarily transmitted) | Low-medium |
+| 19 | Browser/device fingerprint (canvas, fonts, WebGL…) | P3 | **Commoditised** — antidetect browsers are a product category | High | **No** without consent (EDPB Guidelines 2/2023) | **Do not build** |
+| 20 | Mouse / touch dynamics | P1 | Trivial; and useless vs. human farms | High | **No** — likely GDPR Art. 9 if identifying | **Do not build** |
+| 21 | Keystroke cadence | P1 | Trivial; useless vs. human farms | High | **No** — same | **Do not build** |
+| 22 | Session behaviour (copy-paste of own PII, retries, dwell) | P1 | Cheap | Medium | Yes (no device storage/read) | Low — fraud triage only |
+| **Web2 / platform** |
+| 23 | Phone-number verification | P2 | **$0.01-$0.10** (5sim et al.) | Low | Yes | **Do not use as evidence** — rate-limiter only |
+| 24 | Non-VoIP carrier-attested aged number | P2 | Higher, but detection is a paid vendor & imperfect | Medium (prepaid/eSIM users) | Yes | Low |
+| 25 | X / Reddit / Discord account age | P2 | Purchasable, single-digit $ | Medium | Yes | **Very low; bundle only** |
+| 26 | GitHub contribution graph | P2 | Trivial (`git commit --date`) | Medium | Yes | **Do not use** |
+| 27 | GitHub **merged PRs into third-party repos** | P2 | High (requires real reviewed work) | Very high (most humans have none) | Yes | Low weight, **positive-only** |
+| 28 | Google / Apple account attestation (SSO) | P2 | Bulk-creatable & sold, but ban is a real loss | Low-medium | Yes | Low |
+| 29 | Farcaster raw FID | P2 | **~$0.20/yr** ⇒ 10k FIDs ≈ $2k/yr | Low | Yes | **≈ Zero weight** |
+| 30 | Farcaster Pro ($120/yr) | P2 | $120/yr/identity | **Very high FN** (few humans pay) | Yes | High precision, near-zero recall — **positive-only bonus** |
+| **Hardware / cost** |
+| 31 | Apple App Attest | P2 | Physical device slot; per *install*, not per device | Medium (old devices, web-only users) | Yes | **Medium — native flow only** |
+| 32 | Apple DeviceCheck (2 persistent bits) | P2/P3 | Physical device; survives reinstall, dies on factory reset | Medium | Yes | **Medium — best rate-limiter available** |
+| 33 | Play Integrity `MEETS_STRONG_INTEGRITY` | P2 | Physical device + current patches; live bypass ecosystem exists | **High** (rooted, de-Googled, old Android, global south) | Yes | Medium, with an explicit exclusion budget |
+| 34 | WebAuthn / passkey attestation | — | n/a | n/a | Yes | **Do not use — consumer passkeys return no usable attestation** |
+| 35 | Refundable stake with slashing | P2 | = stake size; **defeats key-sale** | Zero classifier FP; **high wealth exclusion** | Yes | Separate axis, not personhood |
+| 36 | Burn / fee | P2 | = fee | Zero classifier FP; wealth exclusion | Yes | Separate axis |
+| 37 | Client-side proof-of-work | P2 | Farms have GPUs; users have phones | Medium, regressive | Yes | **Do not use** (DoS only) |
+| 38 | Non-transferable issuance burn (Circles pattern) | P2 | Cannot be bought with outside capital | Medium | Yes | **Interesting — design pattern to copy** |
+
+### 7.1 Worth building — the short list
+
+1. **D4: invitation/attestation forest concentration after transitive collapse.** Highest
+   value-per-effort in the file. Circles proves the naive version is wrong by 59×.
+2. **D5: cross-protocol co-registration timing, ordering, and coverage clustering.** The only thing
+   here that *requires* an aggregator to exist. Ordering fingerprints in particular look cheap and
+   under-exploited.
+3. **D2 + D3: transitive funding-graph clustering and sweep detection**, as entity-collapse inputs.
+   Perishable, but currently the highest-yield on-chain detectors.
+4. **CEX-funding provenance** (§1.2) — best single per-address on-chain feature; probably buy rather
+   than build.
+5. **Hardware attestation as a cost floor / rate-limiter** (App Attest + DeviceCheck + Play
+   Integrity) in any native flow, used to cap issuances per device rather than to assert personhood.
+6. **Cost-borne signals exposed as a separate API axis**, never folded into a humanity score.
+
+### 7.2 Theatre — do not build
+
+- **Per-address "does this timing look human"** scores. Defeated for ~$0 marginal cost, and they
+  fail on the sparse honest users who most need to pass.
+- **Browser/device fingerprinting, mouse dynamics, keystroke cadence.** Legally exposed in the EU,
+  commoditised counters, and *structurally* useless against human farms — the mouse in a click farm
+  is moved by a real hand.
+- **Phone-number verification as evidence.** One to ten cents. It is a rate-limiter, nothing more.
+- **NFT/DeFi holdings, Discord tenure, Reddit karma, GitHub contribution graphs, raw Farcaster
+  FIDs.** All purchasable or trivially manufactured; all measure wealth or persistence, not humanity.
+- **WebAuthn attestation.** A widespread misconception: consumer passkeys return
+  `attestation: "none"` and cannot assert a hardware instance at all.
+- **Client-side proof-of-work as personhood.** Regressive and inverted — it advantages the
+  adversary's hardware over the user's.
+- **Any individual-level behavioural exclusion.** §6.2's arithmetic says most of the people we would
+  exclude are real.
+
+---
+
+## Open questions for us
+
+1. **Can we run D5 at all under app-scoped nullifiers?** App-scoped nullifiers exist precisely to
+   prevent cross-protocol linkage. Our best detector requires exactly that linkage. What is the
+   weakest data retention (day-buckets? salted rolling hashes? MPC?) that preserves useful power?
+   This is the central design tension of the product and it should be decided explicitly.
+2. **What is the actual residual sybil rate** in a population that has already presented ≥1 strong
+   credential? §6.2 is parameterised on a guess of 2%. If it is really 0.5%, behavioural gating is
+   even more indefensible; if it is 20%, the picture changes materially. **We should try to measure
+   this** — possibly by running detectors in shadow mode on an early integration and reporting only
+   aggregate cluster statistics.
+3. **Ablation numbers for time-of-day vs. gas-price vs. graph-embedding features** from Béres et al.
+   (arXiv:2005.14051) — I could not extract them from the PDF. Read the ar5iv/HTML version or the
+   authors' code before we implement any timing feature.
+4. **A current spot price for aged EVM wallets and for aged Web2 accounts.** I deliberately did not
+   transact and could not find primary quotes. Without these, several "cost to fake" cells above are
+   order-of-magnitude judgements, not measurements.
+5. **DeviceCheck's exact persistence semantics** (does the 2-bit state survive OS upgrade, device
+   migration via Quick Start, iCloud restore?). Confirm against Apple's documentation before
+   designing a per-device issuance cap on it.
+6. **Legal opinion needed** on (a) whether sybil prevention can be "strictly necessary" under Art.
+   5(3) ePD, and (b) whether behavioural biometrics used for bot/not-bot classification (as opposed
+   to identification) escape GDPR Art. 9. Both materially change §3.
+7. **Do we ever want to be the entity that publishes a sybil list?** LayerZero had to pause its
+   bounty under a flood of reports. Publishing exclusions creates an adversarial relationship with
+   users and a reputational liability for our false positives. A *discount* has no equivalent
+   blast radius.
+
+---
+
+## References
+
+**Primary — papers & specs**
+- Ohlhaver, Nikulin & Berman, *Compressed to 0: The Silent Strings of Proof of Personhood* (2024) —
+  https://ash.harvard.edu/wp-content/uploads/2024/06/proof-of-personhood_ohlhaver.pdf ;
+  SSRN https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4749892 . Local analysis:
+  `research/references/ohlhaver-corpus.md` (esp. §1.3, §1.5, §1.6, §1.8).
+- Béres, Seres, Benczúr & Quintyne-Collins, *Blockchain is Watching You: Profiling and Deanonymizing
+  Ethereum Users*, arXiv:2005.14051 (2020) — https://arxiv.org/abs/2005.14051 . Time-of-day activity
+  histograms, gas-price selection and graph position as quasi-identifiers; ENS ground truth.
+- *Detecting Sybil Addresses in Blockchain Airdrops: A Subgraph-based Feature Propagation and Fusion
+  Approach*, arXiv:2505.09313 — https://arxiv.org/pdf/2505.09313 (**UNVERIFIED**: abstract-level
+  reading only).
+- Buterin, *What do I think about biometric proof of personhood?* (2023-07-24) —
+  https://vitalik.eth.limo/general/2023/07/24/biometric.html
+- Buterin, *Minimal Anti-Collusion Infrastructure* — https://ethresear.ch/t/minimal-anti-collusion-infrastructure/5413
+- Idena **IIP-5: Mining rewards based on Quadratic staking** — https://docs.idena.io/docs/iip/iip-5
+- W3C WebAuthn Level 2, attestation conveyance — https://www.w3.org/TR/webauthn-2/#enum-attestation-convey ;
+  MDN https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API/Attestation_and_Assertion
+- GDPR Art. 4(14) & Art. 9 — https://eur-lex.europa.eu/eli/reg/2016/679/oj
+- EDPB **Guidelines 2/2023** on the technical scope of Art. 5(3) ePrivacy Directive, adopted
+  2024-10-16 — https://www.edpb.europa.eu/system/files/2024-10/edpb_guidelines_202302_technical_scope_art_53_eprivacydirective_v2_en_0.pdf
+
+**Primary — vendor / platform documentation**
+- Trusta Labs, Sybil Score & MEDIA Score —
+  https://trusta-labs.gitbook.io/trustalabs/trustscan/introduction-to-sybil-score-and-media-score ;
+  MEDIA methodology https://trusta-labs.gitbook.io/trustalabs/trustgo/media-scoring-methodology
+- Trusta Labs open-source sybil identification framework (GPL-3.0) —
+  https://github.com/TrustaLabs/Airdrop-Sybil-Identification
+- Google Play Integrity API — https://developer.android.com/google/play/integrity/overview ,
+  verdicts https://developer.android.com/google/play/integrity/verdicts ,
+  Oct 2025 update https://android-developers.googleblog.com/2025/10/stronger-threat-detection-simpler.html
+- Apple DeviceCheck / App Attest — https://developer.apple.com/documentation/devicecheck
+  (**page did not render for me**); Apple staff guidance on quotas in developer forum threads
+  [759285](https://developer.apple.com/forums/thread/759285),
+  [778937](https://developer.apple.com/forums/thread/778937),
+  [818214](https://developer.apple.com/forums/thread/818214)
+- 5sim pricing — https://5sim.net/prices
+- LayerZero sybil result (803,093 addresses) —
+  https://x.com/LayerZero_Core/status/1791622471965163597
+- Human Passport / Gitcoin GG23 model-based sybil detection (**publishes no accuracy metrics**) —
+  https://human.tech/blog/human-passport-x-gitcoin-grants-defending-gg23-with-model-based-sybil-detection
+- Idena indexer (replication tooling for the Ohlhaver method) —
+  https://github.com/idena-network/idena-indexer ; API https://api.idena.io ; explorer https://scan.idena.io
+
+**Secondary — labelled as such**
+- Cointelegraph, LayerZero self-report phase concluded —
+  https://cointelegraph.com/news/layerzero-concludes-sybil-self-reporting-phase
+- The Block, LayerZero pauses sybil bounty process —
+  https://www.theblock.co/post/295274/layerzero-labs-ceo-announces-pause-of-sybil-bounty-hunter-process-after-influx-of-reports
+- Approov, *Limitations of Apple DeviceCheck and App Attest* — https://approov.io/blog/limitations-of-apple-devicecheck-and-apple-app-attest
+  (competitor vendor; adversarial but informed)
+- Approov, *Limitations of Google Play Integrity API* — https://approov.io/blog/limitations-of-google-play-integrity-api-ex-safetynet
+- Guardsquare, *Remove the constraints of iOS App Attest* — https://www.guardsquare.com/blog/remove-constraints-of-ios-app-attest
+- Play Integrity Fix (bypass ecosystem, evidence that attestation is not absolute) — https://playintegrityfix.com/
+- Coronium, airdrop farming proxy guide 2026 (**farming-vendor source, self-serving**; used only for
+  the $50-100/month/identity proxy+antidetect price point) —
+  https://www.coronium.io/blog/airdrop-farming-proxy-guide-2026
+- Zipmex, *How to farm airdrops in 2026* (farming-guide source; used only for the $50-500 starting
+  capital / 6-12 month horizon per identity) — https://zipmex.com/blog/how-to-farm-airdrops-in-2026/
+- SMS activation pricing comparison 2026 —
+  https://www.yoobfriv.com/sms-activation-services-in-2026-pricing-breakdown-across-7-platforms/
+
+**Internal cross-references**
+- `research/references/ohlhaver-corpus.md` — the Idena detection method in full
+- `research/protocols/circles.md` — `originInviter` / `proxyInviter` measurement
+- `research/landscape/sybil-incidents-antipatterns.md` — farm economics, KYC rental, credential markets
+- `research/landscape/reputation-scoring-products.md` — the vendors selling these signals
+- `research/landscape/prior-art-scoring.md` — scoring mathematics

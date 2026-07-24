@@ -1,7 +1,5 @@
 # Puja Ohlhaver — corpus and intellectual lineage
 
-> STATUS: in progress — research underway 2026-07-24
-
 **Purpose:** absorb Ohlhaver's critique of proof-of-personhood into the aggregator's design
 thinking. Not a protocol write-up. Citation / date-stamping / honesty rules from
 `research/BRIEF.md` apply.
@@ -627,7 +625,43 @@ whether flat-earthers belong in a polarity subset.
 **Note it does not mention proof of personhood, sybils or puppeteering by name.** The continuity is
 structural, not lexical.
 
-### 4.2 Talks and interviews (from her own index, 2026-07-24)
+### 4.2 "Community Currencies: The Price of Attention and Cost of Influence in a Networked Age" (Jan 2025)
+
+SSRN 5136037, posted **2025-01-02** —
+https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5136037 . **This is her most recent paper and
+the actual successor to *Compressed to 0*** — not a personhood paper at all.
+
+`UNVERIFIED — I could not obtain the full text.` SSRN returns HTTP 403 to automated fetching on both
+the abstract page and the `Delivery.cfm` endpoints, and the paper is not on her own site, arXiv or
+the archive.org mirror that hosts her other two papers. *A sibling agent was tasked with locating
+the full text via the Harvard Allen Lab, gettingplurality.org, Google Scholar and ResearchGate and
+did not return before completion.* **Everything below is from the SSRN abstract and secondary
+podcast summaries, and should be treated as second-hand until someone reads the PDF.** Next step:
+download it manually from SSRN with a browser session, or ask the author.
+
+What the abstract and summaries say:
+- It proposes a **dual-currency model called PCARE**, per-community. `UNVERIFIED:` what the acronym
+  expands to — I could not confirm it and will not guess.
+- The two currencies separate **non-transferable, irrevocable stake conferring influence** from a
+  **transferable currency for exchange and attention**. The stated purpose is to break the identity
+  that one-token-one-vote systems assume between *money* and *votes* — resolving them to the same
+  unit of account is the flaw, and splitting them introduces a deliberate trade-off.
+- The goal is explicitly the one from *Compressed to 0*'s conclusion: **a Gaussian distribution of
+  power**, achieved either locally or globally through the interaction of many local communities —
+  i.e. §1.9(e)'s "plurality of identity games," now with a currency design attached.
+- Composability into "broader networked currencies" as a substrate for decentralised coordination;
+  and an AI angle about embedding social context into neural networks.
+
+**Why this matters to us even unread.** Non-transferable influence + transferable value is the same
+structural move as Idena's identity stake (§1.10) and MACI's deposit (§5.2) — and Ohlhaver's own
+paper showed that non-transferability of the *token* does not survive a willing *human*
+(§2.4 point 4). So the obvious question to put to this paper is whether it answers her own Idena
+result or repeats it at community scale. **I could not answer that without the text, and it is the
+single most useful follow-up read in this whole corpus.** If PCARE genuinely prices influence in a
+way that survives puppeteering, that is directly transferable to how we weight credentials; if it
+does not, then her constructive programme still has no answer to her own critique (cf. §3.4).
+
+### 4.3 Talks and interviews (from her own index, 2026-07-24)
 
 Her site's "select talks" list is short and mostly pre-2024. Post-ETHBerlin the only listed item is
 **"Plurality, Community Currencies, and the Future of Networked Governance," Governance Futures
@@ -647,6 +681,29 @@ Devcon Bogotá (2022).
 That is not a detour — on her own account (§1.9e, §2.2) personhood was always the wrong unit and
 communities were always the right one. **She has moved on from the problem our product is in, and
 she moved on because she concluded it was the wrong problem.** We should sit with that.
+
+### 4.4 Did the promised "social identity" work ever appear? — No, not under that name
+
+She promised at ETHBerlin to write about social identity as the more promising solution "beyond
+Z1." As of 2026-07-24 **no paper by that description exists** on her writings index, her Substack,
+or in search. What exists instead is the substance scattered across three places, none of them the
+promised paper:
+
+- **"Common Knowledge Machines"** (§4.1) — the mechanism design (polarity subsets, correlation
+  grouping by behaviour, credentials as context) without the identity theory.
+- **"Community Currencies"** (§4.2) — the economics of community-scoped influence, without a
+  personhood story.
+- ***Plurality*, chapters 3-2 / 4-1 / 5-6** (§5.4) — the actual social-identity theory, written by
+  Weyl and Tang with Ohlhaver as a credited writer (28.08 pts) and cited author. **If you want the
+  "social identity" argument she promised, read those three chapters; that is where it lives.**
+
+So: two of the three promised follow-ups (Z1, and a social identity paper) never shipped, one
+unpromised paper did (Community Currencies), and the theoretical content migrated into someone
+else's book. **The critique in *Compressed to 0* is complete and devastating; the constructive
+programme it promised is, four years on, still not assembled in one place.** That is the honest
+state of the corpus, and it is why §6 relies on DeSoc's Appendix A and Gitcoin's COCM — the two
+things in this lineage that are actually specified and running — rather than on anything she
+published after 2024.
 ## 5. Surrounding lineage
 
 Brief, and deliberately built from *her own citation graph* (all references below are ones she

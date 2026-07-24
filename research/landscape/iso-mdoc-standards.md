@@ -1,6 +1,6 @@
 # Credential-format standards layer — ISO mdoc / W3C VC / SD-JWT VC / OpenID4VC
 
-> STATUS: in progress (agent writing incrementally — 2026-07-24)
+*Researched 2026-07-24. Volatile facts date-stamped inline.*
 
 **One-liner:** The wire formats and protocols that government and big-tech wallets use to carry
 identity attributes — ISO/IEC 18013-5 mdoc, W3C VC 2.0, SD-JWT VC — plus the OpenID4VCI/OpenID4VP
@@ -8,11 +8,61 @@ protocols and the browser Digital Credentials API a verifier would implement to 
 **Category:** state-identity (format layer — the formats themselves prove nothing; they carry
 whatever the issuer asserted)
 **Chains:** none (all off-chain; ZK-over-mdoc work is the only chain-adjacent thread)
-**Status (2026-07):** TBD
-**Aggregator verdict:** TBD
+**Status (2026-07):** live and shipping — but unevenly. SD-JWT is a finished RFC (9901, Nov 2025);
+W3C VC 2.0 is a REC (May 2025); OpenID4VP is 1.0 Final; the browser Digital Credentials API is
+shipped in Chrome 141 / Safari 26 / Edge 141 and landing in Firefox 149. ISO/IEC **18013-7 is still
+a Technical Specification** (TS:2025, 2nd ed.; 3rd ed. expected ~2026-09-30). Status lists and
+SD-JWT VC itself are **still drafts**. ZK-over-mdoc is a shipping product at Google and an
+**individual IETF draft**, not a standard.
+**Aggregator verdict:** **integrate later, and not as a uniqueness source.** Door-1 (verify what we
+are handed) is permissionless and cheap. Door-2 (make Apple/Google Wallet hand us a state
+credential) requires platform accreditation we cannot get as a crypto-native product in 2026. And
+even with full access, none of these formats yields a stable unique identifier — the stack is
+explicitly engineered to prevent one. Highest-value near-term play is the inverse: **issue** our
+humanity assertion as an SD-JWT VC over OpenID4VCI, which is ungated.
 
 ## What it proves
+
+Nothing, by itself. These are *containers*. What a verified mdoc or SD-JWT VC establishes is:
+
+- **State-issued identity (strong, where present)** — a named issuing authority signed these
+  attribute values, verifiable to an IACA/trusted-list root. This is the best-provenance evidence in
+  the whole personhood landscape.
+- **Device possession (medium)** — device authentication proves the presenter controls the private
+  key the issuer bound at enrolment. It proves *a device*, not *a human*: rented phones, farmed
+  devices, and coerced presentations all pass. It is not liveness.
+- **Uniqueness (none, deliberately)** — see the assessment at the end. There is no nullifier, no
+  stable pseudonym, and the roadmap actively removes the accidental correlators that exist today.
+
+Marketing-vs-reality note: platform materials describe these as "verified identity." They verify
+*attribute provenance and device binding*. Whether the human in front of the phone is the subject of
+the credential is out of scope for every spec here — that is a liveness/biometric problem the
+standards deliberately leave to the wallet's own device unlock.
+
 ## Trust root & failure modes
+
+**Trust root:** a state issuing authority's **IACA** root (mdoc) or an issuer JWKS/trusted list
+(SD-JWT VC). In the US, discovery of those roots runs through AAMVA's Digital Trust Service VICAL;
+in the EU, through member-state trusted lists.
+
+**Failure modes:**
+- **Skipped device authentication.** The single most likely implementation bug. Verify only
+  `issuerAuth` and an mdoc becomes a bearer token — any captured `IssuerSigned` blob replays
+  forever. Same for SD-JWT VC without the KB-JWT.
+- **SessionTranscript mis-binding.** If the transcript is reconstructed loosely, a device signature
+  from one session replays into another. Interop-fragile and security-critical.
+- **Trust-store sloppiness.** Accepting any well-formed X.509 chain rather than a pinned IACA list
+  means a self-signed "issuer" passes. Chrome's guidance to maintain an approved-issuer allowlist is
+  not optional advice.
+- **Wallet/device compromise.** Credential extraction from a rooted device, or provisioning onto a
+  device the human does not control. Sybil farms buy devices; hardware key binding raises unit cost
+  but does not change the shape of the attack.
+- **Issuance-side fraud.** Everything reduces to the DMV's/state's enrolment quality. A fraudulently
+  obtained real licence produces a cryptographically perfect mDL.
+- **Multi-jurisdiction multiplicity.** One human legitimately holds a licence in one state, an ID in
+  another, and a passport — three valid state credentials. Nothing at this layer deduplicates them.
+- **Correlated failure with other protocols.** Any protocol rooted in the same physical document
+  (ZK-passport tooling, KYC vendors, national eID) is **not independent evidence**.
 ## 1. ISO/IEC 18013-5 mdoc in detail
 
 **ISO/IEC 18013-5:2021** — "Personal identification — ISO-compliant driving licence — Part 5:
@@ -368,7 +418,22 @@ request, where *"It is at the discretion of the Wallet whether it uses the infor
 hook through which EU-style "registration certificates" (which attributes an RP is legally allowed
 to request) get enforced technically.
 
-### 5a. Browser Digital Credentials API — shipped, and narrower than it looks
+### 5.2 OpenID4VCI (issuance) — the ungated side
+
+OpenID4VCI is an OAuth 2.0 extension: the wallet obtains an access token (authorization-code flow,
+or **pre-authorized code** flow where the issuer hands the user a code/QR out of band), then calls a
+**Credential Endpoint** to receive one or more credentials in a requested format. Issuer metadata
+lives at `/.well-known/openid-credential-issuer` and advertises the supported
+`credential_configurations_supported` (format, `vct`/`doctype`, claims, cryptographic binding
+methods). **Batch issuance** — the key privacy mitigation of §2.2 — is a first-class feature here
+(the wallet supplies N proofs of possession and gets N credentials back).
+
+For us the important asymmetry: **there is no gate on being an issuer.** Nobody registers issuers;
+wallets decide whether to *trust* an issuer, but any server can stand up an OpenID4VCI endpoint and
+any wallet can be pointed at it. If we want a standards-layer play that is available to us today,
+issuing our aggregate humanity assertion as an SD-JWT VC over OpenID4VCI is it.
+
+### 5.3 Browser Digital Credentials API — shipped, and narrower than it looks
 
 The W3C **Digital Credentials API** (`navigator.credentials.get({digital: {...}})`) is the piece that
 matters most to us: it is the only path by which a *website* can request a wallet credential without
@@ -569,5 +634,245 @@ still decides whether to answer based on the signed request and its trusted-read
 in the engineering assessment at the end.
 
 ## Engineering assessment for the aggregator
+
+### A. What it would take to build a verifier accepting mdoc + SD-JWT VC
+
+Scoping this as an actual work item. Assume a web product; assume we want both formats because the
+EU forces both and the browsers split (Safari = mdoc only, Chrome = both).
+
+**Components:**
+
+1. **Request builder (OpenID4VP 1.0).** Emit `dcql_query` for the credentials we want, generate
+   `nonce`, choose `response_mode` (`dc_api.jwt` for browser, `direct_post.jwt` for QR/cross-device),
+   publish `client_metadata` with an ephemeral encryption JWK. *Small — days.*
+2. **Browser integration.** `navigator.credentials.get({digital:{requests:[...]}})` with
+   `protocol: "openid4vp-v1-unsigned"` (Chrome) **and** a separate `org-iso-mdoc` path for Safari.
+   Two backends, as the Corbado writeup notes. Plus a cross-device QR fallback for desktop and for
+   Firefox. *Small-medium.*
+3. **Response decryption + parsing.** JWE decrypt; then two parsers:
+   - **SD-JWT VC**: split on `~`, verify the issuer JWS, recompute disclosure digests against `_sd`,
+     verify the **KB-JWT** (`aud`, `nonce`, `sd_hash`) against `cnf`. *Straightforward.*
+   - **mdoc**: CBOR-decode `DeviceResponse`; verify `issuerAuth` `COSE_Sign1` and its `x5chain` to a
+     trusted IACA; recompute `SHA-256(CBOR(IssuerSignedItem))` per disclosed item against
+     `valueDigests`; reconstruct the **`SessionTranscript`** correctly for the transport in use and
+     verify `deviceSignature`/`deviceMac` against the MSO's `deviceKey`. *The `SessionTranscript`
+     reconstruction is the classic source of interop failure — budget real time here.*
+4. **Trust stores.** IACA roots (US: AAMVA VICAL, free download; EU: member-state trusted lists —
+   see the EUDI agent's file), plus SD-JWT VC issuer key resolution via
+   `/.well-known/jwt-vc-issuer`. Refresh, pin, and monitor.
+5. **Status checking.** IETF Token Status List fetch + cache (and W3C Bitstring Status List for the
+   VC path), with whole-list caching for herd privacy.
+6. **Policy layer.** Approved-issuer allowlist. Chrome's own guidance: *"maintain a list of approved
+   issuers and reject any issuer that doesn't match."* An unknown-issuer mdoc is worthless.
+
+**Honest estimate:** a competent engineer gets SD-JWT VC verification working in ~1–2 weeks;
+mdoc verification including device auth and session transcript in ~3–6 weeks; the browser/wallet
+integration matrix and trust-store operations are the long tail. Call it **one engineer-quarter for
+a production-grade dual-format verifier**, most of it spent on interop rather than cryptography.
+
+### B. Libraries (name + language + licence)
+
+| Library | Language | Scope | Licence |
+|---|---|---|---|
+| [openwallet-foundation/multipaz](https://github.com/openwallet-foundation/multipaz) | Kotlin Multiplatform (Android/iOS/JVM server), + Swift & JS/WASM bindings | The most complete: mdoc + SD-JWT VC, wallet **and** `multipaz-verifier` reader, 18013-5 proximity, 18013-7:2025 DC API, OpenID4VP 1.0, **and `multipaz-longfellow` (ZKP)** | **Apache-2.0** |
+| [spruceid/openid4vp](https://github.com/spruceid/openid4vp) (crates.io `openid4vp`) | Rust | OID4VP 1.0, verifier and wallet sides; formats `jwt_vc_json`, `ldp_vc`, `dc+sd-jwt`, `mso_mdoc` | **MIT** |
+| [openwallet-foundation-labs/oid4vc-ts](https://github.com/openwallet-foundation-labs/oid4vc-ts) | TypeScript | OpenID4VCI + OpenID4VP; formats incl. `vc+sd-jwt`, `dc+sd-jwt`, `mso_mdoc` | **Apache-2.0** |
+| [animo/mdoc](https://github.com/animo/mdoc) — npm `@owf/mdoc` (also published as `@animo-id/mdoc`) | TypeScript (Node/browser/RN) | Issue **and verify** mdoc/mDL CBOR per ISO 18013-5/-7 | **Apache-2.0** (confirmed on repo, 2026-07-24). `UNCLEAR:` whether device-auth verification is implemented — check before relying on it |
+| [eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt](https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt) | Kotlin | EU reference **Verifier/RP backend** implementing OpenID4VP 1.0 | `UNVERIFIED:` stated as Apache-2.0 across the EUDI repos — confirm |
+| [stelauconseil/mdoc-web-verifier](https://github.com/stelauconseil/mdoc-web-verifier) | JS (browser) | mDL/mdoc 18013-5 reader+verifier entirely in-browser — good reference/test harness | **Apache-2.0** |
+| [google/longfellow-zk](https://google.github.io/longfellow-zk/) / [dyne/longfellow-zk](https://github.com/dyne/longfellow-zk) / [eu-digital-identity-wallet/av-lib-ios-longfellow-zkp](https://github.com/eu-digital-identity-wallet/av-lib-ios-longfellow-zkp) | C++ / Swift | ZK proofs over mdoc (Longfellow) | `UNVERIFIED:` — check each `LICENSE`; Google's is likely Apache-2.0 |
+| spruceid `isomdl` | Rust | ISO 18013-5 mdoc primitives | `UNVERIFIED:` — I did not confirm this crate's existence/licence directly; verify on crates.io before citing |
+
+**Recommendation:** if we build server-side in JVM/Kotlin, **Multipaz** is the single best bet —
+it is the OpenWallet Foundation's flagship, Apache-2.0, covers both formats, both roles, proximity
+and DC API, and already integrates Longfellow ZK. Caveat: **pre-1.0 (v0.99.0), 1.0 expected late
+2026/early 2027**, releases every 4–8 weeks — expect churn. For a Node/TS stack, combine
+`oid4vc-ts` (protocol) with `@animo-id/mdoc` (format).
+
+### C. The decisive question: can an unaccredited crypto-native verifier participate?
+
+**Answer: it depends on which door, and the two doors have opposite answers.**
+
+**Door 1 — verifying a credential we already have: OPEN.** Nothing in mdoc, SD-JWT VC, or OpenID4VP
+requires the *verifier* to be accredited in order to *check a signature*. The AAMVA VICAL is a free
+download under click-through terms; EU trusted lists are public. Cryptographic verification is
+permissionless. OpenID4VP explicitly permits the `redirect_uri` client identifier prefix with
+**unsigned** requests and no key material — a wallet is free to answer an anonymous verifier, and
+the spec says so.
+
+**Door 2 — getting a real wallet to hand us a government credential: CLOSED without accreditation.**
+Every production path gates:
+
+- **Google Wallet:** production requires an intake form, a **Certificate Signing Request**, display
+  assets, an end-to-end demo video, and Google returns a signed certificate that **must** appear in
+  the `x5c` header of the signed OpenID4VP request. Sandbox is open; production is not.
+- **Apple Wallet:** an **entitlement per bundle ID**, granted only to apps in one of twelve
+  enumerated business categories, that can show a *legal requirement* for identity verification,
+  with the exact document types and data elements pinned into the entitlement plist. **Native iOS
+  only** — Apple's own text still frames browser presentment as future work. There is no category
+  that fits "sybil resistance for a crypto protocol."
+- **EU:** relying-party registration + registration certificates constrain which attributes an RP
+  may request; OpenID4VP's `verifier_info` / `verifier_attestation` are the technical hooks.
+  (Detail in the EUDI agent's file.)
+- **The browser Digital Credentials API does not open this door.** It removes the app-store
+  distribution gate, not the reader-authentication gate: the wallet still decides whether to answer
+  based on the signed request and its trusted-reader policy. And the DC API's protocol registry was
+  *hardcoded* at TPAC Nov 2025, so we cannot introduce a crypto-native protocol into it either.
+
+**Conclusion, plainly: no.** An unaccredited, crypto-native verifier cannot obtain state-issued
+mDL/PID presentations from Apple Wallet or Google Wallet in production in 2026. The permissionless
+path exists in the specs and is unavailable in the deployments. **This matches the EU-legal-side
+finding the sister agent is chasing — the gate is enforced both legally (RP registration) and
+technically (reader auth certificates / entitlements), independently.**
+
+Realistic options for us, in order of practicality:
+1. **Don't be the verifier — consume one.** Partner with or resell an accredited IDV that already
+   holds the Google certificate / Apple entitlement (Google's **Verifier Registrar** role exists
+   precisely for aggregators acting as a CA for downstream clients — that is our shape, but it is a
+   commercial relationship with Google, not a permissionless integration).
+2. **Accept mdoc/SD-JWT VC from crypto-native wallets we can influence**, where no platform gate
+   exists — this is real and cheap, and lets us support EUDI-style credentials without touching
+   Apple/Google.
+3. **Apply for accreditation ourselves** and accept that it means legal entity, jurisdiction, stated
+   purpose, and a business category. Expensive, slow, and constrains the product.
+4. **Route around the format layer entirely** for state identity — use ZK-passport tooling
+   (see the ZK-passport agent's file) which reads the eMRTD chip via a native app and needs no
+   relying-party accreditation because it verifies ICAO passive-authentication signatures directly.
+
+### C.1 The chip-reading constraint — does it apply to mdoc?
+
+The ZK-passport agent's finding (no browser can read a passport chip; Web NFC is NDEF-only; iOS
+ISO7816 needs an Apple entitlement) **does not apply to mdoc presentation**, and this is a genuine
+product difference:
+
+- An mdoc is **already provisioned into a wallet app**. Presentation reads from the wallet, not from
+  a chip. The Digital Credentials API therefore genuinely works from a web page: on Android the OS
+  Credential Manager brokers to the wallet; on desktop Chrome tunnels to the phone over **CTAP/BLE**
+  (the WebAuthn hybrid transport). **No native app required on our side.**
+- The chip constraint moves upstream to **issuance**: getting the mDL into the wallet in the first
+  place required a native, state-run enrolment (often including a chip/document scan). We inherit
+  that work for free, and inherit its coverage limits (21 US states, low penetration).
+- So: **mdoc = web-native presentation, gated by platform accreditation. ZK-passport = native-app
+  presentation, ungated.** They trade a distribution constraint for a permission constraint. Given
+  our position, the ungated-but-native path is likely more valuable than the web-native-but-gated
+  one.
+
+### D. Can any of this yield a stable unique identifier for sybil resistance?
+
+**No — and the absence is deliberate, systematic, and getting stronger.**
+
+Enumerate the candidate identifiers and why each fails:
+
+| Candidate | Why it fails as a sybil key |
+|---|---|
+| Document number (`document_number`) | Disclosable in principle, but it is **not stable per human** — it changes on renewal, and one human legitimately holds licences from multiple jurisdictions plus a passport. Also maximally privacy-invasive, so wallets/RP-registration will not permit requesting it. Apple pins requestable elements in the entitlement. |
+| Name + DOB | Not unique, not stable, and a full-attribute request is exactly what RP registration exists to prevent. |
+| `deviceKey` in the MSO | Per-credential-instance, and **deliberately rotated per instance under batch issuance** — the mitigation for linkability is precisely making this non-stable. |
+| Issuer signature bytes / `valueDigests` / salts | These *are* stable correlators today — which is why the entire standards effort is aimed at destroying them (batch issuance now, ZK later). Building on them means building on a bug the ecosystem is actively fixing. |
+| SD-JWT `cnf` key | Same as `deviceKey`: per-instance, rotated. |
+| A ZK nullifier | **Does not exist in any of these standards.** mdoc, SD-JWT VC, VC 2.0, OpenID4VP: none defines a per-verifier deterministic nullifier. Longfellow proves *predicates* over an mdoc (e.g. `age_over_18`) in ZK; it does not derive a stable pseudonym. |
+
+The design intent is explicit in the ARF privacy work: the goal is that repeated presentations
+**cannot** be linked, by anyone, including the issuer. A stable unique identifier is the precise
+thing these standards are engineered to eliminate. The ideal end state of this stack —
+ZK-over-mdoc, per-verifier unlinkable — is **the exact opposite of what a sybil-resistance
+aggregator wants**.
+
+The residual, uncomfortable truth: **today's linkability bug is tomorrow's absence.** If we built
+sybil resistance on "same issuer signature = same human," it would work right now against most
+deployed mDLs and would break the moment batch issuance or ZK lands. That is not a foundation.
+
+**What this stack *can* give us**, and we should scope to exactly this:
+- A **high-quality, state-rooted attribute assertion** (age band, jurisdiction, name) with real
+  cryptographic provenance and device binding — strong *evidence*, weak *uniqueness*.
+- A **liveness/possession signal**: device auth proves control of a hardware key the state bound to
+  a real enrolment.
+- If we need uniqueness on top, **we must derive the nullifier ourselves** in a layer we control —
+  e.g. our own ZK circuit over a disclosed stable field, or a registry keyed on something we
+  extract at enrolment. That means being the accredited verifier (Door 2), which loops back to §C.
+
+Consequently: **the standards layer is an input to our score, not a source of uniqueness.** Weight
+it as state-identity evidence with a jurisdiction tag, deduplicate against other state-identity
+protocols that share the same root document (US mDL and a US passport-based ZK proof are *not*
+independent evidence about the same person), and never treat two mdoc presentations as necessarily
+two people or one person.
+
 ## Open questions for us
+
+1. **Can an Apple Wallet mDL be presented to an arbitrary website via Safari 26's DC API today**, or
+   does Apple still restrict presentment to entitled native apps? Apple's Wallet docs say web is
+   "intended"; WebKit shipped `org-iso-mdoc`. This is empirically testable and worth 30 minutes with
+   a test page and a real California mDL.
+2. **What are Google's actual approval criteria** for the RP intake form and the Verifier Registrar
+   role — is there a published policy, and would a crypto product be rejected on category grounds
+   the way Apple's list implies? Where to look: the intake form itself, Google Wallet partner terms.
+3. **Do any crypto-native wallets speak OpenID4VP?** If a wallet accepts a `redirect_uri`-prefix
+   unsigned request, the permissionless path is live for credentials we or partners issue. Worth
+   surveying (Animo/Paradym, walt.id, Talao, Sphereon).
+4. **Should we *issue* our humanity assertion as an SD-JWT VC** and offer an OpenID4VCI endpoint? We
+   would control the format, there is no gate on issuers, and it makes our output consumable by any
+   EUDI-profile verifier. Low cost, real distribution upside. This is probably the strongest
+   standards-layer play available to us.
+5. **Longfellow licence and portability** — if ZK-over-mdoc is Apache-2.0 and the EU is shipping it,
+   can we verify Longfellow proofs server-side, and could we ever get a *nullifier* added to such a
+   circuit (it would be a small circuit change, and it is exactly what nobody in this ecosystem
+   wants)?
+6. **ISO ZKP work item number** — unconfirmed. Check ISO/IEC JTC1/SC17 WG10's programme of work.
+7. **Is there an OpenID Foundation conformance certification for *verifiers*** that would give us
+   third-party credibility without platform accreditation? Check openid.net/certification.
+
 ## References
+
+**Standards / specs**
+- ISO/IEC 18013-5:2021 — mDL application (paid). Free preview via ISO OBP.
+- ISO/IEC TS 18013-7:2025 (2nd ed.) — mDL add-on functions / internet presentation:
+  https://www.iso.org/obp/ui#!iso:std:iso-iec:ts:18013:-7:ed-2:v1:en — 3rd edition expected
+  ~2026-09-30 per https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/issues/1
+- ISO/IEC 23220 series — generalised mobile eID building blocks (overview:
+  https://learn.mattr.global/docs/concepts/iso-mdoc-standards)
+- W3C Verifiable Credentials Data Model v2.0 (REC 2025-05-15): https://www.w3.org/TR/vc-data-model-2.0/
+  — family announcement: https://www.w3.org/news/2025/the-verifiable-credentials-2-0-family-of-specifications-is-now-a-w3c-recommendation/
+- RFC 9901 — Selective Disclosure for JWTs (SD-JWT), Nov 2025: https://datatracker.ietf.org/doc/html/rfc9901
+- draft-ietf-oauth-sd-jwt-vc (draft-17, Standards Track, not yet RFC):
+  https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/
+- OpenID for Verifiable Presentations 1.0 (Final): https://openid.net/specs/openid-4-verifiable-presentations-1_0.html
+- draft-ietf-oauth-status-list (Token Status List, draft-21, not yet RFC):
+  https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/
+- W3C Digital Credentials API (Working Draft, FedID WG): https://w3c-fedid.github.io/digital-credentials/
+- draft-google-cfrg-libzk (Longfellow ZK, individual I-D): https://datatracker.ietf.org/doc/draft-google-cfrg-libzk/
+  — IETF 125 CFRG slides: https://datatracker.ietf.org/meeting/125/materials/slides-125-cfrg-longfellow-zk-00
+
+**Platform / deployment**
+- Apple — Get started with the Verify with Wallet API: https://developer.apple.com/wallet/get-started-with-verify-with-wallet/
+- Google — Online Acceptance of Digital Credentials: https://developers.google.com/wallet/identity/verify/accepting-ids-from-wallet-online
+- Google — Verify with Google Wallet overview: https://developers.google.com/wallet/identity/verify
+- Android Credential Manager Verifier API: https://developer.android.com/identity/digital-credentials/credential-verifier
+- Chrome for Developers — Digital Credentials API shipped: https://developer.chrome.com/blog/digital-credentials-api-shipped
+- AAMVA mDL Digital Trust Service — for relying parties (free VICAL):
+  https://www.aamva.org/identity/mobile-driver-license-digital-trust-service/for-relying-parties
+- AAMVA mDL topic page: https://www.aamva.org/topics/mobile-driver-license
+- EUDI ARF — privacy risks and mitigations: https://eudi.dev/2.9.0/discussion-topics/a-privacy-risks-and-mitigations/
+
+**Libraries**
+- https://github.com/openwallet-foundation/multipaz (Apache-2.0)
+- https://github.com/spruceid/openid4vp (MIT)
+- https://github.com/openwallet-foundation-labs/oid4vc-ts (Apache-2.0)
+- https://github.com/animo/mdoc — npm `@animo-id/mdoc`, `@owf/mdoc`
+- https://github.com/eu-digital-identity-wallet/eudi-srv-web-verifier-endpoint-23220-4-kt
+- https://github.com/stelauconseil/mdoc-web-verifier (Apache-2.0)
+- https://google.github.io/longfellow-zk/ · https://github.com/dyne/longfellow-zk ·
+  https://github.com/eu-digital-identity-wallet/av-lib-ios-longfellow-zkp
+
+**Secondary / commentary (labelled as such)**
+- Corbado, "Digital Credentials API (2026): Chrome, Safari & Firefox": https://www.corbado.com/blog/digital-credentials-api
+- Credence ID, US mDL state tracker (March 2026): https://credenceid.com/resources/blog/us-mobile-drivers-license-mdl-state-tracker/
+- Regula, "Mobile Driver's License in 2026: Global Status": https://regulaforensics.com/blog/mobile-drivers-license-verification/
+- abhvio.us, "Mobile Driver License format" (concrete CBOR structures): https://abhvio.us/posts/mdoc/
+- N. Sakimura on RFC 9901: https://www.sakimura.org/en/2025/11/7764/
+- ppc.land on WebKit/Safari 26 DC API: https://ppc.land/webkit-introduces-digital-credentials-api-for-safari-26/
+- ID Tech Wire on the W3C DC API draft: https://idtechwire.com/w3c-releases-digital-credentials-api-draft-to-advance-standardized-identity-verification-on-the-web/
+
+**Cross-references (do not duplicate)**
+- EU policy, eIDAS 2.0, EUDI rollout, RP registration law → `research/landscape/eidas2-eudi-wallet.md`
+- ZK passport tooling, nullifier derivations, chip-reading constraints → the ZK-passport agent's file
+  in `research/protocols/`

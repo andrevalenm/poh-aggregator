@@ -418,7 +418,76 @@ mean by privacy. No credible state-deployed ZK identity in China that I could fi
   de-duplicated. Strong in principle, inaccessible in practice.
 
 ### Indonesia — KTP-el, IKD, and INA Digital
-### Sub-Saharan Africa and World Bank ID4D
+
+- **KTP-el** (electronic ID card) issued to **>170 million** residents; the underlying number is the
+  **NIK**, a 16-digit stable national identifier now also used as the taxpayer number.
+- **IKD (Identitas Kependudukan Digital)** — the smartphone KTP, run by Dukcapil (Ministry of Home
+  Affairs). **~17 million users as of 2025-12**, up from ~11m in 2024-07. App:
+  https://play.google.com/store/apps/details?id=gov.dukcapil.mobile_id
+  Dukcapil pushed a system update **2026-04-28**; Dukcapil has said it will stop producing new
+  physical e-KTP stock in favour of IKD.
+- IKD presents as a **photo or QR code**. `UNVERIFIED:` whether the QR is a signed, offline-verifiable
+  payload or a lookup token that must be resolved against Dukcapil's server. My working assumption
+  is the latter (a short-lived QR resolved by a verifier app), which would make it useless to us.
+  **Next step:** decode an IKD QR, or read Dukcapil's Permendagri on IKD.
+- **Consumability: NO.** NIK verification for the private sector goes through Dukcapil's data-access
+  agreements (`hak akses`), signed with each institution; banks and fintechs have them, foreign
+  entities do not.
+- **Uniqueness:** NIK is a stable global identifier. Same story as everywhere else.
+
+### Sub-Saharan Africa, World Bank ID4D, and the conflict with private biometric registries
+
+**The programme.** The World Bank's **Identification for Development (ID4D)** initiative funds
+national foundational ID systems, largely in Africa and South Asia, with the **MOSIP** open-source
+platform (Modular Open Source Identity Platform, IIIT-Bangalore) as the most common technology base.
+Country programmes with real scale: Ethiopia (Fayda, MOSIP-based), Morocco, Philippines (PhilSys,
+MOSIP-based), Nigeria, Togo, Guinea, Sri Lanka, Madagascar. `UNVERIFIED:` current 2026 country
+counts — check https://id4d.worldbank.org and https://mosip.io/deployments .
+Cross-reference: MOSIP-based systems are the most likely future source of a standards-based,
+offline-verifiable citizen credential, because MOSIP ships **verifiable-credential and offline-QR
+modules** by default. That is a thing to watch.
+
+**The conflict with private biometric registries — this is documented and severe.** World ID / Tools
+for Humanity has been suspended, banned or ordered to delete data in a long list of jurisdictions,
+overwhelmingly in the Global South where it recruited most aggressively:
+
+| Jurisdiction | Action | Date |
+|---|---|---|
+| Kenya | Operations suspended 2023-08; **High Court declared operations illegal and ordered data deletion** | 2023-08 / **2025-05** |
+| Brazil | **ANPD banned** paying for iris scans (financial incentive vitiates consent under LGPD); reaffirmed with **R$50,000/day** fine for resumption | 2025-01 / 2025-03 |
+| Indonesia | **Komdigi suspended all operations** over biometric collection and permit violations | 2025-05 |
+| Philippines | **National Privacy Commission ordered a halt** citing consent and "exploitation of vulnerable populations" | 2025-10 |
+| Colombia | **Ordered deletion of biometric data and suspension** | 2025-11-22 |
+| Spain, Portugal, Hong Kong, Thailand, Germany (Bavaria DPA) | various suspensions / deletion orders | 2024–2025 |
+
+Sources (secondary/news, but the underlying regulator orders are public):
+https://bitpinas.com/regulation/indonesia-kenya-worldcoin-issue/ ,
+https://idtechwire.com/worldcoin-fights-philippines-biometric-ban/ ,
+https://restofworld.org/2026/sam-altman-worldcoin-zoom-tinder-partnerships/ ,
+https://en.tempo.co/read/2004666/these-are-8-countries-banning-worldcoin-from-spain-to-indonesia
+`UNVERIFIED:` I have not checked which of these orders have since been lifted or appealed; several
+(Kenya, Spain) had interim/appeal phases. **Anyone integrating World ID must check current
+jurisdiction status themselves** — and the aggregator will need a per-jurisdiction availability
+matrix, which is itself a product feature.
+
+**Why this happens, stated structurally:** a private biometric registry that de-duplicates a
+national population is *functionally a competing civil register*. States that are mid-rollout on
+their own foundational ID (Kenya's Maisha Namba, Indonesia's IKD, Nigeria's NIN, the Philippines'
+PhilSys) treat it as both a data-protection violation and an encroachment on a sovereign function.
+Nigeria's **NIMC Act 2026** exclusivity language (above) is the sharpest version of this. Expect
+more of it, not less.
+
+**Implication for us:** protocols rooted in private biometric de-duplication carry **jurisdictional
+availability risk** that state-rooted and document-rooted protocols do not. Conversely, state-rooted
+credentials carry the political-cancellation risk the UK just demonstrated. Neither leg is safe
+alone; that is an argument *for* the aggregator, and it should be said in the pitch.
+
+### Kenya — Maisha Namba / Huduma Namba (brief)
+
+Kenya's Huduma Namba (NIIMS) was **struck down by the High Court in 2021** for lack of a data
+protection impact assessment, then relaunched as **Maisha Namba** in 2023, which itself faced court
+challenges. `UNVERIFIED:` 2026 status. The point for us: **African foundational ID rollouts are
+routinely halted by courts**, so any coverage assumption built on them should be discounted heavily.
 ### USA — mDL deployments, NIST, and state-led ZK
 ### Buenos Aires — QuarkID  ← the single most important case in this file
 
@@ -530,7 +599,58 @@ document — that trust root belongs to the ZK-passport agent's file, not here.
 
 ### 1. The consumability question (per system)
 ### 2. The uniqueness question
-### 3. Coverage and exclusion
+### 3. Coverage and exclusion — a design constraint, not a footnote
+
+**The numbers (World Bank ID4D, Global Findex 2025 vintage, published 2025-11):**
+- **~800 million people worldwide lack any official proof of identity**, down from ~850m in the 2021
+  ID4D estimate.
+  Blog: https://blogs.worldbank.org/en/digital-development/850-million-people-globally-dont-have-id-why-matters-and-what-we-can-do-about
+  Dataset: https://datacatalog.worldbank.org/search/dataset/0040787/identification-for-development-id4d-global-dataset
+  ID4D portal: https://id4d.worldbank.org/
+  Secondary summary: https://www.biometricupdate.com/202511/new-world-bank-data-shows-800m-people-worldwide-still-lack-legal-identity
+- **Over half of the unregistered are children whose births were never registered.** (Less relevant
+  to us directly — most personhood protocols gate on adulthood — but it forecasts the adult gap 15
+  years out.)
+- **Women in low-income countries are 8 percentage points less likely to hold an ID than men.**
+- The gap concentrates in **Sub-Saharan Africa and South Asia**, in low- and lower-middle-income
+  economies, and within those, in rural, poor and marginalised populations.
+- **A second, larger gap that ID4D's headline number hides:** having *an ID* ≠ having a *digital,
+  online-usable* ID. ID4D's own 2024 analysis found government-issued IDs are still mostly limited
+  in digital capability (https://www.biometricupdate.com/202402/world-bank-id4d-report-shows-govt-issued-ids-still-limited-in-digital-capabilities).
+  For our purposes the relevant denominator is not "has an ID" (~7.3bn) but "has an ID that can
+  produce a credential a remote verifier can check" — which is far smaller, plausibly **1.5–2bn**
+  and concentrated in the EU, India, China, Brazil, the Nordics, Singapore and a handful of others.
+  `UNVERIFIED:` I could not find an authoritative figure for this narrower denominator. It would be
+  a genuinely useful thing for us to estimate and publish.
+- **Third gap: smartphone + connectivity.** Every wallet-based scheme in this file requires a
+  reasonably modern smartphone. GSMA's mobile-internet usage gap is ~3bn people. Even where the ID
+  exists and is digital, the *presentation channel* excludes.
+
+**The fairness consequence, stated plainly.** If the aggregate humanity score weights state identity
+heavily, then:
+1. We systematically score **~800m people at zero** on that axis for reasons entirely outside their
+   control, and a much larger number below the threshold because their state ID is not remotely
+   verifiable.
+2. The exclusion is **not random**: it is poorer, more rural, more female, more Sub-Saharan African
+   and South Asian. Any downstream allocation gated on our score (airdrops, UBI, governance weight,
+   rate limits) inherits that skew and amplifies it.
+3. It also **correlates with the populations that crypto personhood projects claim to serve**. A
+   sybil score that de facto requires a Nordic bank account or an Aadhaar number is a score for the
+   already-included.
+
+**Design responses (opinionated):**
+- **Never make state identity necessary.** It should be one of several *sufficient-ish* paths, with
+  a per-path ceiling, not a multiplier on the whole score.
+- **Cap the state-identity contribution** at a level below "full humanity", so that a user with
+  strong non-state evidence (biometric uniqueness, social graph, long-lived on-chain history) can
+  reach the same top score by a different route.
+- **Publish per-country score-distribution stats.** If our median score in Nigeria is half our median
+  score in Sweden, that is a fact our integrators must know before they gate anything on it.
+- **Do not double-count the same root.** See §Overlap — state ID, ICAO passport chip, EUDI PID and
+  KYC-vendor document checks are all the *same* underlying government assertion. Stacking them
+  multiplies the advantage of the already-documented.
+- Treat "no state ID" as **missing data, not negative evidence.** These are different and the
+  difference is the whole fairness argument.
 
 ## Verdict
 ## Open questions for us
