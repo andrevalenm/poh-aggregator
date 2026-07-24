@@ -828,7 +828,138 @@ engagement with the deployed systems that already tried something adjacent and f
 instructive ways. Her own methodological standard, set in her own prior paper, is not met here.
 §4.3 does the comparison she did not.
 
-### 4.3 Talks and interviews (from her own index, 2026-07-24)
+### 4.3 PCARE vs Circles — the model against the deployed system
+
+She never made this comparison (§4.2.1), which is exactly why it is worth making: Circles is an
+unintentional natural experiment on her model's degenerate corner, and it has five years of public
+chain data. Cross-reference: `research/protocols/circles.md`.
+
+#### 4.3.1 Circles *is* PCARE with α = 0
+
+PCARE's whole apparatus is the split `s_i + r_i = t_i` with `s_i = α_i·t_i` — irrevocable
+non-transferable **stake** conferring influence, and transferable **tokens** for exchange. She names
+the endpoints herself (pp.9-10): `α = 0` is *"equivalent to an ERC-20 airdrop"*, `α = 1` is
+*"all members holding one 'soulbound' token."*
+
+Circles sits precisely at `α = 0`, and not approximately:
+
+| PCARE element | Circles |
+|---|---|
+| Non-transferable stake `s_i` | **None.** Every CRC is a transferable ERC-1155. |
+| Influence / voting dimension `V_i = √s_i` | **None.** Circles is a money protocol; the whitepaper has no governance weighting at all. |
+| Irrevocable commitment | **None.** Trust edges are unilateral, gas-only, and revocable by setting expiry to now. No bond, no stake, no reciprocity. |
+| Transferable tokens `r_i` | All of it — 1 CRC/hour, 7%/yr demurrage. |
+| Community-scoped membership | The trust graph — genuinely present, and the closest thing Circles has to an association set. |
+
+The one thing that *looks* like stake is `INVITATION_COST = 96 CRC` burnt by the inviter against a
+`WELCOME_BONUS = 48 CRC`. **It is a burn, not a stake, and the distinction is exactly hers.** Her
+§3.3.1 argument for why stake keeps people honest is that *"Even if participants sell their
+transferable tokens, staked assets continue to yield rewards through Community Basic Income
+(CBI)—keeping 'skin in the game.'"* A burn leaves no ongoing exposure; it is a one-time toll.
+
+**So PCARE predicts Circles should fail in a specific way.** Her §3.3.2 deterrent against account
+splitting is: *"When caught, participants risk burned stake in both their split and more
+established ('thicker') wallets."* With `α = 0` there is **no stake to burn**, so the deterrent is
+identically zero. And her argument that consolidation self-limits — *"Gaming influence through
+consolidation requires pooling resources and staking them irrevocably as a coalition… This forces
+groups hoarding influence to either stay small and be outcompeted by more open coalitions or expand
+and dilute insider control"* — has no purchase either, because consolidation in Circles costs
+nothing. **Prediction: rampant, undeterred account splitting and consolidation.**
+
+#### 4.3.2 The prediction is confirmed — but it is over-determined
+
+Confirmed, emphatically. Per `circles.md`: a sybil costs ~**2 days of freely-minted currency** plus
+fractions of a cent in gas (96 CRC out, 48 CRC back, at 24 CRC/day); the doubling time of a farm is
+2-4 days; the public indexer carries a namespace whose events are literally named **`BotCreated`**
+and **`FarmGrown`**, with one maintainer growing a farm to **5,000 bots** on 2026-05-26; and in the
+last 10,000 at-scale registrations a single `originInviter` accounts for **2,754 (27.5%)**, routed
+through **1,687 proxy addresses** specifically so the on-chain `inviter` field looks diffuse.
+
+That last detail is worth pausing on: **the laundering exists to defeat exactly the analysis
+Ohlhaver ran on Idena.** Her method was to cluster by shared operator; Circles farms pre-emptively
+break the clustering key. Her own footnote predicted this (*Compressed to 0* p.19 n.44: obfuscation
+costs will be paid up to the value of avoiding detection), and here it is, four years on.
+
+**But the honest reading is that the absence of stake is only one of at least four causes, and
+probably not the binding one.** Circles fails for reasons her model does not isolate:
+
+1. **No stake** — her mechanism. Real, but see (2).
+2. **The cost is denominated in the asset being minted — and this is the deeper flaw she never
+   names.** `INVITATION_COST` is paid in CRC that the inviter minted from nothing. A cost
+   denominated in a freely-minted asset is not a cost. **And PCARE inherits this problem.** PCARE
+   stakes are denominated in the community's own currency, distributed by inflation as Community
+   Basic Income (`X·√s_i`). If members are given the currency and then stake the currency, the stake
+   is only costly in *opportunity* terms — and its opportunity cost is proportional to the currency's
+   external exchange value, which is precisely what a bootstrapping community currency does not
+   have. Setting `α = 1` on a free asset does not create scarcity. **This is a genuine gap in PCARE
+   that the Circles data exposes, and it is invisible from inside a first-principles design.**
+   (Idena is the instructive contrast: identity stake bit *because* IDNA had an external market
+   price — and the paper documents puppeteers dumping IDNA and squeezing the reward pie, i.e. the
+   mechanism's strength decayed exactly as its external price fell.)
+3. **Her scrutiny mechanism was present and still failed.** Her §3.3.2 answer to splitting is
+   local, physical scrutiny — *"periodic in-person voting and verified peer-to-peer interactions…
+   one-person cannot physically show up as two."* Circles onboarding was historically exactly
+   that: Berlin, Nairobi and Bangalore meetups, trusting people you met. It failed anyway, because
+   the protocol **also ships a first-class remote bulk path**: `circles-invitation-at-scale`,
+   `invite-api`, and an `InvitationModule` Safe module in which a funding bot grants single-block
+   trust. **Subsidiarity is a property of the social process, and a protocol can destroy it
+   unilaterally by making the remote path cheaper.** PCARE assumes local scrutiny persists; nothing
+   in the mechanism makes it persist.
+4. **The operator is the attacker.** `BotCreated` and `FarmGrown` are the *Circles team's own* event
+   names, and the 5,000-bot farm traces to a maintainer address. This is not an adversary defeating
+   a mechanism — it is the operator bypassing it for growth metrics. **No mechanism survives its own
+   operator's growth incentives**, and PCARE has nothing to say about this because it models
+   participants and communities but not the protocol's sponsor.
+
+**Verdict: her prediction is right, her explanation is under-determined, and the sharpest lesson
+available from Circles is one she does not draw.**
+
+#### 4.3.3 What we should take from the comparison
+
+**(a) A new, cheap, computable test for every protocol on the roster.** *Is the cost of acquiring
+this credential denominated in something the issuer mints?* If yes, the credential is approximately
+free regardless of how large the nominal cost looks. Circles: yes (CRC) → worth ~0. Idena: partially
+(IDNA, but externally priced) → worked while the price held. World ID: no — an Orb visit costs real
+time and travel — which is why it retains *some* value even at an observed resale price of
+$0.50-$15. **This test is more discriminating than "what does it verify?" and it belongs in the
+protocol template.**
+
+**(b) Circles is the counter-example to the affiliation model's self-sufficiency, and we should not
+dodge it.** §6.5 recommends representing identity as a bundle of affiliations with correlation
+structure. **Circles already *is* that** — identity is nothing but a position in a public trust
+graph, "individuals composed of groups" in the purest deployed form anywhere — and it got farmed to
+the point where 82% of avatars have in-degree zero and a third of recent growth traces to one
+operator. **The affiliation data model is not self-securing.** Structure without cost and without
+scrutiny yields a graph that is free to fabricate. Whatever we build needs the correlation math
+*and* an answer to what makes an edge expensive.
+
+**(c) The genuinely valuable inversion — and the strongest argument in this file for our technical
+contribution.** Put the two bodies of work side by side:
+
+- **Ohlhaver has the theory and no formula.** She argues correlation is the quantity that matters,
+  and then concedes (p.12): *"How to quantify informational diversity or 'consensus across
+  difference' in plural voting is an open, active research question."*
+- **Circles has a formula and no theory.** Its whitepaper (§4.3) proves a real attack-resistance
+  bound — `T(M → R | S) ≤ B_T(F → R | S)`: an attacker's reach into the honest network is bounded by
+  the trusted balance on the boundary set, *no matter how many sybils they mint*. That is a rigorous,
+  computable, deployed min-cut result. But Circles has no concept of informational diversity,
+  faction, or why correlated honest actors should be discounted at all.
+
+**Each has exactly what the other lacks.** Ohlhaver's "constellation of stakes with a correlation
+discount" is what Circles' max-flow should be measuring over; Circles' seed-anchored min-cut is the
+closed form Ohlhaver says does not exist. Note also that both reduce to *the same primitive*: the
+number of **independent** paths / factors / voters — Circles counts edge-disjoint paths to a seed
+set, *Plurality* §5-6 calls them "the real independent voters" (§5.4), and our trust-root dedup is
+the crude discrete version. **Unifying these is a real, unclaimed, technically tractable
+contribution, and it sits exactly on data we will already hold.**
+
+**(d) A caution on borrowing PCARE.** Given §4.2.1 and §4.3.2, PCARE should be treated as a
+*framing* we can think with, not a design we can implement. It is unvalidated against any deployed
+system, its costliness assumption has a hole that Circles makes visible, and its central quantity
+is admittedly unspecified. *Compressed to 0* has earned its authority empirically; Community
+Currencies has not yet.
+
+### 4.4 Talks and interviews (from her own index, 2026-07-24)
 
 Her site's "select talks" list is short and mostly pre-2024. Post-ETHBerlin the only listed item is
 **"Plurality, Community Currencies, and the Future of Networked Governance," Governance Futures
@@ -849,7 +980,7 @@ That is not a detour — on her own account (§1.9e, §2.2) personhood was alway
 communities were always the right one. **She has moved on from the problem our product is in, and
 she moved on because she concluded it was the wrong problem.** We should sit with that.
 
-### 4.4 Did the promised "social identity" work ever appear? — Yes, but folded in, not standalone
+### 4.5 Did the promised "social identity" work ever appear? — Yes, but folded in, not standalone
 
 *Compressed to 0* makes four specific promises of future work: *"social identity systems rich in
 subsidiarity (e.g., federalism)… are key to surfacing bona fide commitments and bias, **challenging
@@ -1476,19 +1607,39 @@ assertion should carry structure, not collapse to a scalar.** Sketch:
   affiliation data as high-toxicity: derive correlation from it, never expose it.
 
 **She has since given the formal version of this data model herself** (Community Currencies, p.39):
-identity is *"a changing constellation of stakes to different communities,"* and *"under plural
-voting, actors with the same composition are treated as a single entity and receive a discount."*
-Identity as a **weighted vector of affiliations**; **sameness of composition** as the discount
-trigger. That is the target schema, and it is close to what `pluraltools` actually implements
-(§5.5) — with the important refinement that her version is *weighted* where pluraltools' is a set.
 
-**The attack this data model invites, named by her (Community Currencies, pp.12-13):
-"anti-correlation palaces."** If affiliation diversity earns a higher score, **affiliations will be
-manufactured** — clusters of accounts constructed to look maximally unaffiliated with each other
-while in fact voting or acting uniformly. This is the reflexivity problem that kills naive
-diversity scoring, and it is the strongest objection to §6.4's recommendation. Her own mitigation
-is to score on **ex-post behaviour** (voting history, revealed action over time) rather than on
-**ex-ante declared affiliation**, precisely because declarations are cheap and behaviour is not.
+> *"community currencies encourage us to view 'identity' as a **changing constellation of stakes to
+> different communities, representing degrees of access and influence to different information
+> streams**… Despite appearing distinct, the 'Big 5' asset managers are the same entity by virtue of
+> their stakes along with their correlated behavior (i.e. shareholder voting history). **Under
+> plural voting, actors with the same composition are treated as a single entity and receive a
+> discount.**"*
+
+Three things to extract. Identity is a **weighted vector**, not a set — the weights are *degrees* of
+access and influence. The vector's semantic content is **information-stream access**, which is why
+correlation is the right operation on it: two identities with the same composition are drinking
+from the same streams. And **sameness of composition is the discount trigger** — no fraud finding
+required, exactly as in DeSoc §4.5. It is more refined than `pluraltools`' implementation (§5.5),
+which uses unweighted set membership.
+
+**The attack this invites, named by her: "anti-correlation palaces."** If affiliation diversity
+earns a higher score, **affiliations will be manufactured** — clusters constructed to look
+maximally unaffiliated while in practice acting uniformly. This is the reflexivity problem that
+kills naive diversity scoring and the strongest objection to §6.4's recommendation.
+
+**Her mitigation is a concrete, two-signal anti-gaming primitive** (p.12, verbatim):
+
+> *"**Ex-ante community memberships** (as reflected in stake) captures overlaps in information, or
+> communication channels. **Ex-post behavior, such as voting history**, captures historical context
+> and divides, and furthermore mitigates gaming through artificial affiliations ('anti-correlation
+> palaces') that, in practice, vote uniformly."*
+
+**Score both, and treat the divergence between them as the fraud signal.** Declared affiliations
+are cheap to manufacture; a track record of *actually diverging behaviour* is not. An identity whose
+ex-ante affiliations look maximally diverse but whose ex-post behaviour is tightly correlated with
+its supposed opposites is exhibiting precisely the anti-correlation-palace signature. Translated to
+our data: ex-ante = the credential/trust-root bundle; ex-post = observed action over time (claim
+timing, transaction co-movement, funding ancestry). **We should never ship an ex-ante-only score.**
 
 **Three design consequences follow, and they are the practical core of this section:**
 1. **Prefer behavioural correlation over declared affiliation.** This also happens to solve the
@@ -1544,6 +1695,115 @@ expect them:
    that our measurements have a ceiling, and to prefer mechanisms that are robust to being evaded
    (graded discounts, bounded loss) over mechanisms that depend on catching people (detection,
    exclusion).
+
+### 6.7 The surveillance singularity — her direct argument against us, and an honest answer
+
+Community Currencies §3.3.3 (pp.26-27) is the most direct attack on a global aggregator anywhere in
+her corpus. It deserves to be stated at full strength before we try to answer it, because the weak
+version is easy to dismiss and the strong version is not.
+
+**Her argument, in six steps:**
+
+1. *"Global currencies have a more complex enforcement challenge: maximum monitoring costs with
+   minimum context. Detached from human interactions, global currencies have to rely on universal
+   credentials."* Distance forces you onto credentials; credentials are all you have precisely
+   because you have no context.
+2. Enforcement is two-sided and both sides are unstable. De jure: *"as humans integrate with
+   technology and synthetic biology advances, defining 'human' inevitably falls short of an exact
+   science, instead inviting false positives and negatives."* De facto: the same incentive that
+   makes people verify makes others *"corral and control other human accounts."*
+3. The judgement required is inherently context-sensitive: global enforcement *"must navigate the
+   grey area between legitimate 'cooperation' … and 'collusion' … on a global scale—a challenge that
+   invites global surveillance."*
+4. **The vantage-point problem, which is the crux:** *"Whereas community currencies leverage local
+   context and multiple perspectives for sensitive judgments, **the surveillor has a single vantage
+   point**, tasked with integrating all perspectives below. Inevitably, contradictions will come to
+   the fore when a set of communicative acts are deemed 'collusive' globally but 'cooperative'
+   locally—since such judgements are context-sensitive and depend on vantage point."*
+5. **The observer effect:** *"the surveillor's observer effect collapses the very social structures
+   necessary for enforcement… participants communicate their differences to each other less, and
+   instead increasingly conform to the surveillor's standards more."* Judgements *"harden into
+   arbitrary rules and rigid classifications,"* conformity produces *"a false impression of
+   compliance,"* and *"a narrow set of idiosyncratic and technology biases universalize into
+   systemic risk."*
+6. **The endpoint:** the gaze *"expands into a force that bends communication, compressing the
+   information function of money and votes into compliance, **until all participants become the
+   same, leaving no differences to coordinate around**."* Her prescription is subsidiarity and
+   plurality: push enforcement **down** to the association set, use local juries internally and
+   bridging bonuses externally.
+
+Note also footnote 2 on p.12, which is our World ID finding in one sentence: *"other methods to
+establish account control (e.g., biometrics) also require **periodic re-authentication to avoid
+one-time account sales, and legal enforcement of administrators to avert spoofing** during
+authentication."* Biometrics do not escape the enforcement problem — they relocate it into an
+administrative and legal apparatus, which is a *more* centralised place, not a less one.
+
+#### Does a scoring aggregator that never adjudicates membership escape this?
+
+**The case that we escape it** is the one we would instinctively reach for: we gate nothing. We
+return a number and the relying app decides. We never revoke anyone's credential, never expel
+anyone from a community, never adjudicate whether a cohort is cooperating or colluding. We read
+credentials that are already public. We are one vendor among several, and we hold no monopoly.
+
+**I do not think that survives. Scoring is not an escape from her argument; it is a purer instance
+of it.** Five reasons:
+
+1. **Her argument is about legibility, not adjudication.** She never says the harm requires an
+   enforcement action — the mechanism is *"the gravitational pull of the surveillor's gaze on
+   attention."* A widely-adopted score is exactly such a pull. "We only measure, we don't decide"
+   is the credit bureau's disclaimer, and it fails for the same reason: **the marginal integrator
+   takes the default**, so whoever supplies the ranking supplies the rule.
+2. **The single vantage point is architectural, not incidental.** One API, one normalisation, one
+   scoring function, applied globally. That is *definitionally* the surveillor's single vantage
+   point, and §6.1(b) already showed we cannot resolve the global/local contradiction she predicts:
+   a cohort onboarded together by one NGO in Nairobi is "collusive globally, cooperative locally,"
+   and we cannot tell which from where we sit.
+3. **The observer effect applies to our best signal specifically.** If we score independence, people
+   will manage credential portfolios to *look* independent. That is her "anti-correlation palaces"
+   (§4.2), and it is the observer effect precisely: publishing the measure destroys the measure.
+   Our strongest product is the one that degrades fastest under adoption.
+4. **The ratchet is real and we have already found it.** Every time we are gamed, the natural fix is
+   more linkage — and more linkage is more surveillance. §6.1(d)'s privacy-versus-detection
+   contradiction *is* her ratchet in miniature, discovered independently before I had read this
+   section.
+5. **Homogenisation is literally the product.** Normalising heterogeneous credentials into one
+   comparable assertion is making participants "the same." Read alongside her p.27 line that global
+   sybil resistance *"makes participants the same and reduces the cost of influence"* (§6.2), the
+   aggregator is not a bystander to the homogenising dynamic — it is the machine that performs it.
+
+**So the honest answer is: no, we do not escape it.** In one respect scoring is *worse* than
+adjudication, because adjudication is visible and contestable — you know when you have been
+excluded and can appeal — whereas a score that quietly weights you at 0.4 is ambient, unexplained
+and unappealable.
+
+#### What taking her seriously would actually require
+
+Not abandonment, but five specific commitments, each of which is a real constraint:
+
+1. **Be reproducible, so we can be forked.** Publish the scoring rules, version them, and make them
+   recomputable from public data by anyone. **An aggregator that can be exactly reproduced is not a
+   singular vantage point.** This is the closest available analogue to plurality, and it is a
+   deliberate choice to give up the moat.
+2. **Scope scores to the querying app's cohort, not globally** (§6.3). This is **subsidiarity in our
+   architecture**: a cohort-relative score has no global vantage point by construction, because
+   there is no global score to have one. Note the convergence — §6.3 reached this from a typing
+   argument about collusion being a set property, and §6.7 reaches it from her political argument.
+   **When two independent lines of reasoning land on the same architecture, that is the strongest
+   signal in this document about what to build.**
+3. **Discount, never deny; and cap the discount** (§6.1). Keep every judgement graded and
+   recoverable.
+4. **Write down in advance the data we will not collect**, and treat "we were gamed, let us add
+   linkage" as a decision requiring explicit sign-off rather than an obvious engineering fix. The
+   ratchet only turns if nobody has to authorise it.
+5. **Prefer correlation computed transiently over affiliation stored durably** (§6.5). We need the
+   co-movement, not the dossier.
+
+And one thing we should simply concede: **her constructive programme is local, in-person and
+small-scale, and it has no place for us in it.** If we build this, we are building the thing she
+argues against, with mitigations. That is a defensible position — the global systems will exist
+whether or not we build one, and a reproducible, cohort-scoped, discount-only aggregator is
+meaningfully better than the additive black-box alternative — but it should be held consciously,
+not by pretending the critique does not apply.
 ## 7. Open questions for us
 
 Ordered by how much they should change what we build.
@@ -1591,6 +1851,19 @@ Ordered by how much they should change what we build.
 11. **Should we tell users the honest answer about locality?** Her constructive programme
     (in-person, local, small-scale — §6.2) has no place for a global remote aggregator in it. If we
     believe she is right about that and build anyway, we should be able to say why in one paragraph.
+12. **Do we accept the reproducibility commitment?** §6.7's strongest mitigation is to publish
+    versioned scoring rules recomputable from public data by anyone — i.e. **deliberately give up
+    the moat** so that we cannot be the singular vantage point. That is a real commercial sacrifice
+    and it should be an explicit founder-level decision, not a documentation choice made later.
+13. **Add the mintedness test to the protocol template.** §4.3.3(a): *is the cost of this credential
+    denominated in something the issuer mints?* Circles fails it outright (a sybil costs ~2 days of
+    freely-minted CRC), Idena passed only while IDNA held an external price. This is cheap to check,
+    more discriminating than "what does it verify," and belongs in `BRIEF.md`'s required coverage.
+14. **Can we unify Circles' min-cut with Ohlhaver's correlation discount?** §4.3.3(c) argues she has
+    the theory without a formula and Circles has a proven bound (`T(M→R|S) ≤ B_T(F→R|S)`) without a
+    theory, and that both reduce to counting *independent* paths/factors. Is that unification real
+    or merely rhetorical? **This is the most promising technical question in the document** and it
+    deserves a spike before it goes into a roadmap.
 
 ## 8. Quotable lines (with locators)
 
@@ -1675,7 +1948,25 @@ Center PDF of *Compressed to 0*
 20. **The measurement problem is open — her words, not ours.** *"How to quantify informational
     diversity or 'consensus across difference' in plural voting is an open, active research
     question."* — ibid., p.12.
-21. **Sybil-ness as a continuum** (Miller, Weyl & Erichsen, quoted approvingly by her at p.33 n.82).
+21. **The single-vantage-point argument against a global aggregator.** *"Whereas community
+    currencies leverage local context and multiple perspectives for sensitive judgments, the
+    surveillor has a single vantage point, tasked with integrating all perspectives below.
+    Inevitably, contradictions will come to the fore when a set of communicative acts are deemed
+    'collusive' globally but 'cooperative' locally—since such judgements are context-sensitive and
+    depend on vantage point."* — *Community Currencies*, §3.3.3, p.27.
+22. **Why global credentials are forced onto thin evidence.** *"Global currencies have a more
+    complex enforcement challenge: maximum monitoring costs with minimum context. Detached from
+    human interactions, global currencies have to rely on universal credentials."* — ibid., p.26.
+23. **The anti-gaming primitive, and the reason never to ship an ex-ante-only score.** *"Ex-ante
+    community memberships (as reflected in stake) captures overlaps in information, or communication
+    channels. Ex-post behavior, such as voting history, captures historical context and divides, and
+    furthermore mitigates gaming through artificial affiliations ('anti-correlation palaces') that,
+    in practice, vote uniformly."* — ibid., pp.12-13.
+24. **Biometrics do not escape the enforcement problem.** *"other methods to establish account
+    control (e.g., biometrics) also require periodic re-authentication to avoid one-time account
+    sales, and legal enforcement of administrators to avert spoofing during authentication."*
+    — ibid., p.12 n.2.
+25. **Sybil-ness as a continuum** (Miller, Weyl & Erichsen, quoted approvingly by her at p.33 n.82).
     *"What makes Sybil agents Sybils is that the will of one entity centrally coordinates them. They
     should be recognized as precisely the same because they all listen to that same entity and that
     entity alone."* — "Beyond Collusion Resistance," https://ssrn.com/abstract=4311507.
@@ -1711,8 +2002,15 @@ All retrieved 2026-07-24 unless stated.
   https://www.pujaohlhaver.com/writings-resesearch · about https://www.pujaohlhaver.com/about-7
 - ETHBerlin04 keynote video (source of our transcript): https://www.youtube.com/watch?v=-mwUQp2qwjk
 - Ash Center / GETTING-Plurality author talk on the paper: https://www.youtube.com/watch?v=oTAsln1RDWg
-- Profiles: https://gettingplurality.org/2023/03/15/puja-ohlhaver/ ·
-  https://www.radicalxchange.org/speakers/puja-ohlhaver/ · http://foresight.org/people/puja-ohlhaver/
+- **Harvard listing (current affiliation): https://ash.harvard.edu/people/puja-ohlhaver/** — Ash
+  Center; GETTING-Plurality Research Group at the Allen Lab for Democracy Renovation.
+  ⚠️ `gettingplurality.org` and `allenlab.hks.harvard.edu` **do not resolve** — both groups live
+  under `ash.harvard.edu`. A dead vanity domain here is not evidence of a dead affiliation.
+- Governance Futures S1 Ep11 (Sept 2025) — source for the current affiliation and for her NYT /
+  Washington Post / POLITICO / WIRED / TIME bylines:
+  https://govfutures.podbean.com/e/s1-ep11-plurality-community-currencies-and-the-future-of-networked-governance-with-puja-ohlhaver/
+- Other profiles: https://www.radicalxchange.org/speakers/puja-ohlhaver/ ·
+  http://foresight.org/people/puja-ohlhaver/
 
 ### Lineage
 - Ford, "Identity and Personhood in Digital Democracy" (EPFL, 2020): https://arxiv.org/pdf/2011.02412.pdf
@@ -1764,4 +2062,19 @@ All retrieved 2026-07-24 unless stated.
 ### In-repo
 - `research/BRIEF.md` — shared research brief
 - `research/references/ohlhaver-ethberlin-2024-transcript.md` — ASR transcript, **unreliable for
-  verbatim quotation**; use the papers instead
+  verbatim quotation**; use the papers instead. Note its header dates the keynote to Aug 2024; the
+  talk was **May 2024** and 2024-08-16 is the video upload date (§3.2).
+- **`research/protocols/circles.md`** — the Circles write-up underpinning §4.3. Sources for every
+  Circles fact used here: `Hub.sol` invitation constants
+  (https://github.com/aboutcircles/circles-contracts-v2/blob/beta/src/hub/Hub.sol), the
+  `CrcV2_InvitationsAtScale` namespace (`BotCreated` / `FarmGrown` / `originInviter`) on
+  https://rpc.aboutcircles.com , bulk-onboarding tooling
+  https://github.com/aboutcircles/circles-invitation-at-scale , and the whitepaper's relative-sybil-
+  resistance theorem (§4.3) at https://whitepaper.aboutcircles.com/
+
+### Note on vendored files
+Third-party PDFs are **cited, not vendored** — none are committed to this repo (verified clean
+2026-07-24). Working copies of *Compressed to 0*, *DeSoc* and *Community Currencies*, plus a
+page-tagged text extract of the latter (`ccp.txt`, every line prefixed `[pN]`), live in the session
+scratchpad only. Community Currencies page citations in §4.2/§4.3 are taken from that extract;
+SSRN is Cloudflare-gated and cannot be re-fetched programmatically.

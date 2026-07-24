@@ -8,3 +8,11 @@
 *.pdf
 sources/
 
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+.pnpm-store/

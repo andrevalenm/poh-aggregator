@@ -1,0 +1,32 @@
+{
+  "name": "poh-aggregator",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "version": "1.0.0",
+  "description": "An aggregator for proof-of-humanity / sybil-resistance protocols — \"1inch for personhood.\"",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrevalenm/poh-aggregator.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/andrevalenm/poh-aggregator/issues"
+  },
+  "homepage": "https://github.com/andrevalenm/poh-aggregator#readme",
+  "dependencies": {
+    "viem": "^2.55.8"
+  }
+}
