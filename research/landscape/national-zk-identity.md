@@ -855,6 +855,166 @@ heavily, then:
 - Treat "no state ID" as **missing data, not negative evidence.** These are different and the
   difference is the whole fairness argument.
 
-## Verdict
+## Overlap with other protocols — do not double-count
+
+**Everything in this file shares the *state-document trust root*.** The following are all downstream
+of "a government asserted this person exists", and are therefore **correlated, not independent,
+evidence**:
+
+- national digital ID schemes (this file)
+- **ICAO 9303 passport chips** and every ZK-passport protocol built on them (separate agent)
+- **EUDI Wallet PID** (separate agent — `eidas2-eudi-wallet.md`)
+- **ISO 18013-5 mDL / mdoc** presentations (separate agent)
+- **KYC/IDV vendor document checks** (Persona, Sumsub, Onfido, Veriff, Jumio — see
+  `kyc-liveness-vendors.md`): these read the *same physical document* and often the *same chip*
+- Any "verified human" badge a platform derived from a government ID
+
+**Scoring rule this implies:** a user who presents an Aadhaar-derived proof, an Indian passport ZK
+proof, and a Sumsub KYC pass done against their Indian passport has **one** piece of evidence
+presented three times, not three. The aggregator must model a **trust-root graph** and take a
+max-or-saturating function within a root, and only sum *across* roots. If we get this wrong, the
+easiest way to farm a high score becomes "present your one passport to every integrated protocol",
+which is exactly the failure mode we exist to prevent.
+
+The genuinely *independent* roots are: (a) live biometric de-duplication against a private registry
+(World ID and similar), (b) social graph / vouching, (c) long-lived costly on-chain behaviour, and
+(d) state documents. State documents are one axis, however many protocols wrap them.
+
+**Second-order overlap worth flagging:** Google's **Longfellow ZK** library is becoming the shared
+ZK layer over *both* US mDLs and EU EUDI credentials. If several protocols we integrate all use
+Longfellow proofs over mdocs, they are not merely sharing a trust root — they share a *proving
+system and a bug surface*. One soundness bug in Longfellow would simultaneously invalidate them.
+
+## Verdict — is state identity realistically an input for us in 2-3 years?
+
+**Yes, but narrowly, and not as the backbone.** Three tiers:
+
+**Tier 1 — build against these now (2026-2027):**
+1. **India, Aadhaar offline e-KYC / secure QR.** The only large-population, user-held,
+   issuer-signed, offline-verifiable state artefact in the world. ~1.4bn people, biometrically
+   de-duplicated, and a live ZK ecosystem already exists (Anon Aadhaar — though the ZK-tooling agent
+   found it dormant: last release 2024-12-12, last push 2025-04-21, which is itself a signal that
+   *someone needs to own this*, and could be us). **Blockers are legal, not technical**: DPDP Act
+   duties, Puttaswamy's constraints on private use, and UIDAI's posture. Get Indian counsel before
+   shipping. Also resolve the SHA-256 question above — if UIDAI's *own* offline signature moved,
+   every existing Aadhaar ZK circuit is already broken as of 2026-06-30, and that is either a
+   catastrophe or an opportunity depending on who fixes it first.
+2. **Buenos Aires QuarkID.** Small (3.6m) but **provably live on-chain today** (190,030 anchor txs,
+   ~250/day, most recent 2026-07-24) and **genuinely permissionless to verify**. Cheapest possible
+   proof that our stack can read a government credential. **Do the 1-2 day resolver spike.**
+
+**Tier 2 — depends on one unresolved fact each; resolve the fact, then decide:**
+3. **US mDL** — hinges entirely on whether the AAMVA Digital Trust Service trust list is publicly
+   downloadable. 21 states + PR live, but low citizen uptake, so this is a 2027-2028 volume story
+   even if the answer is yes.
+4. **Brazil CIN QR** — hinges on whether the QR carries an ICP-Brasil-signed offline payload.
+   48.2m holders and a large crypto population make this high-value if the answer is yes.
+5. **Estonia / Baltic qualified signatures** — hinges on SK ID Solutions' OCSP terms. Small
+   population, but it is the template for *every* EU qualified-certificate scheme, so it is
+   strategically larger than Estonia.
+
+**Tier 3 — do not plan around these:**
+- Everything federated: BankID, Singpass, myID/AGDIS, One Login, gov.br SSO, NIN, IKD, Diia. They
+  are reachable only by becoming an accredited relying party per jurisdiction, or by paying a broker
+  (Criipto, Signicat, Vidos) per verification. That is a real business but it is *KYC reselling*,
+  not permissionless personhood, and it inherits the broker's terms. If we do it, do it knowingly
+  and price it, and keep it out of the "trustless" part of the pitch.
+- China: zero path.
+- **EUDI Wallet is the big one on the horizon but belongs to the eIDAS agent's file.** My only
+  cross-cutting note: even there, the verifier side is a *registered relying party* regime, so the
+  EU is not an exception to the pattern — it is the pattern, written more carefully.
+
+**The strategic read.** State identity is the largest personhood root on earth and the *least*
+available to us, and that gap is the product. The two things that could change it inside three years
+are (a) **user-held signed artefacts** becoming the norm (mDL, EUDI, MOSIP-based national IDs all
+ship one) and (b) **Longfellow-style ZK over legacy credential formats** removing the need for
+governments to build ZK at all. When both land, the only remaining gate is trust-list access — which
+means **the durable moat for an aggregator is operating trust-anchor infrastructure**: fetching,
+monitoring, versioning and re-verifying every issuer's certificates, across dozens of jurisdictions,
+through unilateral rotations like UIDAI Circular 4 of 2026. That is unglamorous, real, and hard to
+copy. It is probably the most defensible thing in this whole research programme.
+
+**And the constraint that must survive contact with the roadmap:** ~800m people have no ID at all,
+the gap is 8pp worse for women in low-income countries, and the "has a *remotely verifiable* ID"
+population is far smaller than the "has an ID" population. State identity must be a **capped,
+optional path**, never a floor.
+
 ## Open questions for us
+
+1. **Does UIDAI Circular 4 of 2026 change UIDAI's own signature on the offline e-KYC XML / secure QR,
+   or only requesting entities' signing of authentication requests?** Highest-priority factual gap
+   in this file. OCR the scanned PDF; diff a fresh offline e-KYC ZIP against a 2024 sample.
+2. **Is the AAMVA mDL Digital Trust Service trust list publicly downloadable, or agreement-gated?**
+   Decides whether US mDL is consumable at all. Shared with the ISO mdoc agent.
+3. **Is the QuarkID zkSync anchor still receiving *new credential issuance* or only DID updates?**
+   Decode a Sidetree anchor file from IPFS. And: run the resolver node, verify one real VC.
+4. **Does the Brazilian CIN QR contain an offline-verifiable ICP-Brasil signature?**
+5. **What are SK ID Solutions' OCSP terms for an unregistered high-volume verifier?** Decides whether
+   EU qualified signatures are a permissionless read.
+6. **Bhutan NDI technical surface**: which DID method, mainnet or L2, is there a public registry
+   contract, can an outsider resolve a Bhutanese DID?
+7. **Can Longfellow ZK be extended to emit a deterministic nullifier** over a stable document field,
+   turning attribute proofs into uniqueness proofs? If yes, that is a very large unlock and possibly
+   something we should build and open-source.
+8. **What is the actual size of the "has a remotely verifiable government credential" population?**
+   Nobody seems to publish it. Estimating it credibly would be a genuinely useful public artefact
+   and good marketing.
+9. Which of the World ID regulatory bans/suspensions (Kenya, Brazil, Indonesia, Philippines,
+   Colombia, Thailand, Spain, Portugal, Hong Kong) are **still in force in 2026-07**? We need a
+   per-jurisdiction availability matrix and it should probably be a live product feature.
+10. Does the UK cancellation of "digital ID" also stop the **GOV.UK Wallet / digital driving
+    licence**, or is that programme continuing?
+
 ## References
+
+Primary / official
+- UIDAI Aadhaar Dashboard — https://uidai.gov.in/aadhaar_dashboard/auth_trend.php
+- UIDAI, Aadhaar Paperless Offline e-KYC — https://uidai.gov.in/en/ecosystem/authentication-devices-documents/about-aadhaar-paperless-offline-e-kyc.html
+- UIDAI, Offline eKYC sample data — https://uidai.gov.in/en/915-developer-section/tutorial-section/11347-offline-ekyc-sample-data.html
+- UIDAI, Circular 4 of 2026 (SHA-1 → SHA-256) — https://www.uidai.gov.in/images/Circular_4_of_2026_reg_SHA-1_SHA-2_SHA-256_migration.pdf
+- UIDAI, Circular 1 of 2026 (unique identifiers for authentication transactions) — https://www.uidai.gov.in/en/ecosystem/authentication-devices-documents/authentication-document/19646-circular-1-of-2026-regarding-implementation-of-unique-identifiers-for-aadhaar-based-authentication-transactions.html
+- UIDAI, Circular 4 of 2025 (Rule 5 notification template) — https://uidai.gov.in/en/ecosystem/authentication-devices-documents/authentication-document/18880-circular-4-of-2025-regarding-sample-template-for-notification-pursuant-to-rule-5-of-aadhaar-authentication-for-good-governance-social-welfare-innovation-knowledge-rules-2020.html
+- PIB, Aadhaar Authentication for Good Governance Amendment Rules 2025 — https://www.pib.gov.in/PressReleaseIframePage.aspx?PRID=2098223
+- QuarkID node quickstart (contracts, RPCs, DID method) — https://github.com/ssi-quarkid/Nodo-QuickStart
+- QuarkID GitHub org — https://github.com/ssi-quarkid
+- GCBA QuarkID (now under /gcaba_historico/) — https://buenosaires.gob.ar/gcaba_historico/jefaturadegabinete/innovacionytransformaciondigital/quarkid/protocolo-quarkid
+- zkSync Era public explorer API (used for the on-chain figures) — https://block-explorer-api.mainnet.zksync.io/address/0xe0055B74422Bec15cB1625792C4aA0beDcC61AA7
+- Australia, Digital ID Act 2024 — https://www.digitalidsystem.gov.au/what-is-digital-id/digital-id-act-2024
+- ACCC Digital ID regulation — https://www.accc.gov.au/by-industry/digital-platforms-and-services/digital-id-regulation
+- Australia, charging & user-choice policy settings — https://www.digitalidsystem.gov.au/news/policy-settings-for-charging-and-user-choice-in-the-australian-government-digital-id-system
+- NZ DISTF Trust Framework Register — https://www.dia.govt.nz/Trust-Framework-Register
+- UK Home Affairs Committee, "Mandatory to manageable" — https://publications.parliament.uk/pa/cm5901/cmselect/cmhaff/986/report.html
+- UK Commons Library briefing CBP-10369 — https://researchbriefings.files.parliament.uk/documents/CBP-10369/CBP-10369.pdf
+- China, network codes & credentials (translation) — https://www.chinalawtranslate.com/en/on-network-codes-and-credentials/
+- Brazil, gov.br account tiers — https://www.gov.br/governodigital/pt-br/noticias/imposto-de-renda-2026-saiba-como-ter-uma-conta-prata-ou-ouro-no-gov.br
+- AAMVA mDL Digital Trust Service — https://www.aamva.org/identity/mobile-driver-license-digital-trust-service
+- NIST SP 800-63-4 — https://pages.nist.gov/800-63-4/
+- Google, Longfellow ZK — https://github.com/google/longfellow-zk ; blog https://blog.google/innovation-and-ai/technology/safety-security/opening-up-zero-knowledge-proof-technology-to-promote-privacy-in-age-assurance/
+- EUDI Swift binding for Longfellow — https://github.com/eu-digital-identity-wallet/av-lib-ios-longfellow-zkp
+- World Bank ID4D — https://id4d.worldbank.org/ ; dataset https://datacatalog.worldbank.org/search/dataset/0040787/identification-for-development-id4d-global-dataset
+- World Bank blog, 850m without ID — https://blogs.worldbank.org/en/digital-development/850-million-people-globally-dont-have-id-why-matters-and-what-we-can-do-about
+- Trust over IP, Bhutan NDI case study — https://trustoverip.org/wp-content/uploads/Case-Study-Bhutan-NDI-National-Digital-Identity-ToIP-Digital-Trust-Ecosystems-V1.0-2024-05-21.ext_.pdf
+- Bhutan NDI, Ethereum announcement — https://www.bhutanndi.com/article/bhutan-adopts-ethereum-for-national-identity-a-new-chapter-in-digital-sovereignty_2d0c7ec2-5605-4c42-b258-bd9361ae8878
+- BankID Relying Party Guidelines v3.4 (mirror) — https://webapp.sebgroup.com/mb/mbcc.nsf/alldocsbyunid/2708B7754A045A6DC12585E5002DEC10/$FILE/bankid-relying-party-guidelines-v3.4.pdf
+- Singpass developer docs — https://docs.developer.singpass.gov.sg/
+- SK ID Solutions — https://www.skidsolutions.eu/
+
+Secondary (news / vendor / analysis — labelled as such throughout)
+- UIDAI press release, Aug 2025 authentication volume — https://www.uidai.gov.in/en/media-resources/media/press-releases/19390-uidai-records-221-crore-aadhaar-authentication-transactions-in-august-2025-10-increase-over-august-2024.html
+- Complinity summary of the SHA-256 migration — https://complinity.com/legal-update/uidai-issues-technical-document-for-migration-from-sha-1-to-sha-2-sha-256-for-digital-signing-in-aadhaar-authentication-ecosystem-23735/
+- Khaitan & Co on Aadhaar authentication for private entities — https://www.khaitanco.com/thought-leadership/Aadhaar-authentication-for-private-entities
+- GlobeNewswire, Buenos Aires 3.6m DIDs — https://www.globenewswire.com/news-release/2024/10/22/2967256/0/en/Buenos-Aires-Sets-Global-Precedent-by-Empowering-3-6-Million-Citizens-with-Blockchain-based-Digital-Identity-on-miBA-platform.html
+- Biometric Update, Buenos Aires / QuarkID — https://www.biometricupdate.com/202410/buenos-aires-moves-from-centralized-to-decentralized-digital-identity-with-quarkid
+- Bloomberg, Burnham scraps digital ID — https://www.bloomberg.com/news/articles/2026-07-19/burnham-to-scrap-uk-digital-id-to-focus-on-cost-of-living-policies
+- TechCrunch, UK scraps digital ID — https://techcrunch.com/2026/07/21/uk-government-scraps-plans-for-digital-id-cards-after-millions-of-brits-opposed/
+- Biometric Update, Vidos first DIATF component provider — https://www.biometricupdate.com/202510/vidos-first-certified-component-provider-for-diatf-ahead-of-gov-uk-wallet-launch
+- China Daily, 6m cyberspace IDs — https://www.chinadaily.com.cn/a/202505/23/WS68303502a310a04af22c1384.html
+- Biometric Update, Nigeria 59m gap to World Bank target — https://www.biometricupdate.com/202508/nigeria-must-issue-59m-digital-ids-in-18-months-to-meet-world-bank-target
+- Innovation Village, NIMC Act 2026 — https://innovation-village.com/nin-enrolment-hits-136-million-as-nimcs-new-act-takes-effect/
+- BitPinas, Indonesia + Kenya vs Worldcoin — https://bitpinas.com/regulation/indonesia-kenya-worldcoin-issue/
+- ID Tech, Worldcoin fights Philippines ban — https://idtechwire.com/worldcoin-fights-philippines-biometric-ban/
+- Rest of World, World iris-scan ID banned in places — https://restofworld.org/2026/sam-altman-worldcoin-zoom-tinder-partnerships/
+- Biometric Update, ~800m still lack legal identity — https://www.biometricupdate.com/202511/new-world-bank-data-shows-800m-people-worldwide-still-lack-legal-identity
+- Biometric Update, US mDL uptake slow — https://www.biometricupdate.com/202506/american-mdl-uptake-suggests-digital-id-mass-adoption-caught-in-the-slow-lane
+- Regula, mDL global status 2026 (state list) — https://regulaforensics.com/blog/mobile-drivers-license-verification/
+- Decrypt, Bhutan anchors national ID on Ethereum — https://decrypt.co/344166/bhutan-national-digital-id-ethereum-early-2026

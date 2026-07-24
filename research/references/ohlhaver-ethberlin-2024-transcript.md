@@ -1,7 +1,10 @@
 # Transcript — "The Silent Strings of Proof of Personhood" (ETHBerlin04 keynote)
 
 **Speakers:** Puja Ohlhaver; Mikhail Nikulin (founder, Idena)
-**Event:** ETHBerlin04 keynote, published 2024-08-16 by Department of Decentralization
+**Event:** ETHBerlin04 keynote. The talk was **delivered in May 2024** (ETHBerlin04 ran 24–26 May
+2024); the recording was **published 2024-08-16** by Department of Decentralization. Cite the
+delivery date, not the upload date — the YouTube metadata only carries the latter, and an earlier
+draft of this file conflated them.
 **Video:** https://www.youtube.com/watch?v=-mwUQp2qwjk (27:02)
 **Underlying paper:** *Compressed to Zero: The Silent Strings of Proof of Personhood* (Ohlhaver & Nikulin, 2024)
 **Retrieved:** 2026-07-24
