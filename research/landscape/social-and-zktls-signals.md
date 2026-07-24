@@ -1,15 +1,35 @@
 # Social-platform signals & zkTLS / web-proof protocols
 
-> STATUS: in progress (started 2026-07-24)
+*Researched 2026-07-24. All on-chain figures measured directly against public RPC on that date.*
 
 **One-liner:** Machinery for proving facts about web2 accounts to a chain without the platform's
 cooperation (TLSNotary / Reclaim / zkPass / Opacity / Primus / Pluto / Clique), plus an honest
-valuation of the social signals themselves.
-**Category:** behavioral (weakest tier in BRIEF.md taxonomy) — zkTLS is a *transport*, not a
-personhood claim; the personhood value is entirely in the underlying platform signal.
-**Chains:** see per-protocol sections
-**Status (2026-07):** TBD
-**Aggregator verdict:** TBD
+valuation of what those web2 facts are worth.
+
+**Category:** **behavioral** — the weakest tier in the BRIEF taxonomy. zkTLS is a *transport*, not a
+personhood claim; all personhood value lives in the underlying platform signal, and Part B prices
+that at **$0.20–$5 per sybil for almost everything**, $30–300 for the strongest tail.
+
+**Chains:** Primus verifiers on Arbitrum / BNB / opBNB (+ testnets, addresses in A.5); Reclaim across
+~12 EVM chains + Solana + NEAR (addresses `UNVERIFIED:`); Opacity as an EigenLayer AVS on Ethereum;
+Farcaster registries on OP Mainnet, Farcaster Pro `TierRegistry` on Base.
+
+**Status (2026-07):** Reclaim, Primus and Opacity all shipping code this week. **TLSNotary still
+`v0.1.0-alpha.15`, README says "should not be used in production."** **Pluto appears to have pivoted
+away from zkTLS entirely** (org last push 2026-02-12; docs now describe browser automation, not web
+proofs). Clique `UNVERIFIED:` — no live repo or docs located.
+
+**Aggregator verdict:**
+- **zkTLS → integrate later, behind a swappable adapter, and not for personhood.** Every shipping
+  design has a single bribable party (proxy operator or SGX enclave), collusion is *undetectable* by
+  the vendors' own admission, and even perfect soundness only faithfully transports a $2 fact. Keep
+  the adapter for future *non-personhood* attestations (income, exchange balances, gig ratings) where
+  the category has actually found product-market fit.
+- **Social signals → zero positive weight; use as negative/routing signals only, escalation-never-denial.**
+  Plus a short whitelist of genuinely cost-bearing bonuses: Farcaster Pro ($120/yr, on-chain
+  verifiable), X verification-by-organisation, Google Workspace `hd` claim, aged-and-seasoned Reddit.
+- **Do not use zkTLS to obtain signals that have a public API** (GitHub, Reddit profiles, Farcaster
+  hubs). It is strictly more trust, cost and friction for the same fact.
 
 ## Part A — zkTLS / web proofs: the mechanism
 
@@ -517,10 +537,121 @@ model, not a personhood credential — and farm detection is a different product
 attestation. See the Verdict.
 
 ### B.3 Lens
+
+Lens relaunched in 2025 as **Lens Chain** (a ZKsync-stack L2) with "the new Lens": accounts are
+ERC-6551-style smart accounts, gas is paid in USD terms, and onboarding is explicitly designed to be
+frictionless — "account abstraction, USD gas fees, and easy onboarding via email and phone
+verification" ([lens.xyz/docs/chain/overview](https://lens.xyz/docs/chain/overview),
+[lens.xyz/news/introducing-the-new-lens](https://lens.xyz/news/introducing-the-new-lens)).
+
+**`UNVERIFIED:` Lens account count, current registration cost, and Lens Chain contract addresses.** I
+could not confirm these from primary sources in this session and I will not guess. Where to look
+next: (a) the `LensFactory` / account-registry contract on Lens Chain via
+[explorer.lens.xyz](https://explorer.lens.xyz) — read the equivalent of an `idCounter`; (b)
+[lens.xyz/docs/protocol/accounts/create](https://lens.xyz/docs/protocol/accounts/create) for the fee
+model; (c) whether the old Polygon `LensHub` (`0xDb46d1Dc155634FbC732f92E853b10B288AD5a1d`) is
+frozen — **note I have not re-verified that address this session, treat it as recall, not a citation.**
+
+**Structural read, which does not depend on the missing numbers:** the entire design goal of new Lens
+is *cheap, abstracted, low-friction account creation*. That is the same design goal that took
+Farcaster's registry from 1.1M to 3.3M FIDs in nine months. A protocol optimising for onboarding
+friction is, by construction, optimising *against* sybil cost. Expect Lens handles to be worth what
+Farcaster FIDs are worth: about nothing. The one exception worth checking is whether Lens **namespace
+/ handle** registration has a length-tiered price (the old Lens did) — a short handle with a real
+price is a cost-bearing signal in the same way Farcaster Pro is.
+
 ### B.4 Discord / Telegram
+
+**Discord: $0.22 fresh, $2.44–5.55 for a 2017-vintage account** (B.8). "Server tenure" and roles are
+worth nothing: an attacker buys aged accounts in bulk and joins servers for free. Discord exposes no
+account-creation date via any public API a proof system could attest to — *although* the snowflake ID
+encodes creation timestamp, which is at least honestly derivable. That makes Discord tenure trivially
+*provable* and trivially *purchasable* — the worst possible combination, because it looks like a
+crisp cryptographic fact while carrying no evidence.
+
+**Telegram: $1.30 fresh (USA) up to $24.05 for 2019-vintage** (B.8). Telegram is materially costlier
+because accounts are **phone-bound**, so you are pricing SIM supply. This has two consequences:
+(1) Telegram tenure is a *usable-but-weak* proxy for phone possession; (2) it is therefore
+**not independent evidence** if the aggregate already contains a phone-verification or
+SMS-based signal — see Overlap.
+
 ### B.5 Reddit
+
+**The one social platform where the market price is genuinely non-trivial:** $27.71 for a 2019
+account, **$185–277.50 for a 2012–2015 account** (B.8). This is 100× the equivalent-vintage X account
+and it deserves an explanation, because the explanation tells us what actually creates sybil cost:
+
+- Reddit aggressively shadowbans and rate-limits new accounts, and many subreddits gate participation
+  on account age and karma. So a Reddit account only becomes *useful* after surviving a long,
+  actively-adversarial seasoning process. That process is what costs money — not the registration.
+- **This is the general principle: sybil cost comes from a platform that actively fights farms, not
+  from a registration fee.** Farcaster charges $0.20/yr and fights nobody, so a FID is worth $0.20.
+  Reddit charges nothing and fights constantly, so a good Reddit account is worth $200. When we score
+  a platform signal we should be scoring *the platform's own anti-abuse investment*, which we are
+  free-riding on.
+
+**Karma** is separable and purchasable — karma-farming is an established service, and accsmarket's
+adjacent "boosting" catalogue prices engagement actions from ~$0.001. `UNVERIFIED:` I did not find a
+current per-1,000-karma price; look at accsmarket boosting and SWAPD listings. Treat karma as
+**cheap**, and treat *age + karma + sustained comment history in moderated subs* as the ~$200 bundle.
+
+**Provability:** Reddit account age and karma are on the public profile, so a zkTLS provider template
+for Reddit is unusually easy and unusually robust (Pluto's original demo was Reddit + Venmo). Of all
+Part B signals, Reddit has the best ratio of *cost-to-fake* to *ease-of-proving*. If we integrate any
+social signal at all, **Reddit is the strongest candidate**, not X.
+
 ### B.6 GitHub
+
+The interesting asymmetry the brief flags is real: a multi-year contribution graph with merged PRs
+into other people's repos is **genuinely expensive to fabricate convincingly** — you cannot buy
+years of accepted code review. But this is defeated in one move: **you don't fabricate it, you buy
+the account.** `UNVERIFIED:` advertised ~$50 basic to $300+ for aged accounts with contribution
+history (B.8, vendor ad copy only).
+
+Two further problems:
+- **The contribution graph is trivially forgeable in the direction people usually measure it.** Green
+  squares come from commits to *your own* repos with *arbitrary author dates*; backdating a five-year
+  commit history is a shell script. Any scoring rule keyed on "contribution streak" or "commits in
+  the last N years" measures nothing. Only **merged PRs into repositories the account does not
+  control, reviewed by accounts that are themselves independently scored** is expensive — and that is
+  a graph computation, not a profile field.
+- GitHub is a *skill* signal, not a *personhood* signal, and it is heavily biased by geography,
+  profession and age. Using it in a personhood score is a fairness problem as much as a security one.
+
+**Provability:** GitHub has a generous public REST/GraphQL API, so this is one of the few signals we
+could verify **without zkTLS at all** — just an OAuth scope or even an unauthenticated API read of a
+claimed username, bound to an address by a signed gist. That is dramatically simpler, cheaper and
+more robust than any zkTLS integration. **Where a public API exists, zkTLS is the wrong tool.**
+
 ### B.7 Google / Apple / Microsoft OAuth
+
+**What an OAuth login actually proves: that someone currently controls an account at that provider.
+Nothing more.** It does not prove uniqueness, personhood, liveness, or age of the account. It is an
+*authentication* protocol being misread as an *identity* protocol.
+
+- A phone-verified Google account costs **$0.35–1.11** (B.8). "Sign in with Google" as a personhood
+  gate therefore has a security level of about **one dollar**.
+- Apple is the outlier worth respecting: Apple ID creation is friction-heavy, frequently tied to a
+  device and a payment method, and **Sign in with Apple** deliberately supports private relay email,
+  which destroys cross-app linkability (good for privacy, bad for us as a dedup key). `UNVERIFIED:`
+  aged-Apple-ID market price — Apple IDs *are* traded but mostly for App Store region/purchase
+  reasons; get a quote before assuming Apple is stronger.
+- Microsoft accounts are the cheapest of all — outlook/hotmail addresses are the *bundled email* in
+  the $0.02–0.20 X account listings above. That tells you exactly what a Microsoft account is worth.
+
+**A genuinely useful sub-signal exists and is usually ignored:** Google Workspace accounts on a
+*verified domain* (`hd` claim in the OIDC ID token) are issued by an accountable organisation that
+paid for a domain and per-seat licences. `hd=<some-real-company.com>` is a meaningfully better signal
+than a `@gmail.com` — it is the OAuth analogue of X's verification-by-organisation. Recall is low and
+it correlates with employment, but it is real. Consumer Gmail is not.
+
+**Attestation vs. OAuth — do not confuse them.** Google Play Integrity API and Apple DeviceCheck /
+App Attest attest to a *genuine, unmodified device and app instance*. That is a real anti-bot signal
+with real cost (you need a physical unrooted device, or an expensive emulator-detection bypass), and
+it is **completely different from an OAuth login**. If we want a cheap anti-automation signal from
+the mobile platforms, that is the API to look at, not sign-in. `UNVERIFIED:` current cost of
+farming Play Integrity `MEETS_DEVICE_INTEGRITY` at scale — this is worth its own research task,
+because it may be the best cheap signal in this whole document.
 ### B.8 The aged-account market (price table)
 
 **This is the most important table in the file.** For a purchasable credential, the market price of a
@@ -653,6 +784,203 @@ argument for how to weight this category.
 
 
 ## Verdict
+
+### Verdict 1 — Is zkTLS a viable input for us in 2026, or a demo technology?
+
+**Neither, quite: it is real infrastructure aimed at a different problem than ours. For personhood
+specifically, it is close to a demo technology, and we should skip it in v1.**
+
+The case against, in order of decisiveness:
+
+1. **The trust model is wrong for an adversary with money.** Every shipping design has a single party
+   — a proxy operator, or an Intel enclave — who can mint arbitrary proofs if compromised. zkPass's
+   own documentation concedes that MPC-mode collusion "could go undetected"; Reclaim's own blog
+   concedes the proxy is assumed honest. Undetectable collusion means restaking and slashing cannot
+   fix it, because there is nothing to slash *on*. A sybil farmer's entire job is to find the cheapest
+   party to compromise, and in zkTLS that party is a company's server. Contrast a passport chip
+   signature or an iris hash: those have no bribable intermediary.
+2. **A perfect proof of a $2 fact is worth $2.** This is the argument that ends the discussion. Even
+   granting zkTLS perfect soundness, it transports the signals in Part B — and Part B tops out at
+   $200–300 per sybil and mostly sits under $5. zkTLS cannot add evidence that was not in the
+   underlying account.
+3. **The environment is turning against it.** JA4+ fingerprinting is universal in 2026 and the
+   published classifiers are at ~0.99 accuracy; PQ-TLS became the default handshake in Q1 2026 and
+   plausibly breaks MPC-mode three-party handshakes outright. Proxy-mode traffic originates from
+   datacenter ASNs, which is exactly what these systems flag. **The failure mode is not just "the
+   proof fails" — it is "our onboarding flow gets the user's real account flagged."**
+4. **The UX tax is the highest in the landscape** — browser extension or native SDK, plus typing a
+   platform password into a third-party surface — for the lowest-value credential in the landscape.
+   That is the wrong end of every trade-off.
+5. **Where a public API exists (GitHub, Reddit profiles, Farcaster hubs), zkTLS is strictly the wrong
+   tool** — more moving parts, more trust, more friction, for the same fact.
+
+The case *for*, honestly stated: the projects are not vaporware. Reclaim, Primus and Opacity are all
+pushing code this week, Primus has real verifier contracts on Arbitrum/BSC, Opacity has real native
+mobile SDKs and $12M. If our product later needs **non-personhood** attestations — income, employment,
+order history, exchange balances, gig-work ratings — zkTLS is the only way to get them, and Opacity's
+DePIN customer list shows that market is where the category has actually found fit. So:
+
+**Integrate later, and for a different reason.** Do not build zkTLS into the personhood score. Keep a
+thin, swappable adapter interface so that if a customer wants "prove you have >$X on Coinbase" or
+"prove your Uber rating", we can plug Reclaim or Primus in behind it. Revisit for personhood only if
+someone ships a **threshold notary** (TACEO's direction) that removes the single bribable party —
+that would be a genuine change in kind, not degree.
+
+**Before spending another day on this, run the one experiment that settles it:** 50 real proof
+attempts against X, Reddit and GitHub via Reclaim and Primus, from residential and datacenter IPs,
+measuring success rate, median latency, and whether any test account gets flagged. Every vendor claim
+in Part A is downstream of that number and I could not find it published anywhere.
+
+### Verdict 2 — Given every social signal is purchasable, can they ever add real evidence?
+
+**As positive evidence: essentially no. As negative evidence: yes, and this is the right way to use
+them — but with a serious caveat that we must not paper over.**
+
+**Why positive scoring fails.** The security level of a positive rule is the market price of the
+credential, and Part B says that price is $0.20–$5 for almost everything, $30–300 for the good tail.
+A farm buys 10,000 aged Discord accounts for $30k and passes any "aged social account" rule
+completely. Worse, positive rules are **regressive in exactly the wrong direction**: they are trivial
+for the funded attacker and burdensome for the ordinary user, who must hand over social accounts they
+had no reason to link. Worst of all, several are **rentable** — the same $84/yr blue-check account can
+service unlimited verification events, so the attacker's *amortised* cost is far below even the
+purchase price.
+
+**Why negative scoring is different, mathematically.** The asymmetry is real and worth stating
+precisely. A positive rule is defeated by the *cheapest* way to acquire the signal — attacker cost is
+`min` over acquisition methods. A negative rule ("no history anywhere is a red flag") must be defeated
+on *every* axis simultaneously — attacker cost is a `sum`, and it multiplies with the number of
+independent axes. Buying one aged Discord account is $5; assembling a *coherent* identity with an
+aged X account, an aged Reddit account with karma in moderated subs, a GitHub account with merged PRs,
+and a Farcaster graph position — for **each** of 10,000 sybils — is a different order of problem. Not
+because any one piece is expensive, but because coherence across pieces is expensive and does not
+bulk-discount.
+
+So the defensible configuration is:
+
+- **Never award points for having a social account.** Zero. Not a small number — zero.
+- **Use absence and incoherence as a penalty or a routing signal**: a wallet with no history on any
+  platform, or with accounts whose creation dates cluster suspiciously, or whose graph neighbours are
+  each other, gets routed to a *stronger* check (document, biometric) rather than being rejected.
+- **Only ever consume the cost-bearing variants as small bonuses:** Farcaster Pro ($120/yr,
+  on-chain-verifiable via `TierRegistry`), X verification-by-organisation, Google Workspace `hd`
+  claim, a Reddit account with 2012–2015 vintage *and* karma in moderated subreddits. These have
+  real recurring cost and high precision; all have terrible recall, so they can only ever be bonuses.
+- **Read graphs, not counts.** The only follower-graph reading that survives is trust propagation from
+  an independently-verified seed set. A threshold on a follower number is worthless.
+
+**Now the caveat, honestly.** Negative signalling is not free, and I do not want to sell it as the
+clever escape hatch:
+
+1. **It has a brutal false-positive profile.** "No social history" describes privacy-conscious users,
+   people in jurisdictions where pseudonymity is safety, older users, and users outside the
+   English-language crypto-social bubble — i.e. exactly the populations a personhood system must not
+   exclude. A red flag that fires on the privacy-conscious and not on the funded farmer is worse than
+   useless; it is actively unjust. **Mitigation is structural: a negative signal may only ever
+   *escalate* to a stronger check, never deny.** If it can deny, we have built a system that punishes
+   privacy.
+2. **It is not a credential, it is fraud scoring.** Sybil-farm detection is a statistical, adversarial,
+   continuously-decaying ML problem — a different product with different economics from issuing and
+   aggregating personhood credentials. It needs labels, retraining, and it degrades silently. We
+   should be clear-eyed that shipping this means running a fraud team, and we should not accidentally
+   commit to that inside a "credential aggregator" product.
+3. **The coherence argument has an expiry date.** "Coherent multi-platform history is expensive to
+   fabricate" was much more true before generative models could produce years of plausible posting
+   history cheaply. In 2026, the cost of *coherence* is falling faster than the cost of *accounts*.
+   I would not build a five-year bet on it.
+
+**Bottom line:** social signals belong in the aggregator as a **negative/routing layer with an
+escalation-only policy**, plus a **short whitelist of cost-bearing bonuses** (Farcaster Pro, X org
+verification, Workspace `hd`, aged-and-seasoned Reddit). They must contribute **no positive weight**
+in the headline humanity score, and we should not use zkTLS to obtain them.
+
 ## Overlap with other protocols
+
+Double-counting is the main risk this file identifies for the aggregate score:
+
+| Signal | Shares a trust root with | Consequence |
+|---|---|---|
+| Telegram tenure | **any phone/SMS-verification protocol** (accounts are phone-bound) | Not independent. If we score both, we count SIM supply twice. |
+| X Premium (blue check) | phone verification (Premium requires a verified phone) + **payment card** | Partially dependent on the same two roots. |
+| Google / Microsoft OAuth | phone verification (PVA accounts), and **each other** — the email bundled with a cheap X or Reddit account is usually an outlook/hotmail address from the same seller | Strongly correlated: a single vendor supplies the email *and* the social account. Scoring "has Google + has X" is often scoring one $0.20 purchase. |
+| Farcaster verified addresses | whatever the **linked Ethereum address** already scores | Explicitly a bridge — do not let a FID inherit score from an address and then also score the address. |
+| Farcaster Pro / X Premium / Workspace | **payment instrument** (card / USDC wallet) | All are "someone paid money", i.e. the same underlying scarce thing. Cap the combined contribution. |
+| Any zkTLS-proved fact | the **zkTLS vendor** | Two facts proved via the same Reclaim attestor set are *one* trust assumption, not two. |
+| Reddit vintage, GitHub PR history | genuinely more independent — cost comes from *time under adversarial moderation*, not from a purchasable root | The only two worth treating as semi-independent. |
+
+Cross-cutting note for the orchestrator: **the phone number is the hidden common root under most of
+Part B.** Telegram, X Premium, PVA Gmail and most "aged account" listings all bottom out in SIM
+supply. Whatever the phone-verification write-up concludes about SIM-farm economics is therefore the
+*real* ceiling on this entire category, and Part B should be weighted as largely-dependent on it
+rather than additive.
+
 ## Open questions for us
+
+1. **Does zkTLS against X actually work today?** Nobody publishes a success rate. Run 50 attempts via
+   Reclaim and Primus from residential and datacenter IPs; measure success, latency, and account-flag
+   rate. This is the single highest-value experiment in this file. (A.9)
+2. **PQ-TLS × MPC-TLS.** Does `X25519MLKEM768` break three-party handshakes, and what is TLSNotary's
+   plan? Ask the maintainers directly. If MPC-TLS cannot do PQ, the only surviving models are
+   proxy-witness and TEE — both of which have a bribable party. (A.9)
+3. **What caused the Farcaster registration surge (Dec 2025 – Mar 2026, +1.59M FIDs) and its collapse
+   in April 2026?** Identify the incentive program. If it was an airdrop/points season, ~2M FIDs are
+   farm inventory and any FID-based rule must exclude that cohort. (B.2)
+4. **How many Farcaster Pro subscribers are there?** Index `TierRegistry` purchase events on Base
+   (`0x00000000fc84484d585C3cF48d213424DFDE43FD`). This gives us the exact recall of the one Farcaster
+   signal that costs something. (B.2)
+5. **Lens numbers.** Account count, registration cost, Lens Chain registry address — all
+   `UNVERIFIED:` here. Read the registry on `explorer.lens.xyz`. (B.3)
+6. **Reclaim per-chain verifier addresses** — I could not retrieve `/onchain/solidity/supported-networks`.
+   Needed before any integration; never source an address from a third party. (A.2)
+7. **Is a fraud proof possible against a lying proxy-witness attestor?** If not, Reclaim's and
+   Opacity's slashing is decorative and their "decentralised attestor" story does not change the trust
+   model at all. This determines whether the category can ever be fixed. (A.0, A.2, A.4)
+8. **Play Integrity / App Attest farming cost.** Possibly the best cheap anti-bot signal available and
+   entirely outside the zkTLS frame. Deserves its own research task. (B.7)
+9. **Aged-account bulk pricing.** All B.8 figures are single-unit retail. Get 1,000-unit quotes; the
+   real attacker cost is likely 2–10× lower and the table's conclusions get correspondingly worse.
+10. **Account *rental* market pricing** for blue-check X, aged Reddit, and Discord. Rental amortises
+    the credential across many verifications and is the true attacker cost for a per-event check.
+
 ## References
+
+**Primary — measured by me on-chain (2026-07-24, `mainnet.optimism.io` / `mainnet.base.org`)**
+- Farcaster `IdRegistry` OP Mainnet `0x00000000Fc6c5F01Fc30151999387Bb99A9f489b` — `idCounter()` = 3,343,572
+- Farcaster `IdGateway` OP Mainnet `0x00000000Fc25870C6eD6b6c7E41Fb078b7656f69` — `price()` = 0.00010686 ETH
+- Farcaster `StorageRegistry` OP Mainnet `0x00000000fcCe7f938e7aE6D3c335bD6a1a7c593D` — `usdUnitPrice()` = $0.20/yr
+- Farcaster `TierRegistry` Base `0x00000000fc84484d585C3cF48d213424DFDE43FD` — `tierInfo(1)` = $120.00/yr, 30–365 days, USDC
+- Monthly `idCounter()` archive samples 2025-07-24 → 2026-07-24 (table in B.2)
+
+**Primary — protocol docs & repos**
+- TLSNotary: [github.com/tlsnotary/tlsn](https://github.com/tlsnotary/tlsn) — README "should not be used in production"; releases API: `v0.1.0-alpha.15` 2026-05-21; last commit 2026-06-23
+- Reclaim: [attestor-core](https://github.com/reclaimprotocol/attestor-core) · [docs](https://docs.reclaimprotocol.org/) · [onchain quickstart](https://docs.reclaimprotocol.org/onchain/solidity/quickstart) · [reclaimprotocol.org](https://www.reclaimprotocol.org/)
+- Reclaim, "Proxying Is Enough": [blog.reclaimprotocol.org/posts/proxying-is-enough](https://blog.reclaimprotocol.org/posts/proxying-is-enough) — honest-proxy assumption, 10⁻⁴⁰ bound
+- Reclaim, "The zk in zkTLS": [blog.reclaimprotocol.org/posts/zk-in-zktls](https://blog.reclaimprotocol.org/posts/zk-in-zktls)
+- zkPass technical overview: [docs.zkpass.org/overview/technical-overview](https://docs.zkpass.org/overview/technical-overview) — 3P-TLS, VOLEitH, collusion "could go undetected", ~32MB MPC upload
+- zkPass whitepaper: [paper.zkpass.org/zkPass_WP2025.pdf](https://paper.zkpass.org/zkPass_WP2025.pdf) · [tech.pdf](https://paper.zkpass.org/tech.pdf)
+- Primus: [docs.primuslabs.xyz/primus-network/tech-intro](https://docs.primuslabs.xyz/primus-network/tech-intro/) · [zktls-contracts](https://github.com/primus-labs/zktls-contracts) (addresses read from `broadcast/` artifacts)
+- Pluto: [docs.pluto.xyz](https://docs.pluto.xyz/) · [TEE mode](https://pluto.xyz/blog/web-proof-techniques-tee-mode) · [Origo mode](https://pluto.xyz/blog/web-proof-techniques-origo-mode) · [github.com/pluto](https://github.com/orgs/pluto/repositories) (org last push 2026-02-12)
+- TACEO, multiparty notaries: [blog.taceo.io/mpc-zktls](https://blog.taceo.io/mpc-zktls)
+- Lens: [lens.xyz/docs/chain/overview](https://lens.xyz/docs/chain/overview) · [introducing the new Lens](https://lens.xyz/news/introducing-the-new-lens)
+- GitHub API (org repo push timestamps for tlsnotary, reclaimprotocol, primus-labs, OpacityLabs, pluto), queried 2026-07-24
+
+**Primary — market pricing (fetched 2026-07-24)**
+- [accsmarket.com/en/catalog/twitter](https://accsmarket.com/en/catalog/twitter) · [aged X](https://accsmarket.com/en/catalog/twitter/s-otlezhkoj-17)
+- [accsmarket.com/en/catalog/reddit](https://accsmarket.com/en/catalog/reddit)
+- [accsmarket.com/en/catalog/games/discord](https://accsmarket.com/en/catalog/games/discord)
+- [accsmarket.com/en/catalog/telegram/telegram-s-otlezhkoj](https://accsmarket.com/en/catalog/telegram/telegram-s-otlezhkoj)
+- [accsmarket.com/en/catalog/gmail](https://accsmarket.com/en/catalog/gmail)
+- [playerup.com/accounts/githubaccount](https://www.playerup.com/accounts/githubaccount/) (GitHub, vendor listings only)
+
+**Secondary (labelled as such)**
+- Shoal Research, "zkTLS: Verifiable Data Composability": [shoal.gg/p/zktls-verifiable-data-composability](https://www.shoal.gg/p/zktls-verifiable-data-composability)
+- Gate Learn, "zkTLS Explained": [gate.com/learn/articles/zk-tls-unlocking-crypto-consumer-apps/7509](https://www.gate.com/learn/articles/zk-tls-unlocking-crypto-consumer-apps/7509)
+- BlockBeats zkTLS overview (Clique TEE model): [en.theblockbeats.news/news/57312](https://en.theblockbeats.news/news/57312)
+- The Block, Opacity $12M seed: [theblock.co/post/321160](https://www.theblock.co/post/321160/opacity-network-funding-zk-data-verification)
+- Vinayak Kurup, "Opacity Network: Trust but Verify": [medium.com](https://medium.com/@vinayak_35433/opacity-network-trust-but-verify-eb819ebb0b0a)
+- Primus × Phala: [medium.com/@primuslabs](https://medium.com/@primuslabs/primus-x-phala-network-build-trustless-zktls-with-tee-332a26d48c83)
+- Stanford Blockchain Review #74 (DECO): [review.stanfordblockchain.xyz/p/74-cryptography-research-spotlight](https://review.stanfordblockchain.xyz/p/74-cryptography-research-spotlight)
+- X Premium pricing 2026: [tweethunter.io](https://tweethunter.io/blog/twitter-blue-vs-x-premium) · [tweetbe.at](https://tweetbe.at/blog/x-verification-guide-2026/) · [techbuzz.ai on 3-tier org verification](https://www.techbuzz.ai/articles/x-splits-business-verification-into-3-tier-premium-system)
+- TLS fingerprinting 2026: [proxylabs.app/blog/ja4-tls-fingerprinting-2026](https://proxylabs.app/blog/ja4-tls-fingerprinting-2026) · [cside.com/blog/tls-fingerprinting](https://cside.com/blog/tls-fingerprinting)
+- Post-quantum TLS & bot detection: [scrapfly.io/blog/posts/post-quantum-tls-bot-detection](https://scrapfly.io/blog/posts/post-quantum-tls-bot-detection)
+- arXiv 2602.09606, "When Handshakes Tell the Truth: Detecting Web Bad Bots via TLS Fingerprints": [arxiv.org/abs/2602.09606](https://arxiv.org/abs/2602.09606)
+- IETF `draft-ietf-tls-ecdhe-mlkem`: [datatracker.ietf.org](https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/)

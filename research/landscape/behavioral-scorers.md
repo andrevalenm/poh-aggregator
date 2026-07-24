@@ -1,8 +1,5 @@
 # Raw behavioural & heuristic signals
 
-> STATUS: in progress — restarted 2026-07-24 after a host power failure destroyed the first pass.
-> Sections 1 and 2 are written; 3-7 in progress.
-
 **One-liner:** The evidence class that is free on every user and the weakest in the taxonomy —
 behavioural signals measure *effort*, *non-automation* and *correlation*, and never *uniqueness*.
 **Category:** behavioral (BRIEF.md §1, class 5)
@@ -16,6 +13,9 @@ nothing as *positive* per-user evidence of humanity, and §6's base-rate arithme
 them to gate individual users at plausible sybil rates produces mostly false positives — i.e. it
 excludes real humans from money. Recommended aggregate contribution to a personhood score: **cap the
 entire behavioural class at ~10-15% of maximum score, and never let it be sufficient on its own.**
+And one hard precondition, measured rather than argued (§2 Precedent C, §6.2a): **no detector ships
+without a per-protocol null hypothesis.** The obvious generalisation of the Circles finding, applied
+to Proof of Humanity v2, flags **94.4% of an honest registry**.
 
 ---
 
@@ -506,7 +506,18 @@ The three statistics that *did* falsify the farm hypothesis on PoH, generalised:
 
 ### D7. Detector-catalogue design rules (the part to carry into the product spec)
 
-1. **Operate on the transitive closure, always.** Circles: 59× understatement from single-hop.
+0. **State the topology precondition, or do not ship the detector.** For every detector, answer in
+   writing: *what does this look like on an honest population of this protocol's shape?* Then
+   calibrate against that null. PoH is the proof of why: root concentration at 94.4% is the
+   **honest** signature of an invite-gated registry, and a detector without a stated null would have
+   excluded 94% of a real user base. **A detector without a null hypothesis is a shape recogniser,
+   and honest populations have shapes.** Corollary: detectors are **per-protocol**, not universal —
+   the same statistic is diagnostic on Circles and meaningless on PoH.
+1. **Operate on the transitive closure — then check whether the closure is informative.** Circles:
+   59× understatement from single-hop. PoH: the closure is a structural artefact carrying zero
+   information. Mechanical test: if distinct roots are `O(1)` rather than `O(N)`, the honest topology
+   is a tree and you must switch from concentration statistics to **shape** statistics (subtree width
+   at shallow depth, intra-subtree timespan, depth-vs-registration-age correlation).
 2. **Output is a group, not a person.** Every detector here returns "these identities are
    correlated". Converting that into an individual exclusion requires an additional inference the
    evidence does not support (Ohlhaver needed Telegram DMs, jurisdiction priors, and forum
@@ -904,6 +915,30 @@ addresses) and fails precisely where a personhood aggregator would apply it (aft
 have already removed most sybils). **The signal is least useful exactly where it sits in our
 pipeline.** That is not a tuning problem; it is arithmetic.
 
+### 6.2a A measured false-positive rate of 94%, from a detector that looked obviously right
+
+The table above assumes the classifier's specificity is at least *approximately* known. In practice
+the dominant failure is not a mis-tuned threshold but a **mis-specified null hypothesis**, and we
+have a measured instance from this project's own research.
+
+The Circles finding — one `originInviter` behind 27.5% of registrations, visible only after
+unwinding 1,687 proxies — generalises to an obvious-looking detector: *collapse the invitation forest
+and flag concentrated roots.* Run against Proof of Humanity v2's 1,553 vouches, that detector returns
+**6 roots for 1,542 identities, one root at 94.4%**. Every instinct says farm. It is not: PoH is an
+invite-gated registry, so **every member descends from genesis by construction**, and the 94.4% is
+the *honest* signature. Median chain depth rises monotonically with registration order
+(7 → 14), the dominant root has one direct child, and its depth-3 subtree spans 635 days. Full
+method and data: `research/protocols/poh-kleros-brightid-idena.md` § "ADDENDUM — the vouch-graph
+test"; script `research/scripts/vouch_sweep.py`.
+
+**A specificity of 5.6% — that is what "flag the concentrated root" scores on this population.** Not
+95%, not 99%. Plug that into the §6.2 table and precision at any plausible base rate is
+indistinguishable from zero. And note *why* it happened: not because the detector was badly
+implemented, but because it was validated on one protocol's topology and deployed against another's.
+That is the realistic way behavioural detection fails in production, and it is far more dangerous
+than a threshold error because **it fails silently and confidently, flagging almost everyone while
+producing a plausible-sounding story about why.**
+
 ### 6.3 Four compounding problems on top of the base rate
 
 1. **We cannot measure our own false-positive rate, because there is no ground truth.** The only
@@ -953,6 +988,12 @@ Four constraints, all falling out of the above:
 4. **Cap the class.** Behavioural signals should contribute a **bounded fraction (~10-15%)** of the
    maximum score and must never be sufficient alone. They are a tiebreaker and a fraud-triage input,
    not evidence of personhood.
+5. **Calibrate per protocol, and refuse to ship a detector without its null.** §6.2a is the warrant:
+   a detector that is correct on Circles scores 5.6% specificity on PoH. Our architecture must treat
+   "detector D, calibrated against protocol P's honest topology" as the unit of deployment — never
+   "detector D" alone. A shared detector library with per-protocol nulls and per-protocol measured
+   flag-rates; a hard rule that any detector flagging more than a few percent of a protocol's
+   population is presumed broken until proven otherwise.
 
 ---
 
@@ -975,7 +1016,8 @@ Evidence class: **P1** = not-automated, **P2** = costly-to-produce, **P3** = not
 | 8 | Counterparty graph position | P3 | Moderate | High per-user | Yes | Clustering input only |
 | 9 | Funding-graph clustering, transitive (D2) | P3 | Low (one CEX/bridge hop breaks it) | High (families, gas gifting) | Yes | **Medium — entity-collapse input** |
 | 10 | Sweep / consolidation detection (D3) | P3 | Cheap once known; **perishable** | Medium | Yes | **Medium-high today, decaying** |
-| 11 | Invitation/attestation forest concentration after transitive collapse (D4) | P3 | **High — needs genuinely independent roots** | Medium (real onboarding operators) | Yes | **Highest in file — build first** |
+| 11a | Invitation-forest **root concentration** after transitive collapse (D4a) | P3 | Moderate | **Catastrophic on tree-topology protocols — measured 94.4% flag rate on an honest PoH registry** | Yes | **Only for non-tree protocols (Circles-like), with an explicit precondition check** |
+| 11b | Invitation-forest **subtree shape**: width at shallow depth, intra-subtree timespan, depth-vs-registration-age correlation (D4b) | P3 | **Highest in file — farm must recruit real intermediate inviters and wait** | Medium (high-volume honest onboarding operators) | Yes | **Highest in file — build first** |
 | 12 | NFT / DeFi holdings | P2 | Purchasable; wash-tradeable | High | Yes | **Do not use** |
 | 13 | Cross-chain footprint | P2/P3 | Linear multiplier on §7.7 | High | Yes | Input to D5 only |
 | **Cross-protocol (aggregator-exclusive)** |
@@ -1008,10 +1050,17 @@ Evidence class: **P1** = not-automated, **P2** = costly-to-produce, **P3** = not
 | 37 | Client-side proof-of-work | P2 | Farms have GPUs; users have phones | Medium, regressive | Yes | **Do not use** (DoS only) |
 | 38 | Non-transferable issuance burn (Circles pattern) | P2 | Cannot be bought with outside capital | Medium | Yes | **Interesting — design pattern to copy** |
 
+**Table caveat that outranks the table:** every row above is conditional on the protocol's honest
+topology (§2, D7 rule 0). "Cost to fake" and "false-positive risk" are *per protocol*, not universal.
+Row 11a is the worked example: identical statistic, genuine finding on Circles, 94.4% false-positive
+rate on PoH.
+
 ### 7.1 Worth building — the short list
 
-1. **D4: invitation/attestation forest concentration after transitive collapse.** Highest
-   value-per-effort in the file. Circles proves the naive version is wrong by 59×.
+1. **D4b: invitation-forest *subtree shape*** — width at shallow depth, intra-subtree timespan, and
+   depth-versus-registration-age correlation. Highest value-per-effort in the file, and the most
+   expensive detector for a farm to defeat. **Not** root concentration: that is D4a, it is valid only
+   where the honest topology is not a tree, and on PoH it flags 94% of a legitimate registry.
 2. **D5: cross-protocol co-registration timing, ordering, and coverage clustering.** The only thing
    here that *requires* an aggregator to exist. Ordering fingerprints in particular look cheap and
    under-exploited.
@@ -1039,6 +1088,10 @@ Evidence class: **P1** = not-automated, **P2** = costly-to-produce, **P3** = not
   adversary's hardware over the user's.
 - **Any individual-level behavioural exclusion.** §6.2's arithmetic says most of the people we would
   exclude are real.
+- **Any detector shipped without a per-protocol null hypothesis** — including ones on the "worth
+  building" list. §6.2a is the measured proof that a *correct* detector applied to the wrong topology
+  is worse than no detector: it flags 94% of an honest population and tells a convincing story while
+  doing it.
 
 ---
 
@@ -1048,27 +1101,40 @@ Evidence class: **P1** = not-automated, **P2** = costly-to-produce, **P3** = not
    prevent cross-protocol linkage. Our best detector requires exactly that linkage. What is the
    weakest data retention (day-buckets? salted rolling hashes? MPC?) that preserves useful power?
    This is the central design tension of the product and it should be decided explicitly.
-2. **What is the actual residual sybil rate** in a population that has already presented ≥1 strong
+2. **The PoH residual (highest-priority concrete follow-up).** The vouch sweep refuted the
+   *concentrated* farm hypothesis but not a **distributed** one — `requiredNumberOfVouches() == 1`
+   makes each vouch cheap to source, so a farm could buy 1,470 vouches from 808 unrelated vouchers
+   and produce exactly the observed broad base. Next query on the same data: the **vouchers' own
+   registration ages**, and whether *they* cluster in registration time. Generalise the worry:
+   **broad, cheap, diffuse sourcing defeats every concentration statistic in this file**, and it is
+   the natural adaptation once concentration detectors are known. What detects it?
+3. **What is the actual residual sybil rate** in a population that has already presented ≥1 strong
    credential? §6.2 is parameterised on a guess of 2%. If it is really 0.5%, behavioural gating is
    even more indefensible; if it is 20%, the picture changes materially. **We should try to measure
    this** — possibly by running detectors in shadow mode on an early integration and reporting only
    aggregate cluster statistics.
-3. **Ablation numbers for time-of-day vs. gas-price vs. graph-embedding features** from Béres et al.
+4. **Ablation numbers for time-of-day vs. gas-price vs. graph-embedding features** from Béres et al.
    (arXiv:2005.14051) — I could not extract them from the PDF. Read the ar5iv/HTML version or the
    authors' code before we implement any timing feature.
-4. **A current spot price for aged EVM wallets and for aged Web2 accounts.** I deliberately did not
+5. **A current spot price for aged EVM wallets and for aged Web2 accounts.** I deliberately did not
    transact and could not find primary quotes. Without these, several "cost to fake" cells above are
    order-of-magnitude judgements, not measurements.
-5. **DeviceCheck's exact persistence semantics** (does the 2-bit state survive OS upgrade, device
+6. **DeviceCheck's exact persistence semantics** (does the 2-bit state survive OS upgrade, device
    migration via Quick Start, iCloud restore?). Confirm against Apple's documentation before
    designing a per-device issuance cap on it.
-6. **Legal opinion needed** on (a) whether sybil prevention can be "strictly necessary" under Art.
+7. **Legal opinion needed** on (a) whether sybil prevention can be "strictly necessary" under Art.
    5(3) ePD, and (b) whether behavioural biometrics used for bot/not-bot classification (as opposed
    to identification) escape GDPR Art. 9. Both materially change §3.
-7. **Do we ever want to be the entity that publishes a sybil list?** LayerZero had to pause its
+8. **Do we ever want to be the entity that publishes a sybil list?** LayerZero had to pause its
    bounty under a flood of reports. Publishing exclusions creates an adversarial relationship with
    users and a reputational liability for our false positives. A *discount* has no equivalent
    blast radius.
+9. **We need a per-protocol topology catalogue** before any detector ships: for each protocol we
+   route to, record whether its honest registration graph is a tree (invite-gated) or a web
+   (unilateral cheap edges), whether it has a canonical funding path, whether it has a deadline or
+   campaign structure, and what its measured honest distributions look like for each statistic in
+   §2. This is a small, concrete, high-value engineering artefact and it is a **precondition** for
+   the detector work, not a follow-up to it. The PoH and Circles sweeps are the first two entries.
 
 ---
 
@@ -1135,9 +1201,23 @@ Evidence class: **P1** = not-automated, **P2** = costly-to-produce, **P3** = not
 - SMS activation pricing comparison 2026 —
   https://www.yoobfriv.com/sms-activation-services-in-2026-pricing-breakdown-across-7-platforms/
 
+**Primary — measurements run by this project (2026-07-24)**
+- **Proof of Humanity v2 vouch-graph sweep** — all 1,553 `VouchRegistered` events
+  (topic0 `0x32d9c9fa0d68d72716d8ce6fb31141216cc8a7059b83f77c3a5c59041029ad76`) on
+  `0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc`, Gnosis, from deploy block 35,846,827 via
+  `rpc.gnosischain.com`. Write-up: `research/protocols/poh-kleros-brightid-idena.md`
+  § "ADDENDUM — the vouch-graph test". Reproduction: `research/scripts/vouch_sweep.py`.
+  **This is the source of §2 Precedent C, §2 D4a/D4b, and §6.2a — the single most load-bearing
+  measurement in this file.**
+- **Circles invitations-at-scale measurement** — `CrcV2_InvitationsAtScale.RegisterHuman(human,
+  originInviter, proxyInviter)`; one `originInviter` behind 2,754/10,000 (27.5%) recent
+  registrations via 1,687 proxy addresses, versus 47/10,000 for the top direct inviter. Write-up:
+  `research/protocols/circles.md`.
+
 **Internal cross-references**
 - `research/references/ohlhaver-corpus.md` — the Idena detection method in full
 - `research/protocols/circles.md` — `originInviter` / `proxyInviter` measurement
+- `research/protocols/poh-kleros-brightid-idena.md` — the vouch-graph counterexample
 - `research/landscape/sybil-incidents-antipatterns.md` — farm economics, KYC rental, credential markets
 - `research/landscape/reputation-scoring-products.md` — the vendors selling these signals
 - `research/landscape/prior-art-scoring.md` — scoring mathematics

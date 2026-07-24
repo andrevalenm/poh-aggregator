@@ -488,7 +488,112 @@ Kenya's Huduma Namba (NIIMS) was **struck down by the High Court in 2021** for l
 protection impact assessment, then relaunched as **Maisha Namba** in 2023, which itself faced court
 challenges. `UNVERIFIED:` 2026 status. The point for us: **African foundational ID rollouts are
 routinely halted by courts**, so any coverage assumption built on them should be discounted heavily.
-### USA — mDL deployments, NIST, and state-led ZK
+### USA — mDL deployments, NIST, and what "state-led ZK" actually means
+
+The USA has **no national ID**. Identity is state-level (driver's licence / ID card) plus federal
+documents (passport, SSN — which is legally not an identity document and is trivially compromised).
+REAL ID sets federal standards for state licences but issues nothing itself.
+
+**mDL deployment — the real numbers.** As of **mid-January 2026**, AAMVA lists **21 US states plus
+Puerto Rico** with mDLs accepted at TSA checkpoints: AK, AR, AZ, CA, CO, DE, GA, HI, IL, IA, LA, KY,
+MD, MT, NM, NY, ND, OH, UT, VA, WV (+PR). Only **AL, ME, MA, NE** have not started work.
+(Secondary compilation: https://regulaforensics.com/blog/mobile-drivers-license-verification/ ;
+AAMVA topic page: https://www.aamva.org/topics/mobile-driver-license )
+Actual *citizen uptake* is the weak point: adoption is in the low single-digit percents of licence
+holders in most states (https://www.biometricupdate.com/202506/american-mdl-uptake-suggests-digital-id-mass-adoption-caught-in-the-slow-lane).
+**Do not model US mDL as population-scale in the next 2-3 years.**
+
+**The consumability gate is the trust list, and it is a real gate.** ISO 18013-5 mDL verification
+requires the verifier to hold the issuing authority's **IACA root certificate**. AAMVA runs the
+**mDL Digital Trust Service (DTS)**: issuing authorities upload their public keys, AAMVA assembles
+them into a list "that can be downloaded by relying parties."
+https://www.aamva.org/identity/mobile-driver-license-digital-trust-service
+`UNCLEAR:` whether DTS list download is open or requires an AAMVA relying-party agreement/account.
+**This is the single most important open question for US mDL consumability and it belongs jointly to
+me and the ISO mdoc agent — please make sure one of us actually answers it.** If the VICAL/trust
+list is publicly downloadable, then a permissionless verifier *can* cryptographically validate a US
+mDL presentation; if it requires an agreement, it cannot. Everything else (the CBOR/COSE parsing,
+device-signed session transcript) is open standard and implementable.
+Note also the separate legal layer: several states' mDL statutes restrict who may *request* an mDL
+and impose obligations on readers, independent of whether the crypto validates.
+
+**NIST — research and standards, not deployment.**
+- **SP 800-63-4 Digital Identity Guidelines** (https://pages.nist.gov/800-63-4/) now explicitly
+  recognise **mDLs and verifiable credentials as acceptable identity evidence**, and discuss
+  selective disclosure, unlinkability and privacy-enhancing technology as design goals. It is
+  guidance for federal agencies; it **deploys nothing**.
+- NIST's **Privacy-Enhancing Cryptography (PEC)** project and NCCoE digital-identity work track
+  ZKPs; NIST/DHS have funded ZKP research (DHS SVIP). Again: **research**.
+- **Verdict on "state-led ZK" in the USA: none deployed.** No US government issues a
+  zero-knowledge-verifiable credential. Be precise about this — the marketing conflates
+  "government credential that a *private wallet* can prove things about in ZK" with "government
+  deploys ZK", and they are different.
+
+**Where ZK over state credentials *is* actually deployed (and it is not by a state):**
+- **Google Wallet ZKP age assurance.** Google shipped ZK-based "over 18" proofs over ISO 18013-5
+  mdocs and open-sourced the library: **https://github.com/google/longfellow-zk** ("Longfellow ZK" /
+  "Google-zk"), announced 2025-05, blog:
+  https://blog.google/innovation-and-ai/technology/safety-security/opening-up-zero-knowledge-proof-technology-to-promote-privacy-in-age-assurance/
+  ; demos at https://lfzk.dev/ . The EU has picked it up: the EUDI reference stack has a Swift
+  binding at https://github.com/eu-digital-identity-wallet/av-lib-ios-longfellow-zkp .
+  **This is the most important cross-cutting item in this file**, and it sits exactly on the seam
+  between me, the ISO mdoc agent and the ZK-tooling agent: it is the mechanism by which a
+  *government-issued, non-ZK* credential becomes a *ZK-provable* one, without the government doing
+  anything. If we can generate/verify Longfellow proofs over an mDL or an EUDI PID, the state's
+  refusal to build ZK stops being a blocker — **the trust-list access question becomes the only
+  blocker.**
+  Note carefully: it proves *attributes* (age), **not uniqueness** — there is no nullifier, so a ZK
+  age proof from an mDL is worthless for sybil resistance on its own. To get uniqueness you need a
+  deterministic nullifier over a stable field (document number / person identifier), which is
+  exactly what Anon Aadhaar and the ZK-passport projects do and what Longfellow does not do
+  out of the box.
+
+### Bhutan — National Digital Identity (NDI)
+
+- Launched nationwide **2023-10** under the **NDI Act 2023**, built by **Druk Holding and
+  Investments** (the sovereign investment arm). First country to run a **population-scale
+  self-sovereign identity** system: W3C Verifiable Credentials, DIDs, a citizen-held wallet.
+  Issues foundational ID, residence permits, employment credentials, academic certificates.
+  ToIP case study (2024-05, primary-ish PDF):
+  https://trustoverip.org/wp-content/uploads/Case-Study-Bhutan-NDI-National-Digital-Identity-ToIP-Digital-Trust-Ecosystems-V1.0-2024-05-21.ext_.pdf
+- **2025-2026: migrated the anchor from Polygon to Ethereum.** Bhutan NDI announced anchoring the
+  national digital ID on **Ethereum**, with full migration of citizen credentials expected by
+  **Q1 2026** — claimed as the first live population-scale identity system anchored on a public
+  network. Official: https://www.bhutanndi.com/article/bhutan-adopts-ethereum-for-national-identity-a-new-chapter-in-digital-sovereignty_2d0c7ec2-5605-4c42-b258-bd9361ae8878
+  ; secondary: https://decrypt.co/344166/bhutan-national-digital-id-ethereum-early-2026
+  `UNVERIFIED:` I could not extract technical detail from the NDI site (the page rendered as
+  navigation only). **Unanswered and worth 30 minutes: which DID method, mainnet or an L2, is there
+  a resolvable registry contract, and can an outside party resolve a Bhutanese DID?** Next step:
+  the NDI developer docs / GitHub, and the Global Acceptance Network (GAN) which Bhutan joined in
+  2024 (https://www.biometricupdate.com/202410/bhutan-brings-first-national-digital-id-program-to-global-acceptance-network).
+- **Scale: tiny.** Bhutan's total population is **~0.80 million** (2026 projection). Even 100%
+  adoption is ~0.01% of humanity. `UNVERIFIED:` actual NDI registration count — not published in
+  anything I found.
+- **Consumability: probably YES technically, negligible in value.** If the DIDs are on Ethereum and
+  the credentials are W3C VCs, a permissionless verifier can check them. It is a proof of concept
+  for the pattern, not a source of users.
+- **Why it still matters to us:** together with QuarkID it establishes that **"government issues a
+  credential onto a public chain that anyone can verify" is not hypothetical — two governments have
+  done it.** That is the sentence to use when arguing that the state-identity input is worth
+  building for, even though today it routes through neither.
+
+### Other national SSI / crypto-adjacent deployments
+
+- **Ukraine — Diia.** ~20m+ users; digital passport has full legal equivalence to the physical one
+  (unusual and notable). Consumability: NO — Diia.Signature/Diia.ID sharing runs through registered
+  partners under Ukrainian law. `UNVERIFIED:` 2026 figures.
+- **Ethiopia — Fayda** (MOSIP-based, ID4D-funded), **Philippines — PhilSys** (MOSIP-based),
+  **Morocco**, **Sri Lanka**, **Togo**. All MOSIP-derived, all with a plausible future
+  offline-verifiable QR/VC path because MOSIP ships one. Watch MOSIP, not the individual countries.
+  `UNVERIFIED:` per-country 2026 enrolment.
+- **South Korea** — mobile resident registration card / mobile ID on the state PKI; resident
+  registration number is a strong global unique identifier; access is closed to licensed domestic
+  entities.
+- **Japan — My Number Card.** The JPKI signature/authentication certificates on the card are
+  **publicly verifiable X.509**, but use of the My Number itself is tightly restricted by the My
+  Number Act to enumerated purposes (tax, social security, disaster). `UNCLEAR:` whether the JPKI
+  user-certificate serial can serve as a nullifier without breaching the Act. Probably a legal dead
+  end but cryptographically interesting; flagged for anyone who cares about Japan.
 ### Buenos Aires — QuarkID  ← the single most important case in this file
 
 **What it is.** A self-sovereign-identity protocol (DID + W3C Verifiable Credentials, Sidetree-based
@@ -597,8 +702,106 @@ document — that trust root belongs to the ZK-passport agent's file, not here.
 
 ## Analysis
 
-### 1. The consumability question (per system)
+### 1. The consumability question, per system
+
+**The question:** could a permissionless third-party verifier — us, with no contract, no licence, no
+accreditation, no national legal presence — check a credential from this system?
+
+**The answer is almost always no, and the reason is almost always the same shape:** the verifier
+side of every federated state identity scheme is gated by a *relying-party agreement*, because the
+scheme is funded by relying-party fees and governed by a liability chain. The gate is commercial and
+legal before it is cryptographic.
+
+| System | Permissionless verify? | The specific thing that blocks it |
+|---|---|---|
+| **India — Aadhaar online auth/eKYC** | **NO** | Must be a licensed AUA/KUA via an ASA; since the *Aadhaar Authentication for Good Governance Amendment Rules 2025*, additionally requires a sponsoring ministry → UIDAI examination → MeitY approval → gazette notification |
+| **India — Aadhaar offline e-KYC / secure QR** | **YES (crypto), constrained (law)** | Nothing cryptographic blocks it: UIDAI-signed XML/QR + published UIDAI cert. Blocked instead by Puttaswamy's s.57 strike-down, DPDP Act 2023 duties, and UIDAI's hostility to unsanctioned use. **Exception — this is the biggest one.** |
+| **Sweden/Norway/Denmark/Finland — BankID / MitID / FTN** | **NO** | RP certificate issued only under a bank contract; national org-number + KYB required; Relying Party Guidelines historically ban "ID switching", i.e. reselling authentication to another scheme — which is literally our business model |
+| **Estonia — ID-card / Mobile-ID / Smart-ID signature** | **PARTIAL YES** | Qualified signature is verifiable against public CA chains + the EU Trusted List with no agreement. `UNCLEAR:` whether production OCSP revocation checking needs an SK contract. **Exception — second biggest.** |
+| **Singapore — Singpass / Myinfo** | **NO** | GovTech partner onboarding + approval + per-call charges; no offline artefact; everything is an OIDC redirect GovTech observes |
+| **Australia — myID / AGDIS** | **NO today; apply-and-pay from 2026-12** | Digital ID Act 2024 + AGDIS onboarding; RP charging from 2027-01-01 |
+| **New Zealand — DISTF** | **NO (and nothing to verify)** | Accreditation via the DISTF Authority; no citizen credential at scale |
+| **UK — One Login / GOV.UK Wallet** | **NO** | DIATF certification by a UKAS-accredited assessor, annually, for any regulated use. Scheme's flagship (mandatory digital ID) **cancelled 2026-07** |
+| **China — resident ID / 网证 / RealDID** | **NO, absolutely** | Verification only via MPS/CAC infrastructure by domestic licensed entities; no public PKI, no offline artefact |
+| **Brazil — gov.br SSO** | **NO** | Federation restricted to government + accredited partners |
+| **Brazil — CIN QR code** | **`UNCLEAR:` possibly YES** | If ICP-Brasil-signed and offline-verifiable, it is an Aadhaar-shaped exception. **Unresolved; chase this.** |
+| **Nigeria — NIN** | **NO** | NIMC-licensed verification agents, per-check fees; NIMC Act 2026 asserts NIMC as sole authority |
+| **Indonesia — IKD / NIK** | **NO** | Dukcapil `hak akses` data-access agreements per institution; QR probably a server-resolved token |
+| **USA — mDL (ISO 18013-5)** | **`UNCLEAR:` — hinges on AAMVA DTS access** | Crypto is open standard; the IACA trust list is distributed by AAMVA's Digital Trust Service. If the list is publicly downloadable → YES. If it needs an RP agreement → NO. **Resolve this.** |
+| **Argentina — Buenos Aires QuarkID** | **YES** | Open DID method, public zkSync Era anchor, self-hostable resolver, W3C VCs. **The clearest exception in the file.** |
+| **Bhutan — NDI** | **probably YES** | W3C VCs, DIDs, Ethereum anchor. Negligible population. |
+| **Japan — My Number Card (JPKI)** | **partial (crypto) / NO (law)** | Certificates are public X.509; the My Number Act restricts purposes |
+| **Ukraine — Diia** | **NO** | Registered partners under Ukrainian law |
+
+**The pattern, compressed:** *online federated schemes are closed; user-held signed artefacts are
+open.* Every exception in the table is an artefact the citizen holds and hands over — Aadhaar's
+offline e-KYC ZIP, an Estonian qualified signature, a QuarkID VC, a Bhutanese VC, an mDL. Every "NO"
+is a redirect flow where the state or a bank sits in the middle of the transaction and therefore
+gets to charge and gatekeep. **Our entire state-identity strategy should be: only pursue systems
+that produce a user-held, issuer-signed artefact, and treat federated SSO as permanently
+unreachable.**
+
+**Two general risk classes that apply to every row above:**
+1. **Unilateral issuer key/algorithm rotation.** UIDAI Circular 4 of 2026 (SHA-1 → SHA-256, hard
+   cut-off 2026-06-30) is the worked example: a state changed its crypto with a deadline and no
+   duty to any third party. Singpass's Myinfo v3/v4 → v5 (end-Sep 2026) and FAPI 2.0 (2026-12-31)
+   mandates are the same class. Design implication: **any offline-artefact verifier we build needs
+   a live, monitored trust-anchor pipeline and an algorithm-agility path**, and we must expect to
+   break, not hope not to.
+2. **Political cancellation.** The UK announced a mandatory national digital ID in 2025-09 and
+   cancelled it in 2026-07 — ten months, after a 2.9m-signature petition. Design implication:
+   **never make a single national scheme load-bearing**, and price roadmap commitments accordingly.
+
 ### 2. The uniqueness question
+
+Sybil resistance needs *one credential per human*. State systems split cleanly into two camps.
+
+**Camp A — exposes a stable, global, per-person identifier.** Directly useful: hash it, get a
+nullifier, done.
+
+| System | Identifier | Notes |
+|---|---|---|
+| India | **Aadhaar number** | Biometrically de-duplicated at 1:N over ~1.4bn — the strongest uniqueness guarantee on earth. Storing it is legally fraught; a salted hash is the obvious nullifier |
+| Sweden / Norway / Denmark / Finland | **personnummer / fødselsnummer / CPR / hetu** | Stable, universal, returned to every RP |
+| Estonia | **isikukood** | Present in the certificate itself |
+| Singapore | **NRIC / FIN** | Returned to accredited Myinfo partners |
+| China | **18-digit ID number**; **网号** | 网号 is a *state-issued* pseudonym, one per person, stable across platforms — so it is still a global correlator, just one the platforms cannot invert |
+| Brazil | **CPF** | Stable and near-public; leaked at scale, so CPF-alone proves nothing |
+| Nigeria | **NIN** | Biometrically de-duplicated |
+| Indonesia | **NIK** | 16-digit, national |
+| South Korea | **resident registration number** | Notoriously breached |
+| Japan | **My Number** | Legally restricted to enumerated purposes |
+
+**Camp B — deliberately pseudonymised per relying party.** No cross-app correlator by design.
+
+| System | Mechanism |
+|---|---|
+| **India, for licensed AUAs** | **UID Token** — a 72-char agency-specific token, stable within one AUA, different across AUAs. Also **VID**, a revocable mapped alias |
+| **Australia (myID/AGDIS)** | No national identifier exists to expose; political taboo since the 1987 Australia Card defeat; TFN legally restricted |
+| **UK (One Login)** | No general-purpose national number; NINo and NHS number are purpose-restricted |
+| **USA** | No national ID; mDL exposes a document number, not a person number — and document numbers change on renewal |
+| **EU / EUDI** | Per-RP pseudonyms are a design goal (see the eIDAS agent's file) |
+| **QuarkID / Bhutan NDI** | The DID is user-controlled; uniqueness comes from the *issuer's* attestation inside the VC, not from the DID |
+
+**What this means for us, concretely:**
+- Camp A gives us a **direct nullifier**. Hash(identifier ‖ app-salt) is app-scoped and unlinkable
+  across apps; hash(identifier ‖ global-salt) is a global nullifier. We would use the former by
+  default and the latter only where a protocol genuinely needs cross-app uniqueness. But note the
+  brutal privacy asymmetry: a global nullifier over a national ID number means **anyone who obtains
+  the salt and a population list can enumerate our entire user base**, because the identifier space
+  is small and enumerable (CPF, NIK and NIN are all structured and partially guessable). **Use a
+  key-derivation with a secret we never publish, or better, use ZK so the raw identifier never
+  leaves the device** — this is precisely the Anon Aadhaar model.
+- Camp B is **not useless**. Even without a correlator we can prove *"some government asserted that
+  a distinct person exists and this presentation is bound to them"*. Combined with a per-app
+  pseudonym that is stable *for that app*, that is enough for per-app sybil resistance, which is
+  what most integrators actually need. It is not enough for cross-app one-human-one-account.
+  **Recommendation: our normalized output should have two distinct fields — `unique_person_proof`
+  (Camp A) and `distinct_human_attested` (Camp B) — and not collapse them into one number.**
+- **Revocation and death.** UIDAI deactivated **>20m** Aadhaar numbers of deceased people in 2025.
+  A nullifier derived from a national ID inherits the register's lifecycle: identities get
+  deactivated, merged, cancelled for duplicate enrolment. Any score built on this needs an expiry,
+  not a permanent assertion.
 ### 3. Coverage and exclusion — a design constraint, not a footnote
 
 **The numbers (World Bank ID4D, Global Findex 2025 vintage, published 2025-11):**

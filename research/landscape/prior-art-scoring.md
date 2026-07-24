@@ -1209,5 +1209,294 @@ Three rules, all of which fall out of the above:
    path to removal** (OPRF/PSI, RLN). The concentration is the product; the removal is the roadmap.
 
 ## 7. Recommended scoring architecture
-## 8. Worked toy example
+
+### 7.1 The recommendation in one paragraph
+
+**Score the adversary's bill, not the user's evidence.** Adopt a **latent-factor (testlet/copula)
+model whose production form is a root-cost aggregation**: maintain a trust-root ontology, assign each
+credential class its roots and its loadings, and define the score as the log of the total cost an
+adversary would pay to reproduce this exact bundle from scratch — **paying each root once and each
+credential's enrolment session every time.** Report it as a continuous, cost-denominated number with
+an explicit uncertainty interval and a small set of categorical root-shaped reason codes; expose it to
+verifiers as a band or a ZK threshold bit, never as an itemised vector.
+
+### 7.2 Why this formalism and not the alternatives
+
+| Candidate | Why not (or not alone) |
+|---|---|
+| **Additive / weighted stamps** (Passport, Trusta) | The §1.1 error, and it fails *in the adversary's favour* because farms maximise `n/d_eff`. Demonstrably broken on live data (§4.1, §8.1). |
+| **Naive Bayes / independent LR sum** | Same failure in log-odds clothing. Correct only if credentials are conditionally independent, which for our roster they emphatically are not. |
+| **Dempster–Shafer + Dempster's rule** | Assumes independent sources (the very assumption that fails); normalises away conflict, which for us is the most valuable signal. **Borrow** the `(b,d,u)` representation and Denœux's *idempotent* cautious rule as a sanity check; do not use it as the engine. |
+| **Subjective logic** | Same dependence problem; but **borrow the discount operator** for issuer reliability and the belief/disbelief/uncertainty output shape. |
+| **Pure IRT/Rasch** | Local independence fails. **Adopt the testlet extension**, which is the same model as our factor model, and adopt IRT's two genuinely valuable exports: parameter estimation from data, and item-information-based **adaptive routing** (§1.4) — that is our "which protocol next?" logic, solved. |
+| **Graph propagation alone** (EigenTrust/PPR/max-flow) | Excellent where a graph exists; there is no cross-protocol graph (§5.2), it needs a seed set that reintroduces correlation (§5.4), and it is blind to puppeteering (§5.5). **Use as one input** (Circles `T(user→Seed)` and its unit-capacity variant), not as the frame. |
+| **Latent-factor / copula → root-cost** ✅ | Represents shared roots as first-class objects; correct limits at `ρ=0` and `ρ=1`; parameterisable from *protocol design* rather than per-user linkability (§1.5); cost-denominated so it is commensurable across wildly different credential types; explainable in root-shaped reason codes without leaking weights; and a compromised root is a **one-line global update** rather than a re-weighting exercise. |
+
+### 7.3 The model, specified
+
+```
+S  =  log₁₀ (  Σ_{k ∈ roots(bundle)}  β_k · C_k^eff  +  Σ_{i ∈ credentials}  d_i(t) · s_i  )
+
+C_k^eff  =  min( forge_cost_k ,  rent_price_k )          ← rental markets collapse cost; price them
+β_k      =  our belief that root k is currently intact    ← subjective-logic discount on the issuer
+d_i(t)   =  freshness decay, continuous, no cliff edges
+s_i      =  marginal cost of credential i *given* its root is already held (the enrolment session)
+```
+
+Read the structure: **roots are paid once, sessions are paid every time.** That single asymmetry is
+the whole correlation model, and it is one line of arithmetic a customer can check.
+
+Reported alongside `S`, and equally load-bearing:
+
+- **`u`** — uncertainty. Wide when a claim rests on an unverifiable vendor assertion (e.g. a 1:N
+  dedup gallery we cannot audit), narrow when we computed it ourselves from chain data.
+- **`R`** — number of *distinct root families* present, and which families (categorical only). This
+  is the reason-code payload and the honest headline: `S=2.9, R=3/6` says more than any single number.
+- **`K`** — evidence conflict (§1.2): inconsistent claims across credentials. Surfaced, never netted.
+- **`Ĉ`** — control flags: cluster/synchrony/funding-topology detections (§4.2, §5.5), applied as a
+  **multiplicative discount and never as points**. Behavioural evidence is admitted as prosecution
+  evidence only.
+
+**Aggregation rule where semantics allow: `min` over root families, not `Σ`.** For high-assurance
+tiers, require coverage of `k` distinct families. This forces the attacker to pay `Σ C_k` rather than
+`min C_k` (§1.6) and is a far stronger guarantee than any weighting of a single sum.
+
+### 7.4 Required inputs, per credential class
+
+This is the schema the protocol write-ups must populate. It is the real deliverable of the research
+phase.
+
+| Field | Meaning | Source |
+|---|---|---|
+| `evidence_class` | uniqueness \| liveness \| social-trust \| state-identity \| behavioural | BRIEF.md §1 |
+| `roots[]` + `loadings[]` | which trust roots, with `λ` (usually 1.0 for the primary root) | BRIEF.md §7 "Overlap" |
+| `forge_cost` | USD to obtain a **fresh, distinct** instance of the root, amortised at farm scale | trust-root analysis; incident reports |
+| `rent_cost` | market price to rent/buy an existing credential on this root | documented rental markets |
+| `session_cost` `s_i` | marginal USD to mint *this* credential given the root is held | integration surface |
+| `decay` | half-life / expiry / revocation channel | BRIEF.md §6 |
+| `nullifier_scope` | global \| app-scoped \| none — **determines whether dedup is even possible** | BRIEF.md §5 |
+| `issuer_prior` `β` | our belief the issuer's assertion means what it says | audits, incidents |
+| `verifiable_without_vendor` | can we check it ourselves? drives `u` | BRIEF.md §4 |
+
+### 7.5 Output and disclosure design
+
+- **Continuous score, verifier-chosen threshold** (reCAPTCHA's pattern, §3.1). We do not decide who
+  passes.
+- **Five bands** for the ZK threshold path, capping binary-search leakage at `log₂ 5 ≈ 2.3` bits
+  (§6.3).
+- **Per-(user, verifier, epoch) memoised noise** — simultaneously the DP mechanism and the
+  anti-threshold-optimisation randomisation (§6.4, §1.6).
+- **Published:** the root ontology, the evidence-class taxonomy, the score *definition*, the
+  committed weight-table Merkle root, and calibration data with an explicit statement of what we
+  cannot measure. **Not published:** numeric cost estimates at full precision, the control-discount
+  detectors, and the audit-probability curve. This is the asymmetric-disclosure split of §3.3, and
+  the reason it works is that our reason codes describe **the user's own evidence** ("you have 1 of 6
+  root families") rather than our weights — and the action it recommends is precisely the expensive
+  thing we want the adversary to pay for.
+- **Hard disqualifiers bypass the score entirely** (Cloudflare's heuristic-engine pattern, §3.1). A
+  matched global nullifier is a decision, not a deduction.
+
+### 7.6 What this architecture cannot do — stated plainly
+
+1. **It cannot detect puppeteering.** No credential in our roster attests independent control at use
+   time (§1.0). We can carry `Ĉ` as a discount driven by weak behavioural signals, and we should be
+   explicit that a well-run farm paying real humans to enrol and then holding their keys will score
+   **legitimately high**. Idena's data is the proof: 23 entities, ≥40% of accounts, all verified
+   humans. Any claim we make about sybil resistance must be scoped to "distinct enrolled humans", not
+   "distinct independent agents".
+2. **It cannot be calibrated against ground truth**, because there is none (§2.6). Every probability
+   we quote is a modelling assumption, and the cost figures are *our judgement*, sourced and dated but
+   not measured. This must be visible in the docs, not buried.
+3. **It under-credits genuine multi-root holders in a class.** Saturation costs the person with two
+   real passports. That is the deliberate minimax trade of §1.5, and it should be appealable.
+4. **It is blind to an unknown compromised root.** The common-factor shock we have not heard about is
+   the CDO failure mode, and it hits every credential on that root at once. Mitigation is
+   operational, not mathematical: root-level incident monitoring, PSI-style distribution drift alarms
+   per credential (§2.4), and the ability to set `β_k → 0` globally within hours.
+5. **Cost figures drift, sometimes discontinuously.** A rental market opening is a step change (see
+   §8.3). Cost estimates need an owner, a review cadence, and a changelog — treat them as a
+   maintained dataset, not constants.
+6. **It does not solve cross-verifier sybil resistance without linkability** (§6.2). Whoever holds
+   the dedup scope holds the linkability. We are proposing to be that party.
+
+## 8. Worked example
+
+### 8.1 The headline, computed from live production weights
+
+Not hypothetical. Using Human Passport's **live `main`-branch weight table** (retrieved 2026-07-24)
+and the trust-root overlaps documented by the other agents in this batch, take an adversary who has
+acquired **one** government-issued identity document (bought, rented, or their own, used
+repeatedly):
+
+| Stamp | Weight | Trust root |
+|---|---|---|
+| `HolonymGovIdProvider` | 16.026 | government document |
+| `BinanceBABT` | 16.021 | government document (Binance KYC = a document check) |
+| `CoinbaseDualVerification` | 16.042 | government document (Coinbase KYC = a document check) |
+| `CleanHands` | 3 | government document (sanctions screen layered on the same gov ID) |
+| **Total** | **51.089** | **one root** |
+
+**Threshold is 20. One document yields 2.55× the passing score.** Adding the second-account variants
+Passport itself defines (`BinanceBABT2` 10.021, `CoinbaseDualVerification2` 10.042) takes it to
+**71.152 — 3.56× threshold, still one document.** Marginal cost of stamps 2, 3 and 4 is a KYC session,
+not a new identity.
+
+`UNVERIFIED:` I have not confirmed from Passport's provider code that Binance BABT and Coinbase
+verification are gated on document KYC in every jurisdiction (both are widely documented as
+KYC-gated, and Coinbase's own verification tiers require government ID). Check
+`passportxyz/passport` provider implementations before quoting this externally. The structural
+argument does not depend on any single row.
+
+### 8.2 Three credentials, naive vs correlation-aware
+
+Two subjects, three credentials each. Root costs are **illustrative and clearly labelled as
+judgement**, chosen to be defensible orders of magnitude rather than precise:
+
+`C_doc = $200` (rent/obtain a usable passport chip) · `C_iris = $30` (a distinct human body at an Orb;
+consistent with reported World ID account-sale prices) · `C_social = $500` (a genuine Circles trust
+position from people who know you — the max-flow bound of §5.2 is what makes this expensive and, more
+importantly, *non-scalable*). Session costs: ZKPassport $5, Self $5, Linea PoH/Sumsub $8, Orb $3,
+Circles $0.
+
+**Subject H (honest):** ZKPassport proof · World ID Orb · Circles trust position.
+**Subject F (farm):** ZKPassport proof · Self proof · Linea PoH (Sumsub) — *all three read the same
+passport.*
+
+| | Naive additive (Passport-style: doc-rooted 16, biometric 6, social 4) | Root-cost `S = log₁₀(Σ roots + Σ sessions)` |
+|---|---|---|
+| **H** | 16 + 6 + 4 = **26.0** | `$200 + $30 + $500 + $5 + $3 + $0 = $738` → **S = 2.87** |
+| **F** | 16 + 16 + 16 = **48.0** | `$200 + $5 + $5 + $8 = $218` → **S = 2.34** |
+| **Verdict** | **the farm scores 1.85× the honest user** | the honest user leads; the farm is priced at one document |
+| Root families | *(not represented)* | H: **3 of 6** · F: **1 of 6** |
+
+This is the entire argument in one table. Naive additive scoring does not merely mis-rank these two
+subjects — it inverts them, and it inverts them *because* the farm concentrated on one root, which is
+the farm's optimal strategy under any additive rule. The correlation-aware score ranks them correctly
+and, more usefully, tells the verifier *why*: `R = 3/6` versus `R = 1/6`.
+
+### 8.3 When the correlation is unobservable
+
+Now suppose we **cannot** tell that F's three credentials share a document — ZKPassport publishes no
+unscoped nullifier, Self publishes a global one, Rarimo a different global one, World hashes a
+neighbouring field. Nothing matches. Two available policies:
+
+| Policy | F's implied attack cost | `S` | Consequence |
+|---|---|---|---|
+| Assume independence (Passport's implicit policy) | `3 × $200 + $18 = $618` | 2.79 | F ≈ H (2.79 vs 2.87). The attack succeeds. |
+| **Saturate within class** (§1.5) | `1 × $200 + $18 = $218` | **2.34** | F is correctly priced. Cost to an honest holder of two genuine passports: one class cap. |
+
+Saturation delivers the correct answer **without any linkability at all** — which is exactly what the
+nullifier findings say we must live with. The information that does the work is not "these two
+credentials share a document" (unobservable) but "these two *credential classes* read the same kind
+of root" (a fact about protocol design, known to us, maintainable as a table). **That substitution is
+the central engineering insight of this document.**
+
+### 8.4 A rental market opens — the common-factor shock
+
+Suppose a passport-chip rental service appears and the effective cost of the document root collapses
+(`C_doc^eff = min(forge, rent)`):
+
+| `C_doc^eff` | H: cost → `S` | F: cost → `S` | Gap |
+|---|---|---|---|
+| $200 | $738 → **2.87** | $218 → **2.34** | 0.53 |
+| $80 | $618 → **2.79** | $98 → **1.99** | 0.80 |
+| $25 | $563 → **2.75** | $43 → **1.63** | 1.12 |
+
+Two things to notice. First, the update is **one number in one table** — `C_doc^eff` — and it
+correctly repriced every document-rooted credential across every protocol simultaneously. Under
+additive stamp weights the same event would require re-weighting a dozen stamps, and the re-weight
+would be a governance argument rather than a data update. Second, **H is barely affected while F
+collapses**: root diversity is what buys robustness to a root compromise. That is precisely the
+property the CDO models lacked (§1.3), and it is the reason to sell root diversity rather than
+credential count.
+
+### 8.5 What a verifier actually receives
+
+```jsonc
+{
+  "score": 2.87,                      // log10 USD adversary cost; continuous, no fixed threshold
+  "band": 4,                          // of 5 — the ZK-provable quantum (≤2.3 bits leaked)
+  "uncertainty": [2.61, 3.05],        // wide when claims rest on unauditable vendor assertions
+  "roots": { "distinct": 3, "of": 6,
+             "families": ["state-document", "biometric-registry", "social-graph"] },
+  "conflict": 0.02,                   // Dempster conflict mass K — surfaced, never netted away
+  "control": { "flags": [], "discount": 1.00 },  // puppeteering/cluster signals; never additive
+  "freshness": { "median_age_days": 34, "min_decay": 0.91 },
+  "caveats": ["independent-control-not-attested"]   // always present; see §7.6.1
+}
+```
+
+No credential is named. Leakage is bounded at a few bits (§6.1) instead of the 20–34 bits an itemised
+attestation list would cost, and the last field is the honesty the whole category currently lacks.
+
 ## References
+
+**Formal frameworks**
+
+- Zadeh, L. A. "A Simple View of the Dempster–Shafer Theory of Evidence and Its Implication for the Rule of Combination." *AI Magazine* 7(2), 1986. (The conflict counterexample; originally 1979.)
+- Shafer, G. *A Mathematical Theory of Evidence.* Princeton, 1976.
+- Yager, R. "On the Dempster–Shafer framework and new combination rules." *Information Sciences* 41(2), 1987. (Conflict → ignorance.)
+- Dubois, D. & Prade, H. "Representation and combination of uncertainty with belief functions and possibility measures." *Computational Intelligence* 4(3), 1988.
+- Denœux, T. "Conjunctive and disjunctive combination of belief functions induced by nondistinct bodies of evidence." *Artificial Intelligence* 172(2–3), 2008. — **the idempotent cautious rule; the DS-family answer to non-distinct sources.**
+- Jøsang, A. *Subjective Logic: A Formalism for Reasoning Under Uncertainty.* Springer, 2016.
+- Vasicek, O. "Loan Portfolio Value." *Risk*, December 2002. (One-factor Gaussian copula.)
+- Li, D. X. "On Default Correlation: A Copula Function Approach." *Journal of Fixed Income* 9(4), 2000.
+- MacKenzie, D. & Spears, T. "'The formula that killed Wall Street': The Gaussian copula and modelling practices in investment banking." *Social Studies of Science* 44(3), 2014.
+- Bradlow, E., Wainer, H. & Wang, X. "A Bayesian random effects model for testlets." *Psychometrika* 64(2), 1999. — **testlets = trust roots.**
+- Lord, F. M. *Applications of Item Response Theory to Practical Testing Problems.* 1980; van der Linden, W. & Glas, C. (eds), *Computerized Adaptive Testing: Theory and Practice.* Kluwer, 2000.
+- Hardt, M., Megiddo, N., Papadimitriou, C. & Wootters, M. "Strategic Classification." ITCS 2016.
+- Brückner, M. & Scheffer, T. "Stackelberg games for adversarial prediction problems." KDD 2011.
+- Perdomo, J., Zrnic, T., Mendler-Dünner, C. & Hardt, M. "Performative Prediction." ICML 2020.
+
+**Credit scoring / regulation**
+
+- CFPB — [12 CFR § 1002.9 Notifications](https://www.consumerfinance.gov/rules-policy/regulations/1002/9/) and [Official Interpretation](https://www.consumerfinance.gov/rules-policy/regulations/1002/Interp-9) (four-reason convention).
+- CFPB — [Circular 2022-03: Adverse action notification requirements in connection with credit decisions based on complex algorithms](https://www.consumerfinance.gov/compliance/circulars/circular-2022-03-adverse-action-notification-requirements-in-connection-with-credit-decisions-based-on-complex-algorithms/) · [Federal Register](https://www.federalregister.gov/documents/2022/06/14/2022-12729/consumer-financial-protection-circular-2022-03-adverse-action-notification-requirements-in).
+- CFPB — [Circular 2023-03](https://www.federalregister.gov/documents/2024/04/17/2024-08003/consumer-financial-protection-circular-2023-03-adverse-action-notification-requirements-and-proper) (sample forms are not a safe harbour for non-listed reasons).
+- FICO — [US FICO Score Reason Codes](https://www.fico.com/en/latest-thinking/product-sheet/us-fico-score-reason-codes) · [myFICO explainer](https://www.myfico.com/credit-education/blog/reason-codes) (secondary).
+- Federal Reserve FEDS 2010-23 — ["Credit Where None Is Due? Authorized User Account Status and Piggybacking Credit"](https://www.federalreserve.gov/pubs/feds/2010/201023/201023pap.pdf). **The credential-rental analogue.**
+- [Credit.com](https://www.credit.com/blog/piggybacking-to-boost-fico-scores-does-it-still-work/) and [creditscoring.com](https://www.creditscoring.com/creditscore/fico/quirks/authorizeduser.html) on FICO 08's undisclosed authorized-user filters (both **secondary**).
+
+**Production fraud / bot scoring**
+
+- Google — [reCAPTCHA v3 docs](https://developers.google.com/recaptcha/docs/v3) (0.0–1.0 score, default threshold 0.5, step-up not block).
+- Cloudflare — [Bot scores](https://developers.cloudflare.com/bots/concepts/bot-score/) and [Bot detection engines](https://developers.cloudflare.com/bots/concepts/bot-detection-engines/) (1–99; heuristics engine can hard-set 1).
+
+**Web3 scorers**
+
+- [`passportxyz/passport-scorer` — `gitcoin_passport_weights.py`](https://github.com/passportxyz/passport-scorer/blob/main/api/scorer/settings/gitcoin_passport_weights.py) (live weights + threshold 20; last touched 2026-01-06).
+- Human Passport — [Deduplicating Stamps](https://docs.passport.human.tech/building-with-passport/stamps/major-concepts/deduplicating-stamps) (LIFO, `hash` key, per-scoring-instance scope) · [Scoring thresholds](https://docs.passport.human.tech/building-with-passport/stamps/major-concepts/scoring-thresholds) · [Available models](https://docs.passport.xyz/building-with-passport/models/available-models).
+- Trusta Labs — [MEDIA scoring methodology](https://trusta-labs.gitbook.io/trustalabs/trustgo/media-scoring-methodology) · [Sybil Score & MEDIA Score](https://trusta-labs.gitbook.io/trustalabs/trustscan/introduction-to-sybil-score-and-media-score).
+- ARCx — [DeFi Credit Score wiki](https://wiki.arcx.money/application/defi-credit-score). Spectral pivot: [Greythorn/Medium](https://medium.com/@0xgreythorn/spectrals-inference-powered-web3-vision-a1019d52720f) (**secondary**).
+- Karma3 Labs / OpenRank — [`go-eigentrust`](https://github.com/Karma3Labs/go-eigentrust) · [`openrank-sdk`](https://github.com/Karma3Labs/openrank-sdk) · [seed round, CoinDesk press release](https://www.coindesk.com/press-release/2024/03/03/karma3-labs-raises-a-45m-seed-round-led-by-galaxy-and-ideo-colab-to-build-openrank-a-decentralized-reputation-protocol) (**secondary**).
+- Delphi Digital — [Decentralized Identity: Gitcoin Passport](https://members.delphidigital.io/feed/decentralized-identity-gitcoin-passport) (**secondary, paywalled, not read directly**).
+
+**Graph sybil defence**
+
+- Kamvar, S., Schlosser, M. & Garcia-Molina, H. "The EigenTrust Algorithm for Reputation Management in P2P Networks." WWW 2003.
+- Gyöngyi, Z., Garcia-Molina, H. & Pedersen, J. "Combating Web Spam with TrustRank." VLDB 2004.
+- Yu, H., Kaminsky, M., Gibbons, P. & Flaxman, A. "SybilGuard: Defending Against Sybil Attacks via Social Networks." SIGCOMM 2006. (`O(√n log n)` sybils per attack edge.)
+- Yu, H., Gibbons, P., Kaminsky, M. & Xiao, F. ["SybilLimit: A Near-Optimal Social Network Defense against Sybil Attacks."](https://www.cs.yale.edu/homes/aspnes/pinewiki/attachments/SybilAttack/sybillimit.pdf) IEEE S&P 2008 / [ToN 18(3), 2010](https://dl.acm.org/doi/10.1109/TNET.2009.2034047). (`O(log n)` per attack edge.)
+- Tran, N., Min, B., Li, J. & Subramanian, L. "Sybil-Resilient Online Content Voting." NSDI 2009. (SumUp — max-flow.)
+- Cao, Q., Sirivianos, M., Yang, X. & Pregueiro, T. "Aiding the Detection of Fake Accounts in Large Scale Social Online Services." NSDI 2012. (SybilRank, deployed at Tuenti.)
+- Danezis, G. & Mittal, P. "SybilInfer: Detecting Sybil Nodes using Social Networks." NDSS 2009.
+- Viswanath, B., Post, A., Gummadi, K. & Mislove, A. ["An Analysis of Social Network-based Sybil Defenses."](https://dl.acm.org/doi/10.1145/1851182.1851226) SIGCOMM 2010 · [PDF](http://ccr.sigcomm.org/online/files/p363.pdf). **They are all community detection.**
+- Alvisi, L., Clement, A., Epasto, A., Lattanzi, S. & Panconesi, A. "SoK: The Evolution of Sybil Defense via Social Networks." IEEE S&P 2013. (`UNVERIFIED:` not re-read this pass.)
+- Mohaisen, A., Yun, A. & Kim, Y. "Measuring the mixing time of social graphs." IMC 2010. (`UNVERIFIED:` not re-read this pass.)
+- Köppelmann, M., Boes, J. & Ernst, J. *Circles – money for a multipolar world*, v2.2.1, §4.2–4.3. <https://whitepaper.aboutcircles.com/> — **transferable trusted balance and the relative sybil-resistance theorem.**
+
+**Privacy**
+
+- Dwork, C. & Roth, A. *The Algorithmic Foundations of Differential Privacy.* FnTTCS, 2014.
+- Camenisch, J. & Lysyanskaya, A. "An Efficient System for Non-transferable Anonymous Credentials with Optional Anonymity Revocation." EUROCRYPT 2001. (CL signatures / Idemix.)
+- Boneh, D., Boyen, X. & Shacham, H. "Short Group Signatures." CRYPTO 2004, and the BBS+ line; W3C VC Data Integrity BBS cryptosuite (`UNVERIFIED:` current standardisation stage — check the W3C VCWG status page).
+- IETF OAuth WG — SD-JWT and SD-JWT VC drafts (selective disclosure **without** unlinkability). ISO/IEC 18013-5 (mDL). See `research/landscape/eidas2-eudi-wallet.md`.
+- Semaphore / Rate-Limiting Nullifiers (RLN) — sybil resistance without a persistent cross-context identifier.
+
+**Internal (this repo)**
+
+- `research/protocols/circles.md` — max-flow, the §4.3 theorem, pathfinder as a trust oracle.
+- `research/protocols/zk-passport-and-eid.md` — the four incompatible nullifier derivations over one chip.
+- `research/landscape/identity-infra-prior-art.md` — Passport's economics, dedup, Civic's sunset, DeSoc's correlation-discounting idea.
+- `research/landscape/poh-landscape-sweep.md`, `research/landscape/kyc-liveness-vendors.md` — the roster→root collapse.
+- `research/references/ohlhaver-ethberlin-2024-transcript.md` — puppeteering; 23 entities, ≥40% of accounts.
