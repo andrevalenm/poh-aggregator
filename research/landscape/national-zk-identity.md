@@ -1,20 +1,41 @@
 # National digital identity systems & state-led ZK/privacy identity (ex-EU)
 
-> STATUS: in progress — started 2026-07-24. Whatever is here is already usable.
+*Researched 2026-07-24. Volatile facts are date-stamped inline.*
 
-**One-liner:** State identity is the largest personhood root on earth (~5.5bn people with some
-digital ID), but it is almost universally gated behind accredited-relying-party regimes, so a
-permissionless verifier can consume almost none of it.
+**One-liner:** State identity is the largest personhood root on earth — the World Bank's residual of
+**~800m people without any official ID** implies roughly 7.3bn who have one — but essentially all of
+it is gated behind accredited-relying-party regimes, so a permissionless verifier can consume almost
+none of it. The exceptions are the story.
 **Category:** state-identity
-**Chains:** mostly none (Web2 federated). Exceptions: Buenos Aires QuarkID (zkSync Era / Polygon),
-Bhutan NDI (Hyperledger-based), Anon Aadhaar (EVM, covered by another agent).
-**Status (2026-07):** TBD
-**Aggregator verdict:** TBD
+**Chains:** mostly none (Web2 federated). Real exceptions: **Buenos Aires QuarkID** (zkSync Era
+mainnet, chain 324, anchor `0xe0055B74422Bec15cB1625792C4aA0beDcC61AA7` — **confirmed live
+2026-07-24**), **Bhutan NDI** (migrating Polygon → Ethereum, Q1 2026), and Aadhaar's offline
+signed artefacts (verifiable on any chain via ZK; tooling covered by another agent).
+**Status (2026-07):** live and fragmenting. Two governments now issue publicly-verifiable
+credentials on public chains; the UK cancelled its national digital ID five days before this was
+written; India tightened private-sector access in 2025 and rotated its signing algorithm in 2026.
+**Aggregator verdict:** **integrate later, with two exceptions to start now.**
+Do not build the score's backbone on state identity — it is unreachable, politically volatile, and
+excludes ~800m people. But **(1) Aadhaar's offline e-KYC/QR path** (1.4bn people, user-held,
+issuer-signed, ZK-provable, no UIDAI cooperation needed) and **(2) Buenos Aires QuarkID** (small but
+genuinely permissionless and provably live on-chain) are worth building against now. Everything
+federated — BankID, Singpass, myID, One Login, gov.br, NIN, IKD, China — is reachable only by
+becoming an accredited relying party per jurisdiction, which is a KYC-reseller business, not a
+permissionless one.
 
-Cross-references (do not duplicate):
+**Cross-references — covered by other agents, deliberately not duplicated here:**
 - EU eIDAS 2.0 / EUDI Wallet → `eidas2-eudi-wallet.md`
-- ISO 18013-5/-7 mdoc/mDL → (separate agent's file)
-- Anon Aadhaar ZK tooling → protocols/ (separate agent). This file covers the *Aadhaar system*.
+- ISO 18013-5/-7 mdoc/mDL and SD-JWT VC format layer → separate agent's file
+- Anon Aadhaar and ZK-passport tooling → `protocols/` (separate agents). **This file covers the
+  *state systems*; they cover the *ZK layer over them*.**
+- KYC/IDV vendors that read the same documents → `kyc-liveness-vendors.md`
+
+**Two risk classes established in this file that apply to every state-rooted protocol we integrate:**
+1. **Unilateral issuer key/algorithm rotation** — UIDAI Circular 4 of 2026 forced SHA-1 → SHA-256
+   with a hard 2026-06-30 cut-off. States rotate crypto on their own schedule with no duty to
+   downstream verifiers.
+2. **Political cancellation** — the UK announced a mandatory national digital ID on 2025-09-25 and
+   scrapped it on 2026-07-19. Ten months.
 
 ## System-by-system
 
@@ -548,52 +569,6 @@ and impose obligations on readers, independent of whether the crypto validates.
   exactly what Anon Aadhaar and the ZK-passport projects do and what Longfellow does not do
   out of the box.
 
-### Bhutan — National Digital Identity (NDI)
-
-- Launched nationwide **2023-10** under the **NDI Act 2023**, built by **Druk Holding and
-  Investments** (the sovereign investment arm). First country to run a **population-scale
-  self-sovereign identity** system: W3C Verifiable Credentials, DIDs, a citizen-held wallet.
-  Issues foundational ID, residence permits, employment credentials, academic certificates.
-  ToIP case study (2024-05, primary-ish PDF):
-  https://trustoverip.org/wp-content/uploads/Case-Study-Bhutan-NDI-National-Digital-Identity-ToIP-Digital-Trust-Ecosystems-V1.0-2024-05-21.ext_.pdf
-- **2025-2026: migrated the anchor from Polygon to Ethereum.** Bhutan NDI announced anchoring the
-  national digital ID on **Ethereum**, with full migration of citizen credentials expected by
-  **Q1 2026** — claimed as the first live population-scale identity system anchored on a public
-  network. Official: https://www.bhutanndi.com/article/bhutan-adopts-ethereum-for-national-identity-a-new-chapter-in-digital-sovereignty_2d0c7ec2-5605-4c42-b258-bd9361ae8878
-  ; secondary: https://decrypt.co/344166/bhutan-national-digital-id-ethereum-early-2026
-  `UNVERIFIED:` I could not extract technical detail from the NDI site (the page rendered as
-  navigation only). **Unanswered and worth 30 minutes: which DID method, mainnet or an L2, is there
-  a resolvable registry contract, and can an outside party resolve a Bhutanese DID?** Next step:
-  the NDI developer docs / GitHub, and the Global Acceptance Network (GAN) which Bhutan joined in
-  2024 (https://www.biometricupdate.com/202410/bhutan-brings-first-national-digital-id-program-to-global-acceptance-network).
-- **Scale: tiny.** Bhutan's total population is **~0.80 million** (2026 projection). Even 100%
-  adoption is ~0.01% of humanity. `UNVERIFIED:` actual NDI registration count — not published in
-  anything I found.
-- **Consumability: probably YES technically, negligible in value.** If the DIDs are on Ethereum and
-  the credentials are W3C VCs, a permissionless verifier can check them. It is a proof of concept
-  for the pattern, not a source of users.
-- **Why it still matters to us:** together with QuarkID it establishes that **"government issues a
-  credential onto a public chain that anyone can verify" is not hypothetical — two governments have
-  done it.** That is the sentence to use when arguing that the state-identity input is worth
-  building for, even though today it routes through neither.
-
-### Other national SSI / crypto-adjacent deployments
-
-- **Ukraine — Diia.** ~20m+ users; digital passport has full legal equivalence to the physical one
-  (unusual and notable). Consumability: NO — Diia.Signature/Diia.ID sharing runs through registered
-  partners under Ukrainian law. `UNVERIFIED:` 2026 figures.
-- **Ethiopia — Fayda** (MOSIP-based, ID4D-funded), **Philippines — PhilSys** (MOSIP-based),
-  **Morocco**, **Sri Lanka**, **Togo**. All MOSIP-derived, all with a plausible future
-  offline-verifiable QR/VC path because MOSIP ships one. Watch MOSIP, not the individual countries.
-  `UNVERIFIED:` per-country 2026 enrolment.
-- **South Korea** — mobile resident registration card / mobile ID on the state PKI; resident
-  registration number is a strong global unique identifier; access is closed to licensed domestic
-  entities.
-- **Japan — My Number Card.** The JPKI signature/authentication certificates on the card are
-  **publicly verifiable X.509**, but use of the My Number itself is tightly restricted by the My
-  Number Act to enumerated purposes (tax, social security, disaster). `UNCLEAR:` whether the JPKI
-  user-certificate serial can serve as a nullifier without breaching the Act. Probably a legal dead
-  end but cryptographically interesting; flagged for anyone who cares about Japan.
 ### Buenos Aires — QuarkID  ← the single most important case in this file
 
 **What it is.** A self-sovereign-identity protocol (DID + W3C Verifiable Credentials, Sidetree-based
@@ -697,8 +672,52 @@ Luján de Cuyo (Mendoza), and reported experiments in Uruguay. Separately, Argen
 electronic DNI (`argentina.gob.ar/interior/dni/nuevo-dni-electronico`) is an ICAO-style chip
 document — that trust root belongs to the ZK-passport agent's file, not here.
 
-### Bhutan — NDI
-### Other national SSI deployments
+### Bhutan — National Digital Identity (NDI)
+
+- Launched nationwide **2023-10** under the **NDI Act 2023**, built by **Druk Holding and
+  Investments** (the sovereign investment arm). First country to run a **population-scale
+  self-sovereign identity** system: W3C Verifiable Credentials, DIDs, a citizen-held wallet.
+  Issues foundational ID, residence permits, employment credentials, academic certificates.
+  ToIP case study (2024-05, primary-ish PDF):
+  https://trustoverip.org/wp-content/uploads/Case-Study-Bhutan-NDI-National-Digital-Identity-ToIP-Digital-Trust-Ecosystems-V1.0-2024-05-21.ext_.pdf
+- **2025-2026: migrated the anchor from Polygon to Ethereum.** Bhutan NDI announced anchoring the
+  national digital ID on **Ethereum**, with full migration of citizen credentials expected by
+  **Q1 2026** — claimed as the first live population-scale identity system anchored on a public
+  network. Official: https://www.bhutanndi.com/article/bhutan-adopts-ethereum-for-national-identity-a-new-chapter-in-digital-sovereignty_2d0c7ec2-5605-4c42-b258-bd9361ae8878
+  ; secondary: https://decrypt.co/344166/bhutan-national-digital-id-ethereum-early-2026
+  `UNVERIFIED:` I could not extract technical detail from the NDI site (the page rendered as
+  navigation only). **Unanswered and worth 30 minutes: which DID method, mainnet or an L2, is there
+  a resolvable registry contract, and can an outside party resolve a Bhutanese DID?** Next step:
+  the NDI developer docs / GitHub, and the Global Acceptance Network (GAN) which Bhutan joined in
+  2024 (https://www.biometricupdate.com/202410/bhutan-brings-first-national-digital-id-program-to-global-acceptance-network).
+- **Scale: tiny.** Bhutan's total population is **~0.80 million** (2026 projection). Even 100%
+  adoption is ~0.01% of humanity. `UNVERIFIED:` actual NDI registration count — not published in
+  anything I found.
+- **Consumability: probably YES technically, negligible in value.** If the DIDs are on Ethereum and
+  the credentials are W3C VCs, a permissionless verifier can check them. It is a proof of concept
+  for the pattern, not a source of users.
+- **Why it still matters to us:** together with QuarkID it establishes that **"government issues a
+  credential onto a public chain that anyone can verify" is not hypothetical — two governments have
+  done it.** That is the sentence to use when arguing that the state-identity input is worth
+  building for, even though today it routes through neither.
+
+### Other national SSI / crypto-adjacent deployments
+
+- **Ukraine — Diia.** ~20m+ users; digital passport has full legal equivalence to the physical one
+  (unusual and notable). Consumability: NO — Diia.Signature/Diia.ID sharing runs through registered
+  partners under Ukrainian law. `UNVERIFIED:` 2026 figures.
+- **Ethiopia — Fayda** (MOSIP-based, ID4D-funded), **Philippines — PhilSys** (MOSIP-based),
+  **Morocco**, **Sri Lanka**, **Togo**. All MOSIP-derived, all with a plausible future
+  offline-verifiable QR/VC path because MOSIP ships one. Watch MOSIP, not the individual countries.
+  `UNVERIFIED:` per-country 2026 enrolment.
+- **South Korea** — mobile resident registration card / mobile ID on the state PKI; resident
+  registration number is a strong global unique identifier; access is closed to licensed domestic
+  entities.
+- **Japan — My Number Card.** The JPKI signature/authentication certificates on the card are
+  **publicly verifiable X.509**, but use of the My Number itself is tightly restricted by the My
+  Number Act to enumerated purposes (tax, social security, disaster). `UNCLEAR:` whether the JPKI
+  user-certificate serial can serve as a nullifier without breaching the Act. Probably a legal dead
+  end but cryptographically interesting; flagged for anyone who cares about Japan.
 
 ## Analysis
 

@@ -1,3 +1,10 @@
 # Salvaged raw research material (verbatim third-party page text — local only, not for redistribution)
 .salvage-source/
 .DS_Store
+
+# Third-party source documents (papers, PDFs). Cite them; do not vendor them.
+# A research agent committed an SSRN PDF here on 2026-07-24 before this rule existed;
+# it was removed from HEAD but the blob remains reachable in history (commit 5c54f75).
+*.pdf
+sources/
+
