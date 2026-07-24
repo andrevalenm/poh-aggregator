@@ -38,7 +38,7 @@ const NEGLIGIBLE_COST_CENTS = 10
 const DEAD_PROTOCOL_MULTIPLIER = 0
 
 export interface ScoreInput {
-  subject: Address
+  subjects: Address[]
   name?: string
   adapters: Map<string, Adapter>
   evidence: Evidence[]
@@ -105,7 +105,8 @@ export function score(input: ScoreInput): PersonhoodResult {
   const scoreValue = totalCostCents <= 0 ? 0 : Math.log10(totalCostCents + 1)
 
   return {
-    subject: input.subject,
+    subject: input.subjects[0]!,
+    subjects: input.subjects,
     ...(input.name !== undefined ? { name: input.name } : {}),
     score: Number(scoreValue.toFixed(4)),
     totalCostCents,
@@ -143,6 +144,16 @@ function caveatsFor(evidence: Evidence[], roots: RootContribution[]): Caveat[] {
         message: `${r.adapterIds.length} credentials share the trust root "${r.trustRoot}" (${r.adapterIds.join(', ')}). Counted once — they are one piece of evidence, not ${r.adapterIds.length}.`,
       })
     }
+  }
+
+  // Saturation deliberately spans addresses: one passport presented from two wallets is
+  // still one passport, so splitting credentials across wallets cannot inflate a score.
+  const addressesWithEvidence = new Set(evidence.filter((e) => e.held).map((e) => e.observedOn))
+  if (addressesWithEvidence.size > 1) {
+    caveats.push({
+      code: 'multi-address-subject',
+      message: `Evidence aggregated across ${addressesWithEvidence.size} addresses supplied by the caller. Correlated roots still saturate across them, so distributing credentials over wallets does not raise the score.`,
+    })
   }
 
   const dead = evidence.filter((e) => e.held && !e.live)

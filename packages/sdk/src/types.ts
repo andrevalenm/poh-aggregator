@@ -47,6 +47,14 @@ export interface Evidence {
   adapterName: string
   evidenceClass: EvidenceClass
   trustRoot: TrustRoot
+  /**
+   * Which of the subject's addresses this credential was found on.
+   *
+   * Real people spread credentials across wallets — Proof of Humanity's own Circles proxy
+   * pairs a PoH address with a *different* Circles avatar — so a single-address lookup
+   * systematically undercounts them.
+   */
+  observedOn: Address
   /** True when the subject holds this credential. */
   held: boolean
   /** Unix seconds the credential was issued, when the protocol exposes it. */
@@ -80,7 +88,14 @@ export interface Caveat {
 }
 
 export interface PersonhoodResult {
+  /** Primary address. For a multi-address subject, the first one supplied. */
   subject: Address
+  /**
+   * Every address the caller asserted control of. The caller is responsible for having
+   * authenticated these — we aggregate what we are given and never infer that two
+   * addresses belong to one person, which would be precisely the linkage we exist to avoid.
+   */
+  subjects: Address[]
   /** Resolved ENS name, when the lookup started from one. */
   name?: string
   /** log10 of total root-cost in cents. Continuous, roughly 0–4. Never a grade. */

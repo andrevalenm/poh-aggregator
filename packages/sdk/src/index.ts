@@ -78,39 +78,60 @@ export class Corroborate {
   /**
    * Gather every credential for a subject and score it.
    *
+   * A subject may be several addresses. Real people spread credentials across wallets —
+   * Proof of Humanity's own Circles proxy pairs a PoH address with a *separate* Circles
+   * avatar — so a single-address lookup systematically undercounts them.
+   *
+   * The caller supplies the address set and is responsible for having authenticated it.
+   * We never infer that two addresses belong to one person: that inference is exactly the
+   * linkage this design exists to avoid. Correlated roots still saturate *across* the set,
+   * so spreading credentials over wallets cannot be used to inflate a score.
+   *
    * Probes run concurrently and independently: one protocol being down degrades the result
-   * rather than failing it, and a failed probe is reported as an error instead of a negative.
+   * rather than failing it, and a failed probe is reported as an error, never as a negative.
    */
-  async resolve(nameOrAddress: string): Promise<PersonhoodResult> {
-    const [{ address, name }, ontology] = await Promise.all([
-      this.resolveSubject(nameOrAddress),
+  async resolve(subject: string | readonly string[]): Promise<PersonhoodResult> {
+    const inputs = typeof subject === 'string' ? [subject] : [...subject]
+    if (inputs.length === 0) throw new Error('resolve requires at least one address or name')
+
+    const [resolved, ontology] = await Promise.all([
+      Promise.all(inputs.map((s) => this.resolveSubject(s))),
       this.ontology(),
     ])
 
+    const addresses = resolved.map((r) => r.address)
+    const name = resolved.find((r) => r.name)?.name
     const now = Math.floor(Date.now() / 1000)
-    const results = await Promise.all(
-      this.#adapters.map(async (probe) => ({ probe, result: await probe.probe(address) })),
+
+    const probes = addresses.flatMap((address) =>
+      this.#adapters.map(async (probe) => ({ address, probe, result: await probe.probe(address) })),
     )
+    const results = await Promise.all(probes)
 
     const evidence: Evidence[] = []
-    for (const { probe, result } of results) {
+    for (const { address, probe, result } of results) {
       const adapter = ontology.adapters.get(probe.adapterId)
-      if (!adapter) continue // adapter not in the registry; nothing to weigh it by
+      if (!adapter) continue // not in the registry, so nothing to weigh it by
+
+      const base = {
+        adapterId: adapter.id,
+        adapterName: adapter.name,
+        evidenceClass: adapter.evidenceClass,
+        trustRoot: adapter.trustRoot,
+        observedOn: address,
+        forgeCostCents: adapter.forgeCostCents,
+        rentCostCents: adapter.rentCostCents,
+        live: adapter.live,
+        sourceURI: adapter.sourceURI,
+      }
 
       // A probe that errored is not evidence of absence.
       if (result.error) {
         evidence.push({
-          adapterId: adapter.id,
-          adapterName: adapter.name,
-          evidenceClass: adapter.evidenceClass,
-          trustRoot: adapter.trustRoot,
+          ...base,
           held: false,
           freshness: 0,
           effectiveCostCents: 0,
-          forgeCostCents: adapter.forgeCostCents,
-          rentCostCents: adapter.rentCostCents,
-          live: adapter.live,
-          sourceURI: adapter.sourceURI,
           detail: { error: result.error, unavailable: true },
         })
         continue
@@ -118,24 +139,17 @@ export class Corroborate {
 
       const freshness = freshnessOf(adapter, result.issuedAt, now)
       evidence.push({
-        adapterId: adapter.id,
-        adapterName: adapter.name,
-        evidenceClass: adapter.evidenceClass,
-        trustRoot: adapter.trustRoot,
+        ...base,
         held: result.held,
         ...(result.issuedAt !== undefined ? { issuedAt: result.issuedAt } : {}),
         freshness,
         effectiveCostCents: result.held ? effectiveCost(adapter, freshness) : 0,
-        forgeCostCents: adapter.forgeCostCents,
-        rentCostCents: adapter.rentCostCents,
-        live: adapter.live,
-        sourceURI: adapter.sourceURI,
         ...(result.detail ? { detail: result.detail } : {}),
       })
     }
 
     return score({
-      subject: address,
+      subjects: addresses,
       ...(name !== undefined ? { name } : {}),
       adapters: ontology.adapters,
       evidence,

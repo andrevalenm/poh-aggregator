@@ -1,0 +1,405 @@
+[
+  {
+    "address": "0xd267eba602e692216703626a81157214b24c85fb",
+    "score": 2.6998,
+    "roots": 1,
+    "held": [
+      "poh-v2"
+    ],
+    "detail": [
+      {
+        "humanityId": "0xd267eba602e692216703626a81157214b24c85fb"
+      }
+    ]
+  },
+  {
+    "address": "0xf7e4d92f94d9cae4ca5fd7bf5faebc239e3f7045",
+    "score": 2.6998,
+    "roots": 1,
+    "held": [
+      "poh-v2"
+    ],
+    "detail": [
+      {
+        "humanityId": "0xf7e4d92f94d9cae4ca5fd7bf5faebc239e3f7045"
+      }
+    ]
+  },
+  {
+    "address": "0x91f640387ea7d050376f9e6854f090c08da9af7b",
+    "score": 2.6998,
+    "roots": 1,
+    "held": [
+      "poh-v2"
+    ],
+    "detail": [
+      {
+        "humanityId": "0x91f640387ea7d050376f9e6854f090c08da9af7b"
+      }
+    ]
+  },
+  {
+    "address": "0x34bb05bd9ffc2a815be6fa2662b22efb1611bf18",
+    "score": 2.6998,
+    "roots": 1,
+    "held": [
+      "poh-v2"
+    ],
+    "detail": [
+      {
+        "humanityId": "0x34bb05bd9ffc2a815be6fa2662b22efb1611bf18"
+      }
+    ]
+  },
+  {
+    "address": "0x02d8520991855aa20af158cbcead471792539892",
+    "score": 2.6998,
+    "roots": 1,
+    "held": [
+      "poh-v2"
+    ],
+    "detail": [
+      {
+        "humanityId": "0x02d8520991855aa20af158cbcead471792539892"
+      }
+    ]
+  },
+  {
+    "address": "0xa38ba430ce67a8dc6b511204ce7a0fe6e8c60c51",
+    "score": 2.6998,
+    "roots": 1,
+    "held": [
+      "poh-v2"
+    ],
+    "detail": [
+      {
+        "humanityId": "0xa38ba430ce67a8dc6b511204ce7a0fe6e8c60c51"
+      }
+    ]
+  },
+  {
+    "address": "0x317C407725145Fa197701045c3383F58fa14204B",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x833F2c5784d3F54e3837a7e5AC681f3c0C3BCF2F",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x4569B1AEcB64C2796f4871AC1385c5D96E232b9A",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 3
+      }
+    ]
+  },
+  {
+    "address": "0xf7166eEDa2bFE81A207Ae25dCEfeb6d062f2fc24",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 7
+      }
+    ]
+  },
+  {
+    "address": "0x675CcDBBF89718800D1A9b05ba7B03435765291D",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0xadEF948bb80dEE2254D368Ff63a48eFbA5791FD6",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0xa945f207a4d98Db1D6aC93BEB6e678032370Fa3C",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x30A5ca209E53070E84Ae1a1280b624bb11d0B617",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 3
+      }
+    ]
+  },
+  {
+    "address": "0x3273a569eDcb0675F306e31Aa89b9dB481200E7b",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 3
+      }
+    ]
+  },
+  {
+    "address": "0x3FD37391B0ebcEFC4f093CCd08bEA3f3d8766846",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 3
+      }
+    ]
+  },
+  {
+    "address": "0x4C18942edCF46623646dd5CF511C50324B2BeB57",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x2B3B9BE5e83BD94C7fcbD38771d0F90CA90a7aFc",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0xd0836E9d1CCdbcAC4569C31A061721e32BA4c648",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x851D53c683b15A5a173d9e960054aB8776557f42",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0xf98ac3cD67FA60c531C5A8DDE9BEE5C44294CC20",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0xF39622aa7D35cec17Ccd478FF7A27D92000d8344",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x7D8459e2ca3f62E6d8599E98ebf8c42d88218C87",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x365A4A6Eee6C947Ff01A641Acf107f9742372e0c",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x10A0Ef6e525adefbBcA505BD52d87F5507420EF3",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x40cA31B1F06D2D7B995a6BC923dAC1a1236b26fF",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0xf01b27Bb980a345466352f972E09CcDDb7a8C7a3",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x13a7A73385858e707205134D53e7784f8a535a5B",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 6
+      }
+    ]
+  },
+  {
+    "address": "0x879EB1819a7025BE1CBa3D1095eA71928b24cFf5",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x0bc529b4c4181fe92c169099fD272dc4c3394399",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 4
+      }
+    ]
+  },
+  {
+    "address": "0x278ea748eCb4e882509BC0F7c6566f225c173271",
+    "score": 1.7076,
+    "roots": 1,
+    "held": [
+      "circles-v2"
+    ],
+    "detail": [
+      {
+        "trustedBy": 6
+      }
+    ]
+  }
+]

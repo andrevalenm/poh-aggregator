@@ -26,6 +26,7 @@ function ev(a: Adapter, over: Partial<Evidence> = {}): Evidence {
     evidenceClass: a.evidenceClass,
     trustRoot: a.trustRoot,
     held: true,
+    observedOn: SUBJECT,
     freshness,
     effectiveCostCents: effectiveCost(a, freshness),
     forgeCostCents: a.forgeCostCents,
@@ -38,7 +39,7 @@ function ev(a: Adapter, over: Partial<Evidence> = {}): Evidence {
 
 function run(adapters: Adapter[], evidence: Evidence[]) {
   return score({
-    subject: SUBJECT,
+    subjects: [SUBJECT],
     adapters: new Map(adapters.map((a) => [a.id, a])),
     evidence,
     now: 1_700_000_000,
@@ -120,6 +121,48 @@ describe('the farm vs the person — the whole thesis in one test', () => {
       additive(farm.evidence) > additive(person.evidence),
       'precondition: naive additive scoring inverts the ranking, which is why we do not use it',
     )
+  })
+})
+
+describe('multi-address subjects', () => {
+  const OTHER = '0x2222222222222222222222222222222222222222' as Address
+
+  function runMulti(adapters: Adapter[], evidence: Evidence[]) {
+    return score({
+      subjects: [SUBJECT, OTHER],
+      adapters: new Map(adapters.map((a) => [a.id, a])),
+      evidence,
+      now: 1_700_000_000,
+    })
+  }
+
+  /**
+   * Real people spread credentials across wallets — PoH's own Circles proxy pairs a PoH
+   * address with a separate Circles avatar — so an address-keyed lookup undercounts them.
+   */
+  test('credentials on different wallets aggregate into one subject', () => {
+    const poh = adapter({ id: 'poh-v2', trustRoot: 'social-vouching:poh', forgeCostCents: 1_000, rentCostCents: 500 })
+    const circles = adapter({ id: 'circles-v2', trustRoot: 'social-trust:circles', forgeCostCents: 100, rentCostCents: 50 })
+
+    const r = runMulti([poh, circles], [ev(poh, { observedOn: SUBJECT }), ev(circles, { observedOn: OTHER })])
+
+    assert.equal(r.independentRoots, 2, 'both wallets contribute')
+    assert.equal(r.totalCostCents, 550)
+    assert.deepEqual(r.subjects, [SUBJECT, OTHER])
+    assert.ok(r.caveats.some((c) => c.code === 'multi-address-subject'))
+  })
+
+  /** And the obvious attack — split one credential type over many wallets — must not pay. */
+  test('splitting correlated credentials across wallets does not inflate the score', () => {
+    const icao = 'state-document:icao-9303'
+    const a = adapter({ id: 'zkpassport', trustRoot: icao, forgeCostCents: 150_000, rentCostCents: 2_000 })
+    const b = adapter({ id: 'self-protocol', trustRoot: icao, forgeCostCents: 150_000, rentCostCents: 2_000 })
+
+    const oneWallet = run([a, b], [ev(a), ev(b)])
+    const twoWallets = runMulti([a, b], [ev(a, { observedOn: SUBJECT }), ev(b, { observedOn: OTHER })])
+
+    assert.equal(twoWallets.totalCostCents, oneWallet.totalCostCents, 'saturation spans addresses')
+    assert.equal(twoWallets.independentRoots, 1)
   })
 })
 

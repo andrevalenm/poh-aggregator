@@ -94,6 +94,7 @@ describe('end to end', () => {
     const r = await client.resolve(UNREGISTERED)
 
     assert.equal(r.subject, UNREGISTERED)
+    assert.deepEqual(r.subjects, [UNREGISTERED])
     assert.equal(r.score, 0)
     assert.equal(r.independentRoots, 0)
     assert.ok(r.evidence.length >= 4, 'every adapter reports, even when it finds nothing')
