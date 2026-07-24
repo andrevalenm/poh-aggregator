@@ -1,0 +1,117 @@
+/**
+ * Core types.
+ *
+ * Design note that governs everything here: we return evidence and a score, and we let
+ * the caller decide. `isHuman` takes a required threshold rather than defaulting to one,
+ * because at a plausible 2% sybil rate a 95%-specificity classifier is wrong about roughly
+ * three-quarters of the people it flags. Denial is the caller's decision to own, not a
+ * default we ship.
+ */
+
+export type Address = `0x${string}`
+
+/** What a credential fundamentally demonstrates. Ordering is not significance. */
+export type EvidenceClass =
+  | 'Uniqueness'
+  | 'StateIdentity'
+  | 'SocialTrust'
+  | 'Liveness'
+  | 'Behavioral'
+
+/**
+ * Correlation key. Two adapters sharing a trustRoot are one piece of evidence observed
+ * twice — a passport read by three protocols is still one passport.
+ */
+export type TrustRoot = string
+
+export interface Adapter {
+  id: string
+  name: string
+  evidenceClass: EvidenceClass
+  trustRoot: TrustRoot
+  /** Cost for an adversary to manufacture the credential, in cents. */
+  forgeCostCents: number
+  /** Cost to borrow one from a willing holder, in cents. Separate on purpose. */
+  rentCostCents: number
+  /** Days after which the credential carries half weight. 0 means no decay. */
+  decayHalfLifeDays: number
+  /** False when the upstream protocol is discontinued. */
+  live: boolean
+  /** Where the costs above came from. */
+  sourceURI: string
+}
+
+/** A credential actually held by a subject, as observed by an adapter. */
+export interface Evidence {
+  adapterId: string
+  adapterName: string
+  evidenceClass: EvidenceClass
+  trustRoot: TrustRoot
+  /** True when the subject holds this credential. */
+  held: boolean
+  /** Unix seconds the credential was issued, when the protocol exposes it. */
+  issuedAt?: number
+  /** Decay multiplier in [0,1] derived from issuedAt and the adapter's half-life. */
+  freshness: number
+  /** Effective adversary cost after decay and liveness, in cents. */
+  effectiveCostCents: number
+  forgeCostCents: number
+  rentCostCents: number
+  live: boolean
+  sourceURI: string
+  /** Adapter-specific detail — trust-graph position, revocation state, and so on. */
+  detail?: Record<string, unknown>
+}
+
+/** One trust root's contribution, after saturation across its correlated adapters. */
+export interface RootContribution {
+  trustRoot: TrustRoot
+  /** Adapter ids that contributed evidence under this root. */
+  adapterIds: string[]
+  /** Cost of the single strongest credential under this root. Saturated, not summed. */
+  contributionCents: number
+  /** True when more than one adapter matched — evidence that would have been double-counted. */
+  saturated: boolean
+}
+
+export interface Caveat {
+  code: string
+  message: string
+}
+
+export interface PersonhoodResult {
+  subject: Address
+  /** Resolved ENS name, when the lookup started from one. */
+  name?: string
+  /** log10 of total root-cost in cents. Continuous, roughly 0–4. Never a grade. */
+  score: number
+  /** Total adversary cost across independent roots, in cents. */
+  totalCostCents: number
+  /** Distinct trust roots with evidence. The number that actually matters. */
+  independentRoots: number
+  evidence: Evidence[]
+  roots: RootContribution[]
+  caveats: Caveat[]
+  /** Registry revision the score was computed against, for reproducibility. */
+  registryRevision?: number
+  computedAt: number
+  /**
+   * Verdict against a caller-supplied threshold. Deliberately a method, and deliberately
+   * without a default — see the note at the top of this file.
+   */
+  isHuman(threshold: number): boolean
+}
+
+export interface AdapterProbe {
+  adapterId: string
+  /** Look up whether this subject holds the credential. Must never throw; return held:false. */
+  probe(subject: Address): Promise<AdapterProbeResult>
+}
+
+export interface AdapterProbeResult {
+  held: boolean
+  issuedAt?: number
+  detail?: Record<string, unknown>
+  /** Set when the probe failed, so a network error is never silently a negative. */
+  error?: string
+}
