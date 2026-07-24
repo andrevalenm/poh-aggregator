@@ -42,7 +42,7 @@ Written incrementally; each file is committed and pushed as it lands.
 
 | # | Topic | Source agent | Status |
 |---|-------|--------------|--------|
-| 1 | World ID | `a4434d921a2f98c87` | pending |
+| 1 | World ID | `a4434d921a2f98c87` | **done** — [world-id.md](protocols/world-id.md) (failure modes/scale are gaps) |
 | 2 | Circles | `a5fe8e1a11cbe3fe7` | pending |
 | 3 | Humanity Protocol | `a66a8ecf7a50419be` | pending |
 | 4 | ZK passport & eID | `aaca5c458e0b44670` | pending |
