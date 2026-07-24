@@ -1,7 +1,5 @@
 # Sybil incidents & antipatterns — the empirical record
 
-> STATUS: in progress (started 2026-07-24)
-
 **One-liner:** What has actually gone wrong in sybil-resistance systems, with numbers and primary
 sources — airdrop farming, personhood-credential trading, human/click farms, and attacks on
 aggregate scores.
@@ -695,6 +693,426 @@ magnitude. **Always compute live, non-revoked, non-expired counts, and show inte
 number.** Conversely — the freshness policy that produced Linea's 502 is not a bug in the data, it
 is a *deliberate* design choice, and it is the correct one for sybil resistance; it just has to be
 priced into coverage.
+
+---
+
+## 5. Antipatterns synthesis
+
+Each entry: the mistake, the evidence, the rule.
+
+### A1. Additive scoring over correlated evidence
+
+**Mistake.** Summing weights from credentials that share a trust root, a supplier, or a cost
+driver, as if they were independent observations.
+
+**Evidence.** Human Passport sums Stamp weights against a threshold of 20, and its own docs
+concede *"not all Sybils will be eliminated at that threshold"* and justify higher thresholds by
+the *"time, effort and possibly money expended"*
+([scoring thresholds](https://docs.passport.human.tech/building-with-passport/stamps/major-concepts/scoring-thresholds)).
+Meanwhile §3 shows that web2 accounts, phone numbers, device fingerprints and IPs are all supplied
+by **the same rental market** at cents to dollars. A farmer buying five cheap stamps has purchased
+one capability, not five facts.
+
+**Rule.** **Score the maximum over evidence classes, not the sum — and only add across classes you
+can argue are causally independent.** Before adding two credentials, answer: *does one supplier
+outage, one document, one biometric, one human, or one rented service produce both?* If yes, they
+are one piece of evidence. Maintain an explicit **overlap matrix** (BRIEF.md §7 already asks every
+protocol write-up for this — it exists precisely to feed this calculation) and cap the contribution
+of any correlated group at the strongest single member.
+
+### A2. Treating credential *possession* as evidence of *control*
+
+**Mistake.** Concluding "a unique human is behind this request" from "a unique human's credential
+is presented."
+
+**Evidence.** The strongest in the file. Idena: **all 31** pools ever exceeding 100 accounts showed
+third-party key access, **even after delegation removed any operational need for it**; 23 entities
+held ≥40% of accounts. World ID/Singapore: three men recruited humans to be Orb-verified, then
+**took control of the accounts and tokens in exchange for cash**; 200+ phones seized in one raid.
+In both cases every credential was genuine, unique and correctly issued.
+
+**Rule.** **A credential proves the issuance event, never the current session.** Design as if every
+credential in the system may be operated by someone other than its subject, and put the sybil
+resistance somewhere that assumption does not destroy — in the *graph* between credentials, in
+*freshness*, and in *behaviour at use time*, not in the credential itself.
+
+### A3. Publishing the weights vs. hiding them — the honest trade-off
+
+**Mistake (either direction, taken purely).**
+
+*Published weights* turn the score into a shopping list: minimise `Σ cost` subject to
+`Σ weight ≥ threshold`. Passport publishes the threshold, publishes weights, and re-weights
+periodically (a Stamp re-weight shipped in **January 2026**) — the re-weighting cadence is itself
+an admission that a static published weighting gets solved.
+
+*Hidden weights* buy real time — Passport's Models API docs say it explicitly: *"model features are
+hidden from the public, making it more difficult for Sybils to cheat"* — but at four costs, all of
+which we would inherit:
+(i) **unfalsifiability** — Passport publishes no accuracy or false-positive figure for the hidden
+model, while BlockScience, doing open work, published a **57–100% recall interval**;
+(ii) **no appeal path** — a user scored 34/100 with no explanation has no remedy, and under **GDPR
+Art. 22** an automated decision gating access to a service needs explanation and human review;
+(iii) **it is only secret until probed** — an adversary with an API key and controlled wallets can
+map the decision boundary; secrecy raises the *fixed* cost of the first attack, not the *marginal*
+cost after, which selectively protects us from small farmers and not from the funded operator who
+is the actual threat;
+(iv) **obscurity is a liability with integrators**, who must explain to their own users why they
+were rejected.
+
+**Rule.** **Publish structure and rationale; keep only calibration private, and rotate it.** State
+which evidence classes exist, what each is worth *relative to* the others, why, and what the
+overlap assumptions are. Keep the numeric calibration versioned, dated and rotating — and say
+publicly that it rotates, because *the honest reason for privacy is not secrecy, it is that any
+fixed weighting is a stationary target*. Publish accuracy metrics on a held-out labelled set even
+when the weights are private. **If we cannot publish a confusion matrix, we do not have a product,
+we have an opinion.**
+
+### A4. Thresholds instead of continuous scores
+
+**Mistake.** Emitting a boolean. It creates a precise, published target; it discards all
+information above and below the line; and it silently transfers the risk decision from the relying
+party (who knows what is at stake) to us (who do not).
+
+**Evidence.** Passport's Unique Humanity Scorer is explicitly *"binary"*, comparing the weight sum
+to a *"pre-defined threshold value"* of 20; the docs then present a threshold-vs-false-positive
+trade-off table (20 / 25 / 30 → higher sybil resistance, higher exclusion of real users). That
+table is the relying party's decision, being made centrally on their behalf.
+
+**Rule.** **Return a calibrated continuous score plus the evidence vector plus a confidence
+interval; let the integrator pick the cut.** Do not ship a single blessed threshold as the default
+API response. Where a boolean is unavoidable, ship *several* named policies (`low-friction`,
+`balanced`, `high-assurance`) with **published measured base rates for each**, so the integrator
+chooses knowingly. And **monitor our own score histogram for a spike just above whatever cut
+integrators actually use** — that spike is the signature of A4 being exploited, and is the single
+most valuable health metric we can build.
+
+### A5. One-shot verification with no freshness
+
+**Mistake.** Treating a credential issued once as valid indefinitely — or, in the other direction,
+shipping an expiry policy without measuring what it does to live coverage.
+
+**Evidence, in both directions.** *Against staleness:* Coinbase Verifications — **720,503
+attestations issued, 406,022 revoked (56% churn)**; the cumulative count is 2.3× the live one.
+*Against naive freshness:* Linea PoH V2 — **50,475 lifetime credentials, hard 90-day expiry,
+502 live**. A freshness policy is a **silent kill switch**: a credential set that looks large
+cumulatively and is nearly empty in live terms, with no error raised anywhere.
+
+**Rule.** **Never store or serve a cumulative count. Every population number we publish is live,
+non-revoked, non-expired, as of a timestamp.** Re-check revocation and expiry at *query* time, not
+at ingest. Expose credential age and last-verification time in the evidence vector so integrators
+can apply their own decay. Monitor expiry cliffs per protocol — if a source silently drops from
+50,475 to 502, our coverage collapses and nothing will tell us unless we look.
+
+### A6. Assuming a credential expensive to *obtain* is expensive to *rent*
+
+**Mistake.** Pricing sybil resistance by acquisition cost.
+
+**Evidence.** An Orb scan requires physical travel to a device and an iris enrolment — genuinely
+expensive to obtain, and the biometric worked. The resulting accounts traded at **$0.50**
+(ZachXBT, 2026-04) and at **$1.40–$70** on Chinese platforms in 2023. Idena's flip ceremonies were
+expensive in attention and could not be sold at all thanks to identity staking — and the humans
+rented themselves for **$2–$4 per ceremony**.
+
+**Rule.** **Price every credential by its rental rate, not its issuance cost** (see §6). If we
+cannot estimate a rental rate, we cannot claim a sybil-resistance level; say so explicitly.
+
+### A7. Ignoring that the human may be a puppet
+
+**Mistake.** Ending the threat model at "is there a human." Building for *bot* resistance and
+marketing *sybil* resistance.
+
+**Evidence.** The whole of §2.3. Idena solved bots, solved account trading, and still collapsed:
+solo accounts **62% → 27%**, large pools **22% → 61%**, terminating at **23 entities holding ≥40%
+of accounts and ~half of rewards**. Ohlhaver's term is exactly right: **de facto sybils**.
+
+**Rule.** State in our own documentation, in plain words, that **we do not and cannot detect a
+verified human acting under another party's direction**, and that no credential in our set does
+either. Then measure what we *can*: concentration. **Publish a concentration metric** — Gini or
+top-N share over whatever grouping we can observe (funding source, referrer, issuer, device, IP
+ASN, on-chain cluster) — because Idena's crisis only became visible when delegation made pool size
+*measurable*. A system that cannot measure concentration cannot notice this failure at all.
+
+### A8. Costing an identity in a currency the attacker mints
+
+**Mistake.** Denominating sybil cost in the protocol's own freely-issued asset.
+
+**Evidence.** Circles: `INVITATION_COST = 96 CRC` against issuance of `24 CRC/day` ⇒ an identity
+costs **two days of free money plus gas**, giving a **~2–4 day doubling time**; the indexer's own
+events are named `BotCreated` and `FarmGrown`, and one maintainer minted **5,000 bots** on
+2026-05-26.
+
+**Rule.** Sybil cost must be **exogenous** — external money, scarce physical presence, or scarce
+social attachment. Any cost denominated in the system's own emissions is not a cost.
+
+### A9. Trusting a single attribution field on a public graph
+
+**Mistake.** Reading one field (`inviter`, `issuer`, `referrer`, `source`) and believing it.
+
+**Evidence.** Circles: `RegisterHuman.inviter` looked healthy (top direct inviter 47/10,000) while
+`originInviter` showed **2,754/10,000 = 27.5% from a single entity, laundered through 1,687 proxy
+addresses**. One hop of indirection defeated the field a verifier would naturally read.
+
+**Rule.** Any provenance signal must be computed **transitively** over the graph, assuming an
+indirection layer has already been inserted. If we cannot compute it transitively, we must not use
+it as a sybil signal at all — a defeated signal is worse than no signal, because it produces false
+confidence.
+
+### A10. Hardening one layer and calling it solved (the displacement antipattern)
+
+**Mistake.** Believing a mitigation *removes* an attack rather than *relocating* it to the
+next-cheapest layer. **This is the master pattern; every other entry is a special case.**
+
+**Evidence, from four independent domains:**
+
+- **CAPTCHA, 2010 → 2026.** Image → reCAPTCHA v2 → invisible v3 → behavioural risk → Turnstile.
+  Retail human solve price went from **~$1–2 per 1,000** (Motoyama et al., USENIX 2010) to
+  **$0.50–$2.99 per 1,000** (2Captcha, retrieved 2026-07-24). Sixteen years of hardening the
+  *puzzle* never touched the *labour market*, which was the real bottleneck.
+- **Liveness.** Hardening presentation-attack detection pushed attackers *below* the camera:
+  iProov reports **injection attacks overtook presentation attacks as the primary vector in 2024**;
+  WEF (Jan 2026) tested 17 face-swap and 8 camera-injection tools and found **most bypassed
+  standard biometric onboarding checks**.
+- **Idena.** Identity staking killed account trading → the next-cheapest attack was **renting the
+  human**, at $2–$4 per ceremony.
+- **World ID.** Face Auth kills resale → the next-cheapest attack is **keeping the human on call**,
+  which is the Singapore configuration precisely.
+- **Ohlhaver's own version, and the one to keep:** receipt-freeness and proofs-of-complete-knowledge
+  defeat *on-chain* vote buying and thereby **encourage off-chain vote buying as the cheap
+  alternative**; TEEs push collusion into meatspace rather than eliminating it. "When on-chain vote
+  buying becomes costly, we can expect the resourceful to simply move offchain into meat space."
+
+**Rule.** Evaluate every mitigation by **"what is the next-cheapest attack once this works?"** —
+never by "does this work?" Write the displacement target down beside the mitigation in the design
+doc. If the next-cheapest attack is *cheaper* than the current one, the mitigation is **negative
+value**: it costs us engineering and users, and moves the adversary somewhere we can see less.
+
+### A11. Measuring detections instead of leakage
+
+**Mistake.** Reporting "we caught N sybils" as evidence the system works.
+
+**Evidence.** Arbitrum ran open-source Louvain cluster detection with Nansen labels and
+**148,595 sybil addresses still received 21.8% of the tokens**. LayerZero's 803,093 counts the
+farms that **either confessed or were detectable** — by construction it excludes the high-opsec
+operators. BlockScience were the only ones honest enough to publish a recall *interval*
+(**57–100%**), which is both the correct shape and an admission that the true denominator is
+unknown.
+
+**Rule.** Detection counts are a **vanity metric**. What matters is **leakage**: the share of value
+or access that reached farms. Build our evaluation around a **labelled red-team set we generate
+ourselves** — buy credentials on the open market at §3 prices, run them through our own pipeline,
+count how many pass — rather than around counts of what we flagged. **A red-team budget of a few
+hundred dollars will tell us more about our product than any amount of heuristic engineering.**
+
+---
+
+## 6. The "can it be sold or rented?" test
+
+Stated once: **a credential whose holder can profitably rent it out provides no sybil resistance
+against a funded adversary, however good its cryptography.** Sale and rental are different, and
+rental is the harder problem — sale is a one-shot transfer that binding, staking or biometric
+re-check can block; rental is an ongoing service relationship that none of those touch, because the
+legitimate subject is genuinely present every time.
+
+| Credential class | Sellable? | Rentable? | Observed price | Residual sybil resistance |
+|---|---|---|---|---|
+| **Biometric uniqueness, no presence check** (World ID pre-Face-Auth) | **Yes** — transfer the account | Yes | **$0.50** escrow (2026-04); **$1.40–$70** (2023); ~$30 iris scans in KE/KH | **~zero** |
+| **Biometric uniqueness + on-device presence** (World ID + Face Auth) | Mostly **no** — re-check binds subject to device | **Yes** — subject stays on payroll and does the selfie | ≈ Idena's $2–$4/session (not directly observed) | **Low.** Raises unit cost ~4–8×, still single-digit dollars |
+| **Cognitive-test uniqueness + identity staking** (Idena) | **No** — genuinely solved | **Yes** — the definitive case | **$2–$4** per ceremony | **~zero at scale.** 23 entities → ≥40% of accounts |
+| **Social-graph vouching** (PoH/Kleros, BrightID) | Partly — vouchers are slashed on rejection, a real deterrent | **Yes** — genuine humans, genuine vouches, keys handed over afterwards | Not directly observed | **Low against a patient adversary**; good against casual sybils |
+| **Invitation/graph currency** (Circles) | n/a | n/a — **minting is cheaper than renting** | ~2 days of self-minted CRC + gas | **Zero for the binary flag.** Non-zero only for the *max-flow trust metric* |
+| **Remote document + selfie KYC** (Onfido/Sumsub/Jumio/Veriff/Persona class) | **Yes** — and increasingly unnecessary | Yes; also **synthesisable** | **<$20** for a KYC-passing synthetic face; FaaS priced per successful account | **Low and falling.** WEF Jan 2026: most tested tools bypass standard checks |
+| **State-issued eID / ZK-passport** (eIDAS 2 / EUDI, zk-passport) | **Sale is illegal and traceable** — strongest class | **Yes, but expensively** — the document holder must participate, and impersonation is criminal | fraudulent-ID markets exist but carry legal risk | **Highest available** — and **legal deterrence, not cryptography, does the work** |
+| **Web2 account stamps** (Google, Discord, X, LinkedIn) | **Yes** — mature market | Yes | cents to low dollars | **~zero**, and mutually correlated (see A1) |
+| **Phone / SIM possession** | **Yes** | Yes | cents; **347,200 SIMs in one Thai house** | **~zero** |
+| **On-chain behavioural history / aged wallets** | **Yes** — wallets are an asset class | Yes | $1–$20 per farmed wallet (`UNVERIFIED`) | **~zero against a funded adversary**; also `-1`/unscoreable for real new users |
+| **Interactive puzzle / CAPTCHA** | n/a | Yes, industrially | **$0.0005–$0.05** per solve, human-solved | **~zero** |
+
+**Three conclusions, in descending order of how much they should change our behaviour:**
+
+1. **Nothing in the table is rental-resistant.** Every row is rentable. The spread across the whole
+   credential set is roughly **$0.001 → ~$20 per identity** — four orders of magnitude, but the top
+   of the range is a rounding error against any prize worth farming. **We are not building a system
+   that stops a funded adversary. We are building one that prices them.** That claim is defensible
+   and true; the stronger claim is not.
+2. **Legal deterrence outperforms cryptography.** The only row with meaningfully high residual
+   resistance — state eID — gets it from *criminal liability attaching to a named person*, not from
+   any protocol property. Worth internalising: our strongest signal is strong for a non-technical
+   reason, and will therefore behave differently (jurisdictionally, and under political change)
+   from everything else in the vector.
+3. **Sale-resistance and rental-resistance must be scored separately.** World ID's Face Auth and
+   Idena's identity staking both move a credential from column-1-yes to column-1-no while leaving
+   column 2 untouched. A model with one "strength" number cannot represent that, and will
+   systematically **overrate exactly the protocols that have done the most visible security work.**
+   Our evidence vector needs two axes: `sale_resistance` and `rental_resistance`.
+
+---
+
+## What this means for our design
+
+Concrete, and pessimistic where the evidence warrants it.
+
+**1. Do not sell "sybil resistance." Sell *priced* friction, with the price published.**
+The honest product claim is: *"passing our `high-assurance` policy costs an attacker at least $X
+per identity, measured, as of date D."* Every number in this file supports that claim and none
+supports a stronger one. LayerZero, Chaos Labs and Nansen spent real money and produced 803,093
+addresses and no recall figure. Arbitrum open-sourced Louvain clustering and leaked **21.8%**.
+BlockScience's honest recall interval was **57–100%**. **If our marketing implies we do better than
+those, we are lying.**
+
+**2. Build the aggregate as `max`-with-bounded-addition over independent evidence classes, never a
+flat sum.** Define a small number of classes (state-identity, biometric-uniqueness, social-graph,
+behavioural, web2-possession); score within class; take the strongest; allow only a capped bonus
+for genuinely independent additional classes. Maintain the **overlap matrix** as a first-class
+artifact — BRIEF.md already requires every protocol write-up to declare shared trust roots, and
+this is what that field is for. **Concretely: World ID, a zk-passport, and a document-based KYC
+that all bottom out in the same face and the same passport are one piece of evidence, not three.**
+
+**3. Return a continuous score, an evidence vector, and a confidence interval. Never a lone
+boolean.** Ship named policies with published measured base rates. Then **build the score histogram
+on day one** and alert on a spike immediately above any commonly used cut. That spike is the
+signature of farmers optimising to the threshold; it is the failure we are most likely to suffer;
+it is cheap to detect and **impossible to see if we never plot it**.
+
+**4. Every credential in the evidence vector carries two resistance axes — `sale_resistance` and
+`rental_resistance` — plus `issued_at`, `expires_at`, `revocation_checked_at`.** Rental resistance
+is near-zero for everything in our set (§6); encoding that in the data model prevents us quietly
+assuming otherwise in the scoring code.
+
+**5. Live counts only.** Never publish or internally reason from a cumulative issuance figure.
+Coinbase: **56% revoked**. Linea PoH V2: **502 live of 50,475 issued**. Check revocation and expiry
+at query time. Alert on expiry cliffs.
+
+**6. Compute provenance transitively, or not at all.** The Circles `originInviter` result is the
+warning shot: the naive field is one hop from useless. Any clustering, referrer or issuer signal we
+ship must be graph-based and must assume an indirection layer is already present.
+
+**7. Denominate cost exogenously.** Never let a credential's sybil cost be paid in a currency the
+issuer or the attacker mints (Circles), and never treat *acquisition* cost as *rental* cost
+(World ID, Idena).
+
+**8. Concentration is the metric that would have caught Idena. Build it.**
+Idena's crisis was invisible until delegation made pool size measurable — and then it was obvious.
+Publish, per integrator and globally, a **top-N-entity share and Gini** over every grouping we can
+observe: funding source, on-chain cluster, referrer chain, issuer, device, IP ASN, verification
+timing. **A cluster of 200 credentials that all pass, all fresh, all correlated in time, is the
+Singapore raid visible in advance.** We will never be able to *prove* puppeteering — nobody can —
+but we can surface concentration and hand it to the relying party, and that is a differentiated
+feature nobody in this space currently ships.
+
+**9. Budget for red-teaming ourselves, and treat it as the primary evaluation.**
+§3 is the price list. A few hundred dollars buys CAPTCHA solves, aged wallets, web2 accounts, and
+possibly a traded personhood credential. Run them through our own pipeline and **count what
+passes**. This measures **leakage**, which is what matters, rather than detections, which are
+vanity (A11). It is also the only route to the confusion matrix we owe integrators. Do it **before**
+launch and repeat quarterly — the adversary's price list moves.
+
+**10. Write down the displacement target for every defence we ship.**
+Beside each mitigation in the design doc: *"once this works, the next-cheapest attack is ___, at
+approximately $___."* If that number is lower than the current attack cost, the mitigation is
+negative value. This one line of discipline is the entire lesson of Idena, of sixteen years of
+CAPTCHA pricing, and of injection attacks overtaking presentation attacks.
+
+**11. Accept the dedup/privacy conflict openly.** An aggregator is by definition a cross-application
+deduplicator; app-scoped nullifiers make cross-app dedup impossible by construction. We cannot
+offer maximal unlinkability *and* maximal dedup. Choose, document, and tell integrators exactly
+which they are buying — the failure mode of not choosing is claiming both and delivering neither.
+
+**12. The thing we most want to detect is the thing we cannot detect.** A verified, unique, live,
+fresh human acting under someone else's direction passes every check in our system and every check
+in every system in this file. Say so, in our public documentation, in one sentence, without
+hedging. It costs nothing, it is true, and every serious integrator already suspects it — the ones
+who do not are the ones who will blame us later.
+
+---
+
+## References
+
+**Primary / near-primary**
+
+- Ohlhaver & Nikulin, *Compressed to Zero: The Silent Strings of Proof of Personhood* (2024) —
+  local ETHBerlin04 keynote transcript at
+  `/home/hugo/Projects/poh-aggregator/research/references/ohlhaver-ethberlin-2024-transcript.md`
+  (machine ASR — cite the paper, not the transcript, in anything public).
+- Motoyama, Levchenko, Kanich, McCoy, Voelker, Savage, *Re: CAPTCHAs — Understanding
+  CAPTCHA-Solving Services in an Economic Context*, USENIX Security 2010 —
+  <https://www.cs.uic.edu/~ckanich/papers/motoyama2010recaptchas.pdf>
+- World Economic Forum, *Unmasking Cybercrime: Strengthening Digital Identity Verification against
+  Deepfakes*, Jan 2026 —
+  <https://reports.weforum.org/docs/WEF_Unmasking_Cybercrime_Strengthening_Digital_Identity_Verification_against_Deepfakes_2026.pdf>
+- Arbitrum Foundation sybil-detection source — <https://github.com/ArbitrumFoundation/sybil-detection>
+- Hop airdrop sybil reports (raw community evidence) —
+  <https://github.com/hop-protocol/hop-airdrop/issues/267>,
+  <https://github.com/hop-protocol/hop-airdrop/issues/192>,
+  <https://github.com/hop-protocol/hop-airdrop/issues/332>
+- *Fighting Sybils in Airdrops* — <https://arxiv.org/pdf/2209.04603>
+- *Airdrops: Giving Money Away Is Harder Than It Seems* — <https://arxiv.org/abs/2312.02752>
+  (nine airdrops; **up to 66%** of recipients sold in their first post-claim transaction)
+- BlockScience, *Gitcoin Grants Round 11 Anti-Fraud Evaluation & Results* —
+  <https://blog.block.science/gitcoin-grants-round-11-anti-fraud-evaluation-results/>
+- Human Passport docs — scoring thresholds:
+  <https://docs.passport.human.tech/building-with-passport/stamps/major-concepts/scoring-thresholds>;
+  Models API: <https://docs.passport.human.tech/building-with-passport/models/introduction>
+- Gitcoin round operations, sybil analysis —
+  <https://roundoperations.gitcoin.co/round-operations/post-round/sybil-analysis>
+- 2Captcha price list (retrieved 2026-07-24) — <https://2captcha.com/for-customer>
+- Circles invitations-at-scale source — <https://github.com/aboutcircles/circles-invitation-at-scale>
+- LayerZero announcement of 803,093 — <https://x.com/LayerZero_Core/status/1791622471965163597>
+- Optimism announcement of 17k removals / 14M OP recovered —
+  <https://x.com/Optimism/status/1528830231322165249>
+- Kleros PoH docs — <https://docs.kleros.io/products/proof-of-humanity/poh-faq>,
+  <https://docs.kleros.io/products/proof-of-humanity/proof-humanity-tutorial-remove-and-challenge>
+
+**Secondary (journalism / analysis — labelled as such throughout)**
+
+- MIT Technology Review, Worldcoin's recruitment of its first 500k users (2022-04-06) —
+  <https://www.technologyreview.com/2022/04/06/1048981/worldcoin-cryptocurrency-biometrics-web3/>
+- MIT Technology Review, Telegram KYC-bypass tooling (2026-04-15) —
+  <https://www.technologyreview.com/2026/04/15/1135898/cyberscammers-bypassing-bank-telegram/>
+- Singapore Worldcoin account-trading arrests —
+  <https://www.singaporelawwatch.sg/Headlines/7-under-police-probe-for-allegedly-buying-and-selling-worldcoin-accounts>,
+  <https://www.thestar.com.my/aseanplus/aseanplus-news/2024/09/15/seven-under-singapore-police-probe-for-allegedly-buying-and-selling-worldcoin-accounts>,
+  <https://cointelegraph.com/news/worldcoin-singapore-investigation-money-laundering-terrorism-financing>
+- ZachXBT Worldcoin black-market coverage (2026-04-28) —
+  <https://www.cryptotimes.io/2026/04/28/scam-altman-musks-jab-meets-zachxbt-claim-as-worldcoin-faces-fresh-scrutiny/>
+- Rest of World, Worldcoin Kenya scammers (2023) —
+  <https://restofworld.org/2023/worldcoin-kenya-suspended-scammers-cash-in/>
+- X-explore Arbitrum sybil analysis — <https://paragraph.com/@x-explore/LkyJPs8v4QkRWxZAx2gc>;
+  summary at <https://beosin.com/resources/a-closer-look-at-the-anti-sybil-mechanism-under-the-arbitrum>
+- The Block, Linea sybil filtering —
+  <https://www.theblock.co/post/335979/linea-filters-over-half-a-million-sybil-addresses-from-upcoming-token-airdrop>
+- The Block, LayerZero self-reporting —
+  <https://www.theblock.co/post/294230/layerzero-labs-ceo-says-up-to-100000-addresses-have-self-reported-as-airdrop-sybils>
+- The Register / VOA, Thai click-farm seizure (2017) —
+  <https://www.theregister.com/2017/06/14/click_farm/>,
+  <https://www.voanews.com/a/thai-police-raid-click-farm-finds-hundreds-of-thousands-of-sim-cards/3898497.html>
+- Biometric Update, World ID live-presence integrations (2026-05) —
+  <https://www.biometricupdate.com/202605/zoom-opens-beta-for-world-id-deepfake-verification-in-enterprise-meetings>
+
+**Sibling files in this research set (measured on-chain findings, 2026-07-24)**
+
+- `/home/hugo/Projects/poh-aggregator/research/protocols/circles.md` — `BotCreated`/`FarmGrown`,
+  `originInviter` concentration, `Hub.sol` invitation economics
+- `/home/hugo/Projects/poh-aggregator/research/protocols/world-id.md` — presence-flag semantics
+- `/home/hugo/Projects/poh-aggregator/research/landscape/kyc-liveness-vendors.md` — the vendor set
+  named in the KYC-bypass reporting
+
+**Known gaps — where to look next**
+
+1. **A score-distribution histogram showing a spike at a published threshold.** The single most
+   persuasive missing artifact in this file (§4.2). Source: Passport scorer API over a large
+   address set, or Gitcoin per-round Vote Coefficients CSVs.
+2. **ZachXBT's original 2026-04 post** and the **$15 upper bound** — only the $0.50 floor is
+   corroborated here. Check his Telegram `@investigations` and X timeline for 2026-04-27/28.
+3. **LayerZero's post-hoc evaluation** (bounty precision/recall). `sybil.layerzero.network` was
+   `ENOTFOUND` on 2026-07-24. Try LayerZero Labs GitHub, Chaos Labs blog, Nansen archive.
+4. **Nansen's Linea methodology page** — 301s to `nansen.ai/blog`; the methodology appears gone.
+   Try the Wayback Machine.
+5. **PoH/Kleros removal statistics** — how many profiles were removed as sybils or duplicates.
+   Source: PoH subgraph removal-request events; Kleros court archive.
+6. **A dated, primary price list for wallet-farm / anti-detect-browser / residential-proxy
+   services.** Everything in §1.5 is currently order-of-magnitude only.
+7. **A documented BrightID incident with numbers** — I found structural criticism only.
+8. **MAS's parliamentary reply on Worldcoin** — the page was in maintenance on 2026-07-24.
 
 
 

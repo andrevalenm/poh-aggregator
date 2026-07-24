@@ -12,10 +12,147 @@ personhood claim; the personhood value is entirely in the underlying platform si
 **Aggregator verdict:** TBD
 
 ## Part A — zkTLS / web proofs: the mechanism
+
 ### A.0 Taxonomy of security models
+
+TLS gives you *authenticity in transit* but the session key is symmetric and known to both endpoints,
+so a transcript proves nothing to a third party — the client could have forged it. Every zkTLS design
+is a different answer to "how do we stop the client forging the transcript", and the answers have
+**wildly different trust roots**. This is the section that matters; the marketing collapses all four
+into "zkTLS" and they are not the same product.
+
+| Model | Who is added to the session | What they see | Breaks if… |
+|---|---|---|---|
+| **MPC-TLS / three-party handshake** (TLSNotary, zkPass MPC mode) | A Notary co-computes the TLS session key with the client via garbled circuits; client holds the enc-key share, notary holds part of the MAC key | Only ciphertext + what the client chooses to open | Notary and client **collude** — the notary can hand over its MAC-key share and the client forges arbitrary transcripts. Also: bandwidth blowup (~32MB uploaded for a 100KB response, per zkPass docs) |
+| **Proxy-witness** (Reclaim, zkPass proxy mode, Primus proxy mode) | A proxy sits on the wire and signs the ciphertext it relayed, plus the server cert / SNI | Ciphertext + destination + timing | The proxy is **dishonest or bribed**: it can sign a transcript for a session that never happened, since only it attests that these bytes came from that server. Also breaks under BGP hijack / DNS spoofing between proxy and server |
+| **TEE attestation** (Opacity, Primus TEE mode, Clique) | A notary running inside SGX/TDX/Nitro; remote attestation vouches for the code | Plaintext, inside the enclave | The **TEE is broken** (SGX has a long list of practical side-channel and fault attacks) or the **manufacturer's attestation key is compromised/coerced**. Trust root is Intel/AMD/AWS, i.e. a corporation |
+| **Restaking / crypto-economic** (Opacity on EigenLayer) | A staked operator set on top of one of the above | as above | Layered *on top of* another model — it converts "trust the notary" into "trust that fraud is detectable and the bond exceeds the payoff". Only works if misbehaviour is **provable to a slasher**, which for a proxy-witness forgery it generally is **not** |
+
+Two consequences an aggregator must internalise:
+
+1. **None of these are trustless.** Every one has a party who, if bribed, makes the proof worthless.
+   For proxy-witness — the model that actually ships and is fast — that party is a **single server run
+   by the protocol company**. Reclaim's own blog states the assumption plainly: "the proxy operator is
+   honest" ([blog.reclaimprotocol.org/posts/proxying-is-enough](https://blog.reclaimprotocol.org/posts/proxying-is-enough),
+   fetched 2026-07-24). For a sybil-resistance use case this is exactly backwards: the attacker is
+   economically motivated, well-resourced, and only needs to compromise the notary **once** to mint
+   unlimited credentials.
+2. **The thing being proven is still a purchasable web2 account** (Part B). zkTLS at its very best
+   faithfully transports a signal that costs $2. A perfect proof of a worthless fact is worthless.
+
 ### A.1 TLSNotary
+
+**Model:** MPC-TLS, the original. Rust implementation at
+[github.com/tlsnotary/tlsn](https://github.com/tlsnotary/tlsn). Prover and Notary jointly run the TLS
+handshake so neither holds the full session key; the Notary signs a commitment to the transcript; the
+Prover later opens selected byte ranges. Redaction is byte-range-level (commit to the whole
+transcript, reveal substrings), which is genuinely good selective disclosure but leaks *structure* —
+a verifier sees the shape and lengths of what was withheld.
+
+**Status (2026-07):** Alive but explicitly **not production-ready**. Latest release
+**`v0.1.0-alpha.15`, published 2026-05-21**; previous `alpha.14` 2026-01-14 (via GitHub releases API,
+checked 2026-07-24). Latest commit on `main` 2026-06-23 (`fix(tlsn): do not write into a closed
+client_io`). The README still says: *"This project is currently under active development and should
+not be used in production. Expect bugs and regular major breaking changes."* Six years in and still
+`0.1.0-alpha` — that is the single most informative fact about MPC-TLS as a production technology.
+Funded by PSE (Ethereum Foundation), so it will not die, but it is a research artefact.
+
+**Trust root:** the Notary must not collude with the Prover. Note the asymmetry: TLSNotary protects
+the *verifier* against a lying prover, and protects the *prover's privacy* against the notary. It does
+**not** protect against notary+prover collusion, which is precisely the sybil attacker's move.
+
+**Cost/latency:** MPC-TLS is bandwidth-bound. `UNVERIFIED:` current alpha.15 figures; historically
+seconds-to-minutes and tens of MB for a modest response. Needs a native prover process or WASM in
+browser — not a one-click flow.
+
+**Aggregator relevance:** as a *dependency of other people's products* (several projects fork tlsn),
+not as something we integrate directly.
+
 ### A.2 Reclaim Protocol
+
+**Model:** proxy-witness ("attestor"). The client opens a TLS session to the target *through* a
+Reclaim attestor. The attestor sees only ciphertext, records the request/response, and signs a claim.
+The client then reveals selected plaintext and proves in ZK (ChaCha20 circuit) that the revealed
+plaintext is consistent with the ciphertext the attestor signed. Repo:
+[github.com/reclaimprotocol/attestor-core](https://github.com/reclaimprotocol/attestor-core).
+
+**Security claim and its actual content:** Reclaim cites a formal analysis (Z. Luo et al.) giving a
+forgery probability of **10⁻⁴⁰**, driven by the number of valid openings in the revealed data, the
+length of revealed padding, and the IV size
+([blog.reclaimprotocol.org/posts/proxying-is-enough](https://blog.reclaimprotocol.org/posts/proxying-is-enough)).
+Additional hardening: only HTTP 200 responses accepted, timestamps must be within 10 minutes, the URL
+is fixed in advance. **But that 10⁻⁴⁰ bounds the wrong adversary** — it bounds a *client* forging
+against an *honest* proxy. The blog does not analyse a malicious or bribed attestor, and Reclaim
+acknowledges honest-proxy as an assumption. Reclaim's answer is to decentralise attestors (they run
+an EigenLayer AVS), which converts the assumption into "≥1 honest attestor in a quorum" — better, but
+`UNCLEAR:` whether quorum attestation is the default path in the shipped SDK or an opt-in, and
+whether an attestor forging a transcript is even *detectable* after the fact (I could find no fraud-
+proof construction; without one, slashing is decorative).
+
+**Selective disclosure:** yes, regex/template-based — you declare a "provider" schema with match
+patterns, and only matched groups are revealed. Redaction quality depends entirely on the provider
+template being written correctly; a sloppy template over-reveals.
+
+**Replayability:** proofs are signed claims over `(provider, params, context)`. The `context` field
+is where you bind a proof to an address/nonce. **If an integrator omits context binding, the proof is
+fully transferable** — anyone can replay someone else's proof. This is the single most common
+integration bug in this whole category and we must treat it as our responsibility, not the vendor's.
+
+**On-chain surface:** `reclaim-solidity-sdk`, contract exposes
+`verifyProof(Reclaim.Proof memory proof) public view`
+([docs.reclaimprotocol.org/onchain/solidity/quickstart](https://docs.reclaimprotocol.org/onchain/solidity/quickstart)).
+Deployed across BNB Chain, Optimism, Celo, Base, Arbitrum, Polygon, Avalanche, Aurora, Hedera, Oasis
+Sapphire, plus non-EVM Solana and NEAR. **`UNVERIFIED:` exact per-chain addresses** — the docs point
+to `/onchain/solidity/supported-networks`; I was unable to retrieve that page in this session. Get
+them from that page or from `reclaimprotocol/reclaim-solidity-sdk` deployment artifacts before
+integrating. Do **not** take an address from anywhere else.
+
+**Cost/UX:** Reclaim's landing page markets "Global Verification from $0.10 at Scale"
+([reclaimprotocol.org](https://www.reclaimprotocol.org/), fetched 2026-07-24) and claims 2–4 second
+mobile proofs across ~889 data sources (secondary: Shoal Research). UX requires the user to **log in
+to the target platform inside Reclaim's webview / mobile SDK / browser extension**. That is the
+crux — see A.9.
+
+**Liveness:** clearly the most commercially active project in the category; also shipping adjacent
+products (`reclaim-8004-validator` for ERC-8004 agent validation, zkFetch for API oracles, a Solana
+program). Alive.
+
 ### A.3 zkPass
+
+**Model:** explicitly **hybrid** — "Proxy Mode" as the production path, "MPC Mode" as a fallback,
+marketed together as 3P-TLS
+([docs.zkpass.org/overview/technical-overview](https://docs.zkpass.org/overview/technical-overview),
+fetched 2026-07-24). Proof system is **VOLEitH** (SoftSpokenOT + Line-Point ZK + Fiat–Shamir), chosen
+to avoid trusted setup and to be fast enough to run in a browser — a genuinely sensible engineering
+choice, and notably *not* a SNARK.
+
+**Trust assumptions, from their own docs:**
+- Proxy mode "requires network assumptions preventing BGP hijacking and message tampering between V
+  and S", and V must maintain a reliable connection to S throughout.
+- MPC mode: "**A malicious notary could cache session data and collude with a compromised client**",
+  and because the decrypted key is hidden for privacy, "external verification is impossible, meaning
+  collusion or manipulation could go undetected."
+
+That last quotation is the most honest sentence any project in this category has published, and it
+should be read as applying to the whole category: **collusion is undetectable, therefore
+crypto-economic slashing cannot fix it.**
+
+- **Cost of MPC mode:** their own figure — a 1KB request / 100KB response needs **~32MB uploaded by
+  the prover**. That is why nobody ships MPC mode.
+
+**UX:** TransGate browser extension (Chrome) and a TransGate Android app
+([play.google.com/store/apps/details?id=com.zkpass.transgate](https://play.google.com/store/apps/details?id=com.zkpass.transgate)).
+An extension install is a brutal funnel step — see A.9.
+
+**Selective disclosure / on-chain:** `UNVERIFIED:` the technical-overview page documents neither
+claim-level selective disclosure granularity, nor proof transferability, nor any on-chain verifier
+schema or contract address. Next place to look: `paper.zkpass.org/zkPass_WP2025.pdf` and the
+zkPass "schema" / "allocator" developer docs. Do not assume an address exists.
+
+**Liveness:** whitepaper dated 2025, roadmap advertises "Phase IV (2026+)" with DAO governance and an
+enterprise suite — i.e. the 2026 roadmap items are governance and sales, not core protocol. Has a
+token (ZKP). Alive, commercial.
+
 ### A.4 Opacity
 ### A.5 Primus (ex-PADO)
 ### A.6 Pluto

@@ -207,10 +207,166 @@ MitID require a broker agreement. **Consumability: NO.**
 - **Uniqueness:** Singpass is bound to **NRIC/FIN**, a stable national identifier, and Myinfo
   returns it to accredited partners. So the uniqueness is strong and the access is closed.
 
-### Australia — myGovID / myID and the Digital ID Act 2024
+### Australia — myID (ex-myGovID) and the Digital ID Act 2024
+
+**This is the cleanest example in the file of "the rule that blocks a permissionless verifier",
+because Australia wrote it into statute.**
+
+- The **Digital ID Act 2024 (Cth)** commenced **2024-12-01**, creating (a) an economy-wide voluntary
+  **accreditation scheme** for digital-ID service providers and (b) the statutory **Australian
+  Government Digital ID System (AGDIS)**. Co-regulated by the **ACCC** (Digital ID Regulator) and the
+  **OAIC** (privacy). Official: https://www.digitalidsystem.gov.au/what-is-digital-id/digital-id-act-2024
+  ; ACCC: https://www.accc.gov.au/by-industry/digital-platforms-and-services/digital-id-regulation
+- `myGovID` was renamed **myID** (Nov 2024). It is the government's own IdP.
+- **Timeline that matters to us:** **from 2026-11-30 accredited private entities may apply to
+  participate in AGDIS**; by **Dec 2026** AGDIS expands to private-sector relying parties. The
+  government will **charge relying parties for myID from 2027-01-01 at the latest**, and approved
+  private providers may charge commercially.
+  https://www.digitalidsystem.gov.au/news/policy-settings-for-charging-and-user-choice-in-the-australian-government-digital-id-system
+- **Important nuance, do not overstate the block:** a relying party is **not required to be
+  accredited** merely to consume an accredited provider's digital ID — accreditation binds the
+  *providers*. But to consume **AGDIS/myID** specifically you must be onboarded as an AGDIS relying
+  party, and from Dec 2026 that route opens to private entities on application + fee. There is also
+  a statutory rule that **an entity cannot require an individual to create a Digital ID** to access
+  a service.
+- **Consumability: NO today; "apply and pay" from Dec 2026.** No user-held offline signed artefact;
+  everything is a redirect flow. `UNVERIFIED:` whether the Data Standards Body's Digital ID Data
+  Standards (https://dsb.gov.au/digital-id/data-standards) mandate any verifiable-credential format
+  that could later be presented offline — worth one look, since if AGDIS lands on ISO mdoc /
+  SD-JWT VC it converges with the mdoc agent's file and becomes interesting.
+- **Uniqueness:** myID has identity **proofing levels (IP1/IP1+/IP2/IP3)** tied to document
+  verification via the DVS. No public unique identifier is exposed to relying parties; Australia has
+  a long-standing political allergy to a national ID number (the 1987 "Australia Card" defeat), and
+  the TFN is legally restricted. So: **pseudonymous per relying party**, no cross-RP correlator.
+
+**Trusted Exchange (TEx)** is the adjacent Australian initiative (a government "digital ID
+exchange"/wallet play). `UNVERIFIED:` current status mid-2026; law-firm commentary exists
+(Ashurst). Not a route for us either way.
+
 ### New Zealand — DISTF
-### UK — GOV.UK One Login and the mandatory digital ID debate
-### China — resident ID, real-name registration, one-person-one-account
+
+- **Digital Identity Services Trust Framework Act 2023**; the **DISTF Authority** (in DIA) is the
+  regulator and maintains a public **Trust Framework Register** of accredited services:
+  https://www.dia.govt.nz/Trust-Framework-Register
+- **First accreditation: NEC New Zealand Ltd**, four services (its Identity Verification Service).
+  Uptake is thin — this is a framework, not yet a population-scale credential.
+- Updated **Trust Framework Rules in force from 2026-06-29**.
+- **Consumability: NO, and irrelevant at current scale.** Accreditation is voluntary but is the only
+  way to make the "trust mark" claim; the framework governs *providers*, and there is no NZ
+  citizen-held verifiable credential to read. Skip.
+
+### UK — GOV.UK One Login, GOV.UK Wallet, and the mandatory digital ID U-turn
+
+**Headline: the UK's mandatory national digital ID was cancelled five days before I wrote this.**
+
+Timeline (dates matter here; the picture changed twice in 2026):
+- **2025-09-25** — PM Keir Starmer announces a mandatory digital ID ("BritCard"), framed as a
+  right-to-work check to deter illegal working. To be in place by end of parliament, no later than
+  2029.
+- **2025-10-23** — the parliamentary petition against it passes **2.9 million signatures**, one of
+  the largest in UK parliamentary history.
+- **2026-01** — first U-turn: government says the ID will **not** be compulsory for citizens and
+  other forms of ID will remain acceptable for right-to-work; digital right-to-work checks
+  themselves stay mandatory.
+- **2026-03-10** — consultation published; closes **2026-05-05**.
+- A cross-party Home Affairs Committee report called the programme a "fiasco"
+  (https://publications.parliament.uk/pa/cm5901/cmselect/cmhaff/986/report.html).
+- **2026-07-19/21** — **Andy Burnham, on becoming Prime Minister, scrapped the digital ID scheme**,
+  reallocating the money to cost-of-living measures (a tax cut on household electricity bills).
+  Bloomberg 2026-07-19:
+  https://www.bloomberg.com/news/articles/2026-07-19/burnham-to-scrap-uk-digital-id-to-focus-on-cost-of-living-policies
+  ; CNBC https://www.cnbc.com/2026/07/19/uks-incoming-pm-andy-burnham-to-prioritize-cost-of-living-say-allies.html
+  ; TechCrunch https://techcrunch.com/2026/07/21/uk-government-scraps-plans-for-digital-id-cards-after-millions-of-brits-opposed/
+  ; Al Jazeera https://www.aljazeera.com/news/2026/7/20/burnhams-move-to-scrap-uks-digital-id-plans-earns-cheers-and-criticism
+  (All secondary/news. `UNVERIFIED:` I have not found the corresponding primary GOV.UK statement —
+  next step: gov.uk news and the DSIT/Cabinet Office pages, which may lag.)
+  Historical rhyme worth noting: Burnham was the Home Office minister who implemented much of
+  Blair's 2006 ID card scheme, which was itself scrapped in 2010. **The UK has now killed a national
+  ID scheme twice in sixteen years.**
+
+**What survives the cancellation** — and this is the part that still matters to us:
+- **GOV.UK One Login** — the cross-government citizen sign-in. Continues; it is plumbing, not a
+  card. `UNVERIFIED:` current registered-user count (GDS publishes it; it was in the tens of
+  millions by 2025).
+- **GOV.UK Wallet + digital driving licence** — DVLA digital driving licence was in private testing
+  in early 2026 with a **wider public rollout during 2026** to England, Wales and Scotland; **~40m
+  motorists** in scope; **adoption explicitly optional**, physical licences continue. This is an
+  **mDL**, so the format layer belongs to the ISO mdoc agent's file. `UNCLEAR:` whether the
+  cancellation of "digital ID" touches the Wallet/mDL programme — it was a separate DfT/DVLA
+  workstream and the reporting is about the identity card, not the licence. Check this.
+- **DIATF** — the UK Digital Identity and Attributes Trust Framework, with **50+ certified Digital
+  Verification Service providers** (secondary: techUK). In 2025-10 **Vidos** became the first
+  DIATF-certified *Component* Service Provider, selling pre-certified verification modules by API
+  (https://www.biometricupdate.com/202510/vidos-first-certified-component-provider-for-diatf-ahead-of-gov-uk-wallet-launch).
+  DIATF certification is a **paid, audited annual scheme**.
+
+**Consumability: NO.** To verify a GOV.UK Wallet credential in a regulated context (right to work,
+right to rent, DBS) you must be a **DIATF-certified IDSP/DVS** — certification requires an
+independent conformity assessment against the trust framework by a UKAS-accredited body, annually,
+at real cost. Nothing stops you *technically* from parsing an mDL a user hands you, but you cannot
+claim the regulated outcome. There is no permissionless route.
+
+**Uniqueness:** the UK has **no national identity number** for general use (NINo is restricted; NHS
+number is health-only). One Login identities are per-person but there is no exposed cross-RP unique
+identifier. **Pseudonymous.**
+
+**Lesson for our roadmap, stated plainly:** a state identity programme can be announced, become the
+centrepiece of national policy, and be **cancelled within ten months**. Any product design that
+depends on a specific national scheme existing in 2029 is uninsurable. This is the second general
+risk class alongside key rotation: **political cancellation**.
+
+### China — resident ID, real-name registration, Cyberspace ID, RealDID
+
+**Layer 1: the resident identity card (居民身份证).** An 18-digit national ID number, universal for
+citizens, embedded in a contactless card. The number is a **stable global unique identifier** and is
+the root of everything below. There is **no** third-party verification route: the authoritative
+check is against the Ministry of Public Security (MPS) population database, accessible only to
+licensed domestic entities.
+
+**Layer 2: real-name registration (实名制).** Since 2010–2017 legislation (Cybersecurity Law art. 24
+and sectoral rules), Chinese platforms must verify users' real identity against the MPS database
+before allowing posting, gaming, payments or phone numbers. Online gaming has an especially strict
+regime (NPPA anti-addiction system, minors' curfews) where accounts are bound to a verified
+identity. This is **the largest de facto "one person, one account" enforcement on earth** — but the
+enforcement lives *inside* the platforms and the state, and produces no artefact a foreign verifier
+can consume. Overview (secondary): https://appinchina.co/blog/the-complete-guide-to-chinas-real-name-verification/
+
+**Layer 3: Cyberspace ID / 网号-网证 ("net number" + "net certificate").** Jointly run by the CAC and
+MPS; the *Measures for the Administration of National Network Identity Authentication Public
+Services* took effect **2025-07-15**. Architecture is notable and, ironically, privacy-forward in
+one narrow sense: the citizen registers once with the state and receives a **网号** (an
+alphanumeric pseudonymous identifier) and a **网证** (a certificate). Platforms then verify the user
+*via the state service* and receive the pseudonym **instead of** the real name and ID number.
+- Adoption: **>6 million** registrations by **2025-05** (Xinhua / China Daily, state media —
+  secondary: https://www.chinadaily.com.cn/a/202505/23/WS68303502a310a04af22c1384.html ). 67 apps in
+  the Aug-2024 pilot including 12306 (railways), Taobao, Xiaohongshu.
+  `UNVERIFIED:` a 2026 adoption figure. Against ~1.1bn Chinese internet users, 6m is <1%.
+- Officially **voluntary**; alternative real-name channels must remain available.
+- Rules translation (useful primary-ish English source):
+  https://www.chinalawtranslate.com/en/on-network-codes-and-credentials/
+- **What it really does for us: it *centralises* identity verification into a single state service
+  and removes the platform's ability to see the underlying ID.** It is per-person stable (one 网号
+  per person) but issued and validated only by the state; there is no offline signed artefact.
+
+**Layer 4: RealDID.** A blockchain-based DID scheme launched Dec 2023 on the state-backed **BSN**
+(Blockchain-based Service Network), tied to real-name identity — "anonymous on-chain, real-name
+off-chain." https://en.wikipedia.org/wiki/China_RealDID (secondary). `UNVERIFIED:` adoption, and
+`UNVERIFIED:` whether any resolver is reachable from outside China. Treat as not integrable: BSN's
+open-permissioned chains are not something a Western verifier can practically depend on, and the
+credential is meaningless without MPS attestation.
+
+**Consumability: NO, absolutely and at every layer.** Verification requires being a domestic,
+licensed, ICP-filed entity connected to MPS infrastructure. There is no offline signed credential,
+no public key infrastructure a foreigner can use, and the whole system is a state-security asset.
+**Zero product path. Do not spend more time here.**
+
+**Uniqueness:** the strongest in the world in principle (18-digit ID → one person; 网号 → one person)
+and the least accessible in practice.
+
+**ZK/privacy work:** the 网号/网证 design is *pseudonymisation by state intermediation*, not
+cryptographic unlinkability — the state sees every verification. That is the opposite of what we
+mean by privacy. No credible state-deployed ZK identity in China that I could find.
+
 ### Brazil — gov.br
 ### Nigeria — NIN
 ### Indonesia — IKD / KTP-el

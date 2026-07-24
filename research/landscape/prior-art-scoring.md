@@ -673,7 +673,388 @@ in a root-cost score, the advice and the defence are the same sentence.
 
 
 ## 4. Web3 attempts at exactly this
+
+### 4.1 Gitcoin / Human Passport — the direct predecessor, and a fully-readable natural experiment
+
+Passport is the only prior art in our exact shape whose scoring model is **completely public**, which
+makes it the most valuable object in this document: we can audit it with the tools of §1.
+
+**The live weight table.** `api/scorer/settings/gitcoin_passport_weights.py` on `main`
+([passportxyz/passport-scorer](https://github.com/passportxyz/passport-scorer/blob/main/api/scorer/settings/gitcoin_passport_weights.py),
+retrieved 2026-07-24) — 50 stamps, `GITCOIN_PASSPORT_THRESHOLD = "20"`, weights summing to
+**180.108**. Still actively maintained: last commits touching the file are **2026-01-06** (remove
+`GuildPassportMember`), **2025-12-18** (add `X` at 3.2), **2025-12-02** (raise `Biometrics` and
+`CleanHands`). Selected weights:
+
+| Stamp | Weight | | Stamp | Weight |
+|---|---|---|---|---|
+| `NFTScore#50` | 16.246 | | `CivicUniquenessPass` | 5.005 |
+| `CoinbaseDualVerification` | 16.042 | | `GitcoinContributorStatistics#…Gte#1000` | 4.997 |
+| `HolonymGovIdProvider` | 16.026 | | `TrustedCitizen` | 4.009 |
+| `BinanceBABT` | 16.021 | | `X` | 3.2 |
+| `ETHScore#50` | 16.021 | | `CivicLivenessPass` | 3.038 |
+| `CoinbaseDualVerification2` | 10.042 | | `CleanHands` | 3 |
+| `BinanceBABT2` | 10.021 | | `Google` | 0.525 |
+| `Biometrics` | 6.001 | | `Brightid` | 0.202 |
+| `IdenaState#Newbie` | 5.892 | | `ETHDaysActive#50` | 0.207 |
+
+**Finding 1 — they discovered within-root discounting and implemented it by hand, without naming it.**
+`BinanceBABT` = 16.021 but `BinanceBABT2` = 10.021; `CoinbaseDualVerification` = 16.042 but
+`CoinbaseDualVerification2` = 10.042. A second credential from the same issuer is deliberately worth
+~62% of the first. That is a manual, per-pair, ungeneralised version of the saturation rule of §1.5.
+It is the right instinct executed without a model, so it only covers the two cases somebody noticed.
+
+**Finding 2 — the arithmetic is broken in exactly the way §1.1 predicts, and it is checkable.**
+The model-based stamps come in stacking tiers (`#50`, `#75`, `#90` are "model score ≥ 50 / 75 / 90",
+so a high-scoring address earns all three):
+
+```
+ETHScore#50 + ETHScore#75 + ETHScore#90  =  16.021 + 2.399 + 2.926  =  21.346   ← above threshold
+NFTScore#50 + NFTScore#75 + NFTScore#90  =  16.246 + 2.362 + 2.413  =  21.021   ← above threshold
+both families together                                              =  42.367
+whole on-chain-activity family (incl. zkSync, gas, tx count, days)  =  50.210
+```
+
+**Two separate ML models, each scoring the same wallet's own transaction history, each independently
+clear the humanity threshold on their own.** These are not independent evidence in any sense — they
+are one root (this address's on-chain behaviour), read twice, tiered three ways each. And on-chain
+behaviour is the *cheapest root in existence to fabricate*: it is the one thing a farm manufactures
+at scale by construction. This is `n / d_eff` maximisation handed to the attacker for free.
+(`UNCLEAR:` whether the three Idena tiers stack — Idena states are mutually exclusive at a point in
+time, so `IdenaState#Newbie + #Human + #Verified = 9.737` is probably *not* simultaneously
+attainable; worth confirming in the scorer code before citing that one.)
+
+**Finding 3 — the knapsack (§1.6) is trivially solvable and someone already solved it.** A
+community/analyst critique surfaced in search reports that "at least 44 points can be earned through
+moderately simple sybil vectors (dupe social media accounts, low tier requirements for on-chain
+activity)" and that "Holonym, Civic, and Coinbase are much more stout defenses against sybils than
+ENS names, GTC holdings, or a Lens handle, yet this is not reflected in the scoring system"
+(surfaced via [Delphi Digital, *Decentralized Identity: Gitcoin
+Passport*](https://members.delphidigital.io/feed/decentralized-identity-gitcoin-passport) —
+**secondary, paywalled, and I did not read the original**; treat the exact figure as `UNVERIFIED:`
+but the structural claim is independently confirmed by the weight arithmetic above). The same
+sources note that "before the Anti-Sybil Assembly program, there was little reason to strive for a
+higher score once a user reaches 20" — i.e. **the published threshold created a mass point at 20**,
+which is the strategic-classification result of §1.6 observed in the wild.
+
+**Finding 4 — dead credentials linger in live weight tables.** `CivicCaptchaPass`,
+`CivicLivenessPass` and `CivicUniquenessPass` (8.866 points combined from one Civic enrolment) are
+still in the `main`-branch weights as of the 2026-01-06 commit, but Civic **sunset** CAPTCHA and IDV
+on 2025-07-01 and Uniqueness and Liveness on 2025-07-31
+(`research/landscape/identity-infra-prior-art.md`, citing
+[Civic](https://www.civic.com/blog/an-update-on-civic-pass)). `UNVERIFIED:` whether the provider is
+disabled elsewhere in the stack and the weight is merely vestigial. Either way the operational
+lesson is ours to learn: **an aggregator's score silently changes meaning when an upstream provider
+dies, and the weight table is the last place anyone looks.** We need a provider-liveness monitor and
+an explicit "component retired" event in our score history.
+
+**The deduplication rules — the most directly relevant published artefact in web3.**
+([Human Passport docs, *Deduplicating
+Stamps*](https://docs.passport.human.tech/building-with-passport/stamps/major-concepts/deduplicating-stamps),
+retrieved 2026-07-24.) The mechanism:
+
+- Each Stamp carries a **`hash` field** used as the dedup key.
+- Policy is **LIFO**: *"if a Passport holder submits a Stamp that has already been submitted by
+  another user, the duplicate Stamp is ignored and not counted towards the score."* First claimant
+  keeps it; later claimants lose it.
+- **Deduplication is scoped to a scoring instance, not global.** Verbatim: *"one user uses Passport
+  holder A with one Twitter account in an application that uses scoring instance X, and another user
+  uses the same Twitter account in a distinct Passport in an independent scoring instance Y. In this
+  case, both users will get scored for the Twitter account."*
+
+Three things follow, and they are load-bearing for our design:
+
+1. **The aggregator, not the provider, is where cross-provider collision gets resolved** — and it is
+   also where the user-facing unfairness lands. A legitimate user who shares a device or re-verifies
+   from a new wallet can *lose* a stamp to whoever claimed it first. We will inherit this exact
+   support burden, and we should decide the policy deliberately rather than defaulting to
+   first-come-first-served, which is the policy that most rewards automation.
+2. **Their dedup is intra-provider only** (same stamp hash), so it does not touch our hard case at
+   all: two *different* providers reading one passport produce two different hashes and dedup never
+   fires. Passport's model has **no answer** to the ZKPassport/Self/Rarimo/World-document collision.
+   Saturation (§1.5) does, without needing linkability.
+3. **Per-instance scoping is a deliberate privacy/linkability trade** and the same one we face in §6:
+   global dedup is stronger sybil resistance and worse privacy. Passport chose privacy-ish and
+   accepted cross-instance multi-counting. We should make that a *verifier-selectable* parameter and
+   price it, not a silent default.
+
+**Verdict.** Published: yes, unusually fully. Gameable: yes, demonstrably, and the weight file itself
+is the proof. Survived: as a product, barely — acquired by Holonym Foundation for ~$10M in Feb 2025
+with >2M users, >35M credentials and under $1M revenue (`research/landscape/identity-infra-prior-art.md`).
+**Their scoring model is the single best "what not to do" specification available**, and it is free.
+
+### 4.2 Trusta Labs — MEDIA score and TrustScan
+
+Two products
+([docs](https://trusta-labs.gitbook.io/trustalabs/trustgo/media-scoring-methodology),
+[TrustScan](https://trusta-labs.gitbook.io/trustalabs/trustscan/introduction-to-sybil-score-and-media-score),
+retrieved 2026-07-24):
+
+- **MEDIA** — five dimensions of on-chain activity with a published point budget: Monetary (25),
+  Engagement (30), Diversity (15), Identity (10), Age (20) = 100. Each dimension is a *weighted sum
+  of variables within it*, i.e. additive at both levels.
+- **TrustScan / Sybil Score** — 0–100 (higher = more sybil risk), built on **Asset Transfer Graphs**
+  and four named structural patterns: star-like transfer graph, chain-like transfer graph, bulk
+  operations, similar behaviour sequences. Coverage Ethereum + zkSync, Arbitrum, BNB, Optimism.
+
+**Assessment.** MEDIA is a pure behavioural score with **no personhood root whatsoever** — it says
+"this wallet behaves like an established user", which is exactly the *cheaply manipulable* feature
+class of §1.6, and its "Identity" dimension is 10 of 100 points. Publishing the dimension weights
+makes the knapsack easy. TrustScan is more interesting because it is **structural**: the four
+patterns are motifs of funding topology that a farm must produce to fund N wallets, and topology is
+harder to fake than volume (though CEX-hop laundering and randomised funding delays are the standard
+evasions, and they are well known).
+
+For us the usable part is TrustScan-style **cluster detection as a negative signal**, not MEDIA as a
+positive one. Note the asymmetry: behavioural evidence is much better at *refuting* independence
+(these 400 wallets were funded by one address in one block) than at *establishing* personhood.
+**Behavioural signals belong on the `¬C` side of the ledger, as disqualifiers, not as points.**
+Passport weights the whole `TrustaLabs` stamp at 0.511, which is roughly the right order of
+magnitude as a positive signal, and misses that it is worth far more as a negative one.
+
+### 4.3 Nomis, ARCx, Spectral — the DeFi-creditworthiness cluster
+
+These solve a *different* problem (repayment risk of an address) and get cited as personhood prior
+art mostly by confusion, but they are worth one paragraph because their fate is instructive.
+
+- **ARCx** — "DeFi Credit Score" driving dynamic max-LTV loans on Polygon
+  ([wiki](https://wiki.arcx.money/application/defi-credit-score)). Score derived from historical
+  on-chain borrowing behaviour. `UNVERIFIED:` current operational status; the wiki and leaderboard
+  are still reachable but I did not confirm live loan activity.
+- **Spectral Finance** — originally MACRO, an on-chain credit score, **has pivoted to "onchain agent
+  economy" / machine-intelligence products** (secondary:
+  [Greythorn/Medium](https://medium.com/@0xgreythorn/spectrals-inference-powered-web3-vision-a1019d52720f)).
+  A pivot away from credit scoring is the single most common outcome in this cluster.
+- **Nomis** — `UNVERIFIED:` I did not confirm current status in this pass. Next step: check the
+  Nomis app/docs and GitHub commit recency directly.
+
+**The lesson, and it is the same lesson as §2.6.** These scores have the one thing we lack — a real
+label (did the address repay?) — and they *still* mostly failed, because the addresses are
+pseudonymous and unbanked-by-design: a defaulting borrower simply abandons the address. **Score
+persistence requires that the subject cannot cheaply abandon the subject-identifier.** That is a
+prerequisite our whole product depends on and should be stated openly: a humanity score attached to
+a discardable address is worth roughly what a credit score attached to a discardable address is
+worth. This is a strong argument for anchoring on credentials with a **persistent, non-transferable
+root** (biometric registry, document nullifier) rather than on address behaviour, and an argument
+against making address-behavioural signals a meaningful share of the score.
+
+### 4.4 Karma3 Labs / OpenRank — EigenTrust, productised
+
+OpenRank is an EigenTrust-derived reputation protocol ($4.5M seed led by Galaxy and IDEO CoLab,
+announced March 2024; [CoinDesk press release,
+secondary](https://www.coindesk.com/press-release/2024/03/03/karma3-labs-raises-a-45m-seed-round-led-by-galaxy-and-ideo-colab-to-build-openrank-a-decentralized-reputation-protocol)).
+Open-source core: [`Karma3Labs/go-eigentrust`](https://github.com/Karma3Labs/go-eigentrust) ("EigenTrust
+implementation in Go") and [`openrank-sdk`](https://github.com/Karma3Labs/openrank-sdk).
+
+**Status check (GitHub org repo push dates, retrieved 2026-07-24):** the org is *active* but has
+drifted away from generic reputation infrastructure — most-recently-pushed repos are `farcaster-graph`
+(2026-04-01), `sentiment-rank` (2026-03-31), `reclaim-polymarket` (2026-03-17), `x-post-viewers`
+(2026-02-12), `karmalaunch-evm` (2026-01-30), `eigencaster` (2025-12-12). The core
+`go-eigentrust` engine was last pushed **2025-08-31**. Read as: the algorithm is stable/finished, and
+the company's energy is in **Farcaster-specific ranking and social/consumer products**, not in a
+general-purpose personhood reputation layer.
+
+**Aggregator relevance.** The Farcaster social graph via OpenRank is a genuinely usable
+*social-trust* input for a specific population, and it is EigenTrust so it inherits the seed-set
+problem of §5.4. It is not personhood: Farcaster accounts are purchasable and the graph is farmable
+(follow-farming is an established practice). Treat as a **low-weight social-trust signal for the
+Farcaster subpopulation**, not as a root.
+
+### 4.5 The pattern across all of them
+
+Every web3 scoring attempt above shares three properties, and each is a lesson:
+
+| Property | Instances | Lesson |
+|---|---|---|
+| **Additive over correlated features** | Passport (`Σ wᵢ`), Trusta MEDIA (weighted sums at two levels) | The entire category made the §1.1 error |
+| **Published weights + published threshold** | Passport (20), Trusta (100-point budget) | Solve the knapsack for them, or they will |
+| **Behavioural signals treated as positive evidence** | Trusta MEDIA, Passport's ETH/NFT/zkSync families, Nomis/ARCx/Spectral | The cheapest root gets the most points; put behaviour on the negative side |
+
+And one absence worth naming: **no web3 scorer in this set publishes a calibration claim, an
+uncertainty estimate, or a formal adversary model.** Not one. That is either an indictment of the
+category or an opening for us; probably both.
+
 ## 5. Graph-based trust propagation
+
+This is the only branch of the prior art that produces **theorems** rather than heuristics, so it
+deserves careful treatment — including of why the theorems are weaker in practice than they read.
+
+### 5.1 The two families
+
+**(a) Random-walk / spectral: EigenTrust, TrustRank, personalised PageRank, SybilRank.**
+
+EigenTrust (Kamvar, Schlosser, Garcia-Molina, WWW 2003) normalises local trust `c_ij` into a row-
+stochastic matrix `C` and iterates to the principal eigenvector, with a **pre-trusted seed
+distribution `p`** injected to guarantee convergence and break out of malicious collectives:
+
+```
+t^(k+1) = (1 − a)·Cᵀ t^(k)  +  a·p
+```
+
+which is personalised PageRank with teleport vector `p`, and TrustRank (Gyöngyi, Garcia-Molina,
+Pedersen, VLDB 2004) is the same construction for web spam. SybilRank (Cao, Sirivianos, Yang,
+Pregueiro, NSDI 2012, deployed at Tuenti) is an early-terminated power iteration from seeds with
+degree normalisation, ranking rather than thresholding.
+
+The essential structural fact: **`a·p` is the entire security argument.** Without the teleport, a
+tightly-knit sybil collective is a perfectly good eigenvector and scores itself arbitrarily high.
+Everything these algorithms guarantee is inherited from the seed.
+
+**(b) Flow-based: SybilGuard, SybilLimit, SumUp, and Circles.**
+
+Flow methods bound the adversary by the **min-cut between the sybil region and the honest region**,
+which is at most the number of **attack edges** — honest→sybil trust relationships the attacker had
+to socially engineer. The published bounds:
+
+| Scheme | Guarantee |
+|---|---|
+| SybilGuard (SIGCOMM 2006) | accepts `O(√n log n)` sybils **per attack edge** |
+| SybilLimit (IEEE S&P 2008 / ToN 2010) | `O(log n)` sybils per attack edge — near-optimal against the `Ω(1)` lower bound ([paper](https://www.cs.yale.edu/homes/aspnes/pinewiki/attachments/SybilAttack/sybillimit.pdf)) |
+| SumUp (NSDI 2009) | adaptive **max-flow** vote aggregation; bounds bogus votes collected per attack edge |
+
+The key qualitative property, and the reason this family is the right one: **the bound does not
+depend on how many sybils the attacker creates.** Minting a million fake nodes does not increase
+flow across a cut of fixed capacity. Cost scales with *social work*, not with compute or capital.
+
+### 5.2 Circles' relative sybil resistance — the strongest formal result in our whole research set
+
+From the Circles whitepaper (Köppelmann, Boes, Ernst, v2.2.1, §4.2–4.3,
+<https://whitepaper.aboutcircles.com/>; analysis in `research/protocols/circles.md`).
+
+**Transferable trusted balance.** For sender set `N_s`, receiver set `N_r`, network state `S`:
+
+```
+T(N_s → N_r | S)  :=  max_{S' : S →_{N_s} S'}  B(N_s → N_r | S')
+```
+
+— "the maximal achievable amount of CRC, trusted by at least one account in `N_r`, that accounts in
+`N_s` can obtain by transitive transfers from state `S`". Mechanically this is **max-flow over the
+trust graph with capacities given by actual CRC balances**. It is not an analogy for a trust score;
+it is the protocol's native measure of embeddedness, and it is computed in production by the
+pathfinder (`circlesV2_findPath`, `findMaxFlow`).
+
+**The theorem (§4.3, boxed).** Let `M` = accounts controlled by the malicious party, `F` = the
+"fooled" accounts that trust at least one account in `M`, `R` = the rest of the network. Then:
+
+```
+T(M → R | S)  ≤  B_T(F → R | S)
+```
+
+**In words: no matter how many sybils the attacker mints, or how densely those sybils trust each
+other, the attacker's economic reach into the honest network is bounded by the trusted balance held
+by the boundary set `F` — the humans they actually fooled.** Sybil creation is free and worthless;
+only social work counts. This is the min-cut-over-attack-edges result of the SybilLimit/SumUp
+literature, restated in economic units, proved by the protocol's own authors, and — uniquely in our
+research set — **implemented in a live production service**.
+
+**Why it is the strongest result we have.** Every other protocol in the roster asserts uniqueness by
+authority (a registry says so) or by ceremony (a scan happened). Circles asserts a *bound*, and the
+bound is (i) unconditional in the number of sybils, (ii) computable by us permissionlessly from
+on-chain `Trust` logs and balances, and (iii) degrades gracefully to a real number rather than a
+boolean.
+
+**How far does it generalise beyond Circles?** Honestly: *the theorem does not generalise; the
+pattern does.* Precisely:
+
+- The proof depends on Circles' specific transfer semantics — flow is limited by *trusted balances*,
+  and trust is a directed willingness to accept a specific personal currency. There is no
+  corresponding conserved quantity across World ID + a passport proof + a KYC attestation, so there
+  is nothing to take a max-flow of. **You cannot state a multi-protocol version of the theorem
+  because there is no multi-protocol graph.**
+- What *does* generalise is the **shape of the guarantee**, and we should adopt it as our target:
+  *express the security of the aggregate as a bound on adversary reach per unit of irreproducible
+  work*, rather than as a probability of humanity. Our root-cost model (§1.3, §7) is precisely that
+  translation — attack cost is the conserved quantity that *is* commensurable across protocols, and
+  min-cost-set-cover over roots is the analogue of min-cut over attack edges.
+- Two real caveats on the Circles number itself, both from our own protocol write-up: flow is
+  **balance-capped, not purely structural** (a rich sybil that has been gifted CRC scores high, a
+  poor well-trusted human scores low), so we should compute the **unit-capacity** version alongside
+  it — pure-structure max-flow = number of edge-disjoint trust paths = min number of attack edges,
+  which is the cleaner sybil metric. And Circles' resistance is explicitly **relative**: the
+  whitepaper concedes "the absence of gatekeeping or KYC mechanisms in principle allows users to
+  create several accounts", and defines an honest user as one who uses a *single* account. Circles
+  dilutes multi-accounting economically; it does not prevent it. For a currency that is sufficient.
+  For a personhood aggregator it is not, because **we are exactly the party that "cares about" the
+  sybil's otherwise-worthless tokens** — we would be re-introducing an advantage the currency
+  withholds.
+
+### 5.3 What the graph literature learned the hard way — three negative results
+
+1. **All of these schemes are secretly the same algorithm, and it is community detection.**
+   Viswanath, Post, Gummadi & Mislove, "An Analysis of Social Network-based Sybil Defenses", SIGCOMM
+   2010 ([ACM](https://dl.acm.org/doi/10.1145/1851182.1851226),
+   [PDF](http://ccr.sigcomm.org/online/files/p363.pdf)): *"despite their considerable differences,
+   existing Sybil defense schemes work by detecting local communities (i.e., clusters of nodes more
+   tightly knit than the rest of the graph) around a trusted node."* Consequences: they inherit
+   community detection's failure modes, they can be *replaced* by off-the-shelf community detection,
+   and — the sting — **they will happily classify a legitimate, loosely-connected community as
+   sybil.** For a global personhood product that is a fairness disaster waiting to happen: the
+   "sybil region" and "the Global South cohort onboarded last month by one field team" have the same
+   graph signature.
+2. **Real social graphs are not fast-mixing**, which is the assumption every random-walk bound rests
+   on (Mohaisen, Yun & Kim, "Measuring the mixing time of social graphs", IMC 2010). The theorems are
+   true; their preconditions are frequently false in the wild. `UNVERIFIED:` I did not re-read this
+   paper in this pass — cite it only after checking the specific graphs measured.
+3. **Targeted attacks beat them.** Alvisi, Clement, Epasto, Lattanzi & Panconesi, "SoK: The Evolution
+   of Sybil Defense via Social Networks", IEEE S&P 2013, show that an attacker who *chooses where to
+   attach* (rather than attaching randomly) defeats schemes that hold up against random attachment.
+   `UNVERIFIED:` cite after re-reading. The intuition is sound and matches the Idena evidence: a
+   real-world attacker does not add random edges, they **recruit** — and a puppeteer paying $2–4 per
+   validation ceremony is buying attack edges wholesale from genuinely well-connected humans.
+
+### 5.4 The seed-set problem — the recurring practical failure, and it is *our* problem specifically
+
+Every method in §5.1 requires a trusted seed: EigenTrust's `p`, TrustRank's seed pages, SybilRank's
+trusted nodes, our `T(user → Seed)` for Circles. Three observations:
+
+1. **The seed is the trust root, and it is unavoidable.** No graph algorithm manufactures trust; they
+   all *propagate* it. The security of the whole construction is the security of the seed.
+2. **Choosing the seed by another credential re-introduces exactly the correlation we are trying to
+   remove.** If we seed the Circles graph with "avatars holding a World ID Orb verification", then
+   our Circles score is no longer independent evidence — it is a function of World ID, and its
+   loading on `Z_iris` is large. We would be measuring the same root twice and congratulating
+   ourselves on diversity. **This is the trap, stated plainly, and it is easy to walk into because
+   credential-based seeding is the most convenient seeding method available.**
+3. **Practical resolutions**, in decreasing order of preference:
+   - **Seed from physical-world events we can independently attest**: in-person meetups, long-lived
+     local groups, curated organisations with off-chain identity (Circles has curated groups; Idena's
+     "solo accounts and family pools with strong social ties" were the *surviving* honest core in
+     Ohlhaver's data). Loads on no protocol root.
+   - **Seed from longevity + the absence of cluster signatures**, i.e. negative-evidence seeding.
+     Weaker, but at least orthogonal to credentials.
+   - **Seed from a credential, but then explicitly set the loading `λ` between the graph score and
+     that credential's root to ~1** — i.e. accept the correlation and *price* it rather than pretend
+     it away. This is the fallback, and the factor model makes it a one-line change instead of a
+     silent bug.
+   - **Multi-seed with disjointness auditing**: compute the score from several seed sets chosen to
+     share no root, and take the **minimum**. Minimax again (§1.6), and it turns the seed problem
+     into a diversity requirement we can state and check.
+
+### 5.5 The puppeteering result destroys the graph frame's *interpretation*, not its math
+
+Ohlhaver & Nikulin's Idena finding (`research/references/ohlhaver-ethberlin-2024-transcript.md`)
+lands directly here and is worth restating in graph terms. At the May 2022 peak, **23 entities
+(<1% of distinct entities) controlled ≥40% of accounts and almost half of rewards**; all 31 pools
+that ever exceeded 100 accounts showed signs of **third-party private-key access**, *including after*
+on-chain delegation removed the operational need for key access.
+
+The graph-theoretic reading: **the attacker did not need attack edges, because the "sybils" were
+genuine, well-embedded honest nodes whose keys they held.** Flow-based bounds are bounds on
+*relationships*, and the puppeteer bought *control* without changing the relationship graph at all.
+Every honest-graph assumption in §5.1 survives; the mapping from "node" to "independent agent" is what
+fails. Two design consequences:
+
+- **Trust-graph position measures `U` and social embeddedness, and says nothing about `C`.** A
+  puppet's Circles max-flow is genuinely high, and correctly so — they really are trusted by their
+  community. Our score must not read that as independence.
+- **The signals that *did* detect puppeteering were behavioural, not structural**: synchronous or
+  sequential transactions across accounts, one-way reward sweeps to a common address, and — the
+  detail I find most instructive — Ohlhaver's *negative-space* argument that the **absence of
+  marketing, disputes and customer complaints** was itself evidence that these were not accountable
+  custody relationships. That is a genuinely novel evidence type ("this market is too quiet to be
+  legitimate") and it has no equivalent in any scoring formalism in this document. Worth remembering
+  when we are tempted to believe our feature set is complete.
+
 ## 6. Privacy composition
 ## 7. Recommended scoring architecture
 ## 8. Worked toy example

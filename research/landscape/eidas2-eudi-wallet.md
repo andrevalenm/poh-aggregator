@@ -1,14 +1,49 @@
 # EU eIDAS 2.0 / European Digital Identity Wallet (EUDI Wallet)
 
-> STATUS: in progress — research started 2026-07-24
+**One-liner:** An EU-mandated, government-issued mobile identity wallet that every member state must
+offer by 24 December 2026 and that large platforms must accept from ~December 2027 — a
+state-identity credential with strong attribute proofs, deliberately weak cross-verifier
+linkability, and a **closed, government-gated verifier PKI**.
 
-**One-liner:** TBD
-**Category:** state-identity
-**Chains:** none (not a blockchain system)
-**Status (2026-07):** TBD
-**Aggregator verdict:** TBD
+**Category:** state-identity (with an *aspirational* uniqueness layer that does not exist yet)
+**Chains:** none. Not a blockchain system, no on-chain surface, no contracts, no subgraph. All
+trust flows through X.509/ETSI PKI and Commission-published trusted lists.
+**Status (2026-07):** **Legally live, operationally barely started.** Regulation in force since
+20 May 2024; six Implementing Regulations adopted; ARF at **v3.0.0 (2026-07-23)**; open-source
+stack extremely active (85 repos, commits today). **One** confirmed production national wallet
+(Denmark AltID, 3 June 2026). ENISA, early 2026: *"no EUDI Wallet has been deployed or certified,
+and the specification remains work in progress."* Fewer than a quarter of member states are
+expected to hit the December 2026 deadline.
+
+**Aggregator verdict:** **Not an integrable input on any near-term horizon — and simultaneously the
+single biggest compliance constraint on our EU business.** Two blockers, either of which is fatal
+on its own: (1) **verification is permissioned** — every verifier needs an access certificate from
+a Member-State-notified CA, granted only to entities *established in* an EU member state and
+registered in a national register with declared attributes and purpose (CIR 2025/848 Art. 3(1),
+ARF `RPA_03`/`RPA_04`); an anonymous crypto aggregator has no path in. (2) **EUDI does not yield a
+stable unique-per-human identifier**: the unique attribute is *optional*, per-issuer-scoped, and
+the wallet is normatively **required** to let one human hold unlimited pseudonyms per relying party
+(`PA_04`). Revisit in 2028 if the *scope rate-limited pseudonym* HLRs (`PA_23`–`PA_31`) ever get a
+real specification — those are a nullifier, and they would change the answer completely.
 
 ## What it proves
+
+**Precisely: that a member state's authentic source asserts this natural person exists, with these
+civil-registry attributes.** That is it.
+
+- ✅ **State-issued identity** — the strongest form of it. LoA "high", vetted PID Providers,
+  certified wallets, hardware-backed keys (WSCA/WSCD).
+- ✅ **Liveness / not-a-bot, indirectly** — holding a PID in an activated Wallet Unit implies a
+  real enrolment against a state identity record, plus User authentication to the secure element on
+  each presentation. The ARF itself proposes this as CAPTCHA replacement (Topic G §4.1.2).
+- ⚠️ **Attribute proofs** — age, nationality, residence, name. Strong, selectively disclosable,
+  and about to get real ZK in the age-verification variant.
+- ❌ **Uniqueness — NO.** See "The uniqueness question". There is no cross-verifier nullifier, the
+  persistent identifier is optional and issuer-scoped, and multiple pseudonyms per RP are mandatory.
+- ❌ **Social trust** — not applicable.
+
+Its trust root is the **same civil-registry / breeder-document root** as passports and national ID
+cards, which is why it does not stack with document-scan protocols (see Overlap).
 ## Legal timeline and current status
 
 **Deadline:** Member States must make at least one EUDI Wallet available to citizens by
@@ -577,9 +612,332 @@ sandbox, which is the only way the demos work; but that is a test trust anchor, 
 one.
 
 ## The uniqueness question
+
+**Direct answer: no. As specified and as shipping, an EUDI credential does not give a
+stable, unique-per-human identifier that a sybil-resistance system can use. For our purposes it is
+not a personhood credential — it is a very strong attribute credential.**
+
+The four things that would have to be true, and their status:
+
+| Requirement for sybil resistance | Status (2026-07) |
+|---|---|
+| A stable identifier per human | `personal_administrative_number` is **optional** (PID Rulebook §2.3) and unique only *"among all personal administrative numbers issued by the provider"* — per-issuer, not EU-wide, and Member States may omit it entirely |
+| Exactly one credential per human | Not guaranteed. A dual national can hold PIDs from two Member States. Nothing prevents a person holding multiple Wallet Units from multiple Wallet Providers |
+| A per-verifier nullifier that is one-per-human *within* a verifier | **Explicitly negated today.** `PA_04` (SHALL): the wallet *must* let a user hold **multiple different Pseudonyms at a given Relying Party**. The only shipping pseudonym is a WebAuthn keypair, and a user can mint as many as they like |
+| A rate-limited, RP-scoped, identity-derived pseudonym | Specified as `PA_23`–`PA_31` and **exactly** the nullifier we would want (RP chooses scope and rate; cross-RP unlinkable; persists across wallet changes). **No technical specification exists**; the Topic E refinement round (v1.2, 26 June 2026) states the current concept "does not support" it and that "there are no final technical specifications available for Pseudonym Attestations or ZKP-based pseudonyms" |
+
+The nuance that saves it slightly: **the design is not accidentally non-unique, it is
+deliberately non-unique** as the default, with a deliberate, specified escape hatch
+(`PA_23`–`PA_31`) for exactly the sybil-resistance case. The EU understands the problem — Topic G
+§4.1.2 is literally titled "Proof of personhood" and §4.1.5 describes deriving a pseudonym from a
+user-unique secret attribute combined with the RP identifier, with the attribute blind-issued so
+neither RP nor issuer can correlate. That is World-ID-shaped thinking inside a Commission document.
+It is just **years from shipping**, gated on ZKP maturity that TS4 says does not yet exist.
+
+**What we could actually squeeze out of a real EUDI presentation today**, if we were a registered
+RP: the mandatory PID attributes — `family_name`, `given_name`, `birth_date`, `birth_place`,
+`nationality`, `portrait`. That tuple is a **strong probabilistic dedup key** (a fuzzy natural key,
+plus a biometric). Deduping on it is legally radioactive under GDPR (biometric = Art. 9 special
+category; the name+DOB tuple is directly identifying) and would blow straight through the
+purpose-limitation that the registration certificate encodes. It is technically possible and
+practically a non-starter.
+
 ## Trust root & failure modes
+
+**Trust root:** national civil registries and breeder documents, via Member-State-approved PID
+Providers (`Reg_19`: vetting policy required), anchored in Commission-published Lists of Trusted
+Entities. Same root as an ePassport, an eID card, and any bank KYC check in the EU.
+
+**Who can forge it?**
+- Not a normal attacker. Forging a PID requires an issuer private key held by a state-vetted PID
+  Provider, plus a certified WSCD to satisfy device binding.
+- **A member state can mint arbitrary identities at will.** This is not a bug from the EU's point
+  of view but it is the ceiling on trustworthiness: a hostile or compromised member state is an
+  unbounded sybil source, and every other member state's wallet ecosystem must accept its PIDs.
+  There is a suspension mechanism (LoTE status → Invalid) but it is political, not cryptographic.
+- **Wallet Provider compromise** — a compromised Wallet Provider could issue WIAs/KAs for fake
+  Wallet Units. Mitigated by CIR 2024/2981 certification and LoTE revocation.
+
+**What a well-funded sybil farm does:**
+1. **Buys or rents real people.** Enrolment is per-person and requires a state identity plus a
+   phone; there is no "one" enforcement across RPs, so a farm with N recruited humans gets N
+   identities, and each of those humans can generate **unlimited pseudonyms at each RP** by design
+   (`PA_04`). Credential *rental* is the natural attack: the presentation requires user
+   authentication to the secure element, so it needs the human at the moment of presentation — but
+   this is exactly the low-cost attack that already works against every liveness protocol.
+2. **Exploits multi-state issuance** for dual nationals and long-term residents.
+3. **Does nothing at all**, because the credential does not claim uniqueness, so there is nothing
+   to break.
+
+**Failure modes relevant to us:**
+- **Registration revocation as a kill switch.** `Reg_29`: a Relying Party is cancelled at least on
+  request of *"a competent national authority"*. If we were ever a registered intermediary, an EU
+  member state can switch us off unilaterally. That is a business-continuity risk on par with an
+  app-store ban.
+- **Purpose-limitation enforced in the client.** `RPRC_21`: the wallet checks requested attributes
+  against our registration certificate and warns the user if we over-ask. Sybil-scoring is an
+  awkward "intended use" to declare.
+- **Data retention prohibition.** `RPI_10` forbids an intermediary from retaining anything after
+  forwarding. A persistent humanity score derived from EUDI data is, on the face of it, not
+  permitted through the intermediary route.
+- **Fragmentation risk.** 27 national registers, 27 registration policies (CIR 2025/848 Art. 4),
+  27 sets of supporting documentation. Even a compliant EU entity faces a heavy per-country lift.
+
 ## Integration surface
+
+**No on-chain surface at all** — no contracts, no events, no subgraph. Everything is HTTPS + PKI.
+
+**The technical integration is easy; the legal integration is the wall.**
+
+Technical (all Apache-2.0, self-hostable — see "Reference implementations"):
+- **Presentation:** OpenID4VP (HAIP-profiled), by redirect or via the **W3C Digital Credentials
+  API** in the browser. Reference verifier: `eudi-srv-verifier-endpoint` (Kotlin) + `eudi-web-verifier`
+  (TS). Cross-reference the sibling mdoc/formats file for protocol mechanics.
+- **Proximity:** ISO/IEC 18013-5 device retrieval (BLE/NFC/QR), server retrieval forbidden.
+- **Verification inputs:** issuer trust anchors from Trusted Lists / LoTE
+  (`eudi-srv-trust-validator`, `eudi-lib-kmp-etsi-1196x2`), revocation via Token Status List
+  (`eudi-lib-kmp-statium`, `eudi-srv-status-validator-py`).
+- **Cost:** no vendor, no API key, no rate limit, no pricing page. The software is free.
+
+Legal — and this is the actual integration surface:
+1. **Be established in an EU member state.** CIR 2025/848 Art. 3(1) registers RPs *"established in
+   that Member State"*; the CIR provides no third-country route.
+2. **Register in that state's national register** under its national registration policy (Art. 4:
+   identity + business registration + entitlements + supporting documentation + a national redress
+   mechanism).
+3. **Declare intended use(s) and the exact attribute list per intended use** (`Reg_10d`, TS6).
+4. **Receive an access certificate** from the notified Access CA (`Reg_10`) and a **registration
+   certificate per (intended use × service)** (`RPRC_09`).
+5. **If we act for third-party customers, register as an *intermediary*** (`RPI_01`) — and every
+   downstream customer must *itself* be individually registered in its own member state
+   (`RPI_03`), with the registrar holding *"legally valid evidence"* of the relationship
+   (`RPI_04`), and we must **delete all credential data immediately after forwarding** (`RPI_10`).
+
+**Can we verify without the ecosystem's cooperation?** No. Unlike an mdoc from a US state (where a
+verifier can just be a reader), the EUDI wallet performs **RP authentication in every transaction**
+and accepts only Member-State-notified trust anchors. There is no permissionless read.
+
+**The one crack: non-qualified EAAs.** `ARB_01a` lets a non-qualified EAA use a third format beyond
+mdoc/SD-JWT VC, and ARF §6.1 notes *"Non-qualified EAAs may adopt alternative trust models and
+verification mechanisms."* A crypto-native personhood credential could in principle be issued
+**into** an EUDI wallet as a non-qualified EAA. `UNCLEAR:` whether a non-qualified EAA **Provider**
+must also register and hold an access certificate — `Reg_01`/`Reg_10` lists "non-qualified EAA
+Providers" among registered entities, and `RPRC_22`/`RPRC_23` make the wallet check the issuer's
+registration certificate before accepting issuance, which suggests **yes, issuers are gated too**.
+Next place to look: ARF §6.3 and TS6, and whether any member state has published a
+non-qualified-EAA-provider registration policy.
+
 ## Scoring-relevant facts
+
+- **Assurance tier:** the highest available anywhere. Level of Assurance **High**, hardware-backed,
+  state-vetted issuer, certified wallet (CIR 2024/2981). If we ever *could* consume it, it should
+  dominate every other state-identity signal in a score.
+- **But it carries no uniqueness weight.** In a scoring model it should contribute to an
+  "identity strength / not-a-bot" axis and contribute **zero** to a "unique human" axis, because
+  nothing in the credential is one-per-human across verifiers.
+- **Population ceiling:** ~449M EU residents; mandated availability to all citizens and residents
+  by 24 Dec 2026. Actual holders as of 2026-07: `UNVERIFIED`, plausibly low six figures at most
+  (one production wallet, launched 7 weeks ago, awareness at ~49%).
+- **Cost and friction to obtain:** free to the user, but requires an existing national eID
+  (AltID requires MitID), a supported smartphone with a secure element, and a state enrolment.
+  Friction is low for EU residents, **infinite for everyone else** — this is a hard geographic
+  ceiling. No non-EU person can ever hold one.
+- **Decay/expiry/revocation:** *technical* credentials are short-lived by design (*"a few days or
+  weeks at most, if not shorter"*, PID Rulebook §2.5) with silent re-issuance; the *logical* PID
+  has a multi-year administrative validity. Revocation via Attestation Status List / Token Status
+  List, or by ≤24h validity. So a cached "user has EUDI" assertion should carry a short TTL.
+- **Acceptance mandate:** regulated relying parties (banks, telcos, VLOPs and others named in
+  eIDAS 2.0) must **accept** the wallet from ~December 2027. This is the moment EUDI stops being a
+  pilot and becomes infrastructure — and the moment a European consumer of ours may reasonably ask
+  "why would I pay you when I can take the wallet directly?"
+- **Age-verification variant** is the near-term reality: 7 pilot member states, feature-ready
+  15 April 2026, real Longfellow ZK code in the repos. Proves "over N" and **nothing else** —
+  scoring weight for uniqueness: zero.
+
 ## Overlap with other protocols
+
+**Critical for not double-counting.** EUDI's PID derives from the **same state civil-registry and
+breeder-document trust root as ICAO passport chips and national ID cards**. It therefore lands in
+the **same dedup bucket** as:
+
+- **ZKPassport**, **Self (Self.xyz)**, **Rarimo** — all read the ICAO 9303 passport/ID chip
+- **World ID's document/passport verification tier**
+- Every **KYC vendor credential** (Onfido/Sumsub/Persona-derived attestations, Coinbase
+  verifications, etc.) that ultimately reads a government document
+- National eID logins (BankID, iDIN, itsme) which are themselves being folded into EUDI Wallets
+
+**Treat all of these as one evidence source, not many.** A user presenting EUDI + ZKPassport +
+a KYC-vendor credential has demonstrated **one** state identity three ways, not three independent
+humanity signals. Correlated failure: whatever compromises the underlying document (a corrupt
+issuing authority, a stolen passport, a sold identity) compromises all of them simultaneously.
+
+EUDI is *strictly stronger* than the document-scan protocols on assurance (live state issuance +
+hardware binding vs. reading a chip) and *strictly weaker* on usability for us (permissioned
+verification, no nullifier, EU-only).
+
+**Genuinely independent from:** biometric-uniqueness protocols (World ID orb iris, Humanity
+Protocol palm) — different root, different failure mode. Also independent from social-graph
+protocols (BrightID, Proof of Humanity vouching) and behavioural/on-chain heuristics
+(Gitcoin Passport stamps, account age).
+
+**Note for the orchestrator:** the age-verification mini-wallet shares the *same* root again, since
+its proof-of-age attestation is derived from the national identity. It is not an independent signal
+from EUDI PID.
+
+## Aggregator verdict — blunt
+
+**All three, on three different clocks.**
+
+### 1. As an *input*: no, and probably never on the terms we'd want. Horizon: 2028+, conditional.
+
+Blocked twice over. **Legally**, we cannot get an access certificate without EU establishment and
+registration in a national register with a declared purpose and attribute list (CIR 2025/848
+Art. 3(1); ARF `RPA_03`, `RPA_04`, `Reg_10`). **Substantively**, even if we could, the credential
+does not carry uniqueness: the persistent identifier is optional and issuer-scoped, and `PA_04`
+*requires* the wallet to support unlimited pseudonyms per relying party. We would be paying a heavy
+regulatory price for a signal that adds assurance but not sybil resistance — and that overlaps
+completely with credentials we can already consume permissionlessly (ZKPassport, Self, Rarimo).
+
+**The condition that flips this:** `PA_23`–`PA_31` (scope rate-limited pseudonyms) getting a real
+specification and shipping. Those HLRs describe a genuine app-scoped nullifier — RP-chosen scope
+and rate, cross-RP unlinkable, persistent across wallet changes. If that ships, EUDI becomes the
+strongest personhood credential on earth for EU residents overnight. It is gated on ZKP maturity
+(TS4: *"no existing ZKP approach can be deemed fully suitable or mature enough"*), currently being
+handed to ETSI TS 119 476-2. Realistic earliest: **2028**, and that is optimistic given the wallet
+itself is missing its 2026 deadline.
+
+### 2. As a *competitor*: yes, in the EU, from ~December 2027.
+
+Once regulated relying parties must accept the wallet, any EU service that needs "real human,
+verified attributes" gets a free, state-backed, universally-held answer. Our EU value proposition
+narrows to exactly the things EUDI refuses to do: **cross-verifier uniqueness**, **non-EU users**,
+and **pseudonymous / crypto-native contexts where nobody will register as a relying party.** That
+is a real niche — it is just a much smaller EU niche than it looks today. Note the asymmetry: EUDI
+takes our *attribute verification* business but leaves our *sybil resistance* business intact,
+because it explicitly declines to solve uniqueness.
+
+### 3. As a *compliance constraint*: yes, immediately.
+
+Even without touching EUDI, it sets the European expectation for what an identity interaction looks
+like: verifier authentication, declared purpose, per-purpose attribute lists, in-client purpose
+enforcement, user-visible transaction logs, one-click data-deletion requests, DPA-reporting
+endpoints (ARF Topics 48/50). Any European customer or regulator will benchmark us against that.
+Building our request model to be *shaped* like an EUDI presentation request — explicit purpose,
+minimal attribute set, user-approved, logged — is cheap now and expensive to retrofit.
+
+### Where "being a regulated entity" is unavoidable
+
+Flagging these explicitly, because each is a hard fork in the roadmap:
+
+- **Consuming EUDI credentials at all** → must be a registered wallet-relying party, established in
+  an EU member state (CIR 2025/848 Art. 3(1)). There is no third-country path in the text.
+- **Consuming them on behalf of customers** → must register as an **intermediary** (`RPI_01`), and
+  **every downstream customer must itself be individually registered** in its own member state
+  (`RPI_03`) with the registrar holding *"legally valid evidence"* of the relationship (`RPI_04`).
+  That is fatal for a self-serve API with anonymous/global consumers.
+- **Retaining anything** → `RPI_10` requires an intermediary to delete PIDs, attestations and user
+  attributes *"completely and immediately"* after forwarding. A persistent EUDI-derived humanity
+  score is, on the face of the ARF, not available via the intermediary route.
+- **Issuing a credential into EUDI wallets** (the "crack" of non-qualified EAAs) → likely also
+  requires registration as an EAA Provider plus an access certificate (`Reg_01`, `RPRC_22`/`_23`).
+  `UNCLEAR:` needs confirmation — see Open Question 4.
+- **A member state can switch us off** (`Reg_29`) at the request of a competent national authority.
+
+**Recommendation:** do not build for EUDI. Build *around* it — design our request semantics to look
+EUDI-shaped for European credibility, keep watching `PA_23`–`PA_31` and ETSI TS 119 476-2 as the
+single trigger to revisit, and in the meantime treat EUDI-adjacent credentials
+(ZKPassport/Self/Rarimo, national eIDs) as the same evidence bucket so we never double-count the
+state-document root.
+
 ## Open questions for us
+
+1. **Can a non-EU entity register as a wallet-relying party at all?** CIR 2025/848 Art. 3(1) says
+   registers cover RPs *"established in that Member State"* and the CIR is silent on third
+   countries. If a national registration policy (Art. 4) accepts an EU subsidiary or an
+   Art.-27-GDPR-style EU representative, the picture changes materially. **This is the single
+   highest-value follow-up.** Look at: published national registration policies (Ireland, Estonia,
+   Netherlands first), Commission FAQ, and the `eudi-srv-web-relyingparty-registration-py`
+   reference implementation's data model.
+2. **What is the actual number of EUDI wallet holders?** Nobody publishes it. Until someone does,
+   "largest personhood credential in existence" is a forecast.
+3. **Is Denmark AltID's "zero-knowledge proof" claim real?** TS4 says no ZKP scheme is mature; the
+   Danish press release says AltID "shares only a zero-knowledge proof". One of these is wrong.
+   Check AltID developer documentation.
+4. **Do non-qualified EAA *issuers* need registration and an access certificate?** If not, issuing
+   a crypto-native personhood attestation into EUDI wallets is a real product. If yes (which the
+   HLRs suggest), that door is shut too.
+5. **Will `PA_23`–`PA_31` (scope rate-limited pseudonyms) ever get a specification, and when?**
+   This is the difference between EUDI being irrelevant to sybil resistance and being the endgame.
+   Watch ETSI TS 119 476-2 and ARF Topic 11/53 revisions.
+6. **Does the mini-wallet's age-verification verifier flow require the same accreditation?** If age
+   verification has a lighter-touch verifier regime, that is the one EUDI surface we might actually
+   reach. Check `ageverification.dev` onboarding and `av-srv-verifier-endpoint` docs.
+7. **Does the December 2027 acceptance mandate for regulated RPs create demand for us**, as a
+   normalisation layer over EUDI + everything else, or does it eat our EU market? Probably both.
+8. `UNVERIFIED:` the CELEX identifiers and dates of the **2026 amending CIRs** referenced by ARF
+   v3.0.0. Worth pinning before quoting any CIR article number in a customer-facing doc.
+
 ## References
+
+### Primary — law
+- Regulation (EU) 2024/1183 (eIDAS 2.0) — https://eur-lex.europa.eu/eli/reg/2024/1183/oj
+- CIR (EU) 2024/2977 — PID and EAA specification
+- CIR (EU) 2024/2979 — integrity and core functionalities — https://eur-lex.europa.eu/eli/reg_impl/2024/2979/oj/eng
+- CIR (EU) 2024/2980 — notifications to the Commission
+- CIR (EU) 2024/2981 — wallet certification (Annex 1 = Risk Register)
+- CIR (EU) 2024/2982 — protocols and interfaces — https://eur-lex.europa.eu/eli/reg_impl/2024/2982/oj/eng
+- **CIR (EU) 2025/848 of 6 May 2025 — registration of wallet-relying parties. Applies from
+  24 December 2026 (Art. 11).** https://eur-lex.europa.eu/eli/reg_impl/2025/848/oj/eng
+
+### Primary — ARF and specs (all read directly, 2026-07-24)
+- ARF repo, **v3.0.0**, commit `6373eee` (2026-07-23) —
+  https://github.com/eu-digital-identity-wallet/eudi-doc-architecture-and-reference-framework
+  - `docs/main/06-trust-model.md` — trust model, LoTE, roles
+  - `docs/annexes/annex-2/annex-2.02-high-level-requirements-by-topic.md` and
+    `hltr/high-level-requirements.csv` — all HLRs cited (RPA_*, Reg_*, RPRC_*, RPI_*, PA_*, ZKP_*,
+    PID_*, ISSU_*, OIA_*, ARB_*, VCR_*)
+  - `docs/discussion-topics/g-zero-knowledge-proof.md` (v1.4, 30 Mar 2025) — ZKP, incl. §4.1.2
+    "Proof of personhood"
+  - `docs/discussion-topics/e-rr-pseudonyms-including-user-authentication-mechanism.md`
+    (**v1.2, 26 June 2026**) — pseudonym state of play
+  - `docs/discussion-topics/x-rr-relying-party-registration.md` — RP registration
+  - `docs/discussion-topics/a-privacy-risks-and-mitigations.md` — privacy risk register
+- Technical specifications repo, commit dated 2026-06-08 —
+  https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications
+  - `ts4-zkp.md` (v1.0 2025-05-21 / v1.0.1 2026-01-30) — *"no existing ZKP approach can be deemed
+    fully suitable or mature enough"*
+  - `ts13-zksnarks.md` (v1.0, 2025-12-15) — arithmetic-circuit ZK, Longfellow, → ETSI TS 119 476-2
+  - `ts14-zkps-from-mms.md` (v1.0, 2026-02-27) — BBS+/BBS#, → ETSI TS 119 476-2
+  - `ts5`, `ts6` — RP registration formats/API and the common set of registered RP information
+- Attestation rulebooks catalog, commit `36f8adc` (2026-07-20) —
+  https://github.com/eu-digital-identity-wallet/eudi-doc-attestation-rulebooks-catalog
+  - `rulebooks/pid/pid-rulebook.md` — mandatory/optional PID attributes,
+    `personal_administrative_number`, short-lived technical PIDs
+
+### Primary — code
+- Org: https://github.com/eu-digital-identity-wallet (85 repos; libraries Apache-2.0, reference
+  apps EUPL-1.2; metadata read via GitHub API 2026-07-24)
+- `av-lib-ios-longfellow-zkp` — Longfellow ZK over mdoc, Swift, Apache-2.0, pushed 2026-07-09
+- `eudi-srv-web-relyingparty-registration-py` — reference RP registration service
+- Conformance test cases: https://conformance.eudi.dev
+
+### Primary — criticism
+- Cryptographers' Feedback on the EU Digital Identity's ARF (June 2024) —
+  https://files.dyne.org/eudi/cryptographers-feedback-june2024.pdf
+- ARF GitHub issues #200, #305, #572 (unlinkability / WebAuthn pseudonyms)
+
+### Secondary (labelled as such)
+- EU Digital Identity Wallet rollout tracker, July 2026 —
+  https://www.eideasy.com/blog/eu-digital-identity-wallets-july-2026
+- Biometric Update, "EUDI What? As wallet deadline looms, awareness remains low" (2026-07) —
+  https://www.biometricupdate.com/202607/eudi-what-as-wallet-deadline-looms-awareness-remains-low
+- Biometric Update, "EU Commission doubtful all member states will be able launch EUDI wallets this
+  year" (2026-04) — ENISA quote, Launchpad readiness figures —
+  https://www.biometricupdate.com/202604/eu-commission-doubtful-all-member-states-will-be-able-launch-eudi-wallets-this-year
+- Biometric Update, Denmark AltID launch (2026-06) and AltID/ZKP announcement (2025-12)
+- Commission age-verification blueprint pages —
+  https://digital-strategy.ec.europa.eu/en/policies/eu-age-verification ,
+  https://digital-strategy.ec.europa.eu/en/news/commission-releases-enhanced-second-version-age-verification-blueprint ,
+  https://ageverification.dev/
+- AEPD (Spanish DPA) blog, "eIDAS2, the EUDI wallet and the GDPR (II)" —
+  https://www.aepd.es/en/press-and-communication/blog/eidas2-the-eudi-wallet-and-the-gdpr-ii

@@ -631,3 +631,227 @@ Recommended weight: **meaningful but capped, and only in the native-app flow** �
 in a pure-web flow, which is where most of our users will be.
 
 ---
+
+## 5. Proof-of-work / proof-of-cost as a floor
+
+Sometimes the honest answer to "is this a human" is **"they paid enough that farming is
+uneconomic."** This is a categorically different move from classification, and it deserves to be
+evaluated on its own terms because it has one enormous advantage over everything else in this file:
+**it has no false positives of the "we decided you're a bot" kind.** Anyone who pays, passes. Given
+§6, that property is worth a great deal.
+
+### 5.1 The mechanism, stated plainly
+
+Let `v` be the expected value an attacker extracts per identity and `c` the cost to produce one. If
+`c > v`, farming is unprofitable **regardless of whether any detector works**. Cost can be imposed
+as:
+
+| Form | Example | Recoverable? | Notes |
+|---|---|---|---|
+| **Refundable stake / deposit** | Idena identity staking; Human Passport GTC identity staking | Yes | Cheapest for honest users (opportunity cost only), but a farm with capital pays only opportunity cost too. Needs **slashing** to bite. |
+| **Burn** | Circles invitation cost | No | Real cost to both sides. |
+| **Fee** | Farcaster registration + storage | No | Simplest; a pure regressive tax. |
+| **Time-lock / illiquidity** | vesting, lockups, minimum age | Partly | Costs *time*, which farms have in abundance if they plan ahead. Weak. |
+| **Compute (proof-of-work)** | Hashcash-style client PoW, mCaptcha, Friendly Captcha | No | **Strictly worse than a fee** for our purposes: farms have GPUs and cheap electricity; honest mobile users have a phone battery. Regressive *and* environmentally wasteful. Fine as a **DoS rate-limiter**, useless as personhood evidence. |
+| **Hardware** | App Attest / Play Integrity (§4.3) | Capital | Cost is a physical device slot. The most interesting form because the cost is in a resource farms cannot print. |
+
+### 5.2 Documented instances worth learning from
+
+- **Idena identity staking** — the mechanism that actually *defeated account trading*. Each identity
+  posts a stake; anyone with the key can steal it, so selling the key means selling the stake. This
+  is functionally Buterin's **MACI deposit** (https://ethresear.ch/t/minimal-anti-collusion-infrastructure/5413),
+  and Ohlhaver notes the equivalence (*Compressed to 0*, p.36 n.94). **It worked** — and the
+  displaced demand reappeared as puppeteering. **Hardening one channel priced the adjacent channel
+  in.** This is the most important lesson about cost floors in the whole literature: they do not
+  remove the demand, they redirect it.
+- **Idena IIP-5, sublinear (quadratic-ish) staking** — the constructive fix for the
+  one-token-one-vote problem. Reward weight is `stake^0.9`, not `stake` (proposer weight
+  `= stake^0.9 × N/5`; validator weight `= stake^0.9`). Rationale given in the IIP: pool
+  concentration was collapsing node count and demotivating solo operators whose ~$7-10/month node
+  cost was not covered. Modelled on epoch #0087: solo miners **28k → 110k iDNA**, large pools
+  **240k → 163k iDNA**, total constant at 510k. Primary: https://docs.idena.io/docs/iip/iip-5 .
+  **The exponent is the whole idea:** a sublinear cost-to-influence curve makes the marginal cost of
+  the Nth identity rise relative to its yield, which bites a farm and not an individual. Ohlhaver's
+  corpus notes this pivot killed the largest "unknown network" pool
+  (`research/references/ohlhaver-corpus.md` §1.8).
+- **Circles invitation cost** — an elegant variant: the inviter **burns 96 CRC = 4 days of their own
+  personal issuance**, and the invitee is credited 48 CRC. The cost is denominated in a resource
+  that is *itself* rate-limited by personhood and is **non-transferable**, so it cannot simply be
+  bought with outside capital. See `research/protocols/circles.md`. This is the best design pattern
+  in the file: **denominate the cost in a personhood-rate-limited currency, not in money.** Its
+  weakness is the same as its strength — it is only as scarce as the personhood it presupposes,
+  and the Circles `originInviter` concentration (§2, Precedent B) shows one entity can accumulate
+  enough of it to mint 27.5% of recent registrations.
+- **Farcaster — a cost floor that collapsed.** Another agent measured this directly:
+  `IdRegistry.idCounter()` = **3,343,569 FIDs** (OP Mainnet), registration ~**0.0001069 ETH**, and
+  storage now **$0.20/yr** — down from ~$7 mid-2025. A **10,000-FID farm therefore costs ~$2k/yr**.
+  A raw FID consequently carries **near-zero personhood weight**. The cost-bearing signal migrated
+  to **Farcaster Pro at $120/yr** (`TierRegistry` on Base
+  `0x00000000fc84484d585C3cF48d213424DFDE43FD`), which is **high precision, very low recall** — few
+  humans pay it, but almost no farm pays it per identity. See the sister agent's Farcaster write-up
+  for the measurement; my point here is purely evidential: *a fee-based cost floor is only as strong
+  as the fee, and fees get cut for growth reasons.* **A cost floor set by a third party is not a
+  cost floor we control, and it can vanish in a product decision.**
+
+### 5.3 Where cost floors beat identity checks
+
+1. **No classifier false positives.** The exclusion criterion is "did not pay", which is
+   unambiguous, appealable (pay), and not a statistical judgement about a person.
+2. **They do not decay.** Every detector in §2 decays as adversaries adapt. A cost floor's
+   "counter" is *paying more*, which is the intended behaviour.
+3. **They are legible and auditable.** A number, on-chain, that anyone can verify — a much better
+   fit for the aggregator's "verify without vendor cooperation" requirement (BRIEF.md §4).
+4. **They compose with slashing**, which is the only mechanism in this entire file that has
+   demonstrably defeated a real attack class (account trading, on Idena).
+
+### 5.4 Where they fail — and it is the failure mode Ohlhaver names
+
+**Proof-of-cost converts one-person-one-vote into one-token-one-vote.** That is the exact thing
+proof-of-personhood exists to prevent. Buterin's framing of the stakes:
+*"If proof of personhood is not solved, decentralized governance … becomes much easier to capture by
+very wealthy actors"* (https://vitalik.eth.limo/general/2023/07/24/biometric.html). And on why even
+social approaches inherit it: *"each person can only have one biometric ID, but a wealthy and
+socially well-connected person could use their connections to generate many IDs"* (same post).
+
+The arithmetic is unforgiving. To deter a farm you need `c > v`. In an airdrop with `v ≈ $50` per
+identity, you need `c ≈ $50` per identity. **$50 is a meaningful fraction of a week's income for a
+large share of the world's population** — including exactly the population that a UBI or
+public-goods-funding use case is *for*. A cost floor calibrated to deter farms is, by construction,
+calibrated to exclude the global poor. **There is no setting of `c` that separates "farm" from
+"poor honest user", because the farm's advantage is capital and capital is precisely what the poor
+honest user lacks.**
+
+Two partial escapes, both worth building around:
+
+- **Sublinear cost-to-influence** (Idena IIP-5's `stake^0.9`; quadratic voting/funding generally).
+  This does not lower the floor; it lowers the *return to scale*, which is the actual problem. But
+  it presupposes that identities are already separated — quadratic mechanisms are famously
+  sybil-vulnerable without personhood. **Circular**, and the circularity is real, not rhetorical.
+- **Denominate cost in a non-transferable, personhood-rate-limited resource** (Circles' issuance
+  burn; social vouching capacity; time-since-issuance quotas). This escapes the wealth problem but
+  inherits the social-graph problem.
+
+### 5.5 Verdict for the aggregator
+
+**Expose cost-borne signals as a separate axis, not as part of a "humanity" score.** Concretely: our
+API should return something like `{ personhood_evidence: …, cost_borne: … }` so an integrator
+running a governance vote can weight cost at zero while an integrator running a faucet can weight it
+highly. Folding proof-of-cost into a personhood number is a category error and it silently converts
+our customers' one-person-one-vote systems into plutocracies. Ohlhaver's whole argument is that this
+is the failure mode, not the fix.
+
+---
+
+## 6. What behavioural signals fundamentally cannot do
+
+### 6.1 They cannot establish uniqueness — structurally, not incidentally
+
+Nothing in an activity trace binds to a body. Behaviour is a property of an **account**, and the
+account-to-human map fails in both directions, both of which are documented:
+
+- **One human → many accounts.** The farm case. Behaviour cannot refute it because a patient,
+  funded human can generate arbitrarily many individually-plausible traces. Every signal in §1 is
+  something a human with time and money can produce N times.
+- **Many humans → one account, or one operator → many humans' accounts.** The puppeteering case.
+  Ohlhaver's Idena result is decisive here and should be read as the ceiling on this entire signal
+  class: Idena **succeeded** at filtering bots *and* at defeating account trading (via identity
+  staking), and the outcome was still that **23 entities — under 0.6% of distinct entities —
+  controlled ≥~40% of accounts and ~48% of reward distribution**, with **all 31** of the pools that
+  ever exceeded 100 accounts showing third-party key access. The accounts were *real humans*
+  performing *real liveness ceremonies*. There is no behavioural signal that separates a paid puppet
+  performing a genuine ceremony from an autonomous participant performing a genuine ceremony,
+  because **there is no behavioural difference** — the difference is in off-chain distribution of
+  information and control (`research/references/ohlhaver-corpus.md` §1.5, quoting p.12).
+
+Therefore: **behavioural signals are at best evidence of *effort* and *non-automation*.** They are
+never evidence of *one*. Any product copy that implies otherwise is false.
+
+### 6.2 The base-rate problem, worked
+
+Assume a classifier that is genuinely good by the standards of this literature: **sensitivity
+(TPR) = 90%**, **specificity = 95%** (FPR = 5%). Population 100,000. Vary the true sybil prevalence
+`p`:
+
+| True sybil rate `p` | Sybils | Humans | True positives | **False positives** | **Precision (PPV)** | Honest users excluded |
+|---|---|---|---|---|---|---|
+| 50% (airdrop snapshot) | 50,000 | 50,000 | 45,000 | 2,500 | **94.7%** | 5.0% |
+| 20% | 20,000 | 80,000 | 18,000 | 4,000 | **81.8%** | 5.0% |
+| 5% | 5,000 | 95,000 | 4,500 | 4,750 | **48.6%** | 5.0% |
+| **2%** | 2,000 | 98,000 | 1,800 | **4,900** | **26.9%** | 5.0% |
+| 1% | 1,000 | 99,000 | 900 | 4,950 | **15.4%** | 5.0% |
+
+**Read the 2% row.** At a 2% sybil rate — which is a plausible residual for a well-designed
+personhood flow where users have already presented at least one strong credential — **73% of
+everyone we flag is a real human**, and we exclude **4,900 real people per 100,000** to catch 1,800
+sybils.
+
+Tightening specificity helps, but not enough:
+
+| Specificity | FPR | PPV at p=2% | PPV at p=1% |
+|---|---|---|---|
+| 95% | 5% | 26.9% | 15.4% |
+| 99% | 1% | 64.7% | 47.6% |
+| 99.9% | 0.1% | **94.8%** | 90.0% |
+
+To reach **95% precision at p = 2%** you need **specificity ≈ 99.90%** (FPR ≤ ~0.097%). At
+**p = 1%** you need **≈ 99.95%** (FPR ≤ ~0.048%). **No published behavioural sybil classifier
+demonstrates anything close to that out-of-sample against an adaptive adversary** — and, per §6.3,
+none of them publish the number at all.
+
+**The structural point this establishes:** behavioural classification works precisely where the
+sybil rate is *enormous* (an unfiltered airdrop snapshot, where LayerZero was flagging 803,093
+addresses) and fails precisely where a personhood aggregator would apply it (after other credentials
+have already removed most sybils). **The signal is least useful exactly where it sits in our
+pipeline.** That is not a tuning problem; it is arithmetic.
+
+### 6.3 Four compounding problems on top of the base rate
+
+1. **We cannot measure our own false-positive rate, because there is no ground truth.** The only
+   large public label set — LayerZero's — was produced by a **self-report amnesty offering 15% of
+   allocation** plus a community bounty. Self-reporters are a biased sample (the marginal farmer for
+   whom 15% > 0), and bounty hunters were reporting so aggressively that LayerZero **paused the
+   bounty process** ([The Block](https://www.theblock.co/post/295274/layerzero-labs-ceo-announces-pause-of-sybil-bounty-hunter-process-after-influx-of-reports)).
+   Labels produced by an incentivised adversarial crowd are not a validation set.
+   Correspondingly: **no vendor publishes precision/recall.** Human Passport's own GG23 model-based
+   detection announcement publishes user counts and dollars protected but **no accuracy figures at
+   all** (https://human.tech/blog/human-passport-x-gitcoin-grants-defending-gg23-with-model-based-sybil-detection).
+   Trusta's open-source repo documents the pipeline but states thresholds are undisclosed
+   (https://github.com/TrustaLabs/Airdrop-Sybil-Identification). **Assume any vendor accuracy claim
+   we are given is unaudited.**
+2. **Multiple testing.** Running `N` detectors and flagging on *any* of them compounds FPR:
+   `1 − (1 − α)^N`. Six detectors at α = 1% each gives an effective **5.9%** FPR — which lands us
+   back in the top row of the table. Detector count must be governed by a joint calibration, not by
+   how many good ideas we have.
+3. **Asymmetric decay.** The honest population's behaviour is roughly stationary; the adversary's is
+   not. So **FPR stays put while TPR falls** after deployment. Precision decays monotonically from
+   launch day. Every one of §2's detectors was validated against farms that had no adversary.
+4. **Correlated, non-random false positives.** The people flagged are not a random 5%. They are:
+   new users with thin histories, mobile-only users behind CGNAT, VPN/Tor users, users onboarded in
+   community batches, users in regions where one operator does all onboarding, and users whose
+   funding came from a friend. **Every single one of D1-D4 concentrates its false positives on the
+   global south and on the newly-onboarded** — the exact populations a personhood system is supposed
+   to include.
+
+### 6.4 What this must do to our product design
+
+Four constraints, all falling out of the above:
+
+1. **Never let a behavioural signal cause an individual exclusion.** It may reduce a score; it may
+   trigger a request for a stronger credential; it must not be terminal. The harm asymmetry is
+   stark: a false negative gives a farm one extra share; a false positive denies a real person money
+   or a vote, **in a permissionless system where there is no appeals desk.**
+2. **Emit cluster-level correlation, not individual verdicts.** Population-level estimation is a
+   well-posed problem — estimating "what fraction of this cohort is one entity" does not suffer the
+   base-rate collapse, because it is estimation, not classification. Individual classification at
+   low prevalence is not well-posed. Our API should be able to say *"this identity belongs to a
+   correlated cluster of size 2,754 sharing one root"* and let the integrator decide.
+3. **Ship a correlation discount, not a filter.** The empirical warrant is Idena's accident: pooled
+   accounts ended at 61% of accounts but **~2.4% of votes** because voting was one-node-one-vote,
+   and that discount is what let the honest 27% hard-fork the protocol out of the crisis
+   (`ohlhaver-corpus.md` §1.6). *A correlation discount saved that network.* An exclusion filter
+   would have had to be right, and at those base rates it would not have been.
+4. **Cap the class.** Behavioural signals should contribute a **bounded fraction (~10-15%)** of the
+   maximum score and must never be sufficient alone. They are a tiebreaker and a fraud-triage input,
+   not evidence of personhood.
+
+---

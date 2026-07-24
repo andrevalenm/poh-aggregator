@@ -906,6 +906,78 @@ observed four times, and the four observations share a failure mode:
 
 ---
 
+## ADDENDUM — the vouch-graph test, run 2026-07-24
+
+The "Open questions" section above flagged the vouch-concentration analysis as the highest-value
+follow-up: if the 2026 airdrop cohort shares a small set of vouchers, it is a farm. That test has
+now been run directly against Gnosis. It is reproducible in about two minutes.
+
+**Method.** Swept `VouchRegistered(bytes20,bytes20,uint256)` — topic0
+`0x32d9c9fa0d68d72716d8ce6fb31141216cc8a7059b83f77c3a5c59041029ad76` — on the PoH v2 proxy
+`0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc` from deploy block 35,846,827 to head, via
+`rpc.gnosischain.com`. **1,553 vouches total**, first 2024-09-06, last 2026-07-24.
+
+**Result 1 — the airdrop surge is confirmed, in the vouch data as well as the claim data.**
+
+| Month | Vouches | | Month | Vouches |
+|---|---|---|---|---|
+| 2025-10 … 2026-03 | 5, 10, 6, 7, 6, 15 | | 2026-04 | **143** |
+| | | | 2026-05 | **203** |
+| | | | 2026-06 | **567** |
+| | | | 2026-07 (to 24th) | **557** |
+
+**Result 2 — the simple farm hypothesis is REFUTED.** Direct voucher concentration is *low*:
+
+- 1,553 vouches from **828 distinct vouchers**; busiest voucher accounts for 18 (1.2%).
+- Top 23 vouchers = **10.4%** of all vouches. In the Apr–Jul 2026 cohort specifically: 1,470
+  vouches from **808 distinct vouchers**, top 23 = **9.0%**.
+
+For contrast, Idena at its puppeteering peak had 23 entities holding **≥40%** of accounts. PoH's
+vouching base is broad — the median voucher vouches for one or two people. Whatever drove 1,299
+registrations in four months, it was not a handful of accounts vouching for hundreds each.
+
+**Result 3 — and this is the methodologically important part — the transitive test produces a
+false positive.** Applying the Circles-style "unwind the indirection to find the true originator"
+heuristic to the same data appears damning, and is not:
+
+- Collapsing each identity to its transitive vouch-forest root gives **6 roots for 1,542 vouched
+  identities**, with a single root, `0xfa00d29d378edc57aa1006946f0fc6230a5e3288`, subsuming
+  **1,456 (94.4%)**.
+
+Taken at face value that reads as one entity behind 94% of the registry. It is not. Three checks
+falsify the farm reading:
+
+1. **Depth grows monotonically with registration order.** Median vouch-chain depth by registration
+   decile: 7, 9, 10, 11, 12, 12, 13, 13, 13, **14**. A farm produces shallow, wide subtrees; this is
+   a chain deepening steadily as it grows.
+2. **The dominant root has exactly one direct child.** A farm's root fans out; a bootstrap seed does
+   not.
+3. **The dominant depth-3 subtree spans 635 days.** Farms are time-clustered; this is the whole
+   history of the registry.
+
+This is simply the shape of *any* invite-tree registry bootstrapped from a seed: every member
+traces back to genesis by construction, so root identity carries no information. The heuristic that
+correctly exposed a farm on Circles — where trust edges are unilateral and cheap, so a genuine graph
+should *not* be a tree — misfires here, because on PoH the tree is the intended topology.
+
+**The generalisable lesson for our detector design:** transitive-origin collapse is only evidence of
+farming when the protocol's honest topology is not already a tree. Where it is, the discriminating
+signals are **subtree width at shallow depth**, **time-clustering within a subtree**, and
+**depth-versus-age correlation** — not root concentration. A detector that flagged PoH on root
+concentration alone would have excluded 94% of a legitimate registry. See
+[`../landscape/behavioral-scorers.md`](../landscape/behavioral-scorers.md) for the detector
+catalogue this feeds.
+
+**What the test did *not* settle.** A broad vouching base is consistent with an organic community
+*and* with a distributed farm that bought many low-value vouches — `requiredNumberOfVouches() == 1`
+makes each vouch cheap to source. Distinguishing those needs the vouchers' own registration ages and
+whether they cluster in registration time, which is a further query on the same data. Ranked as the
+next follow-up, below re-measuring registrations in 2026-10 after the PNK pool empties.
+
+**Reproduction:** `research/scripts/vouch_sweep.py`.
+
+---
+
 ## References
 
 **Proof of Humanity**

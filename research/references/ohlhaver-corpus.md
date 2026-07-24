@@ -493,6 +493,73 @@ Honest assessment. Four years on (paper May 2022 → today 2026-07), the concret
    is worth taking seriously.
 ## 3. Between Zero and One — sublinear identity staking
 ## 4. Later work: social identity / plural identity (2024-2026)
+
+### 4.1 "Common Knowledge Machines: From Community Notes to Community Posts" (Substack, 2024-10-01)
+
+https://pujaohlhaver.substack.com/p/common-knowledge-machines — **the only post on her Substack**
+(verified via the Substack archive API, 2026-07-24: exactly one item). Published ~6 weeks after
+ETHBerlin, and it is the closest thing that exists to the promised "social identity" work.
+
+Thesis: platforms fail to build **common knowledge** because posts polarise before they can be
+stress-tested across tribes. Community Notes is the right mechanism applied too late — it is
+*ex post*, after virality. Her proposal, **"Community Posts"**, moves the bridging test *ex ante*:
+a poster first sends to a **"polarity subset"** of *uncorrelated* followers (balanced for reach),
+via a ZK proof that the recipient follows the poster without revealing the poster's identity;
+recipients agree/disagree via ZK-reposts, forming a tree through the social graph; only content
+that earns cross-tribal support merges into public feeds; Community Notes then handles the residue.
+
+Four things in it matter to us:
+
+1. **She applies correlation discounting to *identity*, explicitly.** *"In polarity subsets,
+   followers with similar behavior are grouped as the same entity."* Note the mechanism: **behaviour
+   similarity → treated as one entity.** This is the same move as DeSoc §4.5 and COCM, and it is the
+   clearest statement anywhere in her corpus that her answer to sybils is *merge the correlated*
+   rather than *detect the fake*. It also means she is comfortable inferring correlation from
+   **behaviour**, not just declared affiliations — which is the cheaper and less toxic data source
+   (cf. §5.6 on Pol.is).
+2. **Diversity as a security property.** *"A Post that resonates with multiple, diverse clusters is
+   harder to cancel… the more diverse the support, the harder it is to divide."* Same structure as
+   DeSoc's community recovery: security increases with affiliation diversity.
+3. **The appendix proposes verifiable credentials** — employment, education, certifications,
+   geography — to *"differentiate between humans and bots while adding rich context for creating
+   polarity subsets."* **This is the closest she comes to endorsing something like our product** —
+   but note the framing: credentials are valuable as *context for constructing diverse subsets*,
+   not as a personhood score. Credentials are inputs to correlation structure. That is the role
+   §6.5 recommends we design for.
+4. **An architectural warning aimed squarely at aggregators:** *"no single actor should have
+   totalistic access to an account feed"*, because backward inference would compromise anonymity.
+   She proposes federation and embedding users in their social networks, *"using diverse and
+   uncorrelated associations for security."* **An aggregator with totalistic cross-protocol
+   visibility is precisely the actor she is warning against** — see §6.1(d).
+
+She is admirably honest about the mechanism's weakness, asking whether cross-tribal consensus
+tracks truth at all (*"Just because everyone believes that everyone else believes 'Ceaușescu is a
+tyrant,' does that make it actually true?"*), and flagging open problems on expertise weighting and
+whether flat-earthers belong in a polarity subset.
+
+**Note it does not mention proof of personhood, sybils or puppeteering by name.** The continuity is
+structural, not lexical.
+
+### 4.2 Talks and interviews (from her own index, 2026-07-24)
+
+Her site's "select talks" list is short and mostly pre-2024. Post-ETHBerlin the only listed item is
+**"Plurality, Community Currencies, and the Future of Networked Governance," Governance Futures
+(Sept 2025)** — https://www.youtube.com/watch?v=sV2x73chl6I — plus an **Epicenter** podcast episode
+588, "Why Community Currencies Are Crucial for Governance in DeSoc"
+(https://www.youtube.com/watch?v=zRnYj_4GQHs). Both are about the Community Currencies paper (§4.3),
+which is the strongest signal available about where her attention actually went after Idena.
+
+Earlier, for context: DeSci Berlin keynotes (2022, 2023); Foresight Institute, "Decentralization in
+the age of AI" (June 2023); Bankless/GreenPill "Stellar Punk" (June 2023); Unchained Podcast on SBTs
+(2022-06-07); interviews she conducted with Audrey Tang & Yuval Noah Harari (RadicalxChange, July
+2020) and Steve Omohundro (2020); workshops "Plural Research Experiment" (Berlin, May 2024) and
+Devcon Bogotá (2022).
+
+**The shape of the trajectory is the finding.** From 2024 onward she stops writing about
+*personhood* and writes about *community currencies*, *attention pricing* and *common knowledge*.
+That is not a detour — on her own account (§1.9e, §2.2) personhood was always the wrong unit and
+communities were always the right one. **She has moved on from the problem our product is in, and
+she moved on because she concluded it was the wrong problem.** We should sit with that.
 ## 5. Surrounding lineage
 
 Brief, and deliberately built from *her own citation graph* (all references below are ones she
@@ -593,12 +660,161 @@ Supporting sociology, both cited by her:
 - **Posner & Weyl**, *Radical Markets* (2018) — tacit collusion / common ownership, her analogy for
   "tacit majorities" (p.32 n.78).
 
-### 5.4 *Plurality* (Weyl & Tang) and the plural-identity implementations
+### 5.4 *Plurality* (Weyl & Tang) — the theory our data model would need
+
+Repo: https://github.com/pluralitybook/plurality — **CC0-1.0**, 644 stars, **alive** (last commit
+2026-07-12, by audreyt; recent commits are release tooling rather than prose). Ohlhaver is a
+**credited writer** of the book (`scripts/credits.json`: `"Puja Ohlhaver", 28.08` points, joint
+2nd in the Writing category) though not a GitHub contributor, and she is **cited four times**.
+
+Three chapters matter, and together they are the most complete statement of the position her papers
+gesture at.
+
+**(a) `contents/english/3-2-connected-society.md` — identity *is* the intersection of affiliations.**
+The Simmel section is the definitional passage the DeSoc footnote only alludes to:
+
+> *"People work with one circle, worship with another, support political causes with a third,
+> recreate with a fourth, cheer for a sports team with a fifth, identify as discriminated against
+> along with a sixth, and so on. These diverse affiliations together form a person's identity. The
+> more numerous and diverse these affiliations become, the less likely it is that anyone else
+> shares precisely the same intersection of affiliations."* (line 121)
+
+Note what this does: **uniqueness becomes an emergent statistical property of the affiliation
+bundle, not an asserted primitive.** That is a genuinely different architecture from every protocol
+on our roster, all of which assert uniqueness at a single trust root.
+
+**(b) `contents/english/4-1-identity-and-personhood.md` — why boolean personhood is too thin.**
+This chapter **cites *Compressed to 0* as its authority** (lines 38 and 127) for the claim that
+unique-human-only systems are too reductive and that account-only biometrics get sold or stolen:
+
+> *"Systems that can determine a user is unique but nothing else can only offer services that can
+> legally and practically be made available to every person on the planet."* (line 36)
+
+> *"if privacy is protected, as in Worldcoin, by using biometrics only to initialize an account, the
+> system becomes vulnerable to stealing or selling of accounts… this extreme preservation of privacy
+> undermines most of the utility of the system… biometric systems are too reductive to establish and
+> protect identities with the richness and security required."* (line 125)
+
+It decomposes any identity system into six elements — **Creation, Access, Linkage, Graph, Recovery,
+Federation** — a better checklist than the BRIEF's current one, and worth stealing. It coins
+**"sociometrics"** (vs biometrics) and, most usefully for us, names **"progressive
+authentication"**: *"such ⿻ systems allow a wide range of confidence to be achieved by drawing on
+more and more trusted issuers of attributes."* **That is our product described in the book's
+vocabulary — graded confidence accumulated across issuers — and it is a much better framing than
+"humanity score."**
+
+The chapter also contains the only quantitative sketch of an affiliation bundle anywhere in this
+literature: with 10 billion people each holding 100 institutional relationships, and requiring any
+two-person meeting to share ≥5 overlapping memberships, ~300 verifiers could coexist with failure
+probability of one in several million — **immediately followed by the concession that kills it**:
+*"Of course, individuals who meet are rarely random nor do they form their affiliations
+randomly…"* The book acknowledges affiliation non-independence and then does not formalise it.
+**That gap is exactly where our correlation work would sit.**
+
+**(c) `contents/english/5-6-⿻-voting.md` — correlation discounting, and "eigenvoting."**
+The signal-processing justification, stated plainly:
+
+> *"a series of uncorrelated signals grows as the square root of their number, while a correlated
+> signal grows in linear proportion to its strength. Thus 10,000 uncorrelated votes will weigh as
+> heavily as only 100 correlated ones."* (line 58)
+
+And the limitation that motivates everything in §6:
+
+> *"these clean rules are only optimal when voters are perfectly internally unified and perfectly
+> externally uncorrelated/uncoordinated… accounting for these within a voting system requires
+> identity systems that can record and account for these."* (line 60)
+
+The frontier proposal (line 72) is the single most useful idea I found for §6.4:
+
+> *"**Correlation discounting and eigenvoting**: … an optimal rule would likely involve partial
+> 'correlation discounting' based on the degree of social connection and, perhaps, the
+> identification of underlying 'principal' social factors that drive coordination and correlation,
+> as is common in statistical modeling. These underlying independent factors, called 'eigenvalues',
+> could then be viewed as **the 'real' independent voters**, to whom degressive proportionality
+> could be applied, a process not dissimilar to how PageRank works."*
+
+**"The real independent voters" is the quantity our product should be trying to estimate.** Not
+"how many humans" but "how many independent factors." Note that this is *precisely* the trust-root
+deduplication problem in disguise: ~40 protocols → ~6 roots is a crude, discrete, computable
+version of exactly this eigen-decomposition. We can ship the crude version now and it is defensible.
+
+Its footnote `[^Pluralvote]` cites exactly two sources: DeSoc (Ohlhaver/Weyl/Buterin) and
+Miller/Weyl/Erichsen "Beyond Collusion Resistance" — closing the loop with §5.3.
+
+### 5.5 The only running implementation of correlation discounting I could find
+
+**`lexicongovernance/pluraltools-backend`** (+ `-frontend`), GPL-3.0, **3 stars**, last real commit
+**2024-08-02**; the demo at `demo.lexicongovernance.org` is **offline (HTTP 402)**. Treat it as
+**good prior art to lift, not a live dependency.**
+
+It implements COCM directly: `src/modules/plural-voting.ts`, class `PluralVoting`, method
+`clusterMatch()`, whose docstring calls it *"the plurality score according to connection-oriented
+cluster match."* The discount lives in method `K()`. The algorithm:
+1. dedupe groups with identical member sets;
+2. build `M_i` = the set of groups containing member `i`;
+3. base term `Σ_g Σ_{i∈g} c_i / |M_i|` — **each voter's weight is split across the affiliations they
+   hold**;
+4. cross terms over ordered pairs of groups using `K`;
+5. return `sqrt(result)`.
+
+Its identity data model is the "bundle of affiliations" shape, and it is worth copying:
+- `users` — deliberately thin: id, username, name, email, telegram. **No score, no weight, no
+  reputation column.**
+- `group_categories` — the affiliation **dimension** (seeded with categories literally named
+  `affiliation`, `public`, `secrets`, `tension`).
+- `groups` — belongs to a category; has an optional `secret` for private/invite-only affiliations.
+- `users_to_groups` — the bundle itself (user × group × category).
+- `questions_to_group_categories` — **which affiliation dimensions are discount-relevant for this
+  question.** This is the most transferable idea in the repo: correlation structure is **scoped per
+  decision**, not global. It is the schema-level expression of §6.3's point that independence is
+  cohort-relative.
+- `questions.vote_model` defaults to `'COCM'`, dispatching to `updateVoteScorePlural`; scores land
+  in `options.vote_score`. `src/services/statistics.ts` reports plural and quadratic scores
+  side by side, so operators can see the delta the discount makes.
+- Personhood is **outsourced entirely** — `federated_credentials` with provider `'zupass'`. The repo
+  does no sybil-resistance of its own. That layering (someone else proves personhood, we do the
+  correlation math) is exactly the division of labour §6.5 proposes for us.
+
+**Two honest caveats.** First, the "correlation" is a **boolean predicate, not a coefficient**:
+`K` attenuates `c_i → sqrt(c_i)` if the agent shares *any one* group with *any one* member of the
+other group, and otherwise leaves it alone. There is no continuous overlap measure, no per-pair
+correlation matrix, no weighting by *how many* affiliations are shared. The only graded element is
+the `1/|M_i|` split. **Nobody in this space has shipped a graded correlation measure** — extending
+`K` to a continuous measure (Jaccard over affiliation sets, or the eigen route the book sketches)
+is genuinely open territory, and is the most defensible technical contribution available to us.
+Second, if we lift code: `statistics.ts` and `groupsDictionary` build SQL via `sql.raw()` with
+interpolated IDs, i.e. injectable. Read, don't paste.
+
+### 5.6 Dead ends checked, so nobody repeats the search
+
+- **`gov4git`** (https://github.com/gov4git/gov4git, 217 stars, dormant since **2024-05-19**):
+  identity = name → `{ID, PublicAddress}` plus a bidirectional `User × Group → bool` membership map.
+  **Groups carry no attributes at all**, voting power is a **scalar token balance**, and
+  `proto/ballot/ballotpolicies/sv/qv.go` is plain quadratic scoring with **zero group awareness** —
+  groups gate *eligibility* only, never the tally. No correlation discounting. No Ohlhaver
+  involvement. `0x758725478/gov4git-identity-public` is not a model at all: one commit
+  (2024-04-12), one ed25519 public key in a JSON file — an auto-generated user credential instance.
+- **`PluralCC`** (org, https://github.com/PluralCC): **dead** — 3 repos, nothing since May 2023,
+  README says "Plugin Summary TODO". It is a Discourse plugin embedding **Pol.is**, forwarding an
+  external opinion-id (`xid`) plus a per-vote `weight`. No groups, no affiliations, no discounting;
+  any clustering is Pol.is's own server-side PCA/k-means over the vote matrix — i.e. **correlation
+  discovered from votes rather than declared as affiliations**, producing opinion-group
+  visualisations, not vote weights. **No Ohlhaver connection found.**
+  *(Worth noting the Pol.is approach as a design option, though: inferring clusters from behaviour
+  needs no affiliation data at all, which sidesteps §6.5's toxicity problem.)*
 ## 6. Implications for the aggregator
 
 Written as an argument aimed at us, at full strength. Her critique is close to fatal for the naive
 version of this product and I have not softened it. Where I think she is wrong or incomplete I say
 so; there are a few such places, and they are where our design should live.
+
+> **Provenance note.** Everything attributed to Ohlhaver, DeSoc, *Plurality*, COCM/Gitcoin and the
+> plural-voting repos I read and verified directly (§§1-5). The **2026 protocol-level facts** used
+> below — World ID account prices, the Circles `Hub.sol` constants and farm statistics, the ~40
+> protocols → ~6 trust roots count, and the Human Passport commercials — come from **sibling
+> research agents on this project, not from my own verification**. They are load-bearing for the
+> argument, so they should be checked against those agents' write-ups before anything here is
+> quoted externally.
 
 **The one-paragraph version.** Every protocol we aggregate filters *bots*. None filters *puppets*.
 Ohlhaver's Idena data shows that a protocol which perfectly solves bots and additionally defeats
@@ -848,6 +1064,28 @@ the honest split matters:
   independence.** It is a proxy for one narrow slice: independence of *evidence*, not independence
   of *interest*.
 
+**The literature already names the target quantity, and it is not uniqueness.** *Plurality* §5-6
+(§5.4 above) proposes identifying the "principal social factors that drive coordination and
+correlation" and treating those eigenvalues as **"the 'real' independent voters."** That is the
+correct statement of what a customer is buying: not a headcount of bodies but an estimate of the
+number of *independent factors* in their cohort. And **the ~40 protocols → ~6 trust roots fact is a
+crude, discrete, computable instance of exactly that eigen-decomposition.** We do not need the full
+statistical machinery to ship something honest and directionally right; we need to stop reporting
+credential counts as though they were independent.
+
+The book also hands us better product language than "score": **"progressive authentication"** —
+*"such systems allow a wide range of confidence to be achieved by drawing on more and more trusted
+issuers of attributes"* (`4-1-identity-and-personhood.md`). That is precisely what an aggregator
+does, framed as graded confidence over issuers rather than a verdict about a person.
+
+**And there is a real gap to own.** Every implementation I could find treats correlation as a
+*boolean*: pluraltools' COCM attenuates a voter iff they share *any one* group with *any one* member
+of another group (§5.5); DeSoc's pairwise score is graded but only over co-funding within a single
+round; Pol.is infers clusters from behaviour but outputs pictures, not weights. **Nobody has
+shipped a graded, cross-context correlation measure.** A continuous overlap measure over trust
+roots and acquisition cohorts — Jaccard at the crude end, eigen-decomposition at the sophisticated
+end — is unclaimed territory that sits exactly on our natural data.
+
 **Concrete recommendation:** stop saying "is this a unique human?" and start saying **"how much
 independent evidence supports the claim that this is a distinct person, and how correlated is this
 identity with the others in your cohort?"** That is honest, it is differentiated, it is what the
@@ -1041,3 +1279,70 @@ is decentralised by forming coalitions. Transcript lines 302-315 of
 someone must check the audio at https://www.youtube.com/watch?v=-mwUQp2qwjk (27:02).**
 
 ## 9. References
+
+All retrieved 2026-07-24 unless stated.
+
+### Ohlhaver — primary
+- **"Compressed to 0: The Silent Strings of Proof of Personhood"**, Ohlhaver, Nikulin & Berman,
+  2024-03-06. SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4749892 · Full PDF (read in
+  full): https://ash.harvard.edu/wp-content/uploads/2024/06/proof-of-personhood_ohlhaver.pdf ·
+  *Stanford J. Blockchain Law & Policy* 8(1): https://stanford-jblp.pubpub.org/pub/compressed-to-0-proof-personhood
+- **"Decentralized Society: Finding Web3's Soul"**, Ohlhaver, Weyl & Buterin, 2022-05-10. SSRN:
+  https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4105763 · Free PDF (read in full):
+  https://www.radicalxchange.org/updates/papers/desoc.pdf
+- **"Community Currencies: The Price of Attention and Cost of Influence in a Networked Age"**,
+  Ohlhaver, 2025-01-02. SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5136037
+  (SSRN 403s on automated fetch; see §4)
+- **"Common Knowledge Machines: From Community Notes to Community Posts"**, Substack, 2024-10-01:
+  https://pujaohlhaver.substack.com/p/common-knowledge-machines
+- Personal site: https://www.pujaohlhaver.com — writings index
+  https://www.pujaohlhaver.com/writings-resesearch · about https://www.pujaohlhaver.com/about-7
+- ETHBerlin04 keynote video (source of our transcript): https://www.youtube.com/watch?v=-mwUQp2qwjk
+- Ash Center / GETTING-Plurality author talk on the paper: https://www.youtube.com/watch?v=oTAsln1RDWg
+- Profiles: https://gettingplurality.org/2023/03/15/puja-ohlhaver/ ·
+  https://www.radicalxchange.org/speakers/puja-ohlhaver/ · http://foresight.org/people/puja-ohlhaver/
+
+### Lineage
+- Ford, "Identity and Personhood in Digital Democracy" (EPFL, 2020): https://arxiv.org/pdf/2011.02412.pdf
+- Borge, Kokoris-Kogias, Jovanovic, Gasser, Gailly & Ford, "Proof-of-Personhood: Redemocratizing
+  Permissionless Cryptocurrencies," IEEE EuroS&PW 2017: https://doi.org/10.1109/EuroSPW.2017.46
+- Douceur, "The Sybil Attack" (2002): https://doi.org/10.1007/3-540-45748-8_24
+- Mazorra & Della Penna, "The Cost of Sybils, Credible Commitments, and False-Name Proof
+  Mechanisms": https://doi.org/10.48550/arXiv.2301.12813
+- Siddarth, Ivliev, Siri & Berman, "Who Watches the Watchmen?", *Frontiers in Blockchain* 3 (2020)
+- Miller, Weyl & Erichsen, "Beyond Collusion Resistance: Leveraging Social Information for Plural
+  Funding and Voting" (2022/23): https://ssrn.com/abstract=4311507
+- Buterin, "Minimal Anti-Collusion Infrastructure" (2019):
+  https://ethresear.ch/t/minimal-anti-collusion-infrastructure/5413
+- Daian, Kell, Miers & Juels, "On-Chain Vote Buying and the Rise of Dark DAOs" (2018):
+  http://hackingdistributed.com/2018/07/02/on-chain-vote-buying/
+- Kelkar, Babel, Daian, Austgen, Buterin & Juels, "Complete Knowledge: Preventing Encumbrance of
+  Cryptographic Secrets": https://www.cs.cornell.edu/~babel/papers/ck.pdf
+- Weyl, Tang & community, *Plurality: The Future of Collaborative Technology and Democracy*:
+  https://www.plurality.net · source repo https://github.com/pluralitybook/plurality (CC0-1.0)
+- Simmel, *Conflict & The Web of Group-Affiliations* (Free Press, 1955/1995)
+- Granovetter, "The Strength of Weak Ties" (1973); "Economic Action and Social Structure" (1985)
+- Madison, Federalist No. 10: https://avalon.law.yale.edu/18th_century/fed10.asp
+- Posner & Weyl, *Radical Markets* (Princeton UP, 2018)
+
+### Implementations
+- Gitcoin COCM explainer:
+  https://www.gitcoin.co/blog/leveling-the-field-how-connection-oriented-cluster-matching-strengthens-quadratic-funding
+  · GG24 round (QF window 2025-10-14 → 2025-10-28): https://gitcoin.co/campaigns/gitcoin-grants-24-gg24
+  · https://www.gitcoin.co/blog/wtf-is-cluster-matching-qf
+  · https://gov.gitcoin.co/t/nerd-post-updates-to-cluster-mapping-matching/18705
+- `lexicongovernance/pluraltools-backend` (GPL-3.0, last real commit 2024-08-02, demo offline):
+  https://github.com/lexicongovernance/pluraltools-backend ·
+  COCM implementation: `src/modules/plural-voting.ts` · dispatch: `src/services/votes.ts` ·
+  schema: `src/db/schema/` · frontend: https://github.com/lexicongovernance/pluraltools-frontend
+- `gov4git/gov4git` (dormant since 2024-05-19, no correlation discounting):
+  https://github.com/gov4git/gov4git
+- `PluralCC` (dead since May 2023): https://github.com/PluralCC
+- Idena forensic surface used by the paper: indexer
+  https://github.com/idena-network/idena-indexer · API https://api.idena.io · explorer
+  https://scan.idena.io · the key-masking client fork https://github.com/haritowa/idena-mirror
+
+### In-repo
+- `research/BRIEF.md` — shared research brief
+- `research/references/ohlhaver-ethberlin-2024-transcript.md` — ASR transcript, **unreliable for
+  verbatim quotation**; use the papers instead

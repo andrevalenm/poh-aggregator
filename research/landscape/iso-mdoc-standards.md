@@ -429,7 +429,89 @@ browser-mediated issuance until a wallet-selection binding weakness (malicious w
 the pre-authorization code) is fixed. Treat browser issuance as **not usable in 2026**.
 
 ## 6. Revocation and freshness
+
+Our README calls freshness an unsolved problem. The standards' answers, and what each costs a
+verifier:
+
+**(a) Validity windows.** Every mdoc MSO carries `validityInfo {signed, validFrom, validUntil}`;
+SD-JWT VC uses `exp`/`nbf`/`iat`. Free to check, but coarse — an mDL is valid for years.
+
+**(b) Short-lived credentials.** Issue with a lifetime of hours/days so revocation is implicit.
+This needs no status infrastructure and leaks nothing to the issuer at verification time, and it
+pairs naturally with batch issuance (refill and rotate at once) — but it makes the issuer a
+permanently-online dependency. Cost to verifier: zero. Cost to issuer: everything.
+
+**(c) Status lists.** Two competing specs, both bitstring designs:
+- **IETF Token Status List (TSL)** — `draft-ietf-oauth-status-list`, at **draft-21** as of 2026 and
+  **still not an RFC** ([datatracker](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/);
+  draft-15 was published 2026-01-06). Explicitly covers JWT, SD-JWT VC, CWT **and ISO mdoc**. The
+  credential carries a `status.status_list` pointer with a `uri` and an integer `idx`; the verifier
+  fetches a DEFLATE-compressed bitstring, indexes it, and reads a 1–8 bit status
+  (valid / invalid / suspended / application-specific).
+- **W3C Bitstring Status List v1.0** — a **W3C Recommendation** (part of the VC 2.0 family, May
+  2025). Same idea in VC clothing. Two ecosystems, two revocation specs — again, we would implement
+  both.
+
+**Verifier cost, concretely:** one cacheable HTTPS GET per issuer per refresh window, of a signed
+bitstring sized to ≥100k entries (tens of KB compressed). Cheap in compute. **The privacy cost is
+the real cost and it lands on the user:** if the verifier fetches live, the issuer learns that a
+verification is happening and from where. The mitigation is herd privacy — lists large enough that
+`idx` is not identifying, and whole-list caching rather than per-credential queries. A verifier that
+fetches per-presentation without caching leaks the correlation to the issuer.
+
+**(d) What none of them solve for us.** Status lists tell you the *credential* is still valid. They
+say nothing about whether the human still controls the device, whether the credential was rented for
+the session, or whether the same human already claimed via another protocol. Freshness of a
+*personhood assertion* is a different problem from credential revocation, and the standards stack
+does not address it. Our aggregate must carry its own freshness semantics.
+
 ## 7. Real deployments
+
+### 7.0 US state mDLs
+
+As of **2026-07**, **21 US states plus Puerto Rico** issue a standards-based (ISO/IEC 18013-5) mDL
+that TSA accepts at checkpoints: Alaska, Arkansas, Arizona, California, Colorado, Delaware, Georgia,
+Hawaii, Illinois, Iowa, Kentucky, Louisiana, Maryland, Montana, New Mexico, New York, North Dakota,
+Ohio, Utah, Virginia, West Virginia (+ PR). Alabama, Maine, Massachusetts and Nebraska are reported
+as the only states not working on one.
+([Regula, "Mobile Driver's License in 2026: Global Status" — secondary](https://regulaforensics.com/blog/mobile-drivers-license-verification/);
+[AAMVA mDL topic page](https://www.aamva.org/topics/mobile-driver-license))
+Caveat from the [Credence ID tracker (secondary, updated March 2026)](https://credenceid.com/resources/blog/us-mobile-drivers-license-mdl-state-tracker/):
+**Delaware and Mississippi programs do not follow ISO/IEC 18013-5** and are not TSA-accepted.
+
+Wallet split (Credence ID, March 2026): Apple Wallet ~15 jurisdictions, Google Wallet ~11,
+Samsung Wallet ~9, state-run apps ~12. Many states appear in several.
+
+**Adoption is thin.** The best concrete number I found: **California — >3.5M applied, ~1.7M active**,
+of which ~900k are in the state's own CA DMV Wallet and the remainder spread across Apple/Google/
+Samsung Wallet (reported 2026, secondary). California has ~27M licensed drivers, so this is
+single-digit-percent penetration after several years. For an aggregator this is decisive:
+**US mDL is not a mass-market personhood signal in 2026** — it is a niche credential held by a small,
+self-selected, US-only slice of users. `UNVERIFIED:` a national total of issued mDLs; AAMVA does not
+publish one that I could find.
+
+### 7.0b Trust roots: AAMVA VICAL is *free and open* to relying parties
+
+Important and under-appreciated: AAMVA runs the **mDL Digital Trust Service (DTS)**, which publishes
+a **VICAL** — the list of participating issuing authorities' IACA public keys — and
+[AAMVA's relying-party page](https://www.aamva.org/identity/mobile-driver-license-digital-trust-service/for-relying-parties)
+states: *"All relying parties can download the VICAL and load it in their mDL reader
+technologies… Relying parties can gain free access to the VICAL"* — subject only to accepting the
+DTS Terms and Conditions, at https://vical.dts.aamva.org/. No stated vetting, no fee.
+
+**So the US trust root is open.** If an mdoc lands in our hands we can validate it to a state IACA
+without anyone's permission. The gate is not verification — it is *acquisition*.
+
+### 7.0c Conformance / certification
+
+`UNVERIFIED:` I could not confirm a formal, publicly-documented mDL **verifier** certification
+programme in the US as of 2026-07. What exists: AAMVA's *mDL Implementation Guidelines* (v1.4 → v1.6
+referenced in 2026 material) which issuing authorities must follow to join the DTS, ISO conformance
+test specifications (18013-6 covers test methods), and vendor/industry interop events (OSIA, OpenID
+Foundation certification for OpenID4VP implementations). The **OpenID Foundation runs conformance
+certification for OpenID4VCI/OpenID4VP** — worth checking whether a verifier profile certification
+exists that would help our credibility. Where to look next: openid.net/certification, ISO/IEC
+18013-6, and the AAMVA DTS terms.
 
 ### 7a. Apple Wallet — "Verify with Wallet" API (native iOS only, entitlement-gated)
 
