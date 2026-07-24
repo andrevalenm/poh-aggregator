@@ -56,7 +56,7 @@ Written incrementally; each file is committed and pushed as it lands.
 | 12 | ISO mdoc standards | `a31695934d159bf7c` | **done** — merged into [government-standards-track.md](landscape/government-standards-track.md) |
 | 13 | Reputation scoring products | `a51bb1fbffb21e39a` | **done** — [scoring-and-prior-art.md](landscape/scoring-and-prior-art.md) |
 | 14 | Behavioral / reputation scorers | `a26a2ae8ab8c0ae96` | **done** — merged into [scoring-and-prior-art.md](landscape/scoring-and-prior-art.md) |
-| 15 | Demand & regulation | `a4531e46f1592e11c` | pending |
+| 15 | Demand & regulation | `a4531e46f1592e11c` | **done** — [demand-and-regulation.md](landscape/demand-and-regulation.md) (regulation only; demand side never researched) |
 | 16 | Sybil incidents & antipatterns | `ae1e92824d423240f` | **done** — [sybil-incidents-and-antipatterns.md](landscape/sybil-incidents-and-antipatterns.md) |
 | 17 | KYC / liveness vendors | `aa4fdd3ca2a96941f` | pending |
 | 18 | Social-platform & zkTLS signals | `a0302204333859327` | pending |
