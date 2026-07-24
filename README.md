@@ -44,9 +44,14 @@ research/
   protocols/   one deep-dive per protocol (contracts, SDKs, trust model, integration surface)
   landscape/   broad sweeps: who else exists, standards, prior-art aggregators
   INDEX.md     master index of all research + references
+  references/  primary sources and their implications (Ohlhaver corpus, transcripts)
+  scripts/     reproducible on-chain measurement scripts
 docs/          design docs (scoring model, API shape, USP) — written after research lands
 ```
 
 ## Status
 
-Research phase. Nothing implemented yet.
+Research phase complete — ~20,800 lines across 23 files, written 2026-07-24 against live
+sources. Start at [research/INDEX.md](research/INDEX.md). Nothing implemented yet; the design
+docs in `docs/` are the next step, and several research findings argue for changing the thesis
+above before writing them.

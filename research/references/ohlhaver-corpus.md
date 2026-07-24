@@ -21,10 +21,25 @@ does not present as one; she is a lawyer-institutionalist who reads mechanism de
 relevant to how to use her: her contribution is problem-framing and political economy, not
 constructions we can implement off the page.
 
-**Current affiliation (2026-07):** Research Affiliate of **Harvard's Allen Lab for Democracy
-Renovation** (formerly/also GETTING-Plurality Research Group, Edmond J. Safra Center for Ethics) —
-https://gettingplurality.org/2023/03/15/puja-ohlhaver/ . She states she "advise[s] a handful of
-experiments, nonprofits and startups" without naming them. Also listed as a RadicalxChange speaker
+**Current affiliation (2026-07):** she is **currently with Harvard University's GETTING-Plurality
+Research Group at the Allen Lab for Democracy Renovation** — per the Governance Futures S1 Ep11
+episode description (Sept 2025, https://govfutures.podbean.com/e/s1-ep11-plurality-community-currencies-and-the-future-of-networked-governance-with-puja-ohlhaver/)
+and her Harvard listing at https://ash.harvard.edu/people/puja-ohlhaver/ . She states she
+"advise[s] a handful of experiments, nonprofits and startups" without naming them.
+
+> **Correction to an earlier finding in this file's research.** A sub-agent reported
+> `gettingplurality.org` and `allenlab.hks.harvard.edu` as non-resolving and inferred from that
+> that the RadicalxChange/Safra Center listing was stale with no replacement. **That inference was
+> wrong.** Both groups are real and live — they sit under the **Ash Center** at `ash.harvard.edu`;
+> only the standalone vanity domains do not exist. Do not read a dead vanity domain as a dead
+> affiliation.
+
+**Reach.** Her writing has appeared in the **New York Times, Washington Post, POLITICO, WIRED and
+TIME** (per the same Governance Futures description). This matters for us in a practical way: her
+critique is not a niche crypto-forum position that we can expect to stay contained. If proof-of-
+personhood aggregation gets mainstream scrutiny, *this* is the frame the scrutiny will arrive in,
+and "every protocol we aggregate filters bots, none filters puppets" is a headline someone will
+eventually write about a product like ours. Better to have an answer than to be surprised by it. Also listed as a RadicalxChange speaker
 (https://www.radicalxchange.org/speakers/puja-ohlhaver/) and a Foresight Institute affiliate
 (http://foresight.org/people/puja-ohlhaver/). Her January 2025 SSRN paper lists her affiliation
 simply as **"Independent."** She is not an employee of any protocol and explicitly disclosed holding
@@ -793,6 +808,25 @@ lineage has a graded correlation measure, including her.
 (the α=0/α=1 boxed cases pp.9-10, the Community Based Income equation p.11). `V_i = √s_i` extracts
 as `Vi = 𝑠𝑖` with the radical lost, though the prose states it explicitly; `V_i = s_i^p` extracted
 cleanly. Anyone relying on the exact forms should open the PDF.*
+
+### 4.2.1 A real limitation: the paper does not engage with any deployed community currency
+
+**Verified by exhaustive search of the full 64-page text (2026-07-24).** The word "circle" appears
+six times and **every occurrence is the ordinary English word** — "the deepest circle of attention"
+(p.13), "circles of communication" (p.20), "overlapping social circles" (p.25), "cross into the
+other's circles" (p.36), "circle back to" (p.40), "tunnels deeper into inner circles" (p.51).
+
+There is **no** reference to CirclesUBI, Gnosis, demurrage, mutual credit, Sarafu / Grassroots
+Economics, Encointer, LETS, Berkshares, Ithaca Hours, or the complementary-currency literature in
+general. A paper proposing a design for **community currencies** cites **none of the community
+currencies that have actually been deployed.**
+
+This is a genuine weakness and should temper how much authority we grant PCARE. *Compressed to 0*
+is powerful precisely because it is **empirical** — it earns its conclusions from three years of
+Idena chain data. Community Currencies is the opposite: a first-principles design with no
+engagement with the deployed systems that already tried something adjacent and failed in
+instructive ways. Her own methodological standard, set in her own prior paper, is not met here.
+§4.3 does the comparison she did not.
 
 ### 4.3 Talks and interviews (from her own index, 2026-07-24)
 
