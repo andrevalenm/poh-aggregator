@@ -49,8 +49,8 @@ Written incrementally; each file is committed and pushed as it lands.
 | 5 | PoH v1/v2, Kleros, BrightID, Idena | `aea9689e84c6782bd` | **done** — [poh-classics.md](landscape/poh-classics.md) |
 | 6 | Passport, Civic, Fractal, zkMe, Galxe, Privado | `acffae4773e27fceb` | **done** — [commercial-identity-vendors.md](landscape/commercial-identity-vendors.md) |
 | 7 | Billions, Silk, Unitap, Disco, Sismo, EAS, Intuition | `a11058a55ef29219b` | **done** — [attestation-layers-and-adjacent.md](landscape/attestation-layers-and-adjacent.md) |
-| 8 | EAS & Disco.xyz | `a75d4b295ff0369b5` | pending |
-| 9 | Privado ID & Verax | `aa43b33d246444fe8` | pending |
+| 8 | EAS & Disco.xyz | `a75d4b295ff0369b5` | **done** — [attestation-substrates.md](landscape/attestation-substrates.md) |
+| 9 | Privado ID & Verax | `aa43b33d246444fe8` | **done** — merged into [attestation-substrates.md](landscape/attestation-substrates.md) |
 | 10 | National ZK identity efforts | `a258b383334c05011` | pending |
 | 11 | EU eIDAS 2.0 / EUDI Wallet | `a07119e8eafc7d9b2` | pending |
 | 12 | ISO mdoc standards | `a31695934d159bf7c` | pending |
