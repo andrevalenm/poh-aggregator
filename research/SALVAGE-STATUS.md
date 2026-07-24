@@ -52,8 +52,8 @@ Written incrementally; each file is committed and pushed as it lands.
 | 8 | EAS & Disco.xyz | `a75d4b295ff0369b5` | **done** — [attestation-substrates.md](landscape/attestation-substrates.md) |
 | 9 | Privado ID & Verax | `aa43b33d246444fe8` | **done** — merged into [attestation-substrates.md](landscape/attestation-substrates.md) |
 | 10 | National ZK identity efforts | `a258b383334c05011` | pending |
-| 11 | EU eIDAS 2.0 / EUDI Wallet | `a07119e8eafc7d9b2` | pending |
-| 12 | ISO mdoc standards | `a31695934d159bf7c` | pending |
+| 11 | EU eIDAS 2.0 / EUDI Wallet | `a07119e8eafc7d9b2` | **done** — [government-standards-track.md](landscape/government-standards-track.md) |
+| 12 | ISO mdoc standards | `a31695934d159bf7c` | **done** — merged into [government-standards-track.md](landscape/government-standards-track.md) |
 | 13 | Reputation scoring products | `a51bb1fbffb21e39a` | pending |
 | 14 | Behavioral / reputation scorers | `a26a2ae8ab8c0ae96` | pending |
 | 15 | Demand & regulation | `a4531e46f1592e11c` | pending |
