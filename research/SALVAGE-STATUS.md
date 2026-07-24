@@ -57,7 +57,7 @@ Written incrementally; each file is committed and pushed as it lands.
 | 13 | Reputation scoring products | `a51bb1fbffb21e39a` | **done** — [scoring-and-prior-art.md](landscape/scoring-and-prior-art.md) |
 | 14 | Behavioral / reputation scorers | `a26a2ae8ab8c0ae96` | **done** — merged into [scoring-and-prior-art.md](landscape/scoring-and-prior-art.md) |
 | 15 | Demand & regulation | `a4531e46f1592e11c` | pending |
-| 16 | Sybil incidents & antipatterns | `ae1e92824d423240f` | pending |
+| 16 | Sybil incidents & antipatterns | `ae1e92824d423240f` | **done** — [sybil-incidents-and-antipatterns.md](landscape/sybil-incidents-and-antipatterns.md) |
 | 17 | KYC / liveness vendors | `aa4fdd3ca2a96941f` | pending |
 | 18 | Social-platform & zkTLS signals | `a0302204333859327` | pending |
 | 19 | Prior art & scoring | `ad0f283a951518b9f` | **done** — orchestrator; content merged into [scoring-and-prior-art.md](landscape/scoring-and-prior-art.md) |
