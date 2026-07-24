@@ -201,6 +201,90 @@ handle unless the wallet uses batch-issued one-time credentials with fresh keys.
 the personal identifier attribute it gets a **stable national identifier in the clear**.
 
 ## Relying party registration
+
+**This is the decisive section for us. Short answer: no, not anyone can verify an EUDI credential.
+Verification is a permissioned role, cryptographically enforced by the wallet.**
+
+### The legal hook
+
+Art. 5b(1) of Reg. (EU) 2024/1183: *"Where a relying party intends to rely upon European Digital
+Identity Wallets for the provision of public or private services by means of digital interaction,
+the relying party **shall register in the Member State where it is established**."*
+The operative implementing act is **CIR (EU) 2025/848** (registration of wallet-relying parties),
+cited throughout ARF v3.0.0 — https://data.europa.eu/eli/reg_impl/2025/848/oj. Its provisions on
+RP registration **apply from 24 December 2026** (secondary sources; verify against the CIR's own
+"applies from" article).
+
+### How the wallet enforces it (ARF v3.0.0 Annex 2, Topics 6 / 27 / 44)
+
+Two certificates are involved, and both come only from the Member State registration process:
+
+1. **Access certificate** — issued by a Member-State-notified **Access Certificate Authority**
+   ([ETSI TS 119 411-8], [ETSI TS 119 475]).
+   - `Reg_10` (AS-MS-27-012): a Member State SHALL ensure an ACA *"issues one or more access
+     certificates to all … Relying Parties **registered in one of the Member State's registries**."*
+   - `RPA_03` (AS-WP-06-004): *"A Wallet Unit and a Relying Party Instance SHALL perform Relying
+     Party authentication in **all** PID or attestation presentation transactions to Relying
+     Parties, whether proximity or remote, **using an access certificate**."*
+   - `RPA_04` (AS-WP-06-005): the wallet *"SHALL accept only the trust anchors in the LoTE(s) of
+     all Access Certificate Authorities notified by Member States."*
+   - `Reg_32`: the access certificate carries an **EU-wide unique identifier for the RP**.
+
+   → **An entity with no access certificate cannot complete a presentation transaction.** There is
+   no anonymous-verifier path. Note `RPA_05`/`RPA_06a`: on failure the wallet warns and *"SHALL
+   either not present the requested attributes … or give the User the choice"* — so the hard block
+   is at the certificate-chain level, not merely a UX warning.
+
+2. **Registration certificate** — issued by a "Provider of registration certificates" attached to
+   the Member State Registrar. `RPRC_09`: **one certificate per (intended use × Relying Party
+   Service)**. `RPRC_19`: the RP Instance *"SHALL include a single registration certificate
+   applicable for its current Service and intended use in each presentation request … by value,
+   not by reference"*. `RPRC_21`: the wallet verifies **every requested attribute is inside the
+   registration certificate's attribute list**, and warns the User if not. `RPRC_03`: contents per
+   Annex V of CIR 2025/848.
+
+So the wallet is doing purpose-limitation enforcement in the client, against a
+government-issued, per-purpose certificate.
+
+### Is registration an *approval* gate or just a register?
+
+Nuance worth having: `Reg_01b` (AS-MS-27-002/003) says Member States collect contact info, service
+description, registered attributes per intended use *"only for the purpose of transparency and
+**SHALL NOT apply any pre-authorisation process on it**."* And `Reg_04` says registries must be
+public with *"NOT require authentication or prior registration"* to **read**. `Reg_24`: RPs must be
+able to register **remotely via an API or UI**.
+
+So it is closer to a *notification* regime than a licensing regime — but `Reg_25` still requires
+the Member State to *"identify a Relying Party at a level of confidence proportionate to the risk"*,
+and `Reg_29` allows cancellation on request of *"a competent national authority"*. In practice you
+must be a **legally identifiable entity established in an EU Member State**.
+
+### The intermediary role — directly relevant to an aggregator
+
+ARF **Topic 52 "Relying Party intermediaries"** (`RPI_01`–`RPI_10`) describes almost exactly our
+product shape, and permits it — with heavy conditions:
+
+- `RPI_01`: *"An intermediary SHALL register as a Relying Party … while indicating it intends to
+  act as an intermediary."*
+- `RPI_03`: the intermediary *"SHALL ensure that **each intermediated Relying Party** … is
+  registered at a Registrar in the Member State where [it] is established"* and that it holds their
+  registration certificates. `RPI_04`: the Registrar must obtain **legally valid evidence** of the
+  intermediary↔RP relationship before registering it.
+- `RPI_06`: each request carries the **intermediary's access certificate + the intermediated RP's
+  registration certificate**.
+- `RPI_07`: the wallet must **not** show the intermediary's name to the User — the User sees the
+  end RP.
+- `RPI_09`: the intermediary verifies authenticity, revocation, device binding, User binding.
+- `RPI_10`: the intermediary *"SHALL **delete any PIDs or attestations it obtained** from the
+  Wallet Unit, including any User attributes, **completely and immediately** after it has sent the
+  User attributes to the intermediated Relying Party."*
+
+**Implication for us:** an EUDI-consuming aggregator would be an *intermediary* under Topic 52. That
+means (a) EU legal establishment + national registration, (b) every downstream customer must also
+be individually EU-registered as an RP with declared attributes and purpose, (c) we may **not
+retain** the credential data we pass through. A pseudonymous crypto aggregator serving global,
+unregistered dApps is **structurally ineligible**.
+
 ## Age verification / mini-wallet
 ## Reference implementations and SDKs
 ## The uniqueness question

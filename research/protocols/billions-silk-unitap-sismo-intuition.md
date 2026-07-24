@@ -440,6 +440,20 @@ verifier-facing side. Trust root correlation is therefore fully intact even thou
   government document. Treat as one evidence class.
 - **Clean Hands ↔ Verax / Sign Protocol** — attestation plumbing shared with the Privado/Verax file.
 
+## Open questions for us
+
+1. **Are `allow-sybils` biometric credentials distinguishable from `no-sybils` ones on-chain?**
+   If not, the `biometrics` SBT cannot be treated as a uniqueness proof at all. Blocking question.
+2. Which IDV vendor signed a given `gov-id` credential — is that exposed anywhere (public inputs,
+   API field), or opaque? Determines whether we can de-correlate against Civic/zkMe.
+3. Is `api.holonym.io` rate-limited or subject to future auth? It is currently open; we should
+   plan an on-chain fallback path (`isUniqueForAction` on Optimism) from day one rather than
+   depending on it.
+4. Real user counts: index `Uniqueness` events on `0xdD748977BAb5782625AF1466F4C5F02Eb92Fce31`
+   (Optimism) and on `HubV3` `0x2AA822e264F8cc31A2b9C22f39e5551241e94DfB`.
+5. Given the org's visible pivot to wallets/AI agents, what is the commitment to keeping Human ID
+   issuance running? The dead `blog/developer/research.holonym.id` subdomains are a bad sign.
+
 ---
 
 # Unitap
