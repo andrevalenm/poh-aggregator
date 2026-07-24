@@ -491,7 +491,94 @@ Honest assessment. Four years on (paper May 2022 → today 2026-07), the concret
    later, empirically. **The 2024 paper is best read as the author auditing her own 2022 proposal
    and finding the load-bearing assumption false.** That is a mark in her favour, and it is why she
    is worth taking seriously.
-## 3. Between Zero and One — sublinear identity staking
+## 3. "Between Zero and One" — sublinear identity staking
+
+**Finding: as of 2026-07-24, there is no evidence this paper was ever published. Treat it as
+abandoned.**
+
+### 3.1 What was promised
+
+Both speakers trailed it at ETHBerlin04 (published 2024-08-16). Nikulin: the May 2022 crisis
+*"prompted us to change the model from proof of personhood to so-called sublinear identity staking
+which is a kind of combination of proof of stake and proof of personhood and this will be the topic
+of our next paper title between zero and one."* Ohlhaver closed by saying that after Z1 she would
+*"expand more on what I think is a more promising solution beyond Z1 about social identity."*
+
+It is also promised twice inside *Compressed to 0* itself — p.3: *"before pivoting in May 2022
+towards a novel experiment in 'sublinear identity staking'—an intermediate between Proof of
+Personhood and Proof of Stake. This paper is an empirical study about Idena's first experiment in
+Proof of Personhood, **saving the pivot for our next essay**"*; and p.26: *"In another essay, we
+unpack how discounted influence enabled solo accounts to pivot the Idena protocol towards a novel
+experiment in sublinear identity staking that shifted incentives away from puppeteering, although
+introducing a different set of challenges."*
+
+So: promised in a March 2024 paper, re-promised in an August 2024 keynote, and **~2 years have
+since elapsed**.
+
+### 3.2 Evidence of absence
+
+The decisive negative evidence is **primary and from the author herself**. Her personal site's
+writings index (https://www.pujaohlhaver.com/writings-resesearch, retrieved 2026-07-24) is a
+curated, complete-looking list of her output. It contains exactly **three** papers — Community
+Currencies (Jan 2025), Compressed to 0 (2024), DeSoc (2022) — and **"Between Zero and One" is not
+among them**, nor is any paper on sublinear identity staking, nor is anything on social identity.
+An author who maintains a writings page and lists a January 2025 paper on it would list a Z1 paper
+if one existed.
+
+Corroborating negatives from my own searching (2026-07-24): searches for
+`"Between Zero and One" Ohlhaver sublinear identity staking` and
+`Ohlhaver "social identity" paper 2025 plural identity` return **only** *Compressed to 0*, DeSoc,
+the Community Currencies paper and podcast/talk pages — no Z1. Her Substack has **one** post, and
+it is not Z1 (§4.1). Her post-2024 talks are all about **community currencies**, not staking (§4.2).
+
+*A sibling agent was tasked with an exhaustive sweep of SSRN, arXiv, Google Scholar, Semantic
+Scholar, Idena's Medium/docs/forum and Nikulin's own output, plus the status of Idena's IIP-5/6/7
+sublinear-staking implementation and whether Idena is still alive. **That sweep did not return
+before this document was completed** — so the channels above are the extent of what I personally
+verified. `UNVERIFIED:` the arXiv/SSRN/Idena-forum channels specifically, and the current state of
+Idena itself. Next place to look: Idena's IIP index at `docs.idena.io/docs/iip/` and
+`github.com/idena-network`, plus Nikulin's authorship record.*
+
+### 3.3 What we know about the mechanism anyway, and why it mattered
+
+Even without the paper, *Compressed to 0* tells us the shape and the motivation:
+
+- The **name** encodes the mechanism: influence scaling as `stake^k` for some `0 < k < 1` — strictly
+  between zero (personhood: everyone equal regardless of stake) and one (proof of stake: influence
+  linear in capital). It is a **degressive proportionality** rule, the same family as quadratic
+  voting's square root. `UNVERIFIED:` the actual exponent and formula Idena shipped.
+- The **motivation** is the one empirical result in §1.6 that we should care about: Idena survived
+  because pooled accounts were *already* being discounted. One-node-one-vote meant large pools held
+  61% of accounts but only ~2.4% of votes, while solo accounts held 27% of accounts and ~89% of
+  votes — and that discount is what let solo accounts vote through the fix.
+- The paper reports that the "unknown network" of 5 puppeteered pools (peak 1,280 accounts)
+  **died after IIP-5**, the sublinear staking change (Appendix B). That is a real, if anecdotal,
+  datum that sublinear staking damaged puppeteering economics.
+- Ohlhaver flags in the ETHBerlin Q&A that sublinear rules have a known failure mode: *"if you're
+  doing it in a distributed system like a DAO, that sublinear discrimination is actually a financial
+  incentive to buy accounts."* Any concave-in-stake rule pays you to split holdings across
+  identities — which is why sublinear staking and personhood have to be co-designed.
+
+### 3.4 Why the non-publication matters to us
+
+Three things follow, and the third is the important one.
+
+1. **We cannot borrow the mechanism.** There is no specification to implement. Anything we build
+   that claims lineage from "sublinear identity staking" would be our own invention.
+2. **The direction is still sound and available.** Concave weighting of evidence is the same family
+   as correlation discounting (§2.3, §6.1) and we do not need her paper to adopt it. The general
+   lesson — *make the second, third and fourth unit of a thing worth less than the first* — is the
+   entire defence against economies of scale, and it applies to credentials as naturally as to
+   stake. **Concretely for us: the Nth credential sharing a trust root should be worth
+   dramatically less than the first, which is just root-deduplication with a concave curve on top.**
+3. **The gap in the corpus is itself a finding.** Her published trajectory goes: diagnose the
+   problem (2024) → *skip the constructive mechanism paper* → move to community currencies and
+   attention pricing (2025). The mechanism that was supposed to answer her own critique is the one
+   piece she never shipped. Read charitably, she concluded that a staking tweak to a global identity
+   game does not fix a problem she had just argued is *social*, and went where she thought the real
+   answer was. Read less charitably, the constructive half of this research programme does not
+   exist yet. **Either way we should not wait for it, and we should be suspicious of anyone —
+   including us — who claims a clean mechanism fix to the puppeteering problem.**
 ## 4. Later work: social identity / plural identity (2024-2026)
 
 ### 4.1 "Common Knowledge Machines: From Community Notes to Community Posts" (Substack, 2024-10-01)

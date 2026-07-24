@@ -367,9 +367,57 @@ and the least accessible in practice.
 cryptographic unlinkability — the state sees every verification. That is the opposite of what we
 mean by privacy. No credible state-deployed ZK identity in China that I could find.
 
-### Brazil — gov.br
+### Brazil — gov.br, CPF and the CIN
+
+- **gov.br** is the federal single sign-on. It uses **three assurance tiers — bronze / prata
+  (silver) / ouro (gold)** — an unusually explicit, publicly documented level semantic that maps
+  well onto a scoring model:
+  - *bronze*: self-asserted / basic (CPF-linked)
+  - *prata*: facial recognition against the **CNH** (driving licence) database, or validation via a
+    partner bank's internet banking
+  - *ouro*: **QR code of the new CIN national identity card**, or facial recognition against the
+    **Electoral Justice (TSE) biometric** database, or an **ICP-Brasil** digital certificate
+  Official: https://www.gov.br/governodigital/pt-br/noticias/imposto-de-renda-2026-saiba-como-ter-uma-conta-prata-ou-ouro-no-gov.br
+  ; tier explainer: https://agenciagov.ebc.com.br/noticias/202402/entenda-a-diferenca-entre-os-selos-de-confiabilidade-do-gov.br
+- **CIN (Carteira de Identidade Nacional)** — the new national ID that finally makes the **CPF** the
+  single national number (previously each state issued its own RG). **48.2 million Brazilians hold a
+  CIN** as of early 2026 (gov.br press, 2026-03). The CIN carries a **QR code** and an ICAO-style
+  MRZ.
+- **Consumability: NO for gov.br SSO** (federation is for government services and accredited
+  partners; no open relying-party registration). **PARTIAL / `UNCLEAR:` for the CIN QR code** —
+  this is the item worth chasing. If the CIN QR contains an ICP-Brasil-signed payload verifiable
+  against the published ICP-Brasil root, it is structurally the same opportunity as Aadhaar's
+  offline e-KYC. `UNVERIFIED:` I did not confirm the CIN QR's contents or signature scheme.
+  **Next step:** the Serpro / Ministério da Gestão CIN technical spec and the ICP-Brasil AC root
+  list at https://www.gov.br/iti/ . This is a high-value open question given Brazil's large crypto
+  population.
+- **Uniqueness:** **CPF is a stable national unique identifier**, is semi-public in Brazil (widely
+  disclosed, and has leaked at scale), and is *already* used by Brazilian crypto/fintech KYC. Note
+  the sybil implication: a leaked-CPF market exists, so possession of a CPF number alone proves
+  nothing; only a *live biometric match* to the TSE/CNH database (i.e. prata/ouro) does.
+
 ### Nigeria — NIN
-### Indonesia — IKD / KTP-el
+
+- **137,371,080 NINs** enrolled as of **mid-July 2026** (secondary reporting; NIMC's own dashboard is
+  the primary — https://nimc.gov.ng ). Up from 121m at 2025-06-30.
+- **World Bank target: 180m NINs by end-2026**, requiring ~3.3m enrolments/month — a target Nigeria
+  is clearly going to miss. https://www.biometricupdate.com/202508/nigeria-must-issue-59m-digital-ids-in-18-months-to-meet-world-bank-target
+  This is funded through the World Bank **ID4D**-supported ID4D/Nigeria Digital Identification for
+  Development project (~US$430m, World Bank + AFD + EIB).
+- **NIMC Act 2026** took effect in 2026, positioning NIMC as *"the only body authorised for digital
+  identity management in Nigeria."* (secondary: https://innovation-village.com/nin-enrolment-hits-136-million-as-nimcs-new-act-takes-effect/
+  and https://idtechwire.com/nigeria-intensifies-national-digital-id-enrolment-under-new-nimc-act/ ).
+  `UNVERIFIED:` exact statutory wording — get the gazetted Act. **If that exclusivity language is
+  real, it is a direct legal threat to any private biometric personhood registry operating in
+  Nigeria**, and that is a scoring-relevant fact for World ID-style protocols, not just for us.
+- **Consumability: NO.** NIN verification runs through NIMC-licensed verification agents/partners
+  with contracts and per-verification fees. Nigeria has also repeatedly suspended and re-priced
+  third-party NIN verification after data-leak scandals (NIN details were found being sold via
+  unauthorised sites in 2024). No offline signed artefact.
+- **Uniqueness:** NIN is a **stable national unique identifier**; enrolment is biometrically
+  de-duplicated. Strong in principle, inaccessible in practice.
+
+### Indonesia — KTP-el, IKD, and INA Digital
 ### Sub-Saharan Africa and World Bank ID4D
 ### USA — mDL deployments, NIST, and state-led ZK
 ### Buenos Aires — QuarkID  ← the single most important case in this file
