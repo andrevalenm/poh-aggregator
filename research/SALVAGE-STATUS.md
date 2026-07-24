@@ -7,6 +7,11 @@ subagents, nested up to 3 levels deep. Between them they ran **238 web searches 
 fetches**. Every one of them was then killed mid-flight by a session usage limit, and every one
 ended on the identical message: `You've hit your session limit · resets 3am (Europe/Lisbon)`.
 
+One agent hit a second ceiling first: it exhausted the session's **200-call web search budget**
+("200 of 200 WebSearch calls") and fell back to direct fetches before the session limit killed it
+too. Two others were blocked by the **20-concurrent-subagent limit**. So three separate resource
+ceilings shaped what survives.
+
 Critically, those agents were instructed *"Do NOT write any files — return your findings as your
 final assistant message."* The parent session was supposed to collect the final messages and write
 the files. No agent ever got to return one. So **zero research output was written to disk**, even
@@ -58,11 +63,29 @@ Written incrementally; each file is committed and pushed as it lands.
 | 14 | Behavioral / reputation scorers | `a26a2ae8ab8c0ae96` | **done** — merged into [scoring-and-prior-art.md](landscape/scoring-and-prior-art.md) |
 | 15 | Demand & regulation | `a4531e46f1592e11c` | **done** — [demand-and-regulation.md](landscape/demand-and-regulation.md) (regulation only; demand side never researched) |
 | 16 | Sybil incidents & antipatterns | `ae1e92824d423240f` | **done** — [sybil-incidents-and-antipatterns.md](landscape/sybil-incidents-and-antipatterns.md) |
-| 17 | KYC / liveness vendors | `aa4fdd3ca2a96941f` | pending |
-| 18 | Social-platform & zkTLS signals | `a0302204333859327` | pending |
+| 17 | KYC / liveness vendors | `aa4fdd3ca2a96941f` | **done** — [kyc-vendors-and-web2-signals.md](landscape/kyc-vendors-and-web2-signals.md) |
+| 18 | Social-platform & zkTLS signals | `a0302204333859327` | **done** — merged into [kyc-vendors-and-web2-signals.md](landscape/kyc-vendors-and-web2-signals.md); zkTLS never researched |
 | 19 | Prior art & scoring | `ad0f283a951518b9f` | **done** — orchestrator; content merged into [scoring-and-prior-art.md](landscape/scoring-and-prior-art.md) |
-| 20 | Identity infra prior art | `aeda6ededca45f92d` | pending |
-| 21 | PoH landscape sweep | `af6763b6be0e144d8` | pending |
+| 20 | Identity infra prior art | `aeda6ededca45f92d` | **n/a** — orchestrator only; its children are rows 8, 9 and 6 |
+| 21 | PoH landscape sweep | `af6763b6be0e144d8` | **n/a** — orchestrator only; its children are rows 5, 6, 7, 14, 17, 18 |
+
+## Salvage complete
+
+All 21 rows are resolved: **19 write-ups produced, 2 orchestrator agents with no unique research of
+their own.** Roughly 1.35 MB of deduplicated fetched page content was read and synthesized into 13
+files under `protocols/` and `landscape/`.
+
+**The largest remaining holes** — none of which are recoverable from the transcripts, because the
+agents died before running the searches:
+
+- **Credential rental and resale markets** (World ID orb accounts, KYC-as-a-service farms, aged
+  social accounts). Directly undermines or supports our core premise and we have no data.
+- **World ID failure modes** — regulatory bans by country, credential-selling, biometric criticism.
+- **Self Protocol** — contracts, SDK, nullifier design. Nearly everything.
+- **Anon Aadhaar and Rarimo** — never researched.
+- **zkTLS providers** (Reclaim, zkPass, Opacity, Primus, TLSNotary) — never researched.
+- **Adoption numbers almost everywhere** — PoH v2, Circles, World ID, Idena all lack verified counts.
+- **The demand side** — who pays for sybil resistance today, and how much.
 
 ## Resuming on another machine
 
