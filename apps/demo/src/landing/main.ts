@@ -16,14 +16,21 @@ async function paintRegistryLine(): Promise<void> {
   const pulse = h('span', { class: 'pulse', 'aria-hidden': 'true' })
   try {
     // The SDK (and viem underneath) is 116 KiB gz — off the critical path, on demand.
-    const { DEFAULT_REGISTRY, makeClient } = await import('../client.ts')
+    const { DEFAULT_REGISTRY, makeClient, LIVE_ADAPTER_IDS } = await import('../client.ts')
     const { adapters, revision } = await makeClient().ontology()
     const roots = new Set([...adapters.values()].map((a) => a.trustRoot))
     el.textContent = ''
     el.append(
       pulse,
-      `live — ${adapters.size} protocols catalogued, ${roots.size} trust roots, 4 probed live · registry ${shortAddr(DEFAULT_REGISTRY)} rev ${revision}, read just now`,
+      `live — ${adapters.size} protocols catalogued, ${roots.size} trust roots, ${LIVE_ADAPTER_IDS.length} probed live · registry ${shortAddr(DEFAULT_REGISTRY)} rev ${revision}, read just now`,
     )
+    // The ticker states the same number — keep it honest from the same source, in both
+    // duplicated track copies.
+    for (const s of document.querySelectorAll('.ticker-track span')) {
+      if (s.textContent && /probed live/.test(s.textContent)) {
+        s.textContent = s.textContent.replace(/\d+ probed live/, `${LIVE_ADAPTER_IDS.length} probed live`)
+      }
+    }
   } catch {
     el.textContent = ''
     el.append(pulse, 'registry unreachable right now — the demo below will say so rather than guess')
