@@ -2160,3 +2160,167 @@ built at the last deploy and this box's user has no docker access (`docker ps` �
 denied), so `scripts/deploy-demo-ax41.sh` cannot be run from here. It does not need to be — the
 bundle reads `version/latest` and every field it queries still exists in the new schema, so it
 picks the new index up at cutover without a rebuild.
+
+## Iteration 18 — 2026-07-25
+
+**Did:** iteration 17's next-step 3 — **a dated ending for Proof of Humanity, on both registries.**
+Iteration 16 built the restore path and wired the two registries that obviously kept an ending
+(EAS revocations on Base, `WorldIDAddressBook`'s lapsed term); PoH keeps one too, on v1 and v2,
+and for the same reason: neither contract deletes anything when a term runs out.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: the two red tests reproduce exactly (`as-of.live.test.ts`, 10
+pass / 2 fail), the chain still reports 32 adapters at revision 36 against this tree's 30, and
+`research/protocols/gitcoin-passport.md` and `research/protocols/lens-onchain-read.md` still do
+not exist here. MORNING "Needs you" item 18 stands, unchanged for a fourth iteration.
+
+**PoH v2 keeps the whole record and stops answering for it.** `isHuman`, `humanityOf` and
+`boundTo` each apply `block.timestamp < expirationTime` *on the way out*; `getHumanityInfo`
+applies nothing and returns the raw struct. So for an expired humanity the owner and the expiry
+are both still readable at head while all three "is this a human" getters have gone quiet — the
+same shape as World's `addressVerifiedUntil`, one layer deeper.
+
+- **The link back is `private`, which is a Solidity concept and not a chain one.**
+  `getHumanityInfo` is keyed by humanity id and the id is *chosen by the claimer*
+  (`claimHumanity(bytes20 _humanityId, …)`), so a subject-keyed read needs
+  `mapping(address => bytes20) private accountHumanity`. It sits at **storage slot 62**, and the
+  slot was found rather than assumed: scanning indices 0..119 for a live subject and comparing
+  each word against `humanityOf` gives exactly one hit, it agrees with all 21 lapsed subjects, and
+  the live suite re-derives it every run. **A wrong slot cannot invent a credential** — whatever
+  comes back is only used to look up the record, and nothing is reported unless that record's
+  `owner` *is the subject*. A proxy upgrade that moves the layout costs us the window and can
+  never fabricate one. `bytes20(subject)` is kept as a fallback because every humanity in the
+  sampled population is filed under its owner's address — but 3 of 1,569 are not, so it is a
+  convention and not the mechanism.
+- **The census is the argument.** All 1,569 humanities the index knows, read through
+  `getHumanityInfo` at Gnosis block 47,388,718: **1,352 live, 21 lapsed and still owned by the
+  subject, 196 with `owner` cleared.** Those 196 are the honest limit — `delete humanity.owner`
+  happens on a successful revocation and on a cross-chain transfer out, and neither writes a
+  timestamp, so the credential may have ended years before its expiry and none of them is
+  restored.
+- **`nbRequests == 0` is an exact discriminator, and it is exactly the population the derivation
+  misses.** Claim and renewal resolution write `expirationTime = block.timestamp + humanityLifespan`,
+  so the subtraction recovers the claim second — measured against the index's independently
+  observed `claimedAt` over all 21 lapsed humanities, **19 agree to the second and 2 miss, by
+  −215.5 and +144.7 days**. Both are the entire `nbRequests == 0` cohort, and the only path that
+  writes an expiry without pushing a request is `grantHumanityDirectly`, the cross-chain entry
+  point, which copies a term settled on another instance. The +144.7 is the direction that would
+  hand a subject a window they never had, so those get `heldUntil` and no start and land in
+  `ceasedStartUndated` — iteration 16's "a bound is not a date" rule, demonstrated on live data
+  rather than asserted.
+- The residual is written down rather than hidden: `nbRequests >= 1` proves this contract resolved
+  *a* request, not that the last write to the expiry was that resolution. What bounds it is that
+  both instances run the same term — `humanityLifespan()` is 31,557,600 s on Gnosis **and** on
+  mainnet `0xbE9834097A4E97689d9B667441acafb456D0480A`, read today — so the derivation is identical
+  either way, and if those ever diverge that is the assumption that breaks.
+
+**PoH v1's defect, read from the other side.** `submission.registered` is never cleared on expiry
+— the thing iteration 8 built the adapter to avoid, since 33 of 215 sampled addresses have it set
+with the credential dead. Read the other way round it is the mechanism: `registered &&
+!isRegistered` says the credential ended **by arithmetic and nothing else**, so both ends are
+still in the registry. A ForkModule removal gets no window (a bare boolean, and v1 went on
+honouring one such registration for 510 days), and a cleared `registered` flag gets none either.
+
+- **Closed a research question to do it.** Every v1 window is `submissionTime +
+  submissionDuration()`, and that term is governance-settable, so when it last moved decides
+  whether a window is right. Bisected over mainnet archive state: **365.25 days at block
+  14,330,754, 730.5 days at 14,330,755** (header timestamp 1,646,535,074, 2022-03-06T02:51:14Z),
+  unchanged since. Every as-of instant this SDK can be asked about is at or after the registry's
+  own genesis (Sepolia 11,344,158, today), four years the other side of that, so today's term
+  governed every window we can be asked to decide. `poh-v1-onchain-read.md` §8 question 1 is now
+  **CLOSED** in place, and a live test pins all three readings so the day it stops being true is a
+  red suite rather than a silent shift.
+
+**One layer moved underneath both.** `reconcile.ts` dropped every date on the `!chain.held` branch,
+so a probe could not report a window through it at all. `ChainView`/`Reconciled` now carry
+`heldUntil`, the not-held branch passes a closed window through with
+`date-from-lapsed-verification`, and an ending with no start is named
+(`lapsed-credential-start-undated`) instead of being silently dropped. Nothing infers an ending
+there: `heldUntil` only ever comes from the chain view, so a failed read, an index that thinks the
+credential ended, and an ordinary absence all still reach the same branch with nothing in it.
+
+**Verified:** on this box, at this commit.
+
+- `cd packages/sdk && npm test` → `# tests 450 # pass 445 # fail 2 # skipped 3` (**+25** over
+  iteration 17's 425: 9 new `poh-v2.test.ts`, 7 `poh-v1.test.ts`, 4 `reconcile.test.ts`, 3 live in
+  `live.test.ts`, 2 live in `poh-v1.live.test.ts`). The 2 failures are iteration 15's registry-drift
+  pair, confirmed unchanged by running `as-of.live.test.ts` alone: `the ontology at the indexed head
+  is the ontology the chain reports` and `the same credential scores differently against the
+  ontology of that morning`.
+- `node --test --experimental-strip-types src/live.test.ts` → **16 pass, 3 skip, 0 fail**. The
+  skips are the three tests that need subgraph v0.0.3's schema, which is still syncing.
+- `node --test --experimental-strip-types src/adapters/poh-v1.live.test.ts` → **12/12, 0 skipped.**
+- `./apps/demo/test.sh` → all suites green: forge **18 passed**, sdk unit, sdk live, Playwright
+  **13 passed**.
+- `npm run build` and `tsc --noEmit` clean in `packages/sdk`; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` → verdicts unchanged: DENY / ALLOW **3.6152** over 5 roots / DENY
+  naming the sibling / DENY `a fleet of 27 agents is still one human`.
+- **The acceptance test the mission asks for** ("a live test that hits the real chain and asserts
+  the mechanism, not a magic number") is *"a humanity that expired is a closed window, and the
+  claim log is its start"*: it samples a lapsed subject at run time, then holds the probe's two
+  dates against three other sources the probe never consulted — `getHumanityInfo`'s own `owner` and
+  `expirationTime`, `humanityLifespan()` at head, and the block header of the humanity's own
+  `HumanityClaimed` log, which must have **exactly** the derived start as its timestamp. Then it
+  restores the credential at the window's midpoint and confirms it is gone at the second it ended.
+  The v1 twin is stronger still: archive `isRegistered` is read at four blocks and must be false
+  immediately before the reported start, true at it, true immediately before the reported end and
+  false at it — *the window we hand back is the window the contract itself honoured*.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved — this changes
+what a past instant can be shown to have contained, not what anything is worth. Both `notes` fields
+gained the new facts (an off-chain field; `setAdapter` does not carry it, checked in
+`PersonhoodRegistry.sol`). Registry stays as the chain has it (32 adapters / revision 36, written by
+the other tree; this tree still has 30).
+
+**Committed:** `d92d159` feat(sdk): both Proof of Humanity registries date the end of a credential,
+so as-of can see it
+
+**Write-up:** `research/protocols/poh-lapsed-credentials.md` — the getter asymmetry with the source
+quoted, the slot-62 derivation, the full census, the `nbRequests` measurement table, the term-change
+bisection, and what is deliberately not restored. Indexed in `research/INDEX.md`.
+`docs/scoring.md` corrected: it still said an as-of score "cannot see" a credential held then and
+revoked since, which iteration 16 fixed two iterations ago — stating a limit that no longer exists
+is as wrong as hiding one that does. README's as-of section now names all four registries and why
+each can produce a window.
+
+**The v0.0.3 cutover, checked (iteration 17's next-step 2).** Still syncing, healthily: **42,287,007
+of 47,389,000** at the time of writing, `hasIndexingErrors: false`, measured at **~65,000
+blocks/min** over two samples 25 minutes apart, so ~75 minutes remain. `version/latest` still serves
+v0.0.2 (`QmeYTnn…`), which is the designed behaviour — Studio's `latest` tracks the latest *synced*
+version — so no consumer is reading a half-indexed index and the flip happens by itself. **One
+operational trap worth recording, because it cost me ten minutes:** a labelled version is queried at
+`/query/77602/poh/v0.0.3`, *not* `/query/77602/poh/version/v0.0.3`. The `version/` prefix works only
+for `latest`; every other path under it returns `{"message":"Not found"}`, which reads exactly like a
+deployment that has been deleted.
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15, 16 and 17,
+   still the only red in the suite, still Hugo's call.
+2. **Circles is the last undated ending, and the subgraph can close it.** The Hub's `stopped()` is a
+   boolean with no timestamp, exactly like PoH v1's ForkModule, so state cannot date it — but the
+   mapping already handles the stop event and could record the block it saw. That is a mapping
+   change plus a resync, and the resync should wait for v0.0.3 to land rather than queue behind it.
+3. **Ask the same question of the adapters that have not been asked it.** Human Passport's cached
+   score carries an `expirationTime` and Linea PoH's attestations carry `expirationDate` and
+   `revocationDate` — both are dated endings on records that stay readable, so both are candidates.
+   Each needs the question that killed Holonym in iteration 16: is the credential still
+   *attributable* at the moment you restore it?
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read
+   appears. Iteration 7's measurement stands: neither leaves per-holder state on any chain.
+
+**Worth keeping, because it generalises.** Iteration 16's lesson was *when history is the problem,
+ask what the contract declines to delete*. This iteration is the same question asked one level down:
+**a getter that hides a value is not a chain that has lost it.** Every one of PoH v2's three
+personhood getters returns zero for a lapsed humanity, and all three are reading a struct that still
+has the answer in it — the expiry check is in the getter, not in the storage. The same holds for
+`private`, which restricts other contracts and not `eth_getStorageAt`. The rule for the next adapter:
+when a contract says *no*, check whether it is saying "there is nothing here" or "I decline to tell
+you", because those two answers live in the same `0x0000…0000` and only one of them is a fact about
+the subject. And when you do reach past a getter, make the read *self-validating* — the owner check
+here is what makes an unverifiable storage slot safe, because every way of getting it wrong produces
+silence rather than a credential.
+
+**Blocked:** nothing new. Iteration 1's two carried notes stand, both Hugo's call —
+`pnpm-lock.yaml` untracked beside a tracked `package-lock.json`, and `./test.sh` living at
+`apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it.
