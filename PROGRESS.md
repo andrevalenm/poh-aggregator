@@ -2843,3 +2843,166 @@ notes, which is exactly what made the wrong fix so easy — a verified constant 
 lottery per commit; did not bite this time), and iteration 1's two notes, `pnpm-lock.yaml` untracked
 beside a tracked `package-lock.json` and `MISSION.md` pointing at a `./test.sh` that lives at
 `apps/demo/test.sh`.
+
+## Iteration 22 — 2026-07-26
+
+**Did:** iteration 20's next-step 3 / iteration 21's next-step 2 — **the index-flag audit**. It was
+written down as "one grep", and the grep was the cheap half. Asking the question in both directions
+turned up a live defect with a hundred times the population of the Circles one it was modelled on.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: the same two tests in `as-of.live.test.ts` are red and nothing
+else is. MORNING "Needs you" item 18 stands, unchanged for an eighth iteration.
+
+**The flag we went looking for is faithful, and empty.** `pohIndexRead` maps
+`ended: Boolean(row.revoked)`, and `revoked` is set by `handleHumanityRevoked`. The deployed
+implementation (`0x85b88E38…3F52`, verified source via Blockscout) emits `HumanityRevoked` at
+exactly the two sites that do `delete humanity.owner` — `executeRequest` L1170 and `rule` L1347 —
+while `revokeHumanity`, the *request*, emits `RevocationRequest` instead. So the event is the
+ending and not the intention to seek one. Proved by moving one block around the registry's **only**
+revocation (topic-filtered sweep over the proxy's whole life, 35,846,827 → 47,390,471):
+
+| | Gnosis block | `owner` | `pendingRevocation` | `nbRequests` |
+|---|---|---|---|---|
+| before | 41,268,458 | `0xCF3c78a7…9e70` | **true** | 2 |
+| **the log** | **41,268,459** (2025-07-25T14:15:20Z) | `0x0` | false | 2 |
+| head | 47,390,676 | `0xeb31c98C…5b4C` | false | 3 |
+
+The head row is the rest of the story: that humanity was **claimed again** by another address, so
+`handleHumanityClaimed` set `revoked = false`, and **0 of 1,576 indexed humanities carry the flag
+today**. The mechanism designed to carry PoH's endings has an empty population.
+
+**The defect is the other direction, and it is ours.** A PoH v2 humanity ends three ways.
+`isHuman` is `owner == account && block.timestamp < expirationTime`, so it ends by **revocation**
+(indexed), by **expiring** — which emits nothing at all, so no mapping could hear it — and by
+**leaving the chain**: `ccDischargeHumanity` clears the owner and emits
+`HumanityDischargedDirectly`, which our `subgraph.yaml` does not register. That is not a historical
+curiosity: **33 all-time, 25 of them since 2026-05-16**, against 9 grants in. Two humanities appear
+in both lists, so the credential bounces between instances.
+
+**Census, every humanity our index holds, through Multicall3 at one pinned block (47,390,676):**
+
+| state at head | count | our index says |
+|---|---:|---|
+| live | 1,359 | held |
+| expired, owner still set | 21 | held |
+| owner cleared | 193 | held |
+| owner is another address | 3 | held |
+| flagged `revoked` | **0** | — |
+
+**217 of 1,576 — 13.8% — are not held on chain and carry no ending in the index**, 31 of them with
+a year of term still to run (the signature of a discharge rather than a lapse). At chain head that
+costs nothing: `reconcile.ts` gives the chain the deciding vote and the chain said no for all 217.
+The exposure was `chain.unavailable` — an RPC blip, a rate limit, or an adversary with a reason to
+arrange one — where the reconciler fell back to the index, and the index said *held*, with
+`claimObserved: true` and a real claim date. On `poh-v2`'s Ramp at a 365-day half-life a two-year
+claim prices at 0.75 of the adapter's full weight, so a subject collected a whole trust root for a
+credential they moved to another chain in May. Same shape as iteration 20's Circles bug, opposite
+direction, ~100× the population.
+
+**The fix is one predicate with a real justification on each side.** `IndexView` now carries
+`observesEveryEnding` beside `completeHistory` — different questions with the same failure mode:
+one is how far *back* an index reaches, the other is which transitions its mapping handles. On the
+one branch where nothing can check the index, an index without it is excluded as **unreadable**
+(`held: false` + `error` + note `index-cannot-see-endings` + caveat) rather than counted or denied.
+Three decisions inside that:
+
+- **Declared per mapping, in `subgraph.ts`, not asked of the endpoint.** An index cannot report the
+  events it does not handle, so asking it is asking the wrong witness.
+- **It applies to `ended: true` as well.** An index that misses endings misses the re-grants that
+  undo them — a revoked humanity can be granted again from another instance without our mapping
+  hearing — so its ending is no more checkable than its silence.
+- **The result is an error, not a negative.** Same weight either way; the difference is that a
+  subject who loses a trust root to *our* RPC failing is told so. `MISSION.md`'s adapter rule 5
+  read in both directions.
+
+**Circles goes the other way, and that is what makes it a rule rather than a switch.** `isHuman` is
+`lastMintTime > 0` and nothing ever writes that word back down (iteration 20), so there is no
+ending to miss and the index's word survives a failed chain read unchanged.
+
+**The rest of the audit, since it had never been done deliberately:** the Circles vendor indexer
+(`rpc.aboutcircles.com`) supplies `trustedBy` only and a failure leaves it absent — it cannot touch
+`held`; Coinbase reads the EAS predeploy and Coinbase's own on-chain indexer, the `easscan.org`
+dependency having been removed earlier; Linea PoH enumerates the registry itself and consults the
+Verax subgraph only in tests; the registry subgraph reconstructs weights, not credentials. Human
+Passport, Holonym, Farcaster, World and PoH v1 read chain state only. **No other adapter has a
+non-chain source in its answer.**
+
+**Verified:** on this box, at this commit.
+
+- `CORROBORATE_SUBGRAPH_URL=…/poh/v0.0.3 ./apps/demo/test.sh` → **all suites green, exit 0**:
+  forge **18 passed**; sdk scoring **35 pass**; sdk live **21 pass, 0 skip, 0 fail**; Playwright
+  **13 passed**.
+- `cd packages/sdk && npm test` → `# tests 517 # pass 514 # fail 2 # skipped 1` (**+11** over
+  iteration 21's 506: 6 reconcile, 3 subgraph, 2 live). The 2 failures are iteration 15's
+  registry-drift pair, unchanged and untouched. The 1 skip is a Coinbase live test whose Base
+  endpoint refused the `Attested` log filter — an unreachable source, not a fault in the mechanism.
+- `node --test src/live.test.ts` → **21/21, 0 skipped** against v0.0.3.
+- `npm run build` and `tsc --noEmit` clean in `packages/sdk`; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` → DENY / ALLOW **3.6178 over 6 roots** / DENY naming the sibling /
+  DENY `a fleet of 27 agents is still one human`. Identical to iterations 20 and 21, which is the
+  point: nothing at head was ever wrong, so nothing at head moved.
+- **The acceptance test the mission asks for** ("a live test that hits the real chain and asserts
+  the mechanism, not a magic number") is *"a humanity that left the chain is held in our index and
+  gone from the registry"*: a discharge sampled from the chain's own logs at run time, required to
+  have its owner cleared **and** its term still running so it cannot be an expiry, then held
+  against the index (entity present, `ended: false`, `observesEveryEnding: false`) and pushed
+  through the reconciler with the chain unreadable, where it must come back excluded and named.
+  Beside it, the revocation transition above — the log re-read, and both sides of the state change
+  re-derived, every run.
+
+**Committed:** `f628c4d` fix(sdk): an index that cannot see an ending may not say a credential is
+held. (`git commit` worked; iteration 19's root-owned-`.git` lottery did not bite.)
+
+**Write-up:** `research/protocols/poh-endings-the-index-cannot-see.md` — the three ending paths from
+the deployed source, the revocation transition, the discharge sweep with the eight-subject table,
+the 1,576-humanity census, the rule and its three decisions, the full audit table of every non-chain
+source in the repo, what is deliberately not done, and three open questions. Indexed in
+`research/INDEX.md` (header recount: 41 files / ~25,550 lines). `docs/scoring.md` gains the rule
+beside the coverage one it is easily confused with; README gains honest limit 13 and its test-count
+paragraph is re-stamped (548 exist / 546 pass).
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved: this changes
+who is allowed to answer when the chain cannot, not what anything is worth. Registry stays as the
+chain has it (32 adapters / revision 36, written by the other tree; this tree still has 30).
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15–21, still
+   the only *real* red in the suite, still Hugo's call.
+2. **`nbRequests == 0` at head.** Open question 1 of the new write-up, and the sharpest remaining
+   correctness item. `closeLapsedHumanityWindow` refuses to derive a start from
+   `expirationTime - humanityLifespan` for a humanity this contract never resolved a request for —
+   the measurement in `poh-lapsed-credentials.md` §2.4 puts the error at −215.5 and +144.7 days —
+   and the **head** path does the same subtraction with no guard and no caveat. Nine humanities
+   arrived by cross-chain grant; whether any is held today is unmeasured. The honest answer may be
+   that the derived date *is* the origin instance's claim date, which is a real date for the same
+   human — which is exactly why it should be decided rather than left implicit.
+3. **Index the two cross-chain events** (`HumanityGrantedDirectly`, `HumanityDischargedDirectly`)
+   and give `PohHuman` an `expirationTime`. That is what would earn PoH `observesEveryEnding: true`
+   and hand the degraded path back — a mapping change, a schema field and a ~2.5-hour resync.
+   Deliberately not queued ahead of the fix: two of three endings handled still may not answer
+   alone, so the resync buys a better index and not a different rule.
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read
+   appears. Iteration 7's measurement stands.
+
+**Worth keeping, because it generalises.** Iteration 20's lesson was *an index flag named after an
+event is not a fact about a credential*. This iteration is that lesson asked about the events that
+are **not** in the mapping, and it wants a sharper form: **an index's silence is only as strong as
+the set of events it handles, and that set is not something the index can tell you.** Coverage
+entities, `_meta` blocks and sync status all describe how far back an endpoint reaches; none of
+them describes what it listens for. So the completeness question splits in two, and we had been
+answering only one of them since iteration 1.
+
+The other one is about how the audit was scoped. The queue said *can an index flag retire a
+credential the chain still honours* — a one-directional question, inherited from the bug that
+prompted it. Reading it that way, the audit closes in ten minutes with "PoH's flag is fine". The
+defect was in the direction nobody had thought to ask about, and it was larger. **When a past bug
+turns into an audit item, widen the question before running it**: the shape that bit you once is
+the shape you will look for, and the same mechanism usually fails both ways.
+
+**Blocked:** nothing. Nothing new for Hugo; MORNING is untouched. Carried: iteration 15's
+ontology/registry drift (Hugo), iteration 19's root-owned `.git` objects (still a ~1-in-128 lottery
+per commit; did not bite this time), and iteration 1's two notes, `pnpm-lock.yaml` untracked beside
+a tracked `package-lock.json` and `MISSION.md` pointing at a `./test.sh` that lives at
+`apps/demo/test.sh`.
