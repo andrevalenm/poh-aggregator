@@ -1026,3 +1026,142 @@ but it would make the enumeration exhaustive rather than exhaustive-modulo-an-ar
 Iteration 1's two notes still stand and are Hugo's calls, not blockers: `./test.sh` lives at
 `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it, and
 `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
+
+## Iteration 9 — 2026-07-25
+
+**Did:** P1 — **as-of scoring**, `resolve(addr, { asOf: block })`. The probe queue emptied at
+iteration 8, and this was the next item: the registry audit trail existed but could only be
+*printed*, never applied.
+
+The weights are dated human judgements and they change — revision 34 alone moved three trust
+roots, retired a placeholder root and added fifteen adapters. Every such edit silently rewrites
+history for anyone holding an old score: a subject told "2.56 on Tuesday" cannot reproduce it on
+Wednesday, and a counterparty who denied somebody at a threshold cannot show what the ontology
+said when they did. Now they can.
+
+- **This is the one read here an archive node cannot serve, which is why it is the strongest
+  Graph claim available.** Reconstructing an entity *set* at block N from the chain means one
+  `eth_call` per adapter and already knowing every adapter id. Graph Node stores each mutable
+  entity version with the block range it was current for, so `adapters(block: {number: N})` is
+  one query. Measured: 15 adapters at block 11,345,000, 30 at head, from the same endpoint.
+- **It never degrades — deliberately, and against the grain of everything else in this SDK.**
+  Every other read falls back: an unreachable index becomes a caveat, a failed probe becomes an
+  excluded error. `asOf` without `registrySubgraphUrl` throws, and an indexer behind the
+  requested block throws naming how far it got. Answering a question about the past with today's
+  weights and stamping a block number on it is a worse failure than no answer.
+- **Credentials are read at head, and the result says which half is reconstructed.** There is no
+  cross-chain archive path that would let ten adapters answer as of a Sepolia block. What is
+  fixed exactly is the direction that would pay an adversary: a credential dated after the as-of
+  instant did not exist then and is excluded (`issuedAfter` counts too — it is a proven lower
+  bound on issuance). What remains — held then, revoked since — understates the subject and never
+  the adversary. Undated credentials are counted and listed in `asOf.existenceUnverified`, since
+  dropping them would penalise a subject for a field their protocol does not store.
+- **The reconstruction is checked, not assumed, and the check is a proof rather than a sample.**
+  `setAdapter` and `setAdapterLiveness` both bump `revision`, but only the first carries a full
+  record. So if the audit trail's revisions are exactly `1..revision()` — read from the chain at
+  head, no archive needed — no liveness flip has ever fired, and the reconstruction is therefore
+  exact at *every* block, not just the ones the suite samples. When it fails, `auditTrailComplete`
+  goes false and the missing revisions are named. Today: 34 recorded, on-chain revision 34, no
+  gaps.
+- **Age is evaluated at the as-of block's own timestamp**, not the wall clock and not the
+  requested instant — the ontology is a step function over blocks, and pretending to a precision
+  the registry does not have would make two instants inside one block look like different states
+  of the world. `asOf` accepts a Sepolia block number or a `Date`/ISO string; the latter bisects
+  block headers (~24 reads, no archive node, so an instant is an acceptable way to name a point).
+- **A real bug in the audit trail, found by building on it.** `AdapterLivenessSet` carries only
+  the hashed adapter key, and the mapping did `Adapter.load(hash.toHexString())` against entities
+  keyed on the plaintext id — matching nothing, so **every liveness flip was dropped in silence**.
+  It survived because it has never fired on the deployed registry, and it is the mutation a score
+  feels hardest: `live: false` zeroes a credential outright. Fixed with an `AdapterKey` reverse
+  index (written on the one event carrying both halves) plus a `LivenessChange` audit entity
+  carrying the curator's stated reason. **Redeployed to the self-hosted node as v0.0.3**
+  (`QmU8UDtsTRsaRZ9u74bFQ7r3tidpXcUGS9157CffPd4Yfg`, was `QmRhvuGcRUYGdvSrPA5iNobdnHfhSNZPz4o7BEpcFf85y2`).
+  The handler body itself has never been exercised by a real event — none exists — so what is
+  asserted is the thing that was actually wrong: all 30 `AdapterKey` entries equal
+  `keccak256("adapter:" ++ id)`, the key a liveness event will carry.
+- **Retired root names are now recorded** in `ontology/adapters.json` under `retiredTrustRoots`:
+  `unknown` (never a root — an admission of research debt that scores as full independence) and
+  `kyc-vendor:facetec-synaps` (widened to `kyc-vendor:facetec` at revision 34). Without their
+  preimages, a historical score prints raw hashes for exactly the roots whose correction is the
+  interesting part of the history. An unrecognised hash still stays a hash rather than collapsing
+  to a placeholder, because a placeholder would merge distinct roots and saturate credentials
+  that were independent.
+- MCP's `lookup_personhood` takes `as_of` (a block number or an ISO date) and the rendering says
+  which block the ontology came from. Deliberately not wrapped in a try: the tool inherits the
+  refusal rather than softening it.
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd packages/sdk && npm test` → `# tests 228 # pass 226 # fail 0 # skipped 2` (was
+  195/193/0/2: +20 as-of unit, +12 as-of live, +1 ontology). The 2 skips are iteration 6's Verax
+  subgraph HTTP 429s, unchanged and untouched by this work.
+- `node --test --experimental-strip-types src/as-of.live.test.ts` → **12/12, `skipped 0`, three
+  consecutive runs**, 2.7 s.
+- `npm run build` clean; `tsc --noEmit` clean for `src` and, checked separately with the project's
+  own flags, for both new test files (they are excluded from `tsconfig.json`); the MCP package
+  typechecks.
+- `cd apps/demo && npx playwright test` → `10 passed`.
+- `node scripts/deploy.mjs --seed-only` → `30 already identical on-chain`, `deployments/sepolia.json`
+  byte-identical. Registry stays at **30 adapters, revision 34**.
+- End to end through `resolve()` on a subject holding PoH v2 plus two Holonym credentials and a
+  Human Passport: **3.61 / $40.73 / 4 roots / revision 34** today against **1.0689 / $0.11 /
+  1 root / revision 15** as of block 11,345,000. Nothing about the subject moved; Holonym and
+  Passport are named in `adaptersNotYetInRegistry`. The PoH contribution differs by half a cent
+  (11.19c vs 10.72c) because the survival ramp was evaluated twelve hours earlier — the as-of
+  instant doing work rather than decorating.
+- The acceptance test `MISSION.md` asks for — *"a score changes when the historical registry
+  revision differs from the current one"* — exists in two forms. **Live:** one surviving Proof of
+  Humanity v1 registration, on a contract frozen since 2021, scores **$3.51 under revision 34 and
+  exactly nothing under revision 15**, because that is when we had not researched the protocol
+  yet. **Deterministic:** the real Civic-Pass root correction in miniature — two adapters that
+  were independent at revision 15 and saturate to one at revision 34, same evidence, lower score.
+  Beside them the reconstruction is asserted against the chain rather than against itself: the
+  ontology the indexer reports at head must equal `allAdapters()` **field by field for all 30
+  adapters**, every revision the registry counted must appear in the audit trail, and a block
+  before the registry existed or beyond the indexer's head must be an error rather than an empty
+  ontology (an empty ontology scores everybody at zero while looking like it worked — the same
+  failure shape as iteration 6's dead Linea portal).
+
+**Committed:** `f6f52d8` feat(sdk): as-of scoring — the audit trail applied, not printed
+
+**Next, in the order I would do it:**
+
+1. **P1's fleet policy**, which is now the strongest remaining item and has had a chain-enforced
+   primitive waiting since iteration 7: `WorldIDAddressBook` allows at most one live verified
+   address per human, and `nullifierHashes(nullifier) → address` is public. "At most N agents per
+   human" can be *checked* against World rather than asserted, which is the difference between a
+   product and an illustration.
+2. **P1's ENS agent track** — `corroborate.human` on an agent's name, the counterparty resolving
+   it and checking the backing human's personhood, a second agent under the same tree refused
+   because it is the same human. `corroborate.subjects` already works for humans; the record is
+   self-asserted and the caveat must keep saying so. Blocked on Hugo registering a mainnet name
+   (`MORNING.md` item 2, open since before iteration 1).
+3. **Base EAS subgraph**, replacing the `easscan.org` GraphQL dependency in
+   `coinbaseVerificationAdapter` — the last vendor on the critical path, and the last place the
+   repo contradicts its own stated principle.
+4. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
+   the cheapest way to turn two flagged approximations into real dates (iteration 1's next-step 1,
+   unchanged through eight iterations now).
+
+**Measured while working, worth keeping:** the graph-node on this box exposes its admin JSON-RPC
+on `127.0.0.1:8120` and its IPFS API on the docker bridge at `172.19.0.2:5001` — neither is on a
+published port, and `docker` is not usable from this user, so the way to redeploy a subgraph here
+is `npx graph deploy <name> --node http://127.0.0.1:8120 --ipfs http://172.19.0.2:5001`. The
+Sepolia range is ~4,300 blocks, so a full resync completes in seconds and the name endpoint
+switches to the new deployment without a visible gap. Recorded because the next iteration that
+needs a subgraph change will otherwise conclude, as I first did, that deployment is impossible
+here. Separately: `_meta` must be queried *unpinned* before a block-pinned query, because
+graph-node fails the whole request when the pin is beyond its head, and the useful error ("we
+only indexed to X") is otherwise unavailable.
+
+**Blocked:** nothing. One thing left deliberately undone: the ontology's own history is only
+~15 hours long, so as-of over it demonstrates *ontology* change convincingly and *credential*
+change not at all — 14 hours of chain history is indistinguishable from now. That is a property
+of the dataset rather than of the design, and it is why the credential half is a documented
+exclusion plus a caveat rather than a second reconstruction. Iteration 1's two notes still stand
+and are Hugo's calls, not blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo
+root where `MISSION.md` says to run it, and `pnpm-lock.yaml` is still untracked beside a tracked
+`package-lock.json`. New and minor: `subgraph-registry/package-lock.json` moved because installing
+graph-cli resolved a floating `@types/node` range from 12.20.55 to 26.1.1; kept, since it is the
+tree that built and deployed v0.0.3.
