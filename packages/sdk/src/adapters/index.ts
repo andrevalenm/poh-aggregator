@@ -8,6 +8,9 @@ import {
   type IndexView,
   type Reconciled,
 } from '../reconcile.ts'
+import { humanPassportAdapter } from './human-passport.ts'
+
+export * from './human-passport.ts'
 
 /**
  * Adapters.
@@ -468,5 +471,6 @@ export function defaultAdapters(opts?: { subgraphUrl?: string }): AdapterProbe[]
     pohAdapter(RPC.gnosis, opts?.subgraphUrl),
     circlesAdapter(RPC.gnosis, undefined, opts?.subgraphUrl),
     coinbaseVerificationAdapter(),
+    humanPassportAdapter(),
   ]
 }

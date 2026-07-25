@@ -154,7 +154,7 @@ export function score(input: ScoreInput): PersonhoodResult {
     independentRoots,
     evidence: input.evidence,
     roots,
-    caveats: caveatsFor(input.evidence, roots),
+    caveats: caveatsFor(input.evidence, roots, input.adapters),
     ...(input.registryRevision !== undefined ? { registryRevision: input.registryRevision } : {}),
     computedAt: now,
     isHuman(threshold: number) {
@@ -166,7 +166,11 @@ export function score(input: ScoreInput): PersonhoodResult {
   }
 }
 
-function caveatsFor(evidence: Evidence[], roots: RootContribution[]): Caveat[] {
+function caveatsFor(
+  evidence: Evidence[],
+  roots: RootContribution[],
+  adapters: Map<string, Adapter>,
+): Caveat[] {
   const caveats: Caveat[] = []
 
   // Always present, and deliberately not suppressible. Nothing in the roster attests that a
@@ -215,6 +219,7 @@ function caveatsFor(evidence: Evidence[], roots: RootContribution[]): Caveat[] {
     })
   }
 
+  caveats.push(...restatementCaveats(evidence, adapters))
   caveats.push(...indexCaveats(evidence))
 
   const unknownRoot = roots.find((r) => r.trustRoot === 'unknown')
@@ -234,6 +239,42 @@ function caveatsFor(evidence: Evidence[], roots: RootContribution[]): Caveat[] {
   }
 
   return caveats
+}
+
+/**
+ * Caveats for aggregates that restate credentials we price elsewhere.
+ *
+ * Some of the things we probe are themselves aggregators. Human Passport's score is built from
+ * stamps, and several of those stamps are credentials with their own entry in this ontology and
+ * their own trust root — Coinbase on Persona, Holonym on FaceTec, BrightID, Idena. An
+ * aggregate is not independent evidence of the things inside it.
+ *
+ * The arithmetic is already safe: an aggregate is rooted and priced at what it can honestly
+ * claim on its own (Passport at wallet-history rates, a dollar), so even a passport made
+ * entirely of restated identity stamps cannot contribute identity money. This caveat exists
+ * because safe is not the same as legible — a caller reading "Human Passport: 28.8" deserves to
+ * be told that two of its three stamps are credentials counted under other roots, and that the
+ * remaining wallet history is what the dollar is for.
+ */
+function restatementCaveats(evidence: Evidence[], adapters: Map<string, Adapter>): Caveat[] {
+  const out: Caveat[] = []
+  for (const e of evidence) {
+    if (!e.held) continue
+    const restated = e.detail?.['restatesAdapters']
+    if (!Array.isArray(restated) || restated.length === 0) continue
+    const named = restated
+      .filter((id): id is string => typeof id === 'string')
+      .map((id) => {
+        const root = adapters.get(id)?.trustRoot
+        return root ? `${id} (${root})` : id
+      })
+    if (named.length === 0) continue
+    out.push({
+      code: 'aggregate-restates-other-credentials',
+      message: `${e.adapterId} is an aggregate whose evidence includes credentials priced separately here: ${named.join(', ')}. It is scored only for what it can claim on its own — ${e.trustRoot} — so those credentials count under their own roots and not twice.`,
+    })
+  }
+  return out
 }
 
 /**

@@ -141,11 +141,21 @@ authenticates the set; we never infer that two addresses belong to one person, b
 inference is the linkage we exist to avoid. Saturation spans the set, so splitting credentials
 across wallets cannot inflate a score — there is a test for exactly that.
 
-Four adapters are implemented, all readable **without vendor cooperation** — no API key on the
+Five adapters are implemented, all readable **without vendor cooperation** — no API key on the
 critical path, nothing that can rate-limit or revoke us: World ID Orb (AgentBook `lookupHuman`
 on World Chain), Proof of Humanity v2 (Gnosis), Circles v2 (Gnosis + trust graph), Coinbase
 Verified Account (EAS on Base, revocation checked explicitly — 720,503 issued against 406,022
-revoked, so presence alone is wrong more than half the time).
+revoked, so presence alone is wrong more than half the time), and Human Passport
+(`GitcoinResolver.getCachedScore` across all seven Decoder deployments).
+
+Human Passport is the interesting one, because it is itself an aggregator. Its stamps are
+frequently credentials this ontology already prices: one live subject's score of 22.027 is a
+Holonym government-ID check plus a Holonym FaceTec biometric and *nothing else* — two roots we
+already had, re-scored by somebody else's weights. So we never import the number. The passport
+is rooted at wallet history and priced at the farmed-wallet market (a dollar), its stamps are
+mapped back to the adapters that own them, and the result says so out loud:
+`aggregate-restates-other-credentials`. The whole thesis, on one address:
+[`research/protocols/human-passport-onchain-read.md`](research/protocols/human-passport-onchain-read.md).
 
 ### 4. MCP server — [`packages/mcp`](packages/mcp)
 
@@ -190,7 +200,9 @@ const result = await corroborate.resolve([
   '0x317C407725145Fa197701045c3383F58fa14204B', // holds Circles v2
 ])
 
-result.score            // 1.5683  — log10 of adversary cost in cents
+result.score            // 1.5683  — log10 of adversary cost in cents, stamped 2026-07-25.
+                        // It creeps upward daily: the PoH credential is on a survival ramp,
+                        // so surviving is the thing that earns the weight. 1.5687 today.
 result.independentRoots // 2
 result.totalCostCents   // 36      — $0.36 to obtain this evidence fraudulently
 
@@ -270,23 +282,27 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 66 SDK tests: 51 unit (scoring model, index reconciliation, input handling) + 15 live
+# 86 SDK tests: 65 unit (scoring model, index reconciliation, input, ontology) + 21 live
 cd packages/sdk && npm test
 
-# the 15 live ones alone — real chains, the deployed registry, no mocks
+# the live ones alone — real chains, the deployed registry, no mocks
 cd packages/sdk && node --test --experimental-strip-types src/live.test.ts
+cd packages/sdk && node --test --experimental-strip-types src/adapters/human-passport.live.test.ts
 
 # 10 browser E2E against the built demo, real chains
 cd apps/demo && npx playwright test
 ```
 
-All 94 pass as of 2026-07-25. The live tests hit real chains on purpose: the failure mode we
+All 114 pass as of 2026-07-25. The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
 assert the seeded ontology loads, that the ICAO cluster really does have three protocols on
 one root, that discontinued protocols are marked dead, that every weight cites a `research/`
 file, that rent never exceeds forge for any adapter, that the chain-derived PoH date matches the
 index's to within the hour, and that a real credential outside the index's window is flagged
-rather than silently re-dated.
+rather than silently re-dated. The Passport suite asserts the mechanism rather than a score,
+because every score in it expires in ninety days: our derived expiry must equal the one the
+Decoder computes in Solidity and returns in its revert payload, on whatever address it is
+pointed at.
 
 ---
 

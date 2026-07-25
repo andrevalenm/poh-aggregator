@@ -353,3 +353,69 @@ describe('isHuman', () => {
     assert.equal(r.independentRoots, 0)
   })
 })
+
+describe('aggregates that restate other credentials', () => {
+  /**
+   * Human Passport is an aggregate: its score is built from stamps, and several of those
+   * stamps are credentials with their own entry and their own root here. The arithmetic is
+   * kept safe by pricing the aggregate at what it can claim alone, so these tests pin both
+   * halves — that the restatement is disclosed, and that disclosing it changes no number.
+   */
+  const passport = adapter({
+    id: 'human-passport',
+    trustRoot: 'behavioral:wallet-history',
+    evidenceClass: 'Behavioral',
+    forgeCostCents: 2_000,
+    rentCostCents: 100,
+  })
+  const holonym = adapter({
+    id: 'holonym-gov-id',
+    trustRoot: 'kyc-vendor:unattributed',
+    forgeCostCents: 120_000,
+    rentCostCents: 3_000,
+  })
+
+  test('the restated credentials are named, with the roots they belong to', () => {
+    const r = run(
+      [passport, holonym],
+      [ev(passport, { detail: { score: 28.847, restatesAdapters: ['holonym-gov-id'] } })],
+    )
+    const c = r.caveats.find((x) => x.code === 'aggregate-restates-other-credentials')
+    assert.ok(c, 'an aggregate carrying other roots must say so')
+    assert.match(c.message, /holonym-gov-id \(kyc-vendor:unattributed\)/)
+    assert.match(c.message, /behavioral:wallet-history/)
+  })
+
+  test('a restated identity credential earns identity money only from its own probe', () => {
+    // The passport is worth its own rent ($1) whether or not a $30 KYC stamp is inside it.
+    // If restatement ever started adding cost, this is the test that would notice.
+    const bare = run([passport, holonym], [ev(passport)])
+    const loaded = run(
+      [passport, holonym],
+      [ev(passport, { detail: { restatesAdapters: ['holonym-gov-id'] } })],
+    )
+    assert.equal(loaded.totalCostCents, bare.totalCostCents)
+    assert.equal(loaded.totalCostCents, 100)
+    assert.equal(loaded.independentRoots, 1)
+  })
+
+  test('probing the restated credential directly is what adds its root', () => {
+    const r = run(
+      [passport, holonym],
+      [ev(passport, { detail: { restatesAdapters: ['holonym-gov-id'] } }), ev(holonym)],
+    )
+    assert.equal(r.independentRoots, 2)
+    assert.equal(r.totalCostCents, 3_100)
+    // Two roots, not one saturated root: the passport is genuinely different evidence from
+    // the gov-id check, it is just cheap.
+    assert.ok(!r.roots.some((x) => x.saturated))
+  })
+
+  test('an unheld aggregate discloses nothing', () => {
+    const r = run(
+      [passport, holonym],
+      [ev(passport, { held: false, detail: { restatesAdapters: ['holonym-gov-id'] } })],
+    )
+    assert.ok(!r.caveats.some((x) => x.code === 'aggregate-restates-other-credentials'))
+  })
+})

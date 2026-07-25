@@ -313,8 +313,8 @@
       "decayHalfLifeDays": 180,
       "live": true,
       "sourceURI": "research/protocols/passport-civic-fractal-zkme-galxe.md",
-      "implemented": false,
-      "notes": "Permissionlessly readable — Decoder.getScore(address) on seven mainnets, no vendor call — which makes it a first-class probe candidate. But the scalar must never be imported at face value: ETHScore#50, a pure wallet-history model, is weighted 16.021, the same as a government ID. So it is rooted at wallet history and priced at the farmed-wallet market ($1–$20 per aged wallet, sybil-incidents table), not at KYC prices. Its high-weight state stamps (Coinbase→Persona, Holonym gov-id) are counted under their own roots; taking the scalar cheaply here is what stops that becoming a double count.",
+      "implemented": true,
+      "notes": "Permissionlessly readable, and now read: GitcoinResolver.getCachedScore(address) on all seven mainnets, no vendor call. The scalar must never be imported at face value: ETHScore#50, a pure wallet-history model, is weighted 16.021, the same as a government ID. So it is rooted at wallet history and priced at the farmed-wallet market ($1–$20 per aged wallet, sybil-incidents table), not at KYC prices. Its high-weight state stamps (Coinbase→Persona, Holonym gov-id, Holonym biometrics, Civic, BrightID, Idena, TrustaLabs) are counted under their own roots; taking the scalar cheaply here is what stops that becoming a double count, and the probe names the restated roots in its detail so the collapse is visible rather than merely safe. Measured on-chain 2026-07-25: maxScoreAge is 7,776,000s (90 days) on every deployment and expiry is enforced, so a passport is a hard-expiring credential and the 180-day half-life only ever applies over the first 90 days of its life.",
       "ageCurve": "Decay"
     },
     {
