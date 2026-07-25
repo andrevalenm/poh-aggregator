@@ -144,9 +144,10 @@ authenticates the set; we never infer that two addresses belong to one person, b
 inference is the linkage we exist to avoid. Saturation spans the set, so splitting credentials
 across wallets cannot inflate a score — there is a test for exactly that.
 
-Nine adapters are implemented, all readable **without vendor cooperation** — no API key on the
+Ten adapters are implemented, all readable **without vendor cooperation** — no API key on the
 critical path, nothing that can rate-limit or revoke us: World ID Orb (`WorldIDAddressBook` and
-AgentBook on World Chain), Proof of Humanity v2 (Gnosis), Circles v2 (Gnosis + trust graph), Coinbase
+AgentBook on World Chain), Proof of Humanity v2 (Gnosis), Proof of Humanity v1 (the original
+registry on Ethereum mainnet), Circles v2 (Gnosis + trust graph), Coinbase
 Verified Account (EAS on Base, revocation checked explicitly — 720,503 issued against 406,022
 revoked, so presence alone is wrong more than half the time), Human Passport
 (`GitcoinResolver.getCachedScore` across all seven Decoder deployments), Farcaster
@@ -225,6 +226,22 @@ World's own relayer and for the contract's owner. The document and Selfie tiers,
 no per-holder state anywhere, and the write-up says so with the measurements rather than leaving a
 gap in the queue.
 [`research/protocols/world-id-onchain-read.md`](research/protocols/world-id-onchain-read.md).
+
+Proof of Humanity v1 is the one that measures how much of a protocol is left. Same trust root as
+v2 on purpose — a subject registered in both holds one vouched identity, not two, and saturation
+is the thing that says so. `isRegistered` is `registered && now - submissionTime <=
+submissionDuration`, and the struct's `registered` flag is **never cleared on expiry**: 33 of 215
+sampled submitters have it set with the credential long dead, so the field `getSubmissionInfo`
+hands you is wrong about them. The comparison was checked against history rather than trusted —
+`true` eleven seconds before a submission's term ran out, `false` one second after, with zero logs
+from the registry in between. PoH v2 cannot write to the frozen contract, so it keeps an overlay
+(`ForkModule.removed`) recording registrations it has retired, and one of the nine set there went
+on being honoured by v1 for **510 days** after v2 retired it — which is why `held` reads both.
+Enumerating the whole registry from its own event history gives the number worth knowing:
+**2 registered addresses out of 20,740 lifetime submissions**, both expiring in late 2026. `live:
+true` here means the contract works, not that the protocol has users, and the ontology note says
+exactly that.
+[`research/protocols/poh-v1-onchain-read.md`](research/protocols/poh-v1-onchain-read.md).
 
 ### 4. MCP server — [`packages/mcp`](packages/mcp)
 
@@ -351,8 +368,9 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 172 SDK tests: 108 unit (scoring model, index reconciliation, input, ontology, SBT
-# interpretation, Verax attestation selection, World address-book interpretation) + 64 live
+# 195 SDK tests: 121 unit (scoring model, index reconciliation, input, ontology, SBT
+# interpretation, Verax attestation selection, World address-book interpretation, PoH v1
+# submission interpretation) + 74 live
 cd packages/sdk && npm test
 
 # the live ones alone — real chains, the deployed registry, no mocks
@@ -362,12 +380,14 @@ cd packages/sdk && node --test --experimental-strip-types src/adapters/farcaster
 cd packages/sdk && node --test --experimental-strip-types src/adapters/holonym.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/linea-poh.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/world.live.test.ts
+cd packages/sdk && node --test --experimental-strip-types src/adapters/poh-v1.live.test.ts
 
 # 10 browser E2E against the built demo, real chains
 cd apps/demo && npx playwright test
 ```
 
-All 141 pass as of 2026-07-25. The live tests hit real chains on purpose: the failure mode we
+All 223 pass as of 2026-07-25 (18 forge + 195 SDK + 10 browser; two of the SDK live tests skip
+loudly when the third-party Verax indexer they cross-check against returns HTTP 429). The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
 assert the seeded ontology loads, that the ICAO cluster really does have three protocols on
 one root, that discontinued protocols are marked dead, that every weight cites a `research/`
@@ -423,10 +443,11 @@ in October 2026 after the pool empties.
 change is an event — but not decentralised. There is no multisig, no timelock, and no appeal
 path. `transferCuratorship` exists and has not been used.
 
-**6. Coverage is 9 of 30 adapters.** The other twenty-one are priced in the ontology but not yet
-probed. An absent credential is reported as absence of evidence, never as evidence of absence.
-One of them — Proof of Humanity v1 — is permissionlessly readable today and is queued in
-`research/landscape/ontology-coverage.md` §6; the rest are gated, off-chain or dead, and say so.
+**6. Coverage is 10 of 30 adapters.** The other twenty are priced in the ontology but not yet
+probed — and that is now the end of the road rather than a backlog: every remaining entry is
+documented in `research/landscape/ontology-coverage.md` §6 as gated, off-chain or dead, so no
+further probe is possible without putting a vendor on the critical path. An absent credential is
+reported as absence of evidence, never as evidence of absence.
 
 **7. World's document and Selfie tiers cannot be read at all.** Not by us and not by anyone
 without World's cooperation: a World ID 4.0 credential leaves no per-holder state on any chain,

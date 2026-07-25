@@ -92,8 +92,9 @@ export type ProvenanceNote =
   | 'date-from-expiry-and-max-term'
   /**
    * The credential is a renewable on-chain attestation, and the date is the most recent renewal
-   * rather than the underlying enrolment — which the protocol keeps off chain. The subject was
-   * enrolled before this date, so on a decay curve the weight here is a ceiling.
+   * rather than the underlying enrolment — which the protocol keeps off chain, or overwrites.
+   * The subject was enrolled before this date, so the weight it produces is a bound in whichever
+   * direction the curve runs: a ceiling under `Decay`, a floor under `Ramp`.
    */
   | 'date-from-latest-reattestation'
 

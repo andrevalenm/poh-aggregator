@@ -12,12 +12,14 @@ import { humanPassportAdapter } from './human-passport.ts'
 import { farcasterAdapter } from './farcaster.ts'
 import { holonymAdapters } from './holonym.ts'
 import { lineaPohAdapter } from './linea-poh.ts'
+import { pohV1Adapter } from './poh-v1.ts'
 import { worldIdOrbAdapter, WORLD_AGENT_BOOK, WORLD_ID_ADDRESS_BOOK, WORLD_RPC } from './world.ts'
 
 export * from './human-passport.ts'
 export * from './farcaster.ts'
 export * from './holonym.ts'
 export * from './linea-poh.ts'
+export * from './poh-v1.ts'
 export * from './world.ts'
 
 /**
@@ -453,5 +455,6 @@ export function defaultAdapters(opts?: { subgraphUrl?: string }): AdapterProbe[]
     farcasterAdapter(),
     ...holonymAdapters(),
     lineaPohAdapter(),
+    pohV1Adapter(),
   ]
 }
