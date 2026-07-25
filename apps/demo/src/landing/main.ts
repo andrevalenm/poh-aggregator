@@ -24,13 +24,6 @@ async function paintRegistryLine(): Promise<void> {
       pulse,
       `live — ${adapters.size} protocols catalogued, ${roots.size} trust roots, ${LIVE_ADAPTER_IDS.length} probed live · registry ${shortAddr(DEFAULT_REGISTRY)} rev ${revision}, read just now`,
     )
-    // The ticker states the same number — keep it honest from the same source, in both
-    // duplicated track copies.
-    for (const s of document.querySelectorAll('.ticker-track span')) {
-      if (s.textContent && /probed live/.test(s.textContent)) {
-        s.textContent = s.textContent.replace(/\d+ probed live/, `${LIVE_ADAPTER_IDS.length} probed live`)
-      }
-    }
   } catch {
     el.textContent = ''
     el.append(pulse, 'registry unreachable right now — the demo below will say so rather than guess')
@@ -335,10 +328,6 @@ mountScroll()
 void Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 400))]).then(() =>
   requestAnimationFrame(() => document.querySelector('.hero h1')?.classList.add('sl-in')),
 )
-
-// Seamless ticker: the track needs its content twice for the -50% translate loop.
-const tickerTrack = document.getElementById('ticker-track')
-if (tickerTrack) tickerTrack.innerHTML += tickerTrack.innerHTML
 
 // The colophon seal: the same print, pressed small in iron.
 const stamp = document.getElementById('stamp') as HTMLCanvasElement | null

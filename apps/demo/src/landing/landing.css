@@ -708,51 +708,6 @@ html.js .sl-in .sl-line {
   }
 }
 
-/* ----------------------------------------------------------------- ticker */
-
-/* A letterpress specimen strip: hairlines, italic serif, fleuron separators. */
-.ticker {
-  overflow: hidden;
-  border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
-  padding: 0.85rem 0;
-  mask-image: linear-gradient(90deg, transparent 0%, black 7%, black 93%, transparent 100%);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 7%, black 93%, transparent 100%);
-}
-
-.ticker:hover .ticker-track {
-  animation-play-state: paused;
-}
-
-.ticker-track {
-  display: flex;
-  gap: 3.2rem;
-  width: max-content;
-  animation: ticker 60s linear infinite;
-}
-
-.ticker-track span {
-  font-family: var(--display);
-  font-variation-settings: 'opsz' 40, 'SOFT' 70, 'WONK' 1;
-  font-style: italic;
-  font-size: 0.98rem;
-  color: var(--ink-soft);
-  white-space: nowrap;
-}
-
-.ticker-track span::after {
-  content: '❧';
-  font-style: normal;
-  color: var(--sage);
-  margin-left: 3.2rem;
-}
-
-@keyframes ticker {
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 /* -------------------------------------------------------------- manifesto */
 
 .manifesto {
@@ -2237,7 +2192,6 @@ html.js .reveal.in {
 
   .pulse,
   .scroll-hint,
-  .ticker-track,
   .hero-copy > :not(h1) {
     animation: none;
   }
