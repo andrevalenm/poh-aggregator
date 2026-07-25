@@ -960,6 +960,14 @@ html.js .sl-in .sl-line {
   color: #8a6d1f;
 }
 
+.probe-row.is-summary {
+  border-bottom: none;
+  border-top: 1.5px solid var(--hairline-strong);
+  margin-top: 0.15rem;
+  padding-top: 0.45rem;
+  color: var(--ink-soft);
+}
+
 .probe-row .p-ms {
   flex: 0 0 4.5em;
   text-align: right;

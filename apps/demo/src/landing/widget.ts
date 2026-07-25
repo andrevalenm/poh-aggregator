@@ -145,11 +145,15 @@ function evidenceRow(e: Evidence): HTMLElement {
 }
 
 function evidenceDetails(result: PersonhoodResult): HTMLElement {
+  const rank = (e: Evidence) => (e.held ? 0 : e.detail?.['unavailable'] === true ? 1 : 2)
+  const sorted = [...result.evidence].sort(
+    (a, b) => rank(a) - rank(b) || b.effectiveCostCents - a.effectiveCostCents,
+  )
   return h(
     'details',
     { class: 'ledger-details' },
     h('summary', {}, `Full evidence — ${result.evidence.length} adapter reads`),
-    h('div', { class: 'evd-rows' }, ...result.evidence.map(evidenceRow)),
+    h('div', { class: 'evd-rows' }, ...sorted.map(evidenceRow)),
   )
 }
 
@@ -312,9 +316,37 @@ export function mountWidget(): void {
       slot.append(probeRows(events))
     })
 
+    // With the full adapter roster a multi-wallet lookup streams dozens of rows — the
+    // drama is worth it live, the residue is not. On completion the receipt settles:
+    // credentials found stay line-by-line, the empties fold into one tally.
+    const settleReceipt = () => {
+      const all = [...events.values()]
+      const held = all.filter((ev) => ev.state === 'held')
+      const unavailable = all.filter((ev) => ev.state === 'unavailable')
+      const absent = all.length - held.length - unavailable.length
+      const settled = new Map(
+        [...events].filter(([, ev]) => ev.state === 'held' || ev.state === 'unavailable'),
+      )
+      clear(slot)
+      slot.append(probeRows(settled))
+      slot.append(
+        h(
+          'div',
+          { class: 'probe-row is-summary' },
+          h('span', { class: 'p-id' }, `${all.length} probes`),
+          h(
+            'span',
+            { class: 'p-state' },
+            `${held.length} found · ${absent} empty${unavailable.length ? ` · ${unavailable.length} unreachable` : ''}`,
+          ),
+        ),
+      )
+    }
+
     const started = performance.now()
     try {
       const result = await client.resolve(subjects)
+      settleReceipt()
       resultEl.append(resultView(result, performance.now() - started))
     } catch (err) {
       resultEl.append(
