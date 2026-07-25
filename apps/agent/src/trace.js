@@ -51,6 +51,8 @@ export function renderTrace(trace) {
     console.log('')
   }
 
+  renderFleet(trace)
+
   if (trace.sdkCaveats?.length) {
     console.log(line())
     console.log(C.bold('  Caveats returned by @corroborate/sdk, verbatim'))
@@ -78,12 +80,52 @@ export function renderTrace(trace) {
   if (trace.policy) {
     console.log(
       C.dim(
-        `         policy owner: ${trace.policy.owner} · threshold ${trace.policy.scoreThreshold} · ` +
-          `min independent roots ${trace.policy.minIndependentRoots} · ${trace.policy.requestsPerHuman} request/human`,
+        `         policy owner: ${trace.policy.owner} · score ≥ ${trace.policy.minScore} · ` +
+          `≥ ${trace.policy.minIndependentRoots} independent roots · ` +
+          `≤ ${trace.policy.maxAgentsPerHuman} agent/human (${trace.policy.admission})`,
       ),
     )
   }
   console.log(line('═'))
+}
+
+/**
+ * The fleet block.
+ *
+ * Printed separately from the gates because it is a fact about a *set* — how many agents this
+ * human runs, which one holds the slot, and what a second slot would cost an adversary — and
+ * the gate table has room for one subject.
+ */
+export function renderFleet(trace) {
+  const f = trace.fleet
+  if (!f) return
+  console.log(line())
+  console.log(
+    `  ${C.bold('fleet')}  this human has registered ${C.cyan(f.summary.agents)} agent(s) in AgentBook` +
+      (f.indexedTo ? C.dim(` · indexed to World Chain block ${f.indexedTo}`) : ''),
+  )
+  for (const s of f.siblings.slice(0, 6)) {
+    console.log(`         ${C.dim('·')} ${s.agent} ${C.dim(`registered at block ${s.block}`)}`)
+  }
+  if (f.siblings.length > 6) console.log(C.dim(`         · …and ${f.siblings.length - 6} more`))
+  console.log(
+    `         ${C.bold('admitted')} ${f.summary.allowed} of ${f.summary.agents}` +
+      (f.admitted.length ? C.dim(` — slot held by ${f.admitted.join(', ')}`) : '') +
+      C.dim(
+        ` (${f.summary.deniedByCap} refused because a sibling holds the slot, ` +
+          `${f.summary.denied - f.summary.deniedByCap} on their human's evidence)`,
+      ),
+  )
+  console.log(
+    `         ${C.bold('price')}    a slot costs an adversary at least ${C.cyan(money(f.price.cheapestSlotCents))} ` +
+      C.dim(`(${f.price.credentials.join(' + ')})`),
+  )
+  console.log(
+    C.dim(
+      `                  ${f.price.fleet.slots} slot(s) needs ${f.price.fleet.humansRequired} human(s) = ` +
+        `${money(f.price.fleet.totalCents)}; without the cap, ${money(f.price.cheapestSlotCents)} buys all ${f.price.fleet.slots}`,
+    ),
+  )
 }
 
 function renderDetail(g) {

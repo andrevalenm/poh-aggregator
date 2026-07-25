@@ -45,9 +45,7 @@ npm start
    ║           lookupHuman(agentWallet) → humanId | 0            │World Chain│║
    ║                                                            └──────────┘ ║
    ╠═════════════════════════════════════════════════════════════════════════╣
-   ║  GATE 2.5 Per-human budget, keyed on humanId — not on the agent wallet  ║
-   ╠═════════════════════════════════════════════════════════════════════════╣
-   ║  GATE 3   Evidence                                                      ║
+   ║  GATE 3   Evidence — resolved once per HUMAN, not once per agent        ║
    ║           operator's declared address set  ──►  @corroborate/sdk        ║
    ║                                                     │                   ║
    ║      ┌──────────────────────────────────────────────┴───────────────┐   ║
@@ -58,21 +56,48 @@ npm start
    ║           saturate within a trust root, sum across  │                   ║
    ║           score = log10(adversary cost in cents)  ──┘                   ║
    ╠═════════════════════════════════════════════════════════════════════════╣
-   ║  GATE 4   The counterparty's own threshold                              ║
-   ║           result.isHuman(2.5)  ← 2.5 belongs to Meridian, not to us     ║
-   ║           + minimum independent roots                                   ║
+   ║  GATE 4   Fleet policy                                     ┌──────────┐ ║
+   ║           evaluateFleet(policy, everyAgentThisHuman    ───► │ AgentBook│ ║
+   ║                          registered, evidence)             │  history │ ║
+   ║           score ≥ 2.5 · ≥ 2 roots · ≤ 1 agent/human        └──────────┘ ║
+   ║           every number belongs to Meridian, not to us                   ║
+   ║           slots go to the earliest registration; each refusal           ║
+   ║           names the sibling that took one                               ║
    ╚═════════════════════════════════════════════════════════════════════════╝
                                      │
                           ALLOW / DENY  +  every caveat, verbatim
 ```
 
-`npm start` runs three passes through this.
+`npm start` runs four passes through this.
 
 | Run | Agent | What it isolates |
 |---|---|---|
 | 1 | `atlas`, an ephemeral wallet | Full HTTP round trip with a real signature. Gate 1 **passes** — the agent proves it controls its wallet — and gate 2 **fails**, because controlling a keypair is free and nobody vouched for it. |
-| 2 | `beacon`, a wallet a real human registered | All four gates against live chain state. Three independent trust roots, score 2.5132, **ALLOW**. |
-| 3 | `mirror`, a *second* wallet the **same** human registered | AgentBook returns an identical `humanId`. The per-human budget is already spent. **DENY**. Counting agents would have counted two; counting humans counts one. |
+| 2 | `mirror`, a wallet a real human registered | All four gates against live chain state. Five independent trust roots, **ALLOW**. It goes first because it is this human's *earlier* registration and the policy gives the slot to the earliest — a rule the chain decides, not the demo. |
+| 3 | `beacon`, a *second* wallet the **same** human registered | AgentBook returns an identical `humanId`, so the slot is already taken and the refusal names the wallet holding it. **DENY**. Counting agents would have counted two; counting humans counts one — and the second request cost one lookup rather than ten probes, because evidence is keyed on the person. |
+| 4 | the largest fleet in the registry, **found not declared** | AgentBook's whole registration history is scanned and the biggest fleet wins. Today that is **27 agents behind one human**, registered inside 0.7 days. Meridian never met the other 26; it refuses this one because the registry says they exist and that the slot is taken. The trace prints what the policy costs an adversary: **$5.50 a slot**, so 27 slots cost $148.50 with the cap and $5.50 without. |
+
+### The fleet gate, in one paragraph
+
+The cap is enforced over every agent the human has **registered**, not only over the ones that
+have asked. A venue that waits to be asked has already served the fleet's first N by the time it
+notices; AgentBook's log says so in advance, and reading the whole thing is six `eth_getLogs`
+calls. The policy is declared as data in `policy.js` and executed by `evaluateFleet()` in the
+SDK — the same function the SDK's 30 unit tests exercise — so what a judge sees on stage is what
+is tested. Three properties it holds to: an agent refused on evidence never spends its human's
+slot; an unreadable registry produces `indeterminate` rather than either a denial or an
+admission; and an agent nobody registered has no identifier for the cap to bind, so the policy
+has to *say* what it does with those (`unbackedAgents: 'deny'`) instead of defaulting into
+handing one slot per free keypair.
+
+**What the chain cannot do here, measured.** AgentBook and the World ID Address Book issue
+nullifiers under different external nullifiers — `38265997…265498` and `377593556…326541`, both
+read from their initialisation events, both over Orb group 1 — so the same person is two
+unlinkable identifiers across them, and of 150 AgentBook `humanId`s tested against the Address
+Book, zero resolve. There is therefore no chain path from an agent to the wallets its operator
+holds credentials on. `address-set-not-authenticated` is permanent, and it is permanent because
+World's privacy design works. Full derivation:
+[`research/protocols/world-agentbook-fleets.md`](../../research/protocols/world-agentbook-fleets.md).
 
 ---
 
@@ -147,7 +172,8 @@ chose not to check.
 
 `2.5` appears exactly once in this codebase, in `src/counterparty/policy.js`, next to the
 reasoning for it. It is not a default, and the SDK does not ship one — `result.isHuman(t)`
-throws a `TypeError` if you call it without a threshold.
+throws a `TypeError` if you call it without a threshold, and `FleetPolicy` has no optional
+fields, so a policy that has not decided its own limits does not typecheck.
 
 That is deliberate and it is a base-rate argument. At a plausible 2% sybil rate, a
 95%-specificity classifier is wrong about roughly three-quarters of the subjects it flags.
@@ -214,8 +240,8 @@ src/
     worldid.js              RP signing, proof request, /api/v4/verify
   counterparty/
     server.js               the 402 challenge and the AgentKit verification
-    policy.js               the counterparty's thresholds — every number it owns
-    decide.js               the four gates
+    policy.js               the counterparty's FleetPolicy — every number it owns
+    decide.js               the four gates; gate 4 delegates to evaluateFleet()
     corroborate.js          @corroborate/sdk lookup
 ```
 

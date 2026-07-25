@@ -46,4 +46,22 @@ export const REGISTERED_AGENTS = {
 export const OPERATOR_ADDRESS_SET = [
   '0xd267eba602e692216703626a81157214b24c85fb', // Proof of Humanity v2, Gnosis
   '0x317C407725145Fa197701045c3383F58fa14204B', // Circles v2, Gnosis
+  '0xA6b7471fe0338F8B45266734A1346E6f1D7267b1', // Holonym gov-id + biometrics, Optimism; Human Passport
 ]
+
+/**
+ * A note on the third address, because it changes what the demo shows.
+ *
+ * The first two are vouching-registry credentials on survival ramps, and both are recent, so
+ * together they score around 1.57 — below Meridian's line. That is the anti-farm curve working
+ * on our own demo and it is a good beat, but it means every run refuses on the *score* and no
+ * run ever reaches the fleet gate, which is the thing this demo is about.
+ *
+ * The third address is the one iteration 3 found inside a Human Passport score and iteration 5
+ * read directly against Holonym's own contract: a government-ID check, a FaceTec biometric and
+ * the passport that restates both. Adding it takes the set to ~3.61 across five roots, with the
+ * two Holonym credentials saturating against the passport rather than being counted twice. It
+ * is live data and it will move — Human Passport hard-expires at 90 days and a Holonym
+ * credential within a year — so a run that suddenly refuses on the score has not broken, it has
+ * observed an expiry.
+ */
