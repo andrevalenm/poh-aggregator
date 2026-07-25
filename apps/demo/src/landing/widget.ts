@@ -252,18 +252,18 @@ export function mountWidget(): void {
     inFlight = true
     submit.disabled = true
     submit.textContent = 'Reading chains…'
+    const { makeClient, LIVE_ADAPTER_IDS } = await clientModule()
     streamEl.append(
       h(
         'p',
         { class: 'probe-lede' },
-        `Probing the 4 live adapters against ${subjects.length} wallet${subjects.length === 1 ? '' : 's'}:`,
+        `Probing the ${LIVE_ADAPTER_IDS.length} live adapters against ${subjects.length} wallet${subjects.length === 1 ? '' : 's'}:`,
       ),
     )
     const slot = h('div')
     streamEl.append(slot)
 
     const events = new Map<string, ProbeEvent>()
-    const { makeClient } = await clientModule()
     const client = makeClient((ev) => {
       events.set(`${ev.adapterId}:${ev.address}`, ev)
       clear(slot)
