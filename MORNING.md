@@ -1,7 +1,8 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 5. All four suites green: 18 forge, 113 SDK, 10 Playwright — 141 total._
+detail. _Last updated 2026-07-25, after unattended iteration 6. All four suites green: 18 forge, 150 SDK
+(148 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 10 Playwright — 178 total._
 
 ---
 
@@ -155,6 +156,31 @@ Three things worth knowing:
 
 No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
 `research/protocols/holonym-human-id-onchain-read.md`.
+
+**Iteration 6 added the ninth adapter — Linea Proof of Humanity V2 — by proving the queue's premise
+wrong.** The queue called it a "passive per-subject read". There is no per-subject read at all: Verax
+stores an attestation's subject as raw bytes, keys attestations by a sequential id, and the Sumsub
+portal registers no indexer module, which is exactly why Linea ships a signature-based path instead.
+It does not need one, because the credential **expires in 90 days** and `attestedDate` is monotone in
+attestation id — so every unexpired attestation in the whole registry sits in a **1,024-id window out
+of 6,366,748**, read whole through Multicall3 in six batched calls in under five seconds. What the
+probe holds is therefore the *complete live population*, and a `false` means "we read every live
+credential and you are not in it" rather than "we failed to find yours".
+
+- **500 live attestations over 499 addresses**, against **50,475 ever issued**. Cumulative counts are
+  not population, and here the factor is 101. January 2026 alone was 24,723 — half the protocol's
+  lifetime issuance — and July 2026 is 11. It had a campaign, not a user base, and with a 90-day term
+  the campaign has fully expired.
+- **The authority worth pinning is none of the obvious three.** Not the portal address (our own
+  research named the dead test portal, which would have matched nobody while looking like it worked);
+  not `ownerName` (a string its owner chose); not `attester` (simulating `attest` from a stranger and
+  from Sumsub's own key gives the identical `ECDSAInvalidSignature` revert, so the gate is a signature
+  and the attester is just a relayer). It is the portal's registered **owner**, in an allowlist only
+  Consensys can add to, re-read at runtime.
+- **Linea's own read is ten months stale — see "Needs you" item 11**, which is now a pitch beat.
+
+No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/linea-poh-onchain-read.md`.
 
 ---
 
@@ -406,8 +432,33 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    ontology describes fifteen" — it describes thirty. Both are one-word fixes. The live counts
    in the hero are read from the chain at runtime and are already correct. The deployed demo
    bundle predates this change, which is harmless (adapter and root counts come from the
-   registry; only the implemented probes — eight of them now — are ever named in results), but
+   registry; only the implemented probes — nine of them now — are ever named in results), but
    the next `scripts/deploy-demo-ax41.sh` run picks it up.
+
+11. **A pitch beat you now own, and it is a good one — but check it before you say it on stage.**
+   Linea Proof of Humanity's own documented integration path is **ten months stale**, and ours is not.
+   `poh-api.linea.build/poh/v2/{addr}` returned `true` for **45 of 45** addresses whose Verax
+   attestations had all expired (earliest 2025-09-29), the signer API signs for them, and Linea's own
+   `PohVerifier.verify(sig, addr)` returns `true` **on chain** for one of them. Meanwhile the
+   attestation says expired. **50,475 attestations ever issued against 500 live** — the two answers
+   describe populations 101× apart. This is the strongest concrete instance of the product thesis we
+   have: reading the credential rather than the vendor is not merely purer, here it is *more correct*.
+   Two caveats before it goes in the script. (a) It is a live claim about somebody else's production
+   service and they could fix it any day; the live test is written so that a fix turns into a clear
+   failure message telling us to update the claim, but re-run
+   `node --test --experimental-strip-types src/adapters/linea-poh.live.test.ts` on the morning of the
+   pitch. (b) Phrase it as *"answers 'was ever verified' rather than 'is verified'"*, which is what we
+   measured — not as a vulnerability, because nothing here is exploitable beyond the staleness itself.
+   Full derivation, addresses and revert payloads: `research/protocols/linea-poh-onchain-read.md` §4.
+
+12. **A research file of ours had the wrong portal address, and I corrected it in place.** No decision
+   needed, but you should know the class of error exists: `research/protocols/privado-id-and-verax.md`
+   named `0xe8a3a57e…b73922` as the Sumsub PoH portal. It is real and registered — it is the
+   *deployment test*, with four attestations from July 2025, all expired. Production is
+   `0x501e742C…7D5B46` with 50,471. An adapter built on the researched constant would have answered
+   "not verified" for the entire population while appearing to work perfectly. That file now carries a
+   `CORRECTED` block at the head of the section, and the adapter pins the portal *owner* rather than
+   any portal address, because Sumsub demonstrably runs three of them.
 
 ## Honest state of weak points
 
