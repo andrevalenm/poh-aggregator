@@ -154,10 +154,14 @@ a {
   align-items: center;
   padding: clamp(5rem, 12vh, 8rem) var(--gutter) 4rem;
   isolation: isolate;
+  overflow: hidden;
+  /* A kiln-glow behind the print — warmth, not colour. */
+  background:
+    radial-gradient(90rem 60rem at 76% 44%, rgb(56 40 28 / 0.55) 0%, transparent 62%),
+    radial-gradient(50rem 40rem at 12% 88%, rgb(43 32 24 / 0.5) 0%, transparent 60%);
 }
 
-#print,
-#smudge {
+#print {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -165,8 +169,16 @@ a {
   z-index: -1;
 }
 
+/* The ink ribbon rides above content, under the grain; exclusion makes one bone colour
+ * read pale on the kiln sections and pressed-dark on the paper ones. */
 #smudge {
-  z-index: 0;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 45;
+  pointer-events: none;
+  mix-blend-mode: exclusion;
 }
 
 .hero-copy {
@@ -302,6 +314,67 @@ a {
   }
 }
 
+/* ----------------------------------------------------------------- ticker */
+
+.ticker {
+  overflow: hidden;
+  border-top: 1px solid var(--umber);
+  border-bottom: 1px solid var(--umber);
+  padding: 0.72rem 0;
+  background: var(--kiln-2);
+}
+
+.ticker-track {
+  display: flex;
+  gap: 3.5rem;
+  width: max-content;
+  animation: ticker 46s linear infinite;
+}
+
+.ticker-track span {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--smoke);
+  white-space: nowrap;
+}
+
+.ticker-track span::after {
+  content: '◌';
+  color: var(--iron);
+  margin-left: 3.5rem;
+}
+
+@keyframes ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ------------------------------------------------------------- torn edges */
+
+/* Section joins are torn, not cut — an SVG edge generated from the same seed as the
+ * print. The divider belongs to the section below and bleeds up over the one above. */
+.torn {
+  position: absolute;
+  top: -23px;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  display: block;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.torn-paper {
+  fill: var(--paper);
+}
+
+.torn-kiln {
+  fill: var(--kiln-2);
+}
+
 /* -------------------------------------------------------------- manifesto */
 
 .manifesto {
@@ -337,9 +410,16 @@ a {
 /* --------------------------------------------------------- daylight bands */
 
 .daylight {
-  background: var(--paper);
+  position: relative;
+  background:
+    radial-gradient(70rem 40rem at 18% 0%, rgb(255 250 238 / 0.5) 0%, transparent 55%),
+    linear-gradient(180deg, #e2d8c6 0%, var(--paper) 34%, var(--paper-2) 100%);
   color: var(--ink-on-paper);
   padding: var(--band-pad) var(--gutter);
+}
+
+.daylight + .daylight {
+  background: var(--paper-2);
 }
 
 .daylight + .daylight {
@@ -622,11 +702,11 @@ a {
 }
 
 .tablet {
-  background: var(--paper-2);
+  background: linear-gradient(160deg, #e4dbc9 0%, var(--paper) 100%);
   border: 1px solid #b9ac95;
   border-radius: 4px;
   padding: 1.8rem 1.6rem;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.4) inset;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.45) inset, 0 10px 30px -22px rgb(36 29 23 / 0.5);
 }
 
 .tablet h3 {
@@ -655,8 +735,11 @@ a {
 /* ---------------------------------------------------------------- install */
 
 .install {
+  position: relative;
   padding: var(--band-pad) var(--gutter);
-  background: var(--kiln-2);
+  background:
+    radial-gradient(80rem 50rem at 50% 0%, rgb(58 40 28 / 0.4) 0%, transparent 60%),
+    var(--kiln-2);
 }
 
 .install .band-head h2 {
@@ -724,11 +807,29 @@ a {
   border-radius: 4px;
   padding: 0.9rem 5.2rem 0.9rem 1.1rem;
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--umber) transparent;
+}
+
+.command-block pre::-webkit-scrollbar,
+.code-sample::-webkit-scrollbar {
+  height: 5px;
+}
+
+.command-block pre::-webkit-scrollbar-thumb,
+.code-sample::-webkit-scrollbar-thumb {
+  background: var(--umber);
+  border-radius: 3px;
+}
+
+.command-block pre::-webkit-scrollbar-track,
+.code-sample::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .command-block code {
   font-family: var(--mono);
-  font-size: 0.84rem;
+  font-size: 0.79rem;
   color: var(--bone);
   white-space: pre;
 }
@@ -779,6 +880,8 @@ a {
   border-radius: 4px;
   padding: 1.1rem 1.2rem;
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--umber) transparent;
 }
 
 .code-sample code {
@@ -831,12 +934,238 @@ a {
   color: var(--bone);
 }
 
+/* -------------------------------------------------------------- hackathon */
+
+/* Lisbon, in the palette's own accent: azulejo glaze. The sponsor cards are ceramic
+ * tiles — cool cobalt wash, glaze highlight, corner diamonds — under a wash of Atlantic
+ * light. The only cool notes on the page, spent on the section that is about Lisbon. */
+
+.hackathon {
+  --azul: #8fa9c9;
+  --azul-deep: #5a6e8c;
+  padding: var(--band-pad) var(--gutter);
+  background:
+    radial-gradient(80rem 44rem at 50% -8%, rgb(120 145 180 / 0.09) 0%, transparent 62%),
+    var(--kiln);
+  border-top: 1px solid rgb(74 58 46 / 0.5);
+}
+
+.hackathon .band-head h2 {
+  color: var(--bone);
+}
+
+.hackathon .band-head p {
+  color: var(--bone-dim);
+  max-width: var(--measure);
+}
+
+.hackathon .band-head p + p {
+  margin-top: 0.9rem;
+}
+
+.hackathon .eyebrow {
+  margin-bottom: 0.9rem;
+  color: var(--azul);
+}
+
+.hackathon > .band-inner > h3,
+.hackathon .band-inner > h3 {
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 60, 'SOFT' 40, 'WONK' 0;
+  font-weight: 540;
+  font-size: 1.4rem;
+  color: var(--bone);
+  margin: 3.2rem 0 0.5rem;
+}
+
+.hackathon .band-inner > p {
+  color: var(--bone-dim);
+  max-width: var(--measure);
+  margin: 0;
+}
+
+.sponsor-tracks {
+  margin-top: 2.2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1.4rem;
+  align-items: start;
+}
+
+.sponsor-card {
+  position: relative;
+  border: 1px solid rgb(110 130 160 / 0.32);
+  border-radius: 3px;
+  padding: 1.9rem 1.7rem;
+  background: linear-gradient(168deg, rgb(40 50 66 / 0.5) 0%, rgb(28 32 42 / 0.12) 55%, rgb(26 21 18 / 0) 100%);
+  box-shadow: 0 1px 0 rgb(200 220 255 / 0.1) inset;
+}
+
+/* Azulejo corner diamonds. */
+.sponsor-card::before,
+.sponsor-card::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  background: var(--azul-deep);
+  transform: rotate(45deg);
+  opacity: 0.7;
+}
+
+.sponsor-card::before {
+  top: 10px;
+  left: 10px;
+}
+
+.sponsor-card::after {
+  bottom: 10px;
+  right: 10px;
+}
+
+.sponsor-name {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--azul);
+  margin: 0 0 0.5rem;
+}
+
+.sponsor-card h4 {
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 60, 'SOFT' 50, 'WONK' 1;
+  font-weight: 560;
+  font-size: 1.35rem;
+  line-height: 1.15;
+  color: var(--bone);
+  margin: 0 0 0.6rem;
+  text-wrap: balance;
+}
+
+.sponsor-alt {
+  font-size: 0.8rem;
+  color: var(--smoke);
+  margin: -0.2rem 0 0.6rem;
+}
+
+.sponsor-claim {
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--bone);
+  margin: 0 0 1.2rem;
+}
+
+.sponsor-detail {
+  margin: 0;
+  border-top: 1px solid rgb(110 130 160 / 0.22);
+  padding-top: 1.1rem;
+}
+
+.sponsor-detail dt {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--azul);
+  margin: 0 0 0.35rem;
+}
+
+.sponsor-detail dd {
+  font-size: 0.9rem;
+  line-height: 1.62;
+  color: var(--bone-dim);
+  margin: 0 0 1.15rem;
+}
+
+.sponsor-detail dd:last-child {
+  margin-bottom: 0;
+}
+
+.sponsor-card code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: rgb(143 169 201 / 0.12);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+.sponsor-card strong {
+  color: var(--bone);
+}
+
+.hackathon-honesty {
+  margin-top: 3rem;
+  border: 1px solid var(--umber);
+  border-left: 3px solid var(--iron);
+  border-radius: 3px;
+  padding: 1.4rem 1.6rem;
+  max-width: 62rem;
+}
+
+.hackathon-honesty h3 {
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 60, 'SOFT' 50, 'WONK' 1;
+  font-weight: 560;
+  font-size: 1.2rem;
+  color: var(--bone);
+  margin: 0 0 0.7rem;
+}
+
+.hackathon-honesty p {
+  color: var(--bone-dim);
+  font-size: 0.93rem;
+  line-height: 1.65;
+  margin: 0 0 0.8rem;
+}
+
+.hackathon-honesty p:last-child {
+  margin-bottom: 0;
+}
+
+.hackathon-honesty code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: rgb(232 224 210 / 0.08);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
 /* --------------------------------------------------------------- colophon */
 
 .colophon {
+  position: relative;
   padding: 4rem var(--gutter) 3rem;
   border-top: 1px solid var(--umber);
   background: var(--kiln);
+  overflow: hidden;
+}
+
+/* The ghost wordmark: poster-scale, outlined, half-buried below the fold line. */
+.ghost {
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 60, 'WONK' 1;
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(5rem, 17vw, 15rem);
+  line-height: 0.8;
+  letter-spacing: -0.02em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(232 224 210 / 0.09);
+  user-select: none;
+  pointer-events: none;
+  text-align: center;
+  margin: 2.5rem 0 -0.36em;
+  white-space: nowrap;
+}
+
+.stamp {
+  float: left;
+  width: 46px;
+  height: 60px;
+  margin: 0.2rem 1rem 0.3rem 0;
+  opacity: 0.9;
 }
 
 .colophon-grid {
@@ -937,7 +1266,8 @@ a {
   }
 
   .pulse,
-  .scroll-hint {
+  .scroll-hint,
+  .ticker-track {
     animation: none;
   }
 

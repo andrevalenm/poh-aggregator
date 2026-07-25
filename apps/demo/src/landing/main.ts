@@ -1,7 +1,7 @@
 import './landing.css'
 import { DEFAULT_REGISTRY, makeClient } from '../client.ts'
 import { h, shortAddr } from '../ui.ts'
-import { mountFingerprint } from './fingerprint.ts'
+import { mountFingerprint, stampPrint } from './fingerprint.ts'
 import { mountSmudge } from './smudge.ts'
 import { mountWidget } from './widget.ts'
 
@@ -140,6 +140,32 @@ function mountReveals(): void {
   for (const el of els) io.observe(el)
 }
 
+// ------------------------------------------------------------ torn edges
+
+/**
+ * Section joins are torn, not cut. Each divider is a seeded jagged polygon — same idea as
+ * the print: deterministic, hand-made-looking, no image asset.
+ */
+function mountTornEdges(): void {
+  let s = 0x7041
+  const rand = () => {
+    s = (s * 1103515245 + 12345) & 0x7fffffff
+    return s / 0x7fffffff
+  }
+  for (const svg of document.querySelectorAll<SVGElement>('svg[data-torn]')) {
+    svg.setAttribute('viewBox', '0 0 100 24')
+    const pts: string[] = ['0,24']
+    for (let x = 0; x <= 100; x += 1.6 + rand() * 1.8) {
+      const y = 4 + rand() * 15 + Math.sin(x * 0.35) * 2.5
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`)
+    }
+    pts.push('100,24')
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
+    poly.setAttribute('points', pts.join(' '))
+    svg.append(poly)
+  }
+}
+
 // -------------------------------------------------------------------- mount
 
 mountFingerprint(document.getElementById('print') as HTMLCanvasElement)
@@ -147,6 +173,15 @@ mountSmudge(document.getElementById('smudge') as HTMLCanvasElement)
 mountWidget()
 mountPicker()
 mountReveals()
+mountTornEdges()
+
+// Seamless ticker: the track needs its content twice for the -50% translate loop.
+const tickerTrack = document.getElementById('ticker-track')
+if (tickerTrack) tickerTrack.innerHTML += tickerTrack.innerHTML
+
+// The colophon stamp: the same print, pressed small in iron.
+const stamp = document.getElementById('stamp') as HTMLCanvasElement | null
+if (stamp) stampPrint(stamp, '#b1401f', 0.95)
 document.querySelectorAll<HTMLButtonElement>('.copy-btn[data-copy]').forEach((btn) => {
   btn.addEventListener('click', async () => {
     try {
