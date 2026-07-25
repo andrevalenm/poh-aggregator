@@ -1,4 +1,4 @@
-import { createPublicClient, http, isAddress, type PublicClient } from 'viem'
+import { createPublicClient, getAddress, http, isAddress, type PublicClient } from 'viem'
 import { mainnet, sepolia } from 'viem/chains'
 import { normalize } from 'viem/ens'
 import { loadOntology } from './ontology.ts'
@@ -125,15 +125,30 @@ export class Corroborate {
    * listed addresses have not countersigned, and scoring flags exactly that.
    */
   async resolveSubject(nameOrAddress: string): Promise<{ address: Address; name?: string; declaredSubjects?: Address[] }> {
-    if (isAddress(nameOrAddress)) return { address: nameOrAddress as Address }
+    // Trim before the address check: a space-padded address is still an address, and
+    // failing that check sends it into ENS normalization, which rejects the spaces with a
+    // baffling "disallowed character" error. Callers paste with whitespace constantly.
+    const trimmed = nameOrAddress.trim()
+    if (trimmed === '') throw new Error('empty subject: pass an address or ENS name')
+    // Accept any valid 20-byte hex address regardless of case — checksum casing is a
+    // typo-guard, not an identity, and users paste lowercase constantly. Return it
+    // checksummed so downstream comparisons are canonical.
+    if (isAddress(trimmed, { strict: false })) return { address: getAddress(trimmed) }
 
     const client = this.#ensClient()
-    const name = normalize(nameOrAddress)
+    let name: string
+    try {
+      name = normalize(trimmed)
+    } catch {
+      // Not an address and not a normalizable name — say so plainly rather than leaking a
+      // normalization internal error.
+      throw new Error(`not an address or a valid ENS name: "${nameOrAddress}"`)
+    }
     const [address, subjectsRecord] = await Promise.all([
       client.getEnsAddress({ name }),
       client.getEnsText({ name, key: 'corroborate.subjects' }).catch(() => null),
     ])
-    if (!address) throw new Error(`could not resolve "${nameOrAddress}"`)
+    if (!address) throw new Error(`ENS name does not resolve to an address: "${trimmed}"`)
 
     const declared = (subjectsRecord ?? '')
       .split(',')
@@ -142,7 +157,7 @@ export class Corroborate {
 
     return {
       address,
-      name: nameOrAddress,
+      name: trimmed,
       ...(declared.length ? { declaredSubjects: declared } : {}),
     }
   }
