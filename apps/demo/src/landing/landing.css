@@ -387,9 +387,11 @@ a {
   animation-delay: 0.9s;
 }
 
+/* from-opacity is 0.02, not 0: the browser then paints the hero copy on the first
+ * frame (LCP fires at FCP) while the entrance still reads as a fade-up. */
 @keyframes surface {
   from {
-    opacity: 0;
+    opacity: 0.02;
     transform: translateY(22px);
   }
   to {
