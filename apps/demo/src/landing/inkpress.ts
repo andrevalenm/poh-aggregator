@@ -82,7 +82,10 @@ export function mountInkPress(): void {
 
     // Bare sheet: a small thumb blot that soaks in and fades. Skip text-ish targets.
     if (target.closest('input, textarea, a, button, [role="tab"], pre, code')) return
-    const night = target.closest('.install, .hackathon, .colophon') != null
+    // The azulejo tiles are cream — paper ink there, bone ink only on true night ground.
+    const night =
+      target.closest('.sponsor-card') == null &&
+      target.closest('.install, .hackathon, .colophon') != null
     const blot = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     blot.setAttribute('viewBox', '-1.3 -1.3 2.6 2.6')
     blot.classList.add('sheet-blot')
