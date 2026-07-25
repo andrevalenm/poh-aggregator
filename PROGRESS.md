@@ -1330,3 +1330,155 @@ we score, since the identifier comes from the proof, but it would change anyone'
 cluster fleets by funder). Iteration 1's two notes still stand and are Hugo's calls, not
 blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md`
 says to run it, and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
+
+## Iteration 11 — 2026-07-25
+
+**Did:** P1 — **ENS as the carrier of agent identity**, the one remaining mission item that
+every iteration since 1 has recorded as *blocked on Hugo registering a mainnet name*. It was
+not blocked, and the block was the interesting part.
+
+- **Sepolia `.eth` registration is free and instant today.** Iteration 0's inherited verdict
+  (`b33e5d6`: "the artifact controller is deployed but `controllers()` = false on the canonical
+  registrar, no `NameRegistered` events in recent history, the deployment is mid-migration") was
+  drawn from the wrong contract and a wrong event topic. Read from the chain instead:
+  `owner(namehash("eth"))` → `0x57f1…eA85`, the canonical BaseRegistrar;
+  `keccak256("NameRegistered(uint256,address,uint256)")` is **`0xb3d98796…70d9`**, and there
+  were **13 registrations in the last 10,000 blocks**; every one went to `0xdF60…7078`, for
+  which `controllers()` returns true; Sourcify has that address verified, **exact match**, as
+  `TestnetV1PremigrationRegistrar` — *"free testnet-only v1 registration controller that
+  immediately reserves names in ENSv2"*. No commit/reveal, no price oracle, `_refund()` returns
+  any ETH you send. ≥3 characters, ≥28 days. The migration made Sepolia *easier*, not harder.
+  `corroborate.eth` is now ours on Sepolia until 2027-07-25, with three agent subnames.
+- **The records, and why the second one is the whole increment.** An agent's name publishes
+  `corroborate.human`; the human's name publishes `corroborate.agents` back, beside the
+  `corroborate.subjects` record that already existed. `packages/sdk/src/ens-agents.ts` resolves
+  a name into an agent wallet, the human behind it, that human's declared address set, the
+  strength of the binding and the tree it sits in — public infrastructure only, no API key.
+- **The finding: a self-published binding makes iteration 10's per-human cap free to evade.**
+  `maxAgentsPerHuman` groups agents by the human they *name*. AgentBook's identifier is a
+  nullifier hash and cannot be minted; an ENS record is whatever the agent wrote there, and
+  addresses are free — so an operator names a fresh wallet per agent, every agent is its own
+  human, and **the cap binds nothing while every individual answer stays true**. Nothing looks
+  wrong: nobody is refused and no rule reports a failure. The live tree runs the attack against
+  us. `unverified.corroborate.eth` names an address that is *already in `corroborate.eth`'s own
+  `corroborate.subjects` list*, takes a second slot, and inherits a **3.6087** credential set
+  (Holonym gov-ID + FaceTec biometrics + Human Passport) it never acquired.
+- **The fix is the other direction, not more cryptography.** A binding both ends assert is
+  `mutual`; the acknowledgement costs a transaction from the key controlling the human's name,
+  so minting humans stops being free and each mint is *visibly* a separate human with its own
+  (usually empty) credential set. `FleetPolicy` gains `requireAttestedBinding`, `HumanBacking`
+  gains a `binding` strength (`attested` from a proof or a mutual record, `asserted` from one
+  side), and the check runs **before** slot allocation — the same ordering rule the score gates
+  follow, so an agent refused on its binding never burns a sibling's allowance. New caveat
+  `fleet-cap-soft-on-asserted-bindings` fires whenever a policy admits one-way claims.
+- **A name tree can be counted but never named.** `setSubnodeRecord` takes the label *hashed by
+  the caller*, so the string appears in no transaction field, event or storage slot anywhere.
+  `scanNameTree()` reads the registry's `NewOwner` log, which still gives an exact count, owners
+  and creation blocks — so slot allocation can be `earliest-registered` with the *chain* deciding
+  which sibling keeps the slot, and a counterparty can learn a tree holds agents it was not
+  shown. Candidate labels are hashed and matched; the remainder is reported as unnamed subnodes.
+  **Deliberately no endpoint canary**, unlike `agentbook.ts`: there an empty answer makes every
+  human look like they run one agent (permissive), here it can only fail to reveal agents beyond
+  those already presented, so the window is reported and the count documented as a lower bound.
+- **Two defects fixed on the way, one of them pre-existing.**
+  1. **One wallet, several names** — ordinary in ENS, and `evaluateFleet` keys agents by address.
+     Two names for one wallet were judged twice, the trace showing only the last verdict, and a
+     cap of one could refuse a wallet on account of its own second name. `toFleetAgents()` now
+     collapses them into one agent, takes the earliest creation block, and lets an
+     acknowledgement on *any* of the names settle the binding. Names disagreeing about *which*
+     human owns the wallet produce `unknown` → `indeterminate`, because a contradiction is not a
+     fact about a person.
+  2. **The engine named the wrong registry in its own trace.** `human-identified` read "AgentBook
+     maps this wallet to human …" for every backing, which became false the moment a second
+     registry existed. Source-neutral now.
+- **The registrar's atomic-records path cannot work, and the revert says nothing.** The
+  registration struct carries `bytes[] data` forwarded to `multicallWithNodeCheck` — the obvious
+  way to register with records already set. It reverts with no reason data. `_registerV1` calls
+  `ENS_REGISTRY.setRecord(namehash, registration.owner, …)` *before* calling the resolver, and
+  PublicResolver authorises on registry ownership, so the controller is no longer the owner when
+  the multicall lands; `multicall` bubbles that through a bare `require`. Confirmed by
+  simulating `setText` from both addresses (owner succeeds, controller reverts). Records are
+  therefore written in follow-up transactions, and a missing `corroborate.human` is treated as
+  "not an agent name" rather than as an error.
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd packages/sdk && npm test` → `# tests 314 # pass 314 # fail 0 # skipped 0` (was
+  276/274/0/2 at iteration 10: **+24 ENS unit, +14 ENS live**, and iteration 6's two Verax
+  subgraph skips answered this time rather than returning HTTP 429 — untouched by this work).
+- `node --test --experimental-strip-types src/ens-agents.live.test.ts` → **14/14, `skipped 0`,
+  three consecutive runs.**
+- `npm run build` clean; `tsc -p tsconfig.json --noEmit` clean; `packages/mcp` builds clean.
+- `cd apps/demo && npx playwright test` → `13 passed`.
+- `cd apps/agent && npm start` (the World flow, which this iteration changed underneath) → run 1
+  DENY, run 2 ALLOW (3.6153 over 5 roots), run 3 DENY naming the sibling, run 4 **admitted 1 of
+  27** with the $5.50/$148.50 price line. Unchanged from iteration 10.
+- `cd apps/agent && npm run ens` end to end: 3 subnodes enumerated from the registry log,
+  3 names resolved, 2 humans scored (**3.6100 over 4 roots** and **3.6087 over 3**), then
+  **2 of 3 admitted** under the policy as written and **1 of 3** with `requireAttestedBinding`.
+- `node scripts/ens-agents-setup.mjs` is idempotent and re-verifies: re-running prints "already
+  registered", rewrites nothing, and reads every field back before writing
+  `deployments/ens-sepolia.json`.
+- The acceptance `MISSION.md` asks for — *"an agent's ENS name resolving records that name the
+  backing human, the counterparty resolving that name and checking the human's personhood before
+  agreeing to anything, and a second agent under the same name tree being refused because it is
+  the same human … end-to-end test against a real testnet name, no hard-coded values anywhere in
+  the demo path"* — is `src/ens-agents.live.test.ts` plus `npm run ens`. The refusal names the
+  sibling holding the slot, and the sibling that keeps it is the one the **chain** says was
+  created first. The only input to either is the parent name in `deployments/ens-sepolia.json`;
+  wallets, humans, acknowledgements, creation blocks, subnode counts and scores are all read at
+  run time, and the live test asserts the deployment file against the chain rather than trusting
+  it.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved — this is an
+identity layer over the ontology, not an edit to it — so a reseed would bump `revision` to record
+nothing. Registry stays at **30 adapters, revision 34**.
+
+**Committed:** `d730e4a` feat(sdk): ENS carries agent identity — and the acknowledgement that makes it enforceable
+
+**Next, in the order I would do it:**
+
+1. **AgentBook registrations still have no date in the World probe.** Iteration 10's next-step 1,
+   unchanged: `world-id-orb` sourced from AgentBook is undated, and an undated credential on a
+   `Decay` curve scores at freshness 1 — full weight, forever. The index built in iteration 10
+   has the block of every registration, so the fix is cheap. Visible in `npm start`'s gate 3
+   today (`issuance-date-unknown` at the full 50c). Small in magnitude (~7% on a four-month-old
+   registration against a 1,095-day half-life) but it is the last undated credential in the
+   roster and the same defect shape iteration 7 called a scoring bug.
+2. **Base EAS subgraph**, replacing the `easscan.org` GraphQL dependency in
+   `coinbaseVerificationAdapter` — the last vendor on the critical path, and the last place the
+   repo contradicts its own stated principle. Note the constraint measured in iteration 9: the
+   self-hosted graph-node here would need a Base network added to its config, which is a
+   container change this mission forbids, so this is Studio or nothing.
+3. **A signature gate for the ENS path.** `agent-presenter-not-authenticated` fires on every
+   batch because resolving a name does not establish that the presenter controls the wallet the
+   name points at. The World flow already does this with CAIP-122, and the three agent wallets'
+   keys are in `.env.local` for exactly this reason, so it is a contained piece of work.
+4. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
+   the cheapest way to turn two flagged approximations into real dates (iteration 1's next-step
+   1, unchanged through ten iterations).
+
+**Measured while working, worth keeping:** Sepolia log endpoints are the mirror image of World
+Chain's. `ethereum-sepolia-rpc.publicnode.com` — the endpoint the rest of the SDK uses for
+Sepolia *state* — refuses every historical `eth_getLogs` with "Archive requests require a
+personal token", which is the honest failure; `sepolia.drpc.org` serves 10,000-block ranges and
+**errors** above that rather than truncating (contrast the same provider's World Chain endpoint,
+which iteration 10 caught answering `[]` for ranges holding 39 logs). `rpc.sepolia.org` returns
+HTML, `1rpc.io` is over quota, `eth-sepolia.public.blastapi.io` is discontinued. Also: viem's
+Sepolia UniversalResolver (`0xeeee…eeee`) resolves both 2LDs and subnames correctly today — the
+earlier note that it "rejects `registry()`" did not affect `getEnsAddress`/`getEnsText`, which
+is all the SDK uses.
+
+**Blocked:** nothing. Two things left deliberately undone and written down rather than guessed:
+**merging humans whose declared subject sets overlap** (our own tree shows the overlap, and
+`declared-humans-share-a-wallet` reports it — but the sets are self-asserted, so merging on them
+would let anyone absorb a stranger by copying their record) and **clustering an agent wallet to
+an operator by funding history** (a guess that reads as an accusation when it is wrong). Both are
+the same principle iteration 10 applied to the 27-agent operator. Iteration 1's two notes still
+stand and are Hugo's calls, not blockers: `./test.sh` lives at `apps/demo/test.sh` rather than
+the repo root where `MISSION.md` says to run it, and `pnpm-lock.yaml` is still untracked beside a
+tracked `package-lock.json`. New and minor: `.env.local` gained three agent wallet keys
+(`AGENT_ALPHA_PRIVATE_KEY`, `AGENT_BETA_PRIVATE_KEY`, `AGENT_UNVERIFIED_PRIVATE_KEY`), generated
+by `scripts/ens-agents-keys.mjs`, holding no funds and needed only to re-run the setup script or
+to build next-step 3.
