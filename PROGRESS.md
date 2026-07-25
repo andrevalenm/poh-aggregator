@@ -1713,3 +1713,151 @@ still untracked beside a tracked `package-lock.json`. Its first note — `./test
 path — is now half-resolved: the script works, but it lives at `apps/demo/test.sh` rather than the
 repo root where `MISSION.md` says to run it. Moving it is a one-line `git mv` somebody should
 approve rather than an agent doing it unasked.
+
+## Iteration 15 — 2026-07-25
+
+**Did:** iteration 14's own next-step 1, and the oldest open item on the ENS track — **the ENS
+path now authenticates whoever is presenting the name.** `agent-presenter-not-authenticated`
+had fired on every batch since iteration 11 and been carried forward as the top next-step three
+times. It reported a real hole and reported it honestly: a name is public, and so is everything
+read from it. Anyone could type `alpha.corroborate.eth` into a counterparty's form and be scored
+on the credentials of the human behind it — riding a stranger's evidence with no key, no
+transaction and no trace, while the counterparty's own log named a party that was never there.
+Every individual answer stays true, which is what makes it worse than not knowing.
+
+New `packages/sdk/src/ens-presentation.ts`: an ERC-4361 challenge the counterparty issues, a
+signature the presenter returns, and one comparison against the `addr` record read in the same
+pass. Four decisions in it matter more than the code.
+
+- **The wallet signs, not the node owner.** Both keys exist and prove different things. The
+  wallet proves the presenter is the party the name currently designates — the party about to be
+  transacted with, and the key the fleet slot is allocated to (`toFleetAgents` groups by wallet,
+  not by name). The owner would prove only control of the *name*, so an operator pointing a name
+  at a wallet it does not hold could then present as that wallet, which is the impersonation the
+  gate exists to stop. Whether the signer *also* owns the node is reported (`signerIsNodeOwner`,
+  caveat `agent-signer-owns-the-name`) because it says whether the key in front of you can
+  rewrite the records you just read — never as a condition. On the live tree they are different
+  addresses (`0xA83378d2…C922` signs, `0xE3C03709…BF87` owns) and a test asserts it.
+- **The name is inside the signed message**, as `ens:<name>` under ERC-4361 `Resources`, and a
+  signature carrying any other name is refused. Without it, one signature authenticates its
+  signer for *every* name in the tree pointing at that wallet, and a signature collected for one
+  name can be presented for another. A signature that does not name what it authorises is a
+  bearer token. Both the unit suite and the live suite prove this with the **same nonce** on both
+  challenges, so the refusal can only be coming from the name binding.
+- **The gate runs before the grouping, not merely before the slot allocation.** An impostor
+  presenting a stranger's name must not be counted as one of that human's agents: grouping first
+  would let it inflate a stranger's fleet size and then have the stranger refused by the cap for
+  agents they never ran. Everything counted per human is now counted over the agents that
+  survived the gate, and a unit test asserts `largestFleet`, `deniedByCap` and the human's agent
+  list all stay clean under exactly that attack.
+- **Failure is three-valued.** A wrong-key signature is a fact about the presenter and is a
+  denial. A smart-account signature (ERC-1271/6492) needs a chain read, and a failed read says
+  nothing about anybody, so it comes back `unknown` → `indeterminate` — the same rule every probe
+  in this SDK follows. An EOA never touches the network at all: local recovery first, chain
+  second, so the common path cannot be broken by an endpoint being down. Verification also never
+  burns a nonce — doing so would spend an honest presenter's nonce on a malformed retry, and
+  replay state belongs to the counterparty that issued it.
+
+- **Error copy is per-failure, not boolean.** Eleven named failures (`wrong-domain`, `wrong-uri`,
+  `wrong-chain`, `wrong-name`, `expired`, `nonce-not-issued`, `signer-is-not-the-name`, …), each
+  with a sentence a presenter can act on. "Signature invalid" and "you signed with the wrong
+  wallet" are the same thing to a boolean and completely different instructions to a person.
+- **`requirePresenterAuthentication` is the policy flag**, off by default for the same reason
+  `requireAttestedBinding` is: the World AgentKit path authenticates at the HTTP layer before it
+  ever reaches this engine, and a policy demanding proof from a caller with no channel to collect
+  it refuses everybody. That flow now carries its CAIP-122 result *into* `evaluateFleet` instead
+  of leaving it implicit, so the new caveat counts only agents that really presented nothing — a
+  sibling discovered by scanning AgentBook's log is not asking for anything and is expected to
+  carry none.
+- **Message construction and parsing are viem's `viem/siwe`**, not string concatenation: ERC-4361
+  has field-ordering rules, and a message the counterparty builds one way and a wallet renders
+  another way is a signature nobody can check. Field *validation* is ours, because
+  `validateSiweMessage` returns a bare boolean and a boolean cannot tell a presenter which field
+  was wrong.
+
+**Verified:** on this box, at this commit.
+
+- `cd packages/sdk && npm test` → `# tests 389 # pass 386 # fail 2 # skipped 1`. **The two
+  failures are not this change** — see "Blocked" below. The same command was `382 / 382 / 0 / 0`
+  earlier in this same session, before an external writer touched the shared registry.
+- Everything this change touches, green: `node --test src/ens-presentation.test.ts
+  src/ens-agents.test.ts src/fleet.test.ts src/scoring.test.ts src/ontology.test.ts` →
+  **131/131, `skipped 0`** (31 of them new), and `node --test src/ens-presentation.live.test.ts
+  src/ens-agents.live.test.ts` → **21/21, `skipped 0`** (7 new).
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `npm run build` clean; `tsc -p tsconfig.json --noEmit` clean; `packages/mcp` builds clean.
+- `cd apps/demo && npx playwright test` → `13 passed`.
+- `cd apps/agent && npm start` → verdicts unchanged: DENY / ALLOW 3.6153 over 5 roots / DENY
+  naming the sibling / DENY `admitted 1 of 27`.
+- `cd apps/agent && npm run ens` end to end, with two new runs. **Run 5**: each agent answers the
+  challenge with the wallet its name designates — **2 of 3 admitted**, the same result as without
+  the gate, because proof costs an honest agent nothing. **Run 6**: the same three names
+  presented by a wallet generated one second earlier (`0x593E69d8…2012` on that run), identical
+  records, identical human, identical score — **0 of 3**, each refusal naming the address the
+  name resolves to and the address that signed.
+- The acceptance the mission asks of this track — *"no hard-coded values anywhere in the demo
+  path"* — holds: the only input is still the parent name in `deployments/ens-sepolia.json`. The
+  challenge, the nonce, the signer, the address it is checked against and the impostor's key are
+  all produced at run time, and the live suite asserts the deployment file's addresses against
+  the chain rather than trusting them.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved — this is an
+authentication layer over the ontology, not an edit to it.
+
+**Committed:** `0cf3e94` feat(sdk): the ENS path authenticates whoever is presenting the name
+
+**Blocked — and it is not this work.** Two tests in `as-of.live.test.ts` are red because the
+**deployed Sepolia registry moved underneath this working copy while the iteration was running.**
+Another writer added two adapters at block **11,349,413**, `2026-07-25T18:29:48Z`, taking the
+registry from 30 adapters / revision 34 to **32 / revision 36**:
+
+| id | name | trust root | tx |
+|---|---|---|---|
+| `human-passport-eas` | Human Passport score (EAS attestation) | `behavioral:wallet-history` | `0x14302f54…e46f` (rev 35) |
+| `lens-account` | Lens account (Lens Chain) | `0x35eda994…4a46` (root name not in this tree) | `0xe5b5ebdd…bab9` (rev 36) |
+
+This tree's `ontology/adapters.json` still has 30 entries, so `loadOntology()` falls back to
+hashes for both and the two tests that compare the indexer's reconstruction against the chain
+(`the ontology at the indexed head is the ontology the chain reports`) and pin the current
+revision (`the same credential scores differently against the ontology of that morning`, expects
+34, gets 36) fail. Confirmed independent of this change: `npm test` was 382/382/0/0 at the start
+of this session, the write landed at 18:29 UTC, and neither test's path touches anything this
+commit edits.
+
+**I did not fix it, deliberately.** The full records are readable from the registry, so the
+fields could be copied — but both cite research files that **do not exist in this working copy**
+(`research/protocols/gitcoin-passport.md`, `research/protocols/lens-onchain-read.md`), and
+`lens-account` sits on a trust root this tree has no plaintext name for. Writing entries whose
+`sourceURI` points at files nobody here has read is exactly what `MISSION.md` rule 5 forbids, and
+`ontology.test.ts` asserts against it on purpose. The other tree holds the missing half; merging
+the two is Hugo's call, and it is item 18 in `MORNING.md`.
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — pull the tree that wrote revisions 35
+   and 36, or re-seed from this one. Until then two as-of tests stay red and any as-of score
+   spanning block 11,349,413 is computed against an ontology this repo cannot name. It is the
+   only red in the suite.
+2. **`as-of` for Base.** Iteration 14 established the precondition — Coinbase's index answers
+   historically and is not backfilled — so `resolve(addr, { asOf: block })` could cover that
+   credential too. Constraint: only tenderly serves archive `eth_call` on Base among the keyless
+   endpoints, and it rate-limits, so this is a demo path and not a hot path.
+3. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
+   the cheapest way to turn two flagged approximations into real dates. Iteration 1's next-step 1,
+   unchanged through fourteen iterations, and still the oldest thing on the list.
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read
+   appears. Iteration 7's measurement stands: neither leaves per-holder state on any chain.
+
+**Worth keeping, because it generalises.** The three-valued failure is the same shape as every
+probe in this SDK, and it turned out to matter here in a way it does not for a probe: an EOA
+signature is *pure arithmetic*, so putting local recovery first means the ordinary agent
+authenticates with no RPC in the path at all, and only the smart-account case can be degraded by
+an endpoint. Cheap authentication that cannot be rate-limited is the same property the adapters
+chase by refusing vendor endpoints — the reason is identical and it is worth saying once: any
+part of a decision an adversary can reach without touching a chain is a part of the decision they
+can move.
+
+**Also blocked, unchanged:** iteration 1's second note stands and is Hugo's call — `pnpm-lock.yaml`
+is still untracked beside a tracked `package-lock.json`. `./test.sh` works but lives at
+`apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it; moving it is a
+one-line `git mv` somebody should approve.
