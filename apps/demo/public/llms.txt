@@ -1,0 +1,32 @@
+# Corroborate
+
+> Proof of personhood, aggregated. One SDK over every proof-of-personhood protocol,
+> scored by what an adversary would actually pay to fake it. Scores are computed
+> client-side against live chains; the on-chain registry stores protocols, never people.
+
+Corroborate answers "is there a human behind this address, and what would faking that
+cost?" It reads World ID (Orb, via AgentBook on World Chain), Proof of Humanity v2 and
+Circles v2 (Gnosis), and Coinbase Verifications (EAS on Base) — permissionlessly, no
+vendor API on the critical path. Scoring rule: saturate within a trust root, sum across
+roots; each credential priced at min(forge_cost, rent_cost), age-weighted (Decay for
+liveness/KYC, survival Ramp for vouching registries). Every result carries caveats,
+including the permanent `independent-control-not-attested`. `isHuman(threshold)` throws
+unless the caller chooses an explicit threshold.
+
+## For agents
+
+- MCP server: `npx -y @corroborate/mcp` — tools: lookup_personhood, check_personhood,
+  explain_trust_roots, explain_weight_history
+- SDK: `npm install @corroborate/sdk` — `new Corroborate().resolve('name.eth')`
+- Registry (Sepolia): 0x977b028b900cce8ee89c46877e814eff3060aa07 — adapters, trust roots,
+  forge/rent costs in cents, age curves; every weight change is an auditable event
+- Protocol subgraph: https://api.studio.thegraph.com/query/77602/poh/version/latest
+- Weight audit trail: http://37.27.67.44:8100/subgraphs/name/corroborate-registry
+
+## Pages
+
+- / : landing with a live lookup ledger (real RPC probes, threshold slider, full evidence)
+- /app.html : the console — full workbench with the additive-vs-root-cost comparison
+
+Built at ETHGlobal Lisbon 2026. Weights are dated, sourced human judgments — not
+measurements — and live on-chain with their sources.

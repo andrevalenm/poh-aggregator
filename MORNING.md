@@ -65,6 +65,11 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Late-run additions**: threshold slider carries scale ticks at the SDK's exported
+Thresholds (lenient/standard/strict — the instrument teaches the API), social card
+regenerated from the finished hero, README opens with the card + all live links,
+public/llms.txt (an MCP-first product should speak to agents), ticker pauses on hover.
+
 **Round-2 jury verdict: 7/10 → fixes landed for the named path to 8.5.** Confirmed good:
 10 of 12 round-1 fixes (tear, choreography, numeric canon, recomposition at 1440…). The
 three shipping bugs it found are fixed: 768 sponsor grid (was two viewport-heights of
