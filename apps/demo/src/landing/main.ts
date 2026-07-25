@@ -277,13 +277,19 @@ function mountScroll(): void {
   }
   requestAnimationFrame(raf)
 
-  // Anchor links glide instead of jumping.
+  // Anchor links glide instead of jumping. Lenis's element-target overload computes the
+  // destination from its internal animatedScroll, which drifts after Lenis-driven
+  // scrolling (QA repro: every click landed at target + currentScroll, never converging).
+  // So: hard-resync internal state to reality, then animate to an absolute number we
+  // compute ourselves.
   for (const a of document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')) {
     a.addEventListener('click', (e) => {
       const target = document.querySelector(a.getAttribute('href') ?? '')
       if (!target) return
       e.preventDefault()
-      lenis.scrollTo(target as HTMLElement, { offset: 0, duration: 1.4 })
+      const top = Math.round(target.getBoundingClientRect().top + scrollY)
+      lenis.scrollTo(scrollY, { immediate: true })
+      lenis.scrollTo(top, { duration: 1.4 })
     })
   }
 }
@@ -334,5 +340,20 @@ if (tickerTrack) tickerTrack.innerHTML += tickerTrack.innerHTML
 // The colophon seal: the same print, pressed small in iron.
 const stamp = document.getElementById('stamp') as HTMLCanvasElement | null
 if (stamp) stampPrint(stamp, '#a6431f', 0.95)
+
+// Static copy buttons (the SDK install line) — wired through the same fallback-aware
+// copyText as the generated ones. This binding was lost once in a refactor; QA caught a
+// dead button, so it lives next to the boot sequence now.
+document.querySelectorAll<HTMLButtonElement>('.copy-btn[data-copy]').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const ok = await copyText(btn.dataset['copy'] ?? '')
+    btn.textContent = ok ? 'copied' : 'select it'
+    if (ok) btn.classList.add('copied')
+    setTimeout(() => {
+      btn.textContent = 'copy'
+      btn.classList.remove('copied')
+    }, 1600)
+  })
+})
 
 void paintRegistryLine()
