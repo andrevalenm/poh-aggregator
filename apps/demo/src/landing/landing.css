@@ -2141,3 +2141,21 @@ html.js .reveal.in {
     display: none;
   }
 }
+
+/* --- sponsor marks (agent) --- */
+/* Official marks set inline with the kicker: cobalt on the cream tile, sized to
+   the 0.72rem mono cap-height so they read as ornament, not brand soup. */
+.sponsor-name {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.sponsor-mark {
+  width: 17px;
+  height: 17px;
+  display: block;
+  flex: none;
+  opacity: 0.88;
+}
+/* --- end sponsor marks (agent) --- */
