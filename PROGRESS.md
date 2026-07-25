@@ -2700,3 +2700,146 @@ root-owned `.git` objects (`git add` and `git commit` both worked this iteration
 hashes did not land in `f5`/`fe` — so the lottery is still running and the fix is still needed),
 and iteration 1's two notes, `pnpm-lock.yaml` untracked beside a tracked `package-lock.json` and
 `MISSION.md` pointing at a `./test.sh` that lives at `apps/demo/test.sh`.
+
+## Iteration 21 — 2026-07-25
+
+**Did:** iteration 19's next-step 3 / iteration 20's next-step 2 — **pin Passport's attester**. It
+was the cheapest remaining correctness item and it did not want the fix the queue proposed.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: the same two tests in `as-of.live.test.ts` are red and nothing
+else is. MORNING "Needs you" item 18 stands, unchanged for a seventh iteration.
+
+**The queue said "pin it the way Holonym's issuer is pinned". A constant would have been wrong.**
+The Passport probe reads one mapping and derives everything from it, so its whole authority model
+was one unverified sentence: *a cached score is Passport's, or it is nobody's*. The resolver
+enforces that itself, on two independent grounds, and publishes both anchors as public getters:
+
+```solidity
+function attest(Attestation calldata a) external payable whenNotPaused onlyAllowlisted {…}
+function _attest(Attestation calldata a) internal { if (a.attester != address(_gitcoinAttester)) revert InvalidAttester(); … }
+```
+
+- **Moved one axis at a time, with a control.** `eth_call` to the live resolver on Optimism: from a
+  stranger with Passport's attester → revert `0x06fb10a9` `NotAllowlisted()`; from the EAS the
+  resolver names, with a stranger as attester → `0xb8daf542` `InvalidAttester()`; from EAS with
+  Passport's attester → **accepted**. The third row is not optional — without it the two reverts
+  prove only that the contract reverts, which a contract that reverts unconditionally also does.
+- **Nothing hard-coded, because the addresses are not one address.** The attester, the EAS and both
+  score schemas are read from the resolver at run time. There are **five distinct attesters across
+  the seven deployments** (`0x84382998…dB1a` Optimism, `0xCc90105D…F422` Base/Scroll/Shape,
+  `0x7848a357…0475` Arbitrum, `0xBC778313…10A2` Linea, `0x2B5D97CB…83cC` zkSync Era) and three
+  distinct EAS instances. A table of constants would have been five chances to be wrong about
+  somebody's identity, going stale in silence. Same discipline as `Decoder.gitcoinResolver()`.
+- **Three outcomes, and the asymmetry is the whole design.** `verified` → the credential stands and
+  `detail.attestation` names the uid. `rejected` (a record exists and contradicts) → **`held: false`**
+  with both keys named, that chain dropped and the choice made again over the rest, so one disowned
+  record cannot hide a genuine passport on another chain. `unchecked` (we could not look) → the
+  credential stands, note `issuer-check-unavailable` → caveat `credential-issuer-unverified`. That is
+  the rule at the top of `adapters/index.ts` applied one level up from presence: an RPC blip deciding
+  somebody is not a person is the same defect in the same direction. `unchecked` also has an innocent
+  cause worth naming rather than punishing — Passport rotating a schema leaves the old uid filed
+  under a key we no longer ask about.
+- **Which record to judge had to be decided, not assumed.** Passport files a uid per schema and mints
+  under two, so a subject who moved from the legacy score to score-v2 has two on file and only one
+  describes the struct we read. The resolver copies `attestation.time` verbatim into the cache, so
+  `time` is the discriminator. Judging the wrong one would have rejected a real passport.
+- **The deployed implementation is the source it claims to be, checked rather than assumed.**
+  `0x2999Ef5C…79dC`'s bytecode yields **34 `PUSH4` selectors and all 34 are accounted for** by
+  `passportxyz/eas-proxy`'s `GitcoinResolver.sol`, none left over. It has **no `onAttest`** at all —
+  it implements the older `attest(Attestation)` shape — which is why iteration 19's open question,
+  phrased against `onAttest`, had nothing to look up.
+- **Fixed a live-test defect of exactly the shape iteration 19 found.** `findCurrentMinter()` wrapped
+  `getLogs` but not the `getBlockNumber` before it, so a drpc rate limit threw uncaught and failed an
+  assertion about Passport rather than reporting an unreachable source. It now prints the refusal and
+  returns `undefined`, and the search is memoised — three tests want a minter and the endpoint that
+  serves that filter is free-tier.
+- **Measured, not waved at:** three probes on one adapter instance across seven chains went
+  **407/165/156 ms → 865/255/374 ms**. ~100–200 ms of warm latency, the largest single cost this
+  adapter has taken on, and worth stating rather than rounding to "negligible".
+- **Shape's `defaultCommunityId` is 335, not 0** — the one deployment where a non-default community
+  exists, so a subject scored under another community there is invisible to us *and to the Decoder*.
+  Coverage, not correctness, and written down rather than discovered later.
+
+**Verified:** on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → **18 passed; 0 failed**.
+- `cd packages/sdk && npm test` → `# tests 506 # pass 504 # fail 2 # skipped 0` (**+13** over
+  iteration 20's 493: 9 unit on `judgeBackingAttestation`, 4 live). The 2 failures are iteration
+  15's registry-drift pair, unchanged and untouched. Against Studio's `version/latest` rather than a
+  pinned version, 4 more in `live.test.ts` go red on a free-tier `Too many requests`; they are
+  **19/19 green against v0.0.3**, and `git stash` confirmed the same 4 fail without this commit — so
+  quota, not code.
+- `node --test src/adapters/human-passport.live.test.ts` → **12/12, 0 skipped**, three consecutive
+  runs. `human-passport.test.ts` → **18/18**, no network.
+- `CORROBORATE_SUBGRAPH_URL=…/poh/v0.0.3 ./apps/demo/test.sh` → **all suites green, exit 0**;
+  Playwright **13 passed**.
+- `npm run build` and `tsc --noEmit` clean in `packages/sdk`; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` → DENY / ALLOW **3.6178 over 6 roots** / DENY naming the sibling /
+  DENY `a fleet of 27 agents is still one human`. Unchanged from iteration 20 — a passport that
+  verifies is a passport that scores exactly as it did.
+- End to end on `0xb0812e00…90F2`: the lapsed window is unchanged (`issuedAt` 1740958699,
+  `heldUntil` 1748734699) and now carries
+  `attestation: {uid: 0x29896d05…4b31, attester: 0x84382998…dB1a, verified: true}`.
+- **The acceptance test the mission asks for** ("a live test that hits the real chain and asserts
+  the mechanism, not a magic number") is the three-row simulation, re-derived every run with the EAS
+  and the attester both read out of the resolver in the same run. Beside it: **the same real
+  attestation judged twice** — verifying against the attester the resolver enforces and rejected
+  against a stranger, which is how we know the check discriminates rather than passing everything
+  that happens to be on chain; and a test that the seven deployments really do name different
+  attesters, so the argument against a constant table is asserted rather than remembered.
+
+**Committed:** `d952da5` feat(sdk): a cached Passport score is Passport's or it is nobody's, and now
+we check. (`git commit` worked this time — iteration 19's root-owned-`.git` lottery did not bite.)
+
+**Write-up:** `research/protocols/passport-attester-pin.md` — the selector census, the source with
+both gates quoted, the three-row experiment with its control, the seven-chain address table, the
+three verdicts, everything refused and why, the cost table, and the residual. Indexed in
+`research/INDEX.md` (header recount: 40 files / ~25,300 lines). Open question 1 of
+`passport-and-linea-lapsed-credentials.md` struck through and answered. README gains honest limit
+12 and a paragraph under Human Passport; its test-count paragraph was two iterations stale (it
+claimed 506 total when 506 is now the SDK alone, and still described three skips waiting on a
+subgraph that landed in iteration 20) — corrected to 537 exist / 535 pass.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved: this changes
+what we are willing to believe about a credential, not what one is worth. `human-passport`'s `notes`
+gained the facts (an off-chain field; `setAdapter` does not carry it). Registry stays as the chain
+has it (32 adapters / revision 36, written by the other tree; this tree still has 30).
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15–20, still the
+   only *real* red in the suite, still Hugo's call.
+2. **Ask whether any other adapter's index flag can retire a credential the chain still honours** —
+   iteration 20's next-step 3, untouched. That is iteration 20's bug stated generally, and Circles was
+   found by accident rather than by looking. `pohIndexRead` maps `ended: Boolean(row.revoked)`, which
+   *is* a real revocation, so PoH is probably fine — but the audit is one grep and has never been done
+   deliberately.
+3. **Ask the same authority question of the adapters that have not been asked it.** This iteration
+   asked "who may write this record" of Passport and got a real answer. Coinbase's EAS attestation on
+   Base and World's `WorldIDAddressBook` have never been asked it; PoH v1/v2 and Circles are
+   permissionless registries where the question is different but not absent. §6 of the new write-up
+   has the two cheapest follow-ups for Passport itself: `owner()` on each of the seven resolvers
+   (which bounds the residual precisely — a multisig and an EOA are very different answers), and
+   whether `GitcoinAttester.verifiers` is one key.
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read appears.
+   Iteration 7's measurement stands: neither leaves per-holder state on any chain.
+
+**Worth keeping, because it generalises.** Iteration 20's lesson was *a getter can answer truthfully
+about the wrong subject; check that the answer moves with the argument*. This iteration is that
+lesson used deliberately instead of learned by accident, and it wants one addition: **when you move
+an argument to prove a gate exists, you also need the row where it opens.** Two reverts prove
+nothing on their own — a contract that reverts unconditionally produces the same two. The control is
+the assertion; the failures are the setup.
+
+The other one is about how the queue said to do this. The task was written as *pin the attester
+address*, and doing that would have shipped seven constants, five of them different, all silently
+rotatable. **When a protocol already enforces the thing you want to check, the fix is to read what
+it enforces, not to copy the value into your source.** The address was right there in iteration 19's
+notes, which is exactly what made the wrong fix so easy — a verified constant is still a constant.
+
+**Blocked:** nothing. Nothing new for Hugo this iteration; MORNING is untouched. Carried: iteration
+15's ontology/registry drift (Hugo), iteration 19's root-owned `.git` objects (still a ~1-in-128
+lottery per commit; did not bite this time), and iteration 1's two notes, `pnpm-lock.yaml` untracked
+beside a tracked `package-lock.json` and `MISSION.md` pointing at a `./test.sh` that lives at
+`apps/demo/test.sh`.
