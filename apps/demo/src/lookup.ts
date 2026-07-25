@@ -254,12 +254,48 @@ function resultView(result: PersonhoodResult): HTMLElement {
 
 // ------------------------------------------------------------------ driver
 
+/**
+ * Real, live example subjects so a first-time visitor never faces an empty input.
+ * All three are wallets found on-chain during the build — nothing curated by hand beyond
+ * that, and nothing here is special-cased in scoring.
+ */
+const EXAMPLES: { label: string; value: string }[] = [
+  {
+    label: 'Three wallets, three roots',
+    value:
+      '0x58b849f60b0515871fcfa80c7907d097571f2a12, 0xd267eba602e692216703626a81157214b24c85fb, 0x7D8459e2ca3f62E6d8599E98ebf8c42d88218C87',
+  },
+  { label: 'An Orb-verified wallet', value: '0x58b849f60b0515871fcfa80c7907d097571f2a12' },
+  { label: 'A 2024 PoH survivor', value: '0x17a91203a9e9c3519c2f76210497ef7f4be2352f' },
+]
+
 export function wireLookup(): void {
   const form = document.getElementById('lookup-form') as HTMLFormElement
   const input = document.getElementById('lookup-input') as HTMLInputElement
   const submit = document.getElementById('lookup-submit') as HTMLButtonElement
   const statusEl = document.getElementById('lookup-adapters') as HTMLElement
   const resultEl = document.getElementById('lookup-result') as HTMLElement
+
+  const examplesRow = h(
+    'div',
+    { class: 'examples-row' },
+    h('span', { class: 'muted' }, 'Try: '),
+    ...EXAMPLES.map((ex) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'example-chip',
+          onclick: () => {
+            input.value = ex.value
+            void run()
+          },
+        },
+        ex.label,
+      ),
+    ),
+  )
+  form.insertAdjacentElement('afterend', examplesRow)
 
   let inFlight = false
 

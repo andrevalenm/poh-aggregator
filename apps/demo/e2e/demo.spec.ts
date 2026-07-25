@@ -22,6 +22,8 @@ test.describe('Corroborate demo', () => {
     // The registry line is populated from a live Sepolia read — no hard-coded values.
     await expect(page.locator('#registry-line')).toContainText(/revision \d+/, { timeout: 60_000 })
     await expect(page.locator('#registry-line')).toContainText('trust roots')
+    // Example chips: a first-time visitor must never face an empty input.
+    await expect(page.locator('.example-chip')).toHaveCount(3)
   })
 
   test('comparison panel: farm collapses to one root, person keeps independence', async ({ page }) => {
