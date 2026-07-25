@@ -35,10 +35,7 @@
       "Read(//home/*/.ssh/**)",
       "Read(//home/*/.claude/**)",
       "Read(/etc/shadow)",
-      "Edit(/etc/**)",
-      "Edit(//**/apps/demo/index.html)",
-      "Edit(//**/apps/demo/src/landing/**)",
-      "Edit(//**/apps/demo/public/**)"
+      "Edit(/etc/**)"
     ]
   }
 }
