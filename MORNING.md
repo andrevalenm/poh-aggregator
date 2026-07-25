@@ -261,6 +261,16 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
 
 ## Needs you (in priority order)
 
+0. **One copy decision (2 min):** the manifesto's closing beat says "Every scorer that
+   adds them up pays the sybil farm." Your research instrument (correctly, honestly)
+   demonstrates the farm outranks the person under BOTH scorings on raw cost — what
+   separates them is independence, and the instrument makes visitors discover exactly
+   that. The beat is defensible (additive scoring rewards correlated evidence at the
+   margin), but the sharpest juror could read tension between the poster claim and the
+   instrument's finding. Stricter alternative: "Every scorer that adds them up rewards
+   correlated evidence. We count independence — priced at what fraud costs." Your voice,
+   your call — one Edit in index.html if you want it.
+
 1. **Repo has no pushable remote.** Judges need a URL. Fork to Hugo0 or get collaborator
    access from Andrei, then `git push`. Nothing was pushed anywhere overnight.
 2. **corroborate.eth — 5 minutes on mainnet.** Sepolia ENS is mid-migration (the artifact
