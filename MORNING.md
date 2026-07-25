@@ -1,7 +1,7 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, ~06:00._
+detail. _Last updated 2026-07-25, ~07:30. All suites green (58 tests + 1 new live enrichment test); agent flow re-verified against the final SDK; demo hosted with example chips._
 
 ---
 
