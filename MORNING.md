@@ -65,6 +65,10 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Ship-quality scoreboard**: axe 0 violations site-wide (both pages); hosted nginx now
+gzips (viem chunk 332KB→115KB on the wire) with immutable caching for hashed assets;
+Lighthouse mobile 89 landing / 88 console, CWV green.
+
 **Integration sweep** (post parallel work): scrolled the full 1440 composition end-to-end
 — hero → ticker → manifesto → ledger → rules → research instruments → cases → tear →
 night install → azulejo → footer reads as one product. The parallel-built research
