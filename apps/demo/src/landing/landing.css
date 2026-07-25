@@ -1998,6 +1998,10 @@ html.js .reveal.in {
     transition: none;
   }
 
+  .ledger-details[open] > :not(summary) {
+    animation: none;
+  }
+
   .tablet:hover,
   .sponsor-card:hover,
   .cta-primary:hover,
