@@ -578,7 +578,7 @@ Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 | World ID (Orb) read | `WorldIDAddressBook` `0x57b930D551e677CC36e2fA036Ae2fe8FdaE0330D` and AgentBook `0xA23aB2712eA7BBa896930544C7d6636a96b944dA` — World Chain |
 | Proof of Humanity v2 | `0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc` — Gnosis |
 | Circles v2 Hub | `0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8` — Gnosis |
-| Coinbase Verified Account | EAS schema `0xf8b05c79…70f0de9` — Base |
+| Coinbase Verified Account | EAS predeploy `0x4200…0021` and Coinbase's attestation indexer `0x2c7eE1E5f416dfF40054c27A62f7B357C4E8619C`, schema `0xf8b05c79…70f0de9` — Base |
 
 Canonical values live in [`deployments/sepolia.json`](deployments/sepolia.json).
 

@@ -1,5 +1,5 @@
 import { createPublicClient, http, type PublicClient } from 'viem'
-import { gnosis, worldchain, base } from 'viem/chains'
+import { gnosis, worldchain } from 'viem/chains'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
 import { circlesIndexRead, pohIndexRead } from '../subgraph.ts'
 import {
@@ -14,7 +14,9 @@ import { holonymAdapters } from './holonym.ts'
 import { lineaPohAdapter } from './linea-poh.ts'
 import { pohV1Adapter } from './poh-v1.ts'
 import { worldIdOrbAdapter, WORLD_AGENT_BOOK, WORLD_ID_ADDRESS_BOOK, WORLD_RPC } from './world.ts'
+import { coinbaseVerificationAdapter, COINBASE_RPC } from './coinbase.ts'
 
+export * from './coinbase.ts'
 export * from './human-passport.ts'
 export * from './farcaster.ts'
 export * from './holonym.ts'
@@ -45,8 +47,7 @@ export * from './world.ts'
 export const RPC = {
   gnosis: 'https://rpc.gnosischain.com',
   worldchain: WORLD_RPC,
-  // base.org returns 403 to non-browser clients; publicnode does not.
-  base: 'https://base-rpc.publicnode.com',
+  base: COINBASE_RPC,
 } as const
 
 export const CONTRACTS = {
@@ -60,7 +61,7 @@ export const CONTRACTS = {
   circlesHub: '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8',
 } as const
 
-const client = (chain: typeof gnosis | typeof worldchain | typeof base, url: string) =>
+const client = (chain: typeof gnosis | typeof worldchain, url: string) =>
   createPublicClient({ chain, transport: http(url) }) as PublicClient
 
 async function safe(fn: () => Promise<AdapterProbeResult>): Promise<AdapterProbeResult> {
@@ -390,59 +391,9 @@ export function circlesAdapter(
   }
 }
 
-// ---------------------------------------------------- Coinbase Verifications
-
-const COINBASE_VERIFIED_ACCOUNT_SCHEMA =
-  '0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9'
-
-/**
- * Coinbase Verified Account, read from EAS on Base.
- *
- * Persona-rooted, per Coinbase's own third-party vendor disclosure — so it shares a trust
- * root with every other Persona-backed credential and must not be counted beside them.
- *
- * Revocation is checked explicitly rather than inferred from presence: 720,503 of these
- * have been issued and 406,022 revoked, so presence alone is wrong more than half the time.
- */
-export function coinbaseVerificationAdapter(
-  easGraphQL = 'https://base.easscan.org/graphql',
-): AdapterProbe {
-  return {
-    adapterId: 'coinbase-verification',
-    probe: (subject: Address) =>
-      safe(async () => {
-        const res = await fetch(easGraphQL, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            query: `query($where: AttestationWhereInput) {
-              attestations(where: $where, orderBy: { time: desc }, take: 1) {
-                id revoked revocationTime time expirationTime attester
-              }
-            }`,
-            variables: {
-              where: {
-                recipient: { equals: subject },
-                schemaId: { equals: COINBASE_VERIFIED_ACCOUNT_SCHEMA },
-                revoked: { equals: false },
-              },
-            },
-          }),
-          signal: AbortSignal.timeout(15_000),
-        })
-        const json = (await res.json()) as {
-          data?: { attestations?: { id: string; revoked: boolean; time: number; attester: string }[] }
-        }
-        const att = json.data?.attestations?.[0]
-        if (!att) return { held: false }
-        return {
-          held: true,
-          issuedAt: Number(att.time),
-          detail: { attestationId: att.id, attester: att.attester, revoked: att.revoked },
-        }
-      }),
-  }
-}
+// Coinbase Verified Account lives in `coinbase.ts`: an on-chain index the issuer maintains,
+// the EAS predeploy as the only thing trusted to say what the attestation is, and the reason
+// scanning `Attested` logs on Base is not an option.
 
 /** Every adapter that can be read without vendor cooperation. */
 export function defaultAdapters(opts?: { subgraphUrl?: string }): AdapterProbe[] {
