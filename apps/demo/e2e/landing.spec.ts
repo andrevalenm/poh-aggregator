@@ -87,6 +87,31 @@ test.describe('Corroborate landing', () => {
     await expect(page.locator('#mcp-command .copy-btn')).toBeVisible()
   })
 
+  test('sequential anchor clicks land on target — no Lenis overshoot', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForTimeout(800)
+    // The QA repro: a SECOND anchor click, made from a Lenis-scrolled position, used to
+    // land at target + currentScroll. Two clicks in a row must both land within a few px.
+    const landedAt = async (href: string) => {
+      await page.click(`.nav-links a[href="${href}"]`)
+      await page.waitForTimeout(1900) // glide duration + settle
+      return page.evaluate((h) => Math.round(document.querySelector(h)!.getBoundingClientRect().top), href)
+    }
+    expect(Math.abs(await landedAt('#install'))).toBeLessThan(6)
+    expect(Math.abs(await landedAt('#how'))).toBeLessThan(6)
+    expect(Math.abs(await landedAt('#try'))).toBeLessThan(6)
+  })
+
+  test('the SDK copy button is alive', async ({ page }) => {
+    await page.goto('/')
+    const btn = page.locator('button[data-copy]')
+    await btn.scrollIntoViewIfNeeded()
+    await btn.click()
+    // Bound + clipboard path succeeded (execCommand works even without permissions).
+    await expect(btn).toHaveText(/copied|select it/)
+    await expect(btn).not.toHaveText('copy', { timeout: 100 })
+  })
+
   test('the workbench deep-link still renders (unlinked, kept for tooling)', async ({ page }) => {
     await page.goto('/app.html')
     await expect(page.locator('h1')).toContainText('Corroborate')

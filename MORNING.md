@@ -65,6 +65,15 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**QA-agent pass (deployed site, real clipboard verified by paste-back)**: 24 items PASS,
+2 real bugs found and fixed same-hour — (1) Lenis anchor overshoot: every in-page anchor
+clicked from a Lenis-scrolled position landed at target+currentScroll, never converging;
+fixed by hard-resyncing Lenis then animating to a self-computed absolute number, with a
+sequential-anchor E2E guard. (2) The SDK copy button was dead — its data-copy wiring had
+been lost in a refactor; rebound through the fallback-aware copyText, with its own E2E
+guard. Zero console/page errors across all QA sessions; the HTTP clipboard fallback
+proven genuine (paste-back match on all four MCP commands).
+
 **Sponsor marks on the tiles**: official World / The Graph / ENS logos (from their own
 repos/brand kits), single-path cobalt SVGs inline with the kickers at matched optical
 weight — the tiles carry their sponsors now, not just ETHGlobal. Agent-built, visually

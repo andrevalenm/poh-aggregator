@@ -12,6 +12,7 @@ export { score, freshnessOf, effectiveCost } from './scoring.ts'
 export { loadOntology, adapterKey, rootKey, REGISTRY_ABI } from './ontology.ts'
 export * from './adapters/index.ts'
 export * from './subgraph.ts'
+export * from './enroll.ts'
 
 /**
  * Named thresholds for `isHuman(threshold)`, exported as documented constants rather than
