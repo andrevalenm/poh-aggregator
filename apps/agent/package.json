@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/demo.js",
     "worldid": "node src/verify-worldid.js",
-    "agentbook": "node src/agentbook-status.js"
+    "agentbook": "node src/agentbook-status.js",
+    "ens": "node src/ens-demo.js"
   },
   "dependencies": {
     "@corroborate/sdk": "file:../../packages/sdk",

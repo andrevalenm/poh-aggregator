@@ -27,7 +27,10 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       existing traefik stack. Kills the "Not secure" bar and the http-clipboard class of
       bugs for good.
 - [ ] **ENS mainnet** — register the name (~5 min, ~$5/yr) + set `corroborate.subjects`
-      text record; the SDK feature is live-tested and the demo lights up on its own.
+      text record. **No longer blocking anything:** the whole ENS story is live on Sepolia
+      (`corroborate.eth` + agent subnames, `deployments/ens-sepolia.json`, `npm run ens`),
+      because Sepolia registration turned out to be free and instant. Mainnet is now a
+      presentation choice — and one to make *after* the name decision.
 - [ ] **Demo video** — script is current (docs/demo-script.md), beat-timed at 3:00.
 - [ ] **World on-device beta checklist** — Selfie Check + Identity Check need a phone
       (~20 min); written half already in docs/world-beta-feedback.md.

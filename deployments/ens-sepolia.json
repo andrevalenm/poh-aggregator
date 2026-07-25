@@ -1,0 +1,35 @@
+{
+  "chainId": 11155111,
+  "parent": "corroborate.eth",
+  "parentNode": "0xd4c42d578d91b689c1e6cf9c24c818ab355c72b2a5a18ae19f767f567830f4f6",
+  "expires": "2027-07-25T16:44:36.000Z",
+  "owner": "0xE3C03709B2b8439Eb07Aac06CC4Fa9886CE5BF87",
+  "ensRegistry": "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
+  "baseRegistrar": "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85",
+  "registrarController": "0xdf60C561Ca35AD3C89D24BbA854654b1c3477078",
+  "resolver": "0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5",
+  "agents": [
+    {
+      "name": "alpha.corroborate.eth",
+      "node": "0xa3c0dd22c841279ac03d637063d52ae35532b113638915e2349980b7ddbda441",
+      "address": "0xA83378d25942A989b0bfD7E6f3259b60Ed42C922",
+      "human": "corroborate.eth",
+      "acknowledged": true
+    },
+    {
+      "name": "beta.corroborate.eth",
+      "node": "0xbd80ad95b1957ebdfbf652c26b2a1989fcd5a9ed93e912385bc9160b0ce27b9b",
+      "address": "0xBB7A6ffbEc6c18631960A5764080e6CB63d5723f",
+      "human": "corroborate.eth",
+      "acknowledged": true
+    },
+    {
+      "name": "unverified.corroborate.eth",
+      "node": "0xe34fa3b72717e493b3d286ac1e1abb069322955043e234b3e33a7acf0c62225b",
+      "address": "0x7DA031B84BbBCE90a811d71695D8480B22504e29",
+      "human": "0xA6b7471fe0338F8B45266734A1346E6f1D7267b1",
+      "acknowledged": false
+    }
+  ],
+  "note": "Written by scripts/ens-agents-setup.mjs after every field was read back from Sepolia. The demo and the live suite take the names from here; the answers still come from the chain."
+}

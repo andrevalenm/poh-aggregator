@@ -1,6 +1,6 @@
 # Research index
 
-Master index of all research in this repo. **~20,800 lines across 23 files**, written 2026-07-24
+Master index of all research in this repo. **~21,300 lines across 24 files**, written 2026-07-24 and after
 against live sources — contracts queried over RPC, repos read at HEAD, prices fetched the same day.
 
 Every file follows [BRIEF.md](BRIEF.md). Volatile facts are date-stamped; unconfirmed claims are
@@ -58,6 +58,7 @@ what the read cannot see. Each names the deep dive above that it builds on.
 | [world-id-onchain-read.md](protocols/world-id-onchain-read.md) | World ID on World Chain | `WorldIDAddressBook` is the registry World populates, not AgentBook; `verifiedUntil − 168 days` is the exact verification block; the mapping is never cleared, so held is a comparison; one live binding per human, enforced on chain; the document and Selfie tiers leave no per-holder state anywhere |
 | [linea-poh-onchain-read.md](protocols/linea-poh-onchain-read.md) | Linea PoH V2 via Verax on Linea | There is no per-subject read, so enumerate the whole live population — a 90-day term confines it to 1,024 of 6.37M ids; the portal our research named is the dead test one; Linea's own `poh-api` and `PohVerifier` say yes ten months after expiry |
 | [poh-v1-onchain-read.md](protocols/poh-v1-onchain-read.md) | Proof of Humanity v1 on Ethereum mainnet | `isRegistered` is a comparison and the struct's `registered` flag outlives the term; PoH v2's ForkModule retires registrations v1 keeps honouring, one for 510 days; acceptance emits nothing and can lag the request by 761 days, so only a full-history scan enumerates the registry — 2 registered out of 20,740 lifetime submissions |
+| [ens-agent-identity.md](protocols/ens-agent-identity.md) | ENS as the carrier of agent identity, Sepolia | Sepolia `.eth` is free and instant today (`TestnetV1PremigrationRegistrar`, no commit/reveal) — the previous "mid-migration, parked" verdict was the wrong contract and a wrong event topic; the registrar's own atomic-records path cannot work, and why; a name tree can be **counted but never named** (labels are hashed by the caller); **a self-published human↔agent binding makes a per-human cap free to evade**, and the acknowledgement record that closes it |
 | [world-agentbook-fleets.md](protocols/world-agentbook-fleets.md) | World Chain AgentBook, read as a fleet index | `humanId` is the registering proof's nullifier hash, read from calldata; the whole registry is 1,164 registrations in six calls; **830 humans run 1,164 agents and one runs 27**; AgentBook and the AddressBook use different external nullifiers, so an agent can never be walked to its operator's verified wallet; a free endpoint returns `[]` for ranges that hold 39 logs |
 
 ## Landscape — the field, the theory, and the adversary
