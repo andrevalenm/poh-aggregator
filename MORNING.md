@@ -1,8 +1,8 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 6. All four suites green: 18 forge, 150 SDK
-(148 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 10 Playwright — 178 total._
+detail. _Last updated 2026-07-25, after unattended iteration 7. All four suites green: 18 forge, 172 SDK
+(170 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 10 Playwright — 200 total._
 
 ---
 
@@ -181,6 +181,36 @@ credential and you are not in it" rather than "we failed to find yours".
 
 No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
 `research/protocols/linea-poh-onchain-read.md`.
+
+**Iteration 7 went after World's document and Selfie tiers, found they cannot be read by anyone,
+and found that the tier we *do* read was being read from the wrong contract.** Both halves matter,
+and the second one was a live scoring defect.
+
+- **World ID Orb was scored as if verified this morning, always.** We read it through
+  `AgentBook.lookupHuman`, which returns a nullifier and **no date** — and an undated credential on
+  a decay curve gets full weight forever. AgentBook is also a registry of *agents*: 1,068
+  transactions in its entire life.
+- **World Chain has a registry World actually populates, and it carries a date.**
+  `WorldIDAddressBook` writes `addressVerifiedUntil[account] = block.timestamp + 168 days` once a
+  Semaphore proof of an Orb credential clears, so `verifiedUntil - 168 days` is the **exact second**
+  the verification was mined — checked against block headers on 24 samples spanning fifteen months,
+  every one to the second. Coverage is ~28,000 verifications a day at head, three to four orders of
+  magnitude past AgentBook. A binding renewed 162 days ago now contributes 45.13 cents; before this
+  it contributed 50.00, as did one renewed this morning.
+- **`held` had to become a comparison, not a presence check.** The mapping is never cleared, so a
+  lapsed verification is a big number sitting in it forever: seven of twelve accounts sampled from
+  April 2025 are in exactly that state. An `!= 0` read counts every one of them as a verified human.
+- **One live verified address per human, enforced on chain.** The contract reverts
+  `VerificationAlreadyActive()` when a nullifier already maps to a different unexpired address. That
+  is the primitive the fleet-policy work needs, and it is a property rather than an inference.
+- **The document (9303) and Selfie (11) tiers leave no per-holder state anywhere**, so no probe is
+  possible for anyone without World's cooperation — the v4 verifier is a `view` function taking a
+  proof (2 transactions in its proxy's life) and the only v4 registry is keyed by *issuer* schema id.
+  Both entries stay priced and rooted with `implemented: false` and a "no permissionless read" note,
+  and a test asserts they keep saying it. See "Needs you" item 13 for the one product consequence.
+
+No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/world-id-onchain-read.md`.
 
 ---
 
@@ -459,6 +489,22 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    "not verified" for the entire population while appearing to work perfectly. That file now carries a
    `CORRECTED` block at the head of the section, and the adapter pins the portal *owner* rather than
    any portal address, because Sumsub demonstrably runs three of them.
+
+13. **The World pitch line "we read all three tiers" is not true and cannot be made true.** Only
+   the Orb tier is readable without World's cooperation; the NFC-document and Selfie Check tiers
+   leave **no per-holder state on any chain**, so nobody can read them passively — not us, not a
+   competitor. The honest and better line is *"we read the tier that can be read, from the registry
+   World itself populates, and we say out loud that the other two cannot be"*. If a slide or the
+   demo script claims otherwise it needs a word changed; I checked `docs/demo-script.md` and it does
+   not, but I cannot see your deck. Evidence, with contract addresses and the measurement behind
+   each claim: `research/protocols/world-id-onchain-read.md` §5.
+
+14. **World ID Orb can now score slightly lower than yesterday, on purpose.** It was previously
+   undated and therefore scored at full freshness forever; it is now dated from the address book and
+   decays. A wallet verified this morning is unchanged at 50.00 cents; one verified 162 days ago is
+   45.13. The demo vectors do not move — the E2E Orb wallet is an AgentBook registration with no
+   address-book entry, so it still reports `issuance-date-unknown` — but if anyone compares a World
+   number against a screenshot from yesterday, that is the reason.
 
 ## Honest state of weak points
 
