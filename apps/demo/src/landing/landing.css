@@ -273,12 +273,14 @@ a {
 .wordmark {
   font-family: var(--display);
   font-variation-settings: 'opsz' 40, 'SOFT' 60, 'WONK' 1;
-  font-weight: 620;
-  font-size: 1.35rem;
+  font-weight: 640;
+  /* The wordmark carries the brand, so it outranks the nav links rather than sitting level
+     with them. One syllable in caps needs the size to register at all. */
+  font-size: clamp(1.7rem, 2.1vw, 2.15rem);
   /* Set in caps: a one-syllable name needs the presence, and it reads as a
      proper noun rather than the verb. Caps need tracking the lowercase did not. */
   text-transform: uppercase;
-  letter-spacing: 0.085em;
+  letter-spacing: 0.075em;
   color: var(--ink);
   text-decoration: none;
 }
@@ -353,10 +355,10 @@ a {
      offset slides out from under the menu on tall screens. And a canvas is a replaced
      element, so it needs an explicit width/height; insets alone leave it at 300x150. */
   position: absolute;
-  top: 4rem;
+  top: 2.6rem;
   left: 0;
   width: 100%;
-  height: calc(100% - 4rem);
+  height: calc(100% - 2.6rem);
   z-index: -1;
   will-change: transform;
 }
@@ -456,8 +458,11 @@ a {
   display: inline-block;
   overflow: hidden;
   vertical-align: bottom;
-  padding-bottom: 0.08em;
-  margin-bottom: -0.08em;
+  /* The mask clips at its own edge, and italic Fraunces at WONK 1 swashes the question
+     mark well below the baseline — 0.08em cut the tail clean off. Enough room for the
+     deepest descender the display face draws; the negative margin keeps layout identical. */
+  padding-bottom: 0.24em;
+  margin-bottom: -0.24em;
 }
 
 .sl-line {
