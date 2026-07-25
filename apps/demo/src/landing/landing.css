@@ -692,6 +692,10 @@ html.js .sl-in .sl-line {
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 7%, black 93%, transparent 100%);
 }
 
+.ticker:hover .ticker-track {
+  animation-play-state: paused;
+}
+
 .ticker-track {
   display: flex;
   gap: 3.2rem;
