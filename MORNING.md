@@ -65,6 +65,12 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Signature elements are now guarded**: after the invisible-h1 incident, both
+load-bearing design moments carry E2E insurance — the headline must be *visibly* risen
+(computed transform + bounding box) and the print must *actually deform* under the
+pointer (canvas pixel diff near the core). 11 E2E tests, all green against the hosted
+deployment.
+
 **Ship-quality scoreboard**: axe 0 violations site-wide (both pages); hosted nginx now
 gzips (viem chunk 332KB→115KB on the wire) with immutable caching for hashed assets;
 Lighthouse mobile 89 landing / 88 console, CWV green.
