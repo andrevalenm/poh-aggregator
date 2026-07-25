@@ -36,16 +36,18 @@ const CREDS: Cred[] = [
   { id: 'world-id-document', name: 'World ID — document tier', root: 'state-document:icao-9303', rootLabel: 'passport chip', forge: 150_000, rent: 2_000 },
   { id: 'zkpassport', name: 'ZKPassport', root: 'state-document:icao-9303', rootLabel: 'passport chip', forge: 150_000, rent: 2_000 },
   { id: 'self-protocol', name: 'Self', root: 'state-document:icao-9303', rootLabel: 'passport chip', forge: 150_000, rent: 2_000 },
+  { id: 'rarimo', name: 'Rarimo', root: 'state-document:icao-9303', rootLabel: 'passport chip', forge: 150_000, rent: 2_000 },
   { id: 'coinbase-verification', name: 'Coinbase Verification', root: 'kyc-vendor:persona', rootLabel: 'Persona KYC', forge: 120_000, rent: 3_000 },
   { id: 'galxe-passport', name: 'Galxe Passport', root: 'kyc-vendor:sumsub', rootLabel: 'Sumsub KYC', forge: 120_000, rent: 3_000 },
   { id: 'linea-poh', name: 'Linea PoH', root: 'kyc-vendor:sumsub', rootLabel: 'Sumsub KYC', forge: 120_000, rent: 3_000 },
   { id: 'poh-v2', name: 'Proof of Humanity', root: 'social-vouching:poh', rootLabel: 'PoH vouching', forge: 1_000, rent: 500 },
   { id: 'circles-v2', name: 'Circles', root: 'social-trust:circles', rootLabel: 'Circles trust graph', forge: 100, rent: 50 },
+  { id: 'human-passport', name: 'Human Passport', root: 'behavioral:wallet-history', rootLabel: 'wallet history', forge: 2_000, rent: 100 },
 ]
 
 const PRESETS: Record<string, string[]> = {
-  farm: ['world-id-document', 'zkpassport', 'self-protocol'],
-  person: ['world-id-orb', 'poh-v2', 'circles-v2'],
+  farm: ['world-id-document', 'zkpassport', 'self-protocol', 'rarimo'],
+  person: ['world-id-orb', 'poh-v2', 'circles-v2', 'human-passport'],
   clear: [],
 }
 
