@@ -84,7 +84,42 @@ console.log(`\nseeding ${ontology.adapters.length} adapters…`)
 let nonce = await pub.getTransactionCount({ address: account.address })
 const pending = []
 
+// Only write what actually differs. Every setAdapter bumps `revision` and emits the full
+// record, and that event stream is the audit trail a subject reads to ask why their score
+// moved — so re-seeding an unchanged adapter would fabricate a change that never happened.
+const onChain = new Map()
+if (seedOnly) {
+  const [ids, rows] = await pub.readContract({
+    address: registry,
+    abi: artifact.abi,
+    functionName: 'allAdapters',
+  })
+  ids.forEach((id, i) => onChain.set(id, rows[i]))
+}
+
+const unchanged = (id, a) => {
+  const r = onChain.get(id)
+  return (
+    r &&
+    r.name === a.name &&
+    r.evidenceClass === EVIDENCE_CLASS[a.evidenceClass] &&
+    r.trustRoot === keccak256(toHex(`root:${a.trustRoot}`)) &&
+    r.forgeCostCents === BigInt(a.forgeCostCents) &&
+    r.rentCostCents === BigInt(a.rentCostCents) &&
+    r.decayHalfLifeDays === a.decayHalfLifeDays &&
+    r.ageCurve === AGE_CURVE[a.ageCurve] &&
+    r.live === a.live &&
+    r.sourceURI === a.sourceURI
+  )
+}
+
+let skipped = 0
 for (const a of ontology.adapters) {
+  const id = keccak256(toHex(`adapter:${a.id}`))
+  if (unchanged(id, a)) {
+    skipped++
+    continue
+  }
   const hash = await wallet.writeContract({
     address: registry,
     abi: artifact.abi,
@@ -109,6 +144,8 @@ for (const a of ontology.adapters) {
   console.log(hash.slice(0, 12))
 }
 
+if (skipped) console.log(`  (${skipped} already identical on-chain, left alone)`)
+
 console.log('\nwaiting for confirmations…')
 await Promise.all(pending.map((p) => pub.waitForTransactionReceipt({ hash: p.hash })))
 
@@ -123,6 +160,23 @@ const revision = await pub.readContract({
   functionName: 'revision',
 })
 console.log(`\nregistry ${registry}: ${count} adapters, revision ${revision}`)
+
+// Record what is actually deployed, so the revision a score cites can be resolved to an
+// ontology without trusting anyone's memory of which seed ran when.
+{
+  const record = JSON.parse(readFileSync(DEPLOYMENTS, 'utf8'))
+  record.ontology = {
+    adapters: Number(count),
+    trustRoots: new Set(ontology.adapters.map((a) => a.trustRoot)).size,
+    revision: Number(revision),
+    seededAt: new Date().toISOString().slice(0, 10),
+    // A no-op re-seed must not erase the record of which adapters last moved the revision.
+    changedInLastSeed: pending.length
+      ? pending.map((p) => p.id)
+      : (record.ontology?.changedInLastSeed ?? []),
+  }
+  writeFileSync(DEPLOYMENTS, JSON.stringify(record, null, 2) + '\n')
+}
 
 // Prove the correlation grouping works on real deployed data.
 const roots = [...new Set(ontology.adapters.map((a) => a.trustRoot))]

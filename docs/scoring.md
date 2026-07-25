@@ -24,15 +24,18 @@ Five steps, in order.
 
 A trust root is the thing actually checked, underneath the branding. `state-document:icao-9303`
 is a passport chip signed by a national CSCA. `kyc-vendor:sumsub` is a document-plus-selfie
-check performed by Sumsub. The deployed ontology has 15 adapters over 10 roots.
+check performed by Sumsub. The deployed ontology has 30 adapters over 18 roots.
 
-Two adapters sharing a root are **one piece of evidence observed twice**. Three protocols read
-the ICAO root: World's document tier, ZKPassport, Self Protocol. A subject holding all three
-made one trip to a passport office.
+Two adapters sharing a root are **one piece of evidence observed twice**. Four protocols read
+the ICAO root: World's document tier, ZKPassport, Self Protocol, Rarimo. A subject holding all
+four made one trip to a passport office.
 
 The collapses are traced to primary sources in
 [`research/landscape/kyc-liveness-vendors.md`](../research/landscape/kyc-liveness-vendors.md) —
-that file is where the root assignments come from, not from vendor marketing.
+that file is where the root assignments come from, not from vendor marketing — and every
+adapter's assignment is justified individually in
+[`research/landscape/ontology-coverage.md`](../research/landscape/ontology-coverage.md), which
+also records the two roots that are judgement calls rather than documented facts.
 
 ## 2. Saturate within the root
 
