@@ -76,7 +76,7 @@
       <div class="ticker-track" id="ticker-track">
         <span>one passport ≠ three credentials</span>
         <span>$0.50 — the going rate for an orb-verified human</span>
-        <span>40 protocols studied · 15 catalogued · 4 probed live</span>
+        <span>40 protocols studied · 30 catalogued · 9 probed live</span>
         <span>saturate within a root · sum across roots</span>
         <span>rent beats forge</span>
         <span>nobody holds the join key</span>
@@ -89,8 +89,8 @@
       <div class="wash wash-sage" data-parallax="0.18" aria-hidden="true"></div>
       <p class="beat reveal">Forty protocols will swear a wallet is human.</p>
       <p class="beat reveal">
-        They collapse into ten trust roots. One passport, read by three protocols, is one
-        credential — not three.
+        They collapse into eighteen trust roots. One passport, read by four protocols, is one
+        credential — not four.
       </p>
       <p class="beat reveal">
         Every scorer that adds them up pays the sybil farm.
@@ -202,7 +202,7 @@
             <h3>Try to buy a high score</h3>
           </div>
           <p class="instrument-hint">
-            Nine real credentials, priced at what the deployed registry says an adversary pays
+            Eleven real credentials, priced at what the deployed registry says an adversary pays
             for each — <code>min(forge, rent)</code>, because a holder willing to rent theirs out
             defeats any amount of cryptography. Switch them on and watch two scorers disagree.
             Then try to work out which number a consumer should actually gate on.
@@ -819,7 +819,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             But the problem is not a hackathon problem. Proof of personhood is being wired into
             airdrops, governance and agent permissions right now, and almost every deployed
             scorer adds credentials together — which means a sybil farm holding one passport
-            read by three protocols outranks a real person holding three unrelated ones. That
+            read by four protocols outranks a real person holding four unrelated ones. That
             failure is live, it is in production, and it fails in the attacker's favour. We
             think it is worth getting right in public, with the weights on-chain and the sources
             attached, whatever happens to us on Sunday.
@@ -1009,11 +1009,12 @@ person.isHuman(Thresholds.standard)</code></pre>
         <div class="hackathon-honesty reveal">
           <h3>What is finished, and what is not</h3>
           <p>
-            Working and live: the registry contract, four credential adapters across World Chain,
-            Gnosis, Base and Sepolia, both subgraphs, the SDK, the MCP server, the agent flow,
-            this page, and a test suite that runs against real chains rather than mocks. Honest
-            gaps: the roster covers four protocols where the ontology describes fifteen, the
-            weights are judgments rather than measurements, and no amount of this proves the
+            Working and live: the registry contract, nine credential probes reading World Chain,
+            Gnosis, Base, Optimism and Linea (plus Sepolia for the registry itself), both
+            subgraphs, the SDK, the MCP server, the agent flow, this page, and a test suite that
+            runs against real chains rather than mocks. Honest gaps: nine probes against thirty
+            catalogued adapters, so most of the ontology is priced but not yet readable; the
+            weights are judgments rather than measurements; and no amount of this proves the
             human behind a credential is acting for themselves.
           </p>
           <p>
