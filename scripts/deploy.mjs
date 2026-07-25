@@ -170,7 +170,10 @@ console.log(`\nregistry ${registry}: ${count} adapters, revision ${revision}`)
     trustRoots: new Set(ontology.adapters.map((a) => a.trustRoot)).size,
     revision: Number(revision),
     seededAt: new Date().toISOString().slice(0, 10),
-    // A no-op re-seed must not erase the record of which adapters last moved the revision.
+    // A no-op re-seed must not erase the record of which adapters last moved the revision, nor
+    // the prose explaining what that revision was — this rewrite is otherwise lossy, and the
+    // note is the only place the reason for a revision is written down.
+    ...(record.ontology?.note ? { note: record.ontology.note } : {}),
     changedInLastSeed: pending.length
       ? pending.map((p) => p.id)
       : (record.ontology?.changedInLastSeed ?? []),

@@ -12,19 +12,22 @@ import { humanPassportAdapter } from './human-passport.ts'
 import { farcasterAdapter } from './farcaster.ts'
 import { holonymAdapters } from './holonym.ts'
 import { lineaPohAdapter } from './linea-poh.ts'
+import { worldIdOrbAdapter, WORLD_AGENT_BOOK, WORLD_ID_ADDRESS_BOOK, WORLD_RPC } from './world.ts'
 
 export * from './human-passport.ts'
 export * from './farcaster.ts'
 export * from './holonym.ts'
 export * from './linea-poh.ts'
+export * from './world.ts'
 
 /**
  * Adapters.
  *
  * Every adapter here reads a credential **without the issuing vendor's cooperation** — no
  * API key on the critical path, nothing that can rate-limit or revoke us. That constraint
- * shaped the selection: World is read through AgentBook rather than the verification API,
- * because `lookupHuman` is a plain `eth_call` that returns the Orb-verified status of any
+ * shaped the selection: World is read through its on-chain registries rather than the
+ * verification API, because `WorldIDAddressBook.addressVerifiedUntil` and
+ * `AgentBook.lookupHuman` are plain `eth_call`s that return the Orb-verified status of any
  * address with no proof, no relying-party id and no user interaction.
  *
  * A probe must never throw. A network failure returning `held: false` would silently
@@ -39,14 +42,16 @@ export * from './linea-poh.ts'
 
 export const RPC = {
   gnosis: 'https://rpc.gnosischain.com',
-  worldchain: 'https://worldchain-mainnet.g.alchemy.com/public',
+  worldchain: WORLD_RPC,
   // base.org returns 403 to non-browser clients; publicnode does not.
   base: 'https://base-rpc.publicnode.com',
 } as const
 
 export const CONTRACTS = {
-  /** Permissionless World ID lookup. groupId 1 == Orb-verified only. */
-  worldAgentBook: '0xA23aB2712eA7BBa896930544C7d6636a96b944dA',
+  /** Permissionless World ID lookup. groupId 1 == Orb-verified only. See `world.ts`. */
+  worldAgentBook: WORLD_AGENT_BOOK,
+  /** World's own registry of verified addresses, with a term and therefore a date. */
+  worldIdAddressBook: WORLD_ID_ADDRESS_BOOK,
   /** Proof of Humanity v2 proxy on Gnosis. */
   pohV2: '0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc',
   /** Circles v2 Hub on Gnosis. */
@@ -100,41 +105,8 @@ async function reconcileWithIndex(opts: {
   return reconciled
 }
 
-// --------------------------------------------------------------- World ID
-
-const AGENTBOOK_ABI = [
-  {
-    type: 'function',
-    name: 'lookupHuman',
-    stateMutability: 'view',
-    inputs: [{ name: 'account', type: 'address' }],
-    outputs: [{ type: 'uint256' }],
-  },
-] as const
-
-/**
- * World ID (Orb tier), read permissionlessly from World Chain.
- *
- * A non-zero humanId means the address is bound to an Orb-verified human. Note this is
- * also a stable global identifier published on a public chain, which sits awkwardly beside
- * World's unlinkability story — we read it, we do not republish it.
- */
-export function worldIdOrbAdapter(rpcUrl: string = RPC.worldchain): AdapterProbe {
-  const c = client(worldchain, rpcUrl)
-  return {
-    adapterId: 'world-id-orb',
-    probe: (subject: Address) =>
-      safe(async () => {
-        const humanId = await c.readContract({
-          address: CONTRACTS.worldAgentBook,
-          abi: AGENTBOOK_ABI,
-          functionName: 'lookupHuman',
-          args: [subject],
-        })
-        return { held: humanId !== 0n, detail: { humanId: humanId.toString(), tier: 'orb' } }
-      }),
-  }
-}
+// World ID lives in `world.ts`: two registries, a date derived from a fixed term, and the
+// reasoning about why the document and Selfie tiers cannot be read from any chain.
 
 // -------------------------------------------------------- Proof of Humanity
 

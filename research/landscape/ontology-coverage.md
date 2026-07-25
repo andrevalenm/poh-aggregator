@@ -48,9 +48,9 @@ is why Civic and Sismo are in the file at all.
 
 | Adapter | Trust root | live | impl | Source |
 |---|---|---|---|---|
-| World ID (Orb) | `iris-registry:world-orb` | ✔ | ✔ | `protocols/world-id.md` |
-| World ID (document/NFC) | `state-document:icao-9303` | ✔ | — | `protocols/world-id.md` |
-| World ID (Selfie Check) | `liveness:world-selfie` | ✔ | — | `landscape/kyc-liveness-vendors.md` |
+| World ID (Orb) | `iris-registry:world-orb` | ✔ | ✔ | `protocols/world-id-onchain-read.md` |
+| World ID (document/NFC) | `state-document:icao-9303` | ✔ | — (no permissionless read, §6) | `protocols/world-id-onchain-read.md` |
+| World ID (Selfie Check) | `liveness:world-selfie` | ✔ | — (no permissionless read, §6) | `protocols/world-id-onchain-read.md` |
 | ZKPassport | `state-document:icao-9303` | ✔ | — | `protocols/zk-passport-and-eid.md` |
 | Self Protocol | `state-document:icao-9303` | ✔ | — | `protocols/zk-passport-and-eid.md` |
 | **Rarimo** | `state-document:icao-9303` | ✔ | — | `protocols/zk-passport-and-eid.md` |
@@ -251,8 +251,28 @@ the read is):
    `PohVerifier.verify` accepts it on chain; 50,475 issued against 500 live means the vendor boolean
    and the registry describe populations 101× apart. Write-up:
    `protocols/linea-poh-onchain-read.md`.
-5. **World document / Selfie tiers** — already partly reachable through AgentBook; the mission's P1
-   asks for these so World appears in the *score*, not only in the agent gate.
+5. ~~**World document / Selfie tiers**~~ — **RESOLVED 2026-07-25, in the opposite direction to the
+   one this entry assumed.** Neither tier is readable from any chain, and the reason is structural:
+   World ID 4.0 verification writes no state (`WorldIDVerifier` is a `view` function taking a proof
+   — its proxy has taken **2 transactions in its life**), the only v4 registry
+   (`CredentialSchemaIssuerRegistry`) is keyed by *issuer schema id* and stores issuer pubkeys with
+   no address in its read surface, and both address-keyed World Chain registries report
+   `groupId() == 1`, which is the Orb. Reading schema 9303 or 11 needs the Developer Portal with a
+   registered `rp_id` — a vendor on the critical path — so both stay `implemented: false` with a
+   `no permissionless read` note citing the measurements.
+
+   What the pass **did** find is the contract this file and `protocols/world-id.md` both missed:
+   **`WorldIDAddressBook`** (`0x57b930D5…E0330D`), World's own registry of verified addresses. It
+   fixes a live scoring defect rather than adding coverage. AgentBook returns a nullifier and no
+   date, and an undated credential on a `Decay` curve scores at freshness **1** — so every World
+   credential we held was priced as if issued this morning. The address book writes
+   `addressVerifiedUntil[account] = block.timestamp + 168 days`, so the date is exact (verified to
+   the second against block headers on 24 samples across fifteen months), `held` is a comparison
+   rather than a presence check (the mapping is never cleared; more than half a sampled 2025-04
+   cohort is lapsed), and the contract refuses a second live binding per World ID nullifier — one
+   live verified address per human, enforced on chain. Coverage: ~28,000 verifications a day at
+   head against AgentBook's 1,068 lifetime transactions. Write-up:
+   `protocols/world-id-onchain-read.md`.
 6. **Proof of Humanity v1** — a second `isRegistered` call on a registry we already talk to. Cheap,
    and it exercises saturation against v2 with real data.
 

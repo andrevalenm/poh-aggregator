@@ -143,6 +143,19 @@ had anyway — and where the index only covers a *window* of history, absence pr
 old fallback applies unchanged, and `index-coverage-partial` says so. Full decision table:
 [`packages/sdk/src/reconcile.ts`](../packages/sdk/src/reconcile.ts).
 
+**A hard expiry truncates a decay curve, so a half-life longer than the expiry never
+completes.** Four of the nine implemented adapters have this shape, and it is easy to misread
+their half-lives as the range over which weight falls. Human Passport hard-expires at 90 days
+against a 180-day half-life; Holonym within a year of the check behind it against 730; World's
+address-book binding at 168 days against 1,095; Linea PoH at 90 against 90. Because the probe
+returns `held: false` the instant the credential expires, weight for these never falls below the
+value the *term* implies — 0.71, 0.71, 0.90 and 0.50 respectively — and the remainder of the curve
+is unreachable. That is not a defect in the half-lives, which describe how confidence in the
+underlying check decays; it means the credential's own renewal policy, not our curve, is what
+bounds these four. The Holonym and World live suites assert their floor directly; the Passport and
+Linea suites assert the term it is derived from — either way a term change upstream shows up as a
+failing test rather than as a quiet re-pricing.
+
 Where a protocol dates its own credentials on chain, none of this is needed. PoH v2's
 `getHumanityInfo` returns `expirationTime`, and `humanityLifespan()` is the fixed term granted
 at claim, so `expirationTime − humanityLifespan` is the claim timestamp — two `eth_call`s, no
