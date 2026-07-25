@@ -1,0 +1,501 @@
+[
+ {
+  "inputs": [
+   {
+    "internalType": "address",
+    "name": "curator_",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "nonpayable",
+  "type": "constructor"
+ },
+ {
+  "inputs": [],
+  "name": "EmptyId",
+  "type": "error"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "bytes32",
+    "name": "id",
+    "type": "bytes32"
+   },
+   {
+    "internalType": "string",
+    "name": "idString",
+    "type": "string"
+   }
+  ],
+  "name": "IdMismatch",
+  "type": "error"
+ },
+ {
+  "inputs": [],
+  "name": "NotCurator",
+  "type": "error"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "bytes32",
+    "name": "id",
+    "type": "bytes32"
+   }
+  ],
+  "name": "UnknownAdapter",
+  "type": "error"
+ },
+ {
+  "inputs": [],
+  "name": "ZeroAddress",
+  "type": "error"
+ },
+ {
+  "anonymous": false,
+  "inputs": [
+   {
+    "indexed": true,
+    "internalType": "bytes32",
+    "name": "id",
+    "type": "bytes32"
+   },
+   {
+    "indexed": false,
+    "internalType": "bool",
+    "name": "live",
+    "type": "bool"
+   },
+   {
+    "indexed": false,
+    "internalType": "string",
+    "name": "reason",
+    "type": "string"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint64",
+    "name": "revision",
+    "type": "uint64"
+   }
+  ],
+  "name": "AdapterLivenessSet",
+  "type": "event"
+ },
+ {
+  "anonymous": false,
+  "inputs": [
+   {
+    "indexed": true,
+    "internalType": "bytes32",
+    "name": "id",
+    "type": "bytes32"
+   },
+   {
+    "indexed": false,
+    "internalType": "string",
+    "name": "idString",
+    "type": "string"
+   },
+   {
+    "indexed": false,
+    "internalType": "string",
+    "name": "name",
+    "type": "string"
+   },
+   {
+    "indexed": false,
+    "internalType": "enum PersonhoodRegistry.EvidenceClass",
+    "name": "evidenceClass",
+    "type": "uint8"
+   },
+   {
+    "indexed": true,
+    "internalType": "bytes32",
+    "name": "trustRoot",
+    "type": "bytes32"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint64",
+    "name": "forgeCostCents",
+    "type": "uint64"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint64",
+    "name": "rentCostCents",
+    "type": "uint64"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint32",
+    "name": "decayHalfLifeDays",
+    "type": "uint32"
+   },
+   {
+    "indexed": false,
+    "internalType": "enum PersonhoodRegistry.AgeCurve",
+    "name": "ageCurve",
+    "type": "uint8"
+   },
+   {
+    "indexed": false,
+    "internalType": "bool",
+    "name": "live",
+    "type": "bool"
+   },
+   {
+    "indexed": false,
+    "internalType": "string",
+    "name": "sourceURI",
+    "type": "string"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint64",
+    "name": "revision",
+    "type": "uint64"
+   }
+  ],
+  "name": "AdapterSet",
+  "type": "event"
+ },
+ {
+  "anonymous": false,
+  "inputs": [
+   {
+    "indexed": true,
+    "internalType": "address",
+    "name": "from",
+    "type": "address"
+   },
+   {
+    "indexed": true,
+    "internalType": "address",
+    "name": "to",
+    "type": "address"
+   }
+  ],
+  "name": "CuratorTransferred",
+  "type": "event"
+ },
+ {
+  "inputs": [],
+  "name": "adapterCount",
+  "outputs": [
+   {
+    "internalType": "uint256",
+    "name": "",
+    "type": "uint256"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "uint256",
+    "name": "index",
+    "type": "uint256"
+   }
+  ],
+  "name": "adapterIdAt",
+  "outputs": [
+   {
+    "internalType": "bytes32",
+    "name": "",
+    "type": "bytes32"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "bytes32",
+    "name": "trustRoot",
+    "type": "bytes32"
+   }
+  ],
+  "name": "adaptersByTrustRoot",
+  "outputs": [
+   {
+    "internalType": "bytes32[]",
+    "name": "ids",
+    "type": "bytes32[]"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "allAdapters",
+  "outputs": [
+   {
+    "internalType": "bytes32[]",
+    "name": "ids",
+    "type": "bytes32[]"
+   },
+   {
+    "components": [
+     {
+      "internalType": "string",
+      "name": "name",
+      "type": "string"
+     },
+     {
+      "internalType": "enum PersonhoodRegistry.EvidenceClass",
+      "name": "evidenceClass",
+      "type": "uint8"
+     },
+     {
+      "internalType": "bytes32",
+      "name": "trustRoot",
+      "type": "bytes32"
+     },
+     {
+      "internalType": "uint64",
+      "name": "forgeCostCents",
+      "type": "uint64"
+     },
+     {
+      "internalType": "uint64",
+      "name": "rentCostCents",
+      "type": "uint64"
+     },
+     {
+      "internalType": "uint32",
+      "name": "decayHalfLifeDays",
+      "type": "uint32"
+     },
+     {
+      "internalType": "enum PersonhoodRegistry.AgeCurve",
+      "name": "ageCurve",
+      "type": "uint8"
+     },
+     {
+      "internalType": "bool",
+      "name": "live",
+      "type": "bool"
+     },
+     {
+      "internalType": "bool",
+      "name": "exists",
+      "type": "bool"
+     },
+     {
+      "internalType": "string",
+      "name": "sourceURI",
+      "type": "string"
+     }
+    ],
+    "internalType": "struct PersonhoodRegistry.Adapter[]",
+    "name": "adapters",
+    "type": "tuple[]"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "curator",
+  "outputs": [
+   {
+    "internalType": "address",
+    "name": "",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "bytes32",
+    "name": "id",
+    "type": "bytes32"
+   }
+  ],
+  "name": "getAdapter",
+  "outputs": [
+   {
+    "components": [
+     {
+      "internalType": "string",
+      "name": "name",
+      "type": "string"
+     },
+     {
+      "internalType": "enum PersonhoodRegistry.EvidenceClass",
+      "name": "evidenceClass",
+      "type": "uint8"
+     },
+     {
+      "internalType": "bytes32",
+      "name": "trustRoot",
+      "type": "bytes32"
+     },
+     {
+      "internalType": "uint64",
+      "name": "forgeCostCents",
+      "type": "uint64"
+     },
+     {
+      "internalType": "uint64",
+      "name": "rentCostCents",
+      "type": "uint64"
+     },
+     {
+      "internalType": "uint32",
+      "name": "decayHalfLifeDays",
+      "type": "uint32"
+     },
+     {
+      "internalType": "enum PersonhoodRegistry.AgeCurve",
+      "name": "ageCurve",
+      "type": "uint8"
+     },
+     {
+      "internalType": "bool",
+      "name": "live",
+      "type": "bool"
+     },
+     {
+      "internalType": "bool",
+      "name": "exists",
+      "type": "bool"
+     },
+     {
+      "internalType": "string",
+      "name": "sourceURI",
+      "type": "string"
+     }
+    ],
+    "internalType": "struct PersonhoodRegistry.Adapter",
+    "name": "",
+    "type": "tuple"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "revision",
+  "outputs": [
+   {
+    "internalType": "uint64",
+    "name": "",
+    "type": "uint64"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "bytes32",
+    "name": "id",
+    "type": "bytes32"
+   },
+   {
+    "internalType": "string",
+    "name": "idString",
+    "type": "string"
+   },
+   {
+    "internalType": "string",
+    "name": "name",
+    "type": "string"
+   },
+   {
+    "internalType": "enum PersonhoodRegistry.EvidenceClass",
+    "name": "evidenceClass",
+    "type": "uint8"
+   },
+   {
+    "internalType": "bytes32",
+    "name": "trustRoot",
+    "type": "bytes32"
+   },
+   {
+    "internalType": "uint64",
+    "name": "forgeCostCents",
+    "type": "uint64"
+   },
+   {
+    "internalType": "uint64",
+    "name": "rentCostCents",
+    "type": "uint64"
+   },
+   {
+    "internalType": "uint32",
+    "name": "decayHalfLifeDays",
+    "type": "uint32"
+   },
+   {
+    "internalType": "enum PersonhoodRegistry.AgeCurve",
+    "name": "ageCurve",
+    "type": "uint8"
+   },
+   {
+    "internalType": "bool",
+    "name": "live",
+    "type": "bool"
+   },
+   {
+    "internalType": "string",
+    "name": "sourceURI",
+    "type": "string"
+   }
+  ],
+  "name": "setAdapter",
+  "outputs": [],
+  "stateMutability": "nonpayable",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "bytes32",
+    "name": "id",
+    "type": "bytes32"
+   },
+   {
+    "internalType": "bool",
+    "name": "live",
+    "type": "bool"
+   },
+   {
+    "internalType": "string",
+    "name": "reason",
+    "type": "string"
+   }
+  ],
+  "name": "setAdapterLiveness",
+  "outputs": [],
+  "stateMutability": "nonpayable",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "address",
+    "name": "to",
+    "type": "address"
+   }
+  ],
+  "name": "transferCuratorship",
+  "outputs": [],
+  "stateMutability": "nonpayable",
+  "type": "function"
+ }
+]
