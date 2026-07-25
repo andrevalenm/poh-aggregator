@@ -9,6 +9,10 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
 - [x] **Research margin notes** — shipped: at ≥1280px the long-form reserves a Tufte
       margin and the Ohlhaver pull-quotes float into it at natural flow height — iron
       rules, mono citations, CSS-only, author's markup untouched.
+- [x] **No vendor on the critical path** — shipped (iteration 14): the Coinbase probe reads
+      Base's EAS predeploy through Coinbase's own on-chain attestation index, so
+      `base.easscan.org` is gone. Every adapter is now a chain read or a self-hosted index.
+      Two `eth_call`s, no key. `research/protocols/eas-and-disco.md` §"Resolution, 2026-07-25".
 - [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.

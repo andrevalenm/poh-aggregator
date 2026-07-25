@@ -1,8 +1,8 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 12. All four suites green: 18 forge, 330 SDK
-(330 pass, 0 fail, 0 skipped), 13 Playwright — 361 total._
+detail. _Last updated 2026-07-25, after unattended iteration 14. All four suites green: 18 forge, 351 SDK
+(351 pass, 0 fail, 0 skipped), 13 Playwright — 382 total._
 
 ---
 
@@ -375,6 +375,42 @@ block is the second the contract accepted an Orb proof for that address.
 No weight moved; the registry stays at **30 adapters, revision 34**. Write-up:
 `research/protocols/world-agentbook-fleets.md` §7.
 
+**Iteration 14 took the last vendor off the critical path.** The Coinbase Verified Account probe
+POSTed a GraphQL query to `base.easscan.org` on every scoring request — the one adapter
+contradicting the rule the other eight are built on. That is not a tidiness point: a hosted
+endpoint we do not run is the only part of a score an adversary can attack without touching a
+chain, and degrading it silently costs every Coinbase-verified subject a trust root. Our own
+research file said "do not put EASSCAN in a synchronous user-facing path", and then we did.
+
+- **The obvious fix does not survive Base.** A recipient-filtered `eth_getLogs` over the full
+  49.1M-block history takes 14.0 s across the last 5M blocks and **times out at 120 s past 20M**
+  — on the only keyless Base endpoint that serves archive logs at all. A subgraph would fix it,
+  but the graph-node here would need a Base network added to its config, which is a container
+  change the mission forbids.
+- **It needs neither, because Coinbase already publishes the index.** They write
+  `(recipient, schema) => uid` to their own on-chain indexer so their integrators can read it, and
+  that write is public. Two `eth_call`s and it is done — no key, no vendor endpoint, nothing that
+  can rate-limit us. Address taken from their repo, then verified live rather than trusted.
+- **The indexer is only a pointer; EAS is the truth.** It is a proxy Coinbase can upgrade, so
+  schema, recipient, date and revocation all come from the EAS predeploy, and a record that does
+  not match what was asked for is an **error rather than a negative**. Revocation is why the
+  second call exists at all: the index keeps pointing at an attestation after it is revoked, and
+  the sampled windows hold 5,143 revocations against 18,655 issuances.
+- **The live suite found something reading could not have.** Its first draft asserted the indexed
+  uid equals the uid in the historical log; the chain refuted it, because Coinbase re-attests and
+  the newer uid supersedes the old one. The test now asserts the superseding record is the same
+  subject under the same schema and strictly *newer* — an index pointing backwards is the fault
+  worth catching, and equality never was.
+- **Nothing about a holder is hard-coded.** Subjects come out of `Attested` logs at run time in
+  five windows spanning Jan 2024 to today, so the suite follows the registry rather than a
+  snapshot of it, and reddens if Coinbase stops indexing.
+- **Also: `apps/demo/test.sh` runs now.** It has been broken since iteration 1 — it `cd`s to its
+  own directory and then to `packages/sdk`, which only exists from the repo root — so every
+  iteration has been running the four suites by hand. One line.
+
+No weight moved; the registry stays at **30 adapters, revision 34**. SDK suite **351 pass, 0 fail,
+0 skipped** (was 330). Write-up: `research/protocols/eas-and-disco.md`, §"Resolution, 2026-07-25".
+
 ---
 
 ## State: every phase shipped and tested
@@ -704,8 +740,12 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    correlated evidence. We count independence — priced at what fraud costs." Your voice,
    your call — one Edit in index.html if you want it.
 
-1. **Repo has no pushable remote.** Judges need a URL. Fork to Hugo0 or get collaborator
-   access from Andrei, then `git push`. Nothing was pushed anywhere overnight.
+1. ~~**Repo has no pushable remote.**~~ **Done from the laptop, and now the question is
+   visibility.** `b1a9097` records the private repo at `github.com/Hugo0/poh-aggregator` with
+   full history pushed after a secrets audit, and andrevalenm invited. Judges still need a
+   **public** URL, so this becomes: flip visibility, or re-push under the final name after the
+   name decision. Nothing has ever been pushed from ax41 and nothing will be — `MISSION.md`
+   forbids it.
 2. **corroborate.eth — no longer blocking, and the Sepolia half is done.** The earlier
    "Sepolia ENS is mid-migration" verdict was wrong: it was the wrong controller and a wrong
    event topic. Sepolia `.eth` registration is **free and instant** today through
@@ -838,6 +878,15 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    before a pitch it will look like a bug. Either re-point the third address at a live
    credential-holder on the morning, or accept that runs 2–4 will show the fleet gate as
    unreached.
+
+17. **`test.sh` works now, but it is in the wrong place, and moving it is your call.**
+   `MISSION.md` tells every iteration to run `./test.sh` from the repo root; the file lives at
+   `apps/demo/test.sh` and, until iteration 14, `cd`'d to its own directory and then to
+   `packages/sdk` — which only exists from the root — so it had never run to completion from
+   anywhere. It is anchored to the root now and the full sweep is green. The remaining oddity is
+   the path: a repo-wide sweep sitting inside the demo app. `git mv apps/demo/test.sh ./` plus
+   changing `"$(dirname "$0")/../.."` to `"$(dirname "$0")"` finishes it, and an agent moving a
+   file the mission names by path unasked seemed worse than leaving you the one-liner.
 
 ## Honest state of weak points
 
