@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Register corroborate.eth on Sepolia via commit-reveal, setting the address and the
-// corroborate.subjects text record atomically inside the registration's resolver-data array.
+// Register print.eth on Sepolia via commit-reveal, setting the address and the
+// print.subjects text record atomically inside the registration's resolver-data array.
 //
 // The subjects record is the product idea, not a convenience: ENS is where a person
 // declares which wallets are theirs. resolve("name.eth") expands the set from the record —
@@ -18,7 +18,7 @@ const env = Object.fromEntries(
     .map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()] }),
 )
 
-const LABEL = 'corroborate'
+const LABEL = 'print'
 const NAME = `${LABEL}.eth`
 const DURATION = 365n * 24n * 3600n
 // The demo subject set: real credential-holding wallets (PoH on one, Circles on the other),
@@ -37,10 +37,10 @@ const wallet = createWalletClient({ account, chain: sepolia, transport })
 const node = namehash(NAME)
 const resolverData = [
   encodeFunctionData({ abi: resolver.abi, functionName: 'setAddr', args: [node, account.address] }),
-  encodeFunctionData({ abi: resolver.abi, functionName: 'setText', args: [node, 'corroborate.subjects', SUBJECTS] }),
+  encodeFunctionData({ abi: resolver.abi, functionName: 'setText', args: [node, 'print.subjects', SUBJECTS] }),
   encodeFunctionData({
     abi: resolver.abi, functionName: 'setText',
-    args: [node, 'description', 'Corroborate — personhood scored by independent trust roots. subjects record = the wallets this name asserts as one person.'],
+    args: [node, 'description', 'Print — personhood scored by independent trust roots. subjects record = the wallets this name asserts as one person.'],
   }),
 ]
 
@@ -101,16 +101,16 @@ if (!available) {
 
 // Verify end to end through public ENS resolution — no hard-coded values downstream.
 const addr = await pub.getEnsAddress({ name: NAME })
-const subjects = await pub.getEnsText({ name: NAME, key: 'corroborate.subjects' })
+const subjects = await pub.getEnsText({ name: NAME, key: 'print.subjects' })
 console.log(`\nverification via Sepolia ENS:`)
 console.log(`  ${NAME} -> ${addr}`)
-console.log(`  corroborate.subjects -> ${subjects}`)
+console.log(`  print.subjects -> ${subjects}`)
 if (!addr || !subjects) { console.error('resolution failed'); process.exit(1) }
 
 writeFileSync('deployments/ens-sepolia.json', JSON.stringify({
   name: NAME, owner: account.address, node,
   resolver: resolver.address, controller: controller.address,
-  textRecords: { 'corroborate.subjects': subjects },
+  textRecords: { 'print.subjects': subjects },
 }, null, 2) + '\n')
 try { const { unlinkSync } = await import('node:fs'); unlinkSync(COMMIT_STATE) } catch {}
 console.log('\nsaved deployments/ens-sepolia.json')

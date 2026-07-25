@@ -8,7 +8,7 @@
 import { test, describe, before } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { Corroborate, DEFAULT_REGISTRY } from './index.ts'
+import { Print, DEFAULT_REGISTRY } from './index.ts'
 import { worldIdOrbAdapter, pohAdapter, circlesAdapter, coinbaseVerificationAdapter } from './adapters/index.ts'
 import type { Address } from './types.ts'
 
@@ -19,10 +19,10 @@ const knownRoots: string[] = Object.keys(ontologyJson.trustRoots)
 const UNREGISTERED = '0x000000000000000000000000000000000000dEaD' as Address
 
 describe('registry (Sepolia, live)', () => {
-  let client: Corroborate
+  let client: Print
 
   before(() => {
-    client = new Corroborate({ knownIds, knownRoots })
+    client = new Print({ knownIds, knownRoots })
   })
 
   test('loads the seeded ontology', async () => {
@@ -90,7 +90,7 @@ describe('adapters against live chains', () => {
 
 describe('end to end', () => {
   test('an address with no credentials scores 0 with an explicit no-evidence caveat', async () => {
-    const client = new Corroborate({ knownIds, knownRoots })
+    const client = new Print({ knownIds, knownRoots })
     const r = await client.resolve(UNREGISTERED)
 
     assert.equal(r.subject, UNREGISTERED)
@@ -104,7 +104,7 @@ describe('end to end', () => {
   })
 
   test('isHuman refuses to guess a threshold', async () => {
-    const client = new Corroborate({ knownIds, knownRoots })
+    const client = new Print({ knownIds, knownRoots })
     const r = await client.resolve(UNREGISTERED)
     // @ts-expect-error missing required argument is the point
     assert.throws(() => r.isHuman(), TypeError)
@@ -112,7 +112,7 @@ describe('end to end', () => {
   })
 
   test('a failing probe degrades the result instead of failing it', async () => {
-    const client = new Corroborate({
+    const client = new Print({
       knownIds,
       knownRoots,
       adapters: [
@@ -139,7 +139,7 @@ describe('index and chain, reconciled against live data', () => {
    * mechanism is why corrected data no longer breaks it.) Skips while the subgraph is still
    * syncing so a fresh deployment does not redden the suite.
    */
-  const SUBGRAPH = process.env.CORROBORATE_SUBGRAPH_URL ?? 'https://api.studio.thegraph.com/query/77602/poh/version/latest'
+  const SUBGRAPH = process.env.PRINT_SUBGRAPH_URL ?? 'https://api.studio.thegraph.com/query/77602/poh/version/latest'
   // A currently-registered PoH human. Used only because it is live; the tests read its real
   // dates rather than assuming any.
   const LIVE_POH = '0xd267eba602e692216703626a81157214b24c85fb' as Address
@@ -189,7 +189,7 @@ describe('index and chain, reconciled against live data', () => {
       return
     }
 
-    const r = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(LIVE_POH)
+    const r = await new Print({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(LIVE_POH)
     const poh = r.evidence.find((e) => e.adapterId === 'poh-v2')
     if (!answered(t, poh, 'poh-v2')) return
     assert.ok(poh!.held, 'vector must still be registered on-chain')
@@ -220,8 +220,8 @@ describe('index and chain, reconciled against live data', () => {
     // the index, so a subject's score moved with our indexing infrastructure; now the contract
     // answers both and the index only corroborates.
     const [bare, enriched] = await Promise.all([
-      new Corroborate({ knownIds, knownRoots }).resolve(LIVE_POH),
-      new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(LIVE_POH),
+      new Print({ knownIds, knownRoots }).resolve(LIVE_POH),
+      new Print({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(LIVE_POH),
     ])
     const barePoh = bare.evidence.find((e) => e.adapterId === 'poh-v2')
     const richPoh = enriched.evidence.find((e) => e.adapterId === 'poh-v2')
@@ -236,7 +236,7 @@ describe('index and chain, reconciled against live data', () => {
   })
 
   test('a real credential outside the index window is flagged, not silently re-dated', async (t) => {
-    const r = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(
+    const r = await new Print({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(
       CIRCLES_BEFORE_WINDOW,
     )
     const circles = r.evidence.find((e) => e.adapterId === 'circles-v2')
@@ -266,7 +266,7 @@ describe('index and chain, reconciled against live data', () => {
       'this avatar registered before the window, so the index never saw its RegisterHuman',
     )
 
-    const r = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(
+    const r = await new Print({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(
       CIRCLES_SIDE_EVENT_DATED,
     )
     const circles = r.evidence.find((e) => e.adapterId === 'circles-v2')

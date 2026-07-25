@@ -27,7 +27,7 @@ import { sepolia } from 'viem/chains'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
-  Corroborate,
+  Print,
   creationBlocks,
   ensBatchCaveats,
   evaluateFleet,
@@ -35,8 +35,8 @@ import {
   resolveEnsAgents,
   scanNameTree,
   toFleetAgents,
-} from '@corroborate/sdk'
-import { corroborate as corroborateConfig, REPO_ROOT } from './config.js'
+} from '@print/sdk'
+import { print as corroborateConfig, REPO_ROOT } from './config.js'
 import { fleetPolicy } from './counterparty/policy.js'
 import { banner, colour as C } from './trace.js'
 
@@ -87,11 +87,11 @@ function renderDecision(decision, identities) {
 
 async function main() {
   console.log('')
-  console.log(C.bold('Corroborate × ENS — an agent’s name, the human behind it, and the cap that follows'))
+  console.log(C.bold('Print × ENS — an agent’s name, the human behind it, and the cap that follows'))
   console.log(
     C.dim(
       `Sepolia ENS · parent ${deployment.parent} · resolver ${deployment.resolver}\n` +
-        'Records: corroborate.human on each agent, corroborate.agents + corroborate.subjects on the human.',
+        'Records: print.human on each agent, print.agents + print.subjects on the human.',
     ),
   )
 
@@ -123,7 +123,7 @@ async function main() {
     'Personhood, resolved once per human',
     'The credentials belong to the person. Two agents of one human are one lookup, not two.',
   )
-  const sdk = new Corroborate({
+  const sdk = new Print({
     ...(corroborateConfig.registryRpcUrl ? { registryRpcUrl: corroborateConfig.registryRpcUrl } : {}),
     ...(corroborateConfig.subgraphUrl ? { subgraphUrl: corroborateConfig.subgraphUrl } : {}),
   })

@@ -15,8 +15,8 @@
  */
 
 import './research.css'
-import { suggestEnrollment } from '@corroborate/sdk'
-import type { Adapter } from '@corroborate/sdk'
+import { suggestEnrollment } from '@print/sdk'
+import type { Adapter } from '@print/sdk'
 import ontologyJson from '../../../../ontology/adapters.json'
 
 /**

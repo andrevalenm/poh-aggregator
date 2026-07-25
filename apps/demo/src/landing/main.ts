@@ -50,7 +50,7 @@ const MCP_CLIENTS: ClientOption[] = [
   {
     id: 'claude-code',
     label: 'Claude Code',
-    command: 'claude mcp add corroborate -- npx -y @corroborate/mcp',
+    command: 'claude mcp add print -- npx -y @print/mcp',
     note: 'Then ask: “is 0xd267…85fb a person? which evidence is correlated?”',
   },
   {
@@ -58,9 +58,9 @@ const MCP_CLIENTS: ClientOption[] = [
     label: 'Cursor',
     command: `{
   "mcpServers": {
-    "corroborate": {
+    "print": {
       "command": "npx",
-      "args": ["-y", "@corroborate/mcp"]
+      "args": ["-y", "@print/mcp"]
     }
   }
 }`,
@@ -69,14 +69,14 @@ const MCP_CLIENTS: ClientOption[] = [
   {
     id: 'codex',
     label: 'Codex',
-    command: 'codex mcp add corroborate -- npx -y @corroborate/mcp',
+    command: 'codex mcp add print -- npx -y @print/mcp',
     note: 'Registers the four tools with the Codex CLI.',
   },
   {
     id: 'any',
     label: 'Any MCP client',
-    command: 'npx -y @corroborate/mcp',
-    note: 'Plain stdio server. Optional: CORROBORATE_SUBGRAPH_URL for issuance-date enrichment.',
+    command: 'npx -y @print/mcp',
+    note: 'Plain stdio server. Optional: PRINT_SUBGRAPH_URL for issuance-date enrichment.',
   },
 ]
 

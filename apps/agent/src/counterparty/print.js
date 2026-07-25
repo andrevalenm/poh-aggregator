@@ -1,24 +1,24 @@
 /**
- * Corroborate lookup for the counterparty.
+ * Print lookup for the counterparty.
  *
  * The counterparty asks one question — "what independent evidence exists that a human stands
  * behind this address set?" — and gets back evidence, roots and caveats. It does the deciding
  * itself, in decide.js.
  *
  * Note what the counterparty never receives: any link between the operator's World ID, their
- * passport proof and their social graph. Corroborate runs in the counterparty's own process,
+ * passport proof and their social graph. Print runs in the counterparty's own process,
  * reads public chains, and never phones home. An aggregator that collected credentials
  * centrally would become the single party able to correlate exactly the identities these
  * protocols are built to keep apart.
  */
 
-import { Corroborate, defaultAdapters } from '@corroborate/sdk'
-import { corroborate as cfg } from '../config.js'
+import { Print, defaultAdapters } from '@print/sdk'
+import { print as cfg } from '../config.js'
 
 let client
 function getClient() {
   if (!client) {
-    client = new Corroborate({
+    client = new Print({
       ...(cfg.registryAddress ? { registryAddress: cfg.registryAddress } : {}),
       ...(cfg.registryRpcUrl ? { registryRpcUrl: cfg.registryRpcUrl } : {}),
       ...(cfg.subgraphUrl ? { subgraphUrl: cfg.subgraphUrl } : {}),

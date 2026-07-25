@@ -120,7 +120,7 @@ describe('the binding is read in both directions', () => {
     }
   })
 
-  test('every agent’s corroborate.human record is what the SDK reports it declared', async () => {
+  test('every agent’s print.human record is what the SDK reports it declared', async () => {
     for (const id of identities) {
       const record = await client.getEnsText({ name: id.name, key: AGENT_HUMAN_RECORD })
       assert.equal(id.human?.declared, record)
@@ -244,7 +244,7 @@ describe('the counterparty’s decision over the live tree', () => {
 
   test('the unacknowledged agent names a wallet its own operator also declares — reported, not merged', () => {
     // The live tree is built so this is true: `unverified` names an address that appears in the
-    // parent's own `corroborate.subjects`. One operator, two humans, and the only honest move
+    // parent's own `print.subjects`. One operator, two humans, and the only honest move
     // is to say so — merging self-asserted sets would let anyone absorb a stranger.
     const caveats = ensBatchCaveats(identities)
     assert.ok(caveats.some((c) => c.code === 'declared-humans-share-a-wallet'))

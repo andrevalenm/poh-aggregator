@@ -15,10 +15,10 @@ const BEACON = '0x58b849f60b0515871fcfa80c7907d097571f2a12'
 const POH_VECTOR = '0xd267eba602e692216703626a81157214b24c85fb'
 const CIRCLES_VECTOR = '0x7D8459e2ca3f62E6d8599E98ebf8c42d88218C87'
 
-test.describe('Corroborate demo', () => {
+test.describe('Print demo', () => {
   test('loads and reports the live registry', async ({ page }) => {
     await page.goto('/app.html')
-    await expect(page.locator('h1')).toContainText('Corroborate')
+    await expect(page.locator('h1')).toContainText('Print')
     // The registry line is populated from a live Sepolia read — no hard-coded values.
     await expect(page.locator('#registry-line')).toContainText(/revision \d+/, { timeout: 60_000 })
     await expect(page.locator('#registry-line')).toContainText('trust roots')

@@ -75,7 +75,7 @@ export function enrollableRoots(): string[] {
 /**
  * What would raise this subject's independence, and where to go.
  *
- * `adapters` is the ontology (from `Corroborate#ontology()`), used to price each unheld root at
+ * `adapters` is the ontology (from `Print#ontology()`), used to price each unheld root at
  * its strongest available credential — the same figure scoring would credit.
  */
 export function suggestEnrollment(

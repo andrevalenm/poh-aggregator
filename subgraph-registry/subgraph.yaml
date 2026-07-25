@@ -1,6 +1,6 @@
 specVersion: 1.0.0
 description: >
-  The Corroborate trust-root ontology and its full audit trail. Every adapter weight, every
+  The Print trust-root ontology and its full audit trail. Every adapter weight, every
   change, with the source each judgment was derived from — the answer to "why did my score
   change" is a query here, with a block number attached.
 repository: https://github.com/andrevalenm/poh-aggregator

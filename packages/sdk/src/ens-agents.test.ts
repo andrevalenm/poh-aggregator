@@ -60,34 +60,34 @@ function fakeClient(records: Records, opts: { failText?: string[]; failAddr?: st
 }
 
 const TREE: Records = {
-  'corroborate.eth': {
+  'print.eth': {
     addr: HUMAN_WALLET,
     owner: OWNER,
     text: {
       [HUMAN_SUBJECTS_RECORD]: `${OTHER_WALLET}`,
-      [HUMAN_AGENTS_RECORD]: 'alpha.corroborate.eth,beta.corroborate.eth',
+      [HUMAN_AGENTS_RECORD]: 'alpha.print.eth,beta.print.eth',
     },
   },
-  'alpha.corroborate.eth': { addr: AGENT_A, owner: OWNER, text: { [AGENT_HUMAN_RECORD]: 'corroborate.eth' } },
-  'beta.corroborate.eth': { addr: AGENT_B, owner: OWNER, text: { [AGENT_HUMAN_RECORD]: 'corroborate.eth' } },
-  'rogue.example.eth': { addr: AGENT_B, owner: OWNER, text: { [AGENT_HUMAN_RECORD]: 'corroborate.eth' } },
-  'orphan.corroborate.eth': { addr: AGENT_A, owner: OWNER },
+  'alpha.print.eth': { addr: AGENT_A, owner: OWNER, text: { [AGENT_HUMAN_RECORD]: 'print.eth' } },
+  'beta.print.eth': { addr: AGENT_B, owner: OWNER, text: { [AGENT_HUMAN_RECORD]: 'print.eth' } },
+  'rogue.example.eth': { addr: AGENT_B, owner: OWNER, text: { [AGENT_HUMAN_RECORD]: 'print.eth' } },
+  'orphan.print.eth': { addr: AGENT_A, owner: OWNER },
 }
 
 describe('resolving an agent name', () => {
   test('a name the human lists back is a mutual binding', async () => {
-    const id = await resolveEnsAgent(fakeClient(TREE), 'alpha.corroborate.eth')
+    const id = await resolveEnsAgent(fakeClient(TREE), 'alpha.print.eth')
     assert.equal(id.binding, 'mutual')
     assert.equal(id.agent, AGENT_A)
     assert.equal(id.owner, OWNER)
-    assert.equal(id.human?.name, 'corroborate.eth')
+    assert.equal(id.human?.name, 'print.eth')
     assert.equal(id.human?.humanId, ensHumanId(HUMAN_WALLET))
     assert.ok(id.caveats.some((c) => c.code === 'agent-human-binding-mutual'))
     assert.equal(id.error, undefined)
   })
 
   test('the human’s address set is its addr record plus its declared subjects, deduped', async () => {
-    const id = await resolveEnsAgent(fakeClient(TREE), 'alpha.corroborate.eth')
+    const id = await resolveEnsAgent(fakeClient(TREE), 'alpha.print.eth')
     assert.deepEqual(id.human?.subjects, [HUMAN_WALLET, OTHER_WALLET])
   })
 
@@ -102,9 +102,9 @@ describe('resolving an agent name', () => {
 
   test('a bare address can never acknowledge, so naming one is always one-way', async () => {
     const records: Records = {
-      'solo.corroborate.eth': { addr: AGENT_A, text: { [AGENT_HUMAN_RECORD]: HUMAN_WALLET } },
+      'solo.print.eth': { addr: AGENT_A, text: { [AGENT_HUMAN_RECORD]: HUMAN_WALLET } },
     }
-    const id = await resolveEnsAgent(fakeClient(records), 'solo.corroborate.eth')
+    const id = await resolveEnsAgent(fakeClient(records), 'solo.print.eth')
     assert.equal(id.binding, 'agent-asserted')
     assert.equal(id.human?.address, HUMAN_WALLET)
     assert.deepEqual(id.human?.subjects, [HUMAN_WALLET])
@@ -115,13 +115,13 @@ describe('resolving an agent name', () => {
   })
 
   test('a human named by name and by address is one human, not two', async () => {
-    const byName = await resolveEnsHuman(fakeClient(TREE), 'corroborate.eth')
+    const byName = await resolveEnsHuman(fakeClient(TREE), 'print.eth')
     const byAddress = await resolveEnsHuman(fakeClient(TREE), HUMAN_WALLET)
     assert.equal(byName.humanId, byAddress.humanId)
   })
 
-  test('an agent with no corroborate.human record names nobody, and says so', async () => {
-    const id = await resolveEnsAgent(fakeClient(TREE), 'orphan.corroborate.eth')
+  test('an agent with no print.human record names nobody, and says so', async () => {
+    const id = await resolveEnsAgent(fakeClient(TREE), 'orphan.print.eth')
     assert.equal(id.binding, 'unbound')
     assert.equal(id.human, undefined)
     assert.ok(id.caveats.some((c) => c.code === 'agent-declares-no-human'))
@@ -129,18 +129,18 @@ describe('resolving an agent name', () => {
   })
 
   test('an unreadable resolver is unreadable, never unbound', async () => {
-    const id = await resolveEnsAgent(fakeClient(TREE, { failText: ['alpha.corroborate.eth'] }), 'alpha.corroborate.eth')
+    const id = await resolveEnsAgent(fakeClient(TREE, { failText: ['alpha.print.eth'] }), 'alpha.print.eth')
     assert.equal(id.binding, 'unreadable')
-    assert.match(id.error!, /could not read corroborate.human/)
+    assert.match(id.error!, /could not read print.human/)
   })
 
   test('an unreadable human side is unreadable too — the agent is not judged on half a read', async () => {
     const id = await resolveEnsAgent(
-      fakeClient(TREE, { failText: ['corroborate.eth'], failAddr: ['corroborate.eth'] }),
-      'alpha.corroborate.eth',
+      fakeClient(TREE, { failText: ['print.eth'], failAddr: ['print.eth'] }),
+      'alpha.print.eth',
     )
     assert.equal(id.binding, 'unreadable')
-    assert.match(id.human!.error!, /could not resolve corroborate.eth/)
+    assert.match(id.human!.error!, /could not resolve print.eth/)
   })
 
   test('a malformed name is rejected without a network call', async () => {
@@ -152,26 +152,26 @@ describe('resolving an agent name', () => {
   })
 
   test('a human record that is neither a name nor an address errors rather than guessing', async () => {
-    const records: Records = { 'x.corroborate.eth': { addr: AGENT_A, text: { [AGENT_HUMAN_RECORD]: '!! nope !!' } } }
-    const id = await resolveEnsAgent(fakeClient(records), 'x.corroborate.eth')
+    const records: Records = { 'x.print.eth': { addr: AGENT_A, text: { [AGENT_HUMAN_RECORD]: '!! nope !!' } } }
+    const id = await resolveEnsAgent(fakeClient(records), 'x.print.eth')
     assert.equal(id.binding, 'unreadable')
     assert.match(id.human!.error!, /neither an address nor a valid ENS name/)
   })
 
   test('acknowledgement matching is normalized, not string-compared', async () => {
     const records: Records = {
-      'human.eth': { addr: HUMAN_WALLET, text: { [HUMAN_AGENTS_RECORD]: ' ALPHA.corroborate.eth , ' } },
-      'alpha.corroborate.eth': { addr: AGENT_A, text: { [AGENT_HUMAN_RECORD]: 'human.eth' } },
+      'human.eth': { addr: HUMAN_WALLET, text: { [HUMAN_AGENTS_RECORD]: ' ALPHA.print.eth , ' } },
+      'alpha.print.eth': { addr: AGENT_A, text: { [AGENT_HUMAN_RECORD]: 'human.eth' } },
     }
-    const id = await resolveEnsAgent(fakeClient(records), 'alpha.corroborate.eth')
+    const id = await resolveEnsAgent(fakeClient(records), 'alpha.print.eth')
     assert.equal(id.binding, 'mutual')
   })
 })
 
 describe('feeding the fleet engine', () => {
   const identity = (over: Partial<EnsAgentIdentity>): EnsAgentIdentity => ({
-    name: 'a.corroborate.eth',
-    node: namehash('a.corroborate.eth'),
+    name: 'a.print.eth',
+    node: namehash('a.print.eth'),
     binding: 'mutual',
     caveats: [],
     ...over,
@@ -180,9 +180,9 @@ describe('feeding the fleet engine', () => {
   test('binding strength survives the mapping', () => {
     const [mutual, asserted, broken, unbound] = toFleetAgents([
       identity({ agent: AGENT_A, human: human('mutual') }),
-      identity({ name: 'b.corroborate.eth', agent: AGENT_B, binding: 'agent-asserted', human: human('asserted') }),
-      identity({ name: 'c.corroborate.eth', agent: AGENT_C, binding: 'unreadable', error: 'RPC down' }),
-      identity({ name: 'd.corroborate.eth', agent: OTHER_WALLET, binding: 'unbound' }),
+      identity({ name: 'b.print.eth', agent: AGENT_B, binding: 'agent-asserted', human: human('asserted') }),
+      identity({ name: 'c.print.eth', agent: AGENT_C, binding: 'unreadable', error: 'RPC down' }),
+      identity({ name: 'd.print.eth', agent: OTHER_WALLET, binding: 'unbound' }),
     ])
     assert.equal(mutual!.backing.status === 'backed' && mutual!.backing.binding, 'attested')
     assert.equal(asserted!.backing.status === 'backed' && asserted!.backing.binding, 'asserted')
@@ -192,8 +192,8 @@ describe('feeding the fleet engine', () => {
 
   test('an agent with no addr record still gets a distinct key, and it is not a wallet', () => {
     const [a, b] = toFleetAgents([
-      identity({ name: 'a.corroborate.eth', node: namehash('a.corroborate.eth'), human: human('m') }),
-      identity({ name: 'b.corroborate.eth', node: namehash('b.corroborate.eth'), human: human('m') }),
+      identity({ name: 'a.print.eth', node: namehash('a.print.eth'), human: human('m') }),
+      identity({ name: 'b.print.eth', node: namehash('b.print.eth'), human: human('m') }),
     ])
     assert.notEqual(a!.agent, b!.agent)
     assert.match(a!.agent, /^0xname:/)
@@ -204,18 +204,18 @@ describe('feeding the fleet engine', () => {
     // refuse a wallet on account of its own second name. The engine keys agents by address,
     // so the collapse has to happen here.
     const agents = toFleetAgents([
-      identity({ name: 'alias.corroborate.eth', agent: AGENT_A, binding: 'agent-asserted', human: human('h1'), createdAtBlock: 20 }),
-      identity({ name: 'alpha.corroborate.eth', agent: AGENT_A, binding: 'mutual', human: human('h1'), createdAtBlock: 10 }),
+      identity({ name: 'alias.print.eth', agent: AGENT_A, binding: 'agent-asserted', human: human('h1'), createdAtBlock: 20 }),
+      identity({ name: 'alpha.print.eth', agent: AGENT_A, binding: 'mutual', human: human('h1'), createdAtBlock: 10 }),
     ])
     assert.equal(agents.length, 1)
     assert.equal(agents[0]!.backing.status === 'backed' && agents[0]!.backing.binding, 'attested')
     assert.equal(agents[0]!.registeredAtBlock, 10, 'the earliest of the two names dates the wallet')
-    assert.match(agents[0]!.label!, /alias.corroborate.eth \+ alpha.corroborate.eth/)
+    assert.match(agents[0]!.label!, /alias.print.eth \+ alpha.print.eth/)
   })
 
   test('two names claiming different humans for one wallet is a contradiction, not a fact', () => {
     const agents = toFleetAgents([
-      identity({ name: 'a.corroborate.eth', agent: AGENT_A, human: human('h1') }),
+      identity({ name: 'a.print.eth', agent: AGENT_A, human: human('h1') }),
       identity({ name: 'b.elsewhere.eth', agent: AGENT_A, human: human('h2') }),
     ])
     assert.equal(agents.length, 1)
@@ -225,8 +225,8 @@ describe('feeding the fleet engine', () => {
 
   test('a wallet named twice is reported to the counterparty', () => {
     const caveats = ensBatchCaveats([
-      identity({ name: 'a.corroborate.eth', agent: AGENT_A, human: human('h1') }),
-      identity({ name: 'b.corroborate.eth', agent: AGENT_A, human: human('h1') }),
+      identity({ name: 'a.print.eth', agent: AGENT_A, human: human('h1') }),
+      identity({ name: 'b.print.eth', agent: AGENT_A, human: human('h1') }),
     ])
     assert.ok(caveats.some((c) => c.code === 'one-wallet-presented-under-several-names'))
   })
@@ -234,7 +234,7 @@ describe('feeding the fleet engine', () => {
   test('one address set per human, not per agent', () => {
     const sets = humanAddressSets([
       identity({ agent: AGENT_A, human: human('h1') }),
-      identity({ name: 'b.corroborate.eth', agent: AGENT_B, human: human('h1') }),
+      identity({ name: 'b.print.eth', agent: AGENT_B, human: human('h1') }),
     ])
     assert.equal(sets.size, 1)
   })
@@ -242,7 +242,7 @@ describe('feeding the fleet engine', () => {
   test('two declared humans claiming one wallet is reported, never merged', () => {
     const ids = [
       identity({ agent: AGENT_A, human: { ...human('h1'), subjects: [HUMAN_WALLET, OTHER_WALLET] } }),
-      identity({ name: 'b.corroborate.eth', agent: AGENT_B, human: { ...human('h2'), subjects: [OTHER_WALLET] } }),
+      identity({ name: 'b.print.eth', agent: AGENT_B, human: { ...human('h2'), subjects: [OTHER_WALLET] } }),
     ]
     const shared = sharedWalletHumans(ids)
     assert.equal(shared.length, 1)
@@ -276,26 +276,26 @@ describe('minting humans defeats a per-human cap unless the binding is attested'
   const agents = () =>
     toFleetAgents([
       {
-        name: 'alpha.corroborate.eth',
-        node: namehash('alpha.corroborate.eth'),
+        name: 'alpha.print.eth',
+        node: namehash('alpha.print.eth'),
         agent: AGENT_A,
         binding: 'mutual',
         caveats: [],
         createdAtBlock: 10,
-        human: { declared: 'corroborate.eth', name: 'corroborate.eth', address: HUMAN_WALLET, subjects: [HUMAN_WALLET], acknowledges: [], humanId: ensHumanId(HUMAN_WALLET) },
+        human: { declared: 'print.eth', name: 'print.eth', address: HUMAN_WALLET, subjects: [HUMAN_WALLET], acknowledges: [], humanId: ensHumanId(HUMAN_WALLET) },
       },
       {
-        name: 'beta.corroborate.eth',
-        node: namehash('beta.corroborate.eth'),
+        name: 'beta.print.eth',
+        node: namehash('beta.print.eth'),
         agent: AGENT_B,
         binding: 'mutual',
         caveats: [],
         createdAtBlock: 11,
-        human: { declared: 'corroborate.eth', name: 'corroborate.eth', address: HUMAN_WALLET, subjects: [HUMAN_WALLET], acknowledges: [], humanId: ensHumanId(HUMAN_WALLET) },
+        human: { declared: 'print.eth', name: 'print.eth', address: HUMAN_WALLET, subjects: [HUMAN_WALLET], acknowledges: [], humanId: ensHumanId(HUMAN_WALLET) },
       },
       {
-        name: 'unverified.corroborate.eth',
-        node: namehash('unverified.corroborate.eth'),
+        name: 'unverified.print.eth',
+        node: namehash('unverified.print.eth'),
         agent: AGENT_C,
         binding: 'agent-asserted',
         caveats: [],
@@ -314,13 +314,13 @@ describe('minting humans defeats a per-human cap unless the binding is attested'
     assert.equal(d.summary.humans, 2, 'because a second wallet is a second human')
     assert.equal(d.summary.assertedBindings, 1)
     assert.ok(d.caveats.some((c) => c.code === 'fleet-cap-soft-on-asserted-bindings'))
-    assert.equal(d.agents.find((a) => a.label === 'unverified.corroborate.eth')!.verdict, 'allow')
+    assert.equal(d.agents.find((a) => a.label === 'unverified.print.eth')!.verdict, 'allow')
   })
 
   test('requiring an acknowledgement closes it, and one human keeps exactly one slot', () => {
     const d = evaluateFleet({ policy: policy({ requireAttestedBinding: true }), agents: agents(), evidence })
     assert.equal(d.summary.allowed, 1)
-    const unverified = d.agents.find((a) => a.label === 'unverified.corroborate.eth')!
+    const unverified = d.agents.find((a) => a.label === 'unverified.print.eth')!
     assert.equal(unverified.verdict, 'deny')
     assert.equal(unverified.rules.find((r) => r.rule === 'human-binding')!.pass, false)
     assert.match(unverified.because, /has not acknowledged it/)
@@ -336,13 +336,13 @@ describe('minting humans defeats a per-human cap unless the binding is attested'
       alpha!,
     ]
     const d = evaluateFleet({ policy: policy({ requireAttestedBinding: true }), agents: shared, evidence })
-    assert.equal(d.agents.find((a) => a.label === 'unverified.corroborate.eth')!.verdict, 'deny')
-    assert.equal(d.agents.find((a) => a.label === 'alpha.corroborate.eth')!.verdict, 'allow')
+    assert.equal(d.agents.find((a) => a.label === 'unverified.print.eth')!.verdict, 'deny')
+    assert.equal(d.agents.find((a) => a.label === 'alpha.print.eth')!.verdict, 'allow')
   })
 
   test('an unreadable binding is indeterminate under both policies', () => {
     const broken = toFleetAgents([
-      { name: 'x.corroborate.eth', node: namehash('x.corroborate.eth'), agent: AGENT_A, binding: 'unreadable', error: 'RPC down', caveats: [] },
+      { name: 'x.print.eth', node: namehash('x.print.eth'), agent: AGENT_A, binding: 'unreadable', error: 'RPC down', caveats: [] },
     ])
     for (const p of [policy(), policy({ requireAttestedBinding: true })]) {
       const d = evaluateFleet({ policy: p, agents: broken, evidence })
@@ -353,11 +353,11 @@ describe('minting humans defeats a per-human cap unless the binding is attested'
 
 describe('naming a tree', () => {
   const scan: NameTreeScan = {
-    parent: 'corroborate.eth',
-    parentNode: namehash('corroborate.eth'),
+    parent: 'print.eth',
+    parentNode: namehash('print.eth'),
     subnodes: [],
     named: [
-      { labelhash: '0x01', node: '0x01', owner: OWNER, block: 7, label: 'alpha', name: 'alpha.corroborate.eth' },
+      { labelhash: '0x01', node: '0x01', owner: OWNER, block: 7, label: 'alpha', name: 'alpha.print.eth' },
     ],
     unnamed: [{ labelhash: '0x02', node: '0x02', owner: OWNER, block: 8 }],
     coverage: { fromBlock: 1, toBlock: 9, endpoint: 'test', calls: 1 },
@@ -366,15 +366,15 @@ describe('naming a tree', () => {
 
   test('creation blocks are keyed by full name so slot order can come from the chain', () => {
     const blocks = creationBlocks(scan)
-    assert.equal(blocks.get('alpha.corroborate.eth'), 7)
+    assert.equal(blocks.get('alpha.print.eth'), 7)
     assert.equal(blocks.size, 1, 'an unnamed subnode cannot be keyed by a name it does not have')
   })
 })
 
 function human(id: string) {
   return {
-    declared: 'corroborate.eth',
-    name: 'corroborate.eth',
+    declared: 'print.eth',
+    name: 'print.eth',
     address: HUMAN_WALLET as `0x${string}`,
     subjects: [HUMAN_WALLET as `0x${string}`],
     acknowledges: [],

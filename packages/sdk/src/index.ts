@@ -58,7 +58,7 @@ export interface CorroborateOptions {
   registryAddress?: `0x${string}`
   registryRpcUrl?: string
   /**
-   * GraphQL endpoint of the Corroborate subgraph. Supplies issuance dates (which unlock
+   * GraphQL endpoint of the Print subgraph. Supplies issuance dates (which unlock
    * decay) and trust-graph position. Without it the SDK degrades to bare contract reads and
    * results carry the issuance-date-unknown caveat.
    */
@@ -88,7 +88,7 @@ export interface ResolveOptions {
 }
 
 /**
- * Corroborate — aggregate personhood credentials, scored by independent trust root.
+ * Print — aggregate personhood credentials, scored by independent trust root.
  *
  * The client holds no user state and talks to no server of ours. Ontology comes from the
  * public registry, credentials come from public chains, and scoring happens here in your
@@ -97,7 +97,7 @@ export interface ResolveOptions {
  * exactly the correlation those protocols are designed to prevent. We never need that link,
  * because correlation is a property of the credential class, not of the person.
  */
-export class Corroborate {
+export class Print {
   #opts: Required<Pick<CorroborateOptions, 'registryAddress'>> & CorroborateOptions
   #adapters: AdapterProbe[]
   #ontology?: Awaited<ReturnType<typeof loadOntology>>
@@ -190,7 +190,7 @@ export class Corroborate {
 
   /**
    * Resolve an ENS name to an address — and, when the name carries a
-   * `corroborate.subjects` text record, to the full address set it declares.
+   * `print.subjects` text record, to the full address set it declares.
    *
    * The record is the product idea in one line: ENS is where a person asserts which
    * wallets are theirs. Real people hold different credentials on different addresses
@@ -221,7 +221,7 @@ export class Corroborate {
     }
     const [address, subjectsRecord] = await Promise.all([
       client.getEnsAddress({ name }),
-      client.getEnsText({ name, key: 'corroborate.subjects' }).catch(() => null),
+      client.getEnsText({ name, key: 'print.subjects' }).catch(() => null),
     ])
     if (!address) throw new Error(`ENS name does not resolve to an address: "${trimmed}"`)
 
@@ -280,7 +280,7 @@ export class Corroborate {
       historical ? historical.ontology : this.ontology(),
     ])
 
-    // A name's corroborate.subjects record expands the set; dedupe again afterwards.
+    // A name's print.subjects record expands the set; dedupe again afterwards.
     const expandedSeen = new Set<string>()
     const addresses: Address[] = []
     let subjectsDeclaredByName = false
@@ -381,7 +381,7 @@ export class Corroborate {
       result.caveats.push({
         code: 'address-set-asserted-by-name-owner',
         message:
-          'Part of this address set comes from a corroborate.subjects ENS text record. The name owner asserted it; the listed addresses have not countersigned, so ownership of every listed wallet is a claim, not a proof.',
+          'Part of this address set comes from a print.subjects ENS text record. The name owner asserted it; the listed addresses have not countersigned, so ownership of every listed wallet is a claim, not a proof.',
       })
     }
     return result
@@ -393,7 +393,7 @@ export async function resolvePersonhood(
   nameOrAddress: string,
   opts?: CorroborateOptions & ResolveOptions,
 ): Promise<PersonhoodResult> {
-  return new Corroborate(opts).resolve(
+  return new Print(opts).resolve(
     nameOrAddress,
     opts?.asOf !== undefined ? { asOf: opts.asOf } : {},
   )

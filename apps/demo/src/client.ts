@@ -1,5 +1,5 @@
-import { Corroborate, defaultAdapters, DEFAULT_REGISTRY } from '@corroborate/sdk'
-import type { Address, AdapterProbe, AdapterProbeResult } from '@corroborate/sdk'
+import { Print, defaultAdapters, DEFAULT_REGISTRY } from '@print/sdk'
+import type { Address, AdapterProbe, AdapterProbeResult } from '@print/sdk'
 import { knownIds, knownRoots } from './known.ts'
 
 export { DEFAULT_REGISTRY }
@@ -53,8 +53,8 @@ export function instrumentedAdapters(onEvent: (e: ProbeEvent) => void): AdapterP
   }))
 }
 
-export function makeClient(onEvent?: (e: ProbeEvent) => void): Corroborate {
-  return new Corroborate({
+export function makeClient(onEvent?: (e: ProbeEvent) => void): Print {
+  return new Print({
     knownIds,
     knownRoots,
     adapters: onEvent ? instrumentedAdapters(onEvent) : baseAdapters(),

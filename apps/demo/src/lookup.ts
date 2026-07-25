@@ -1,4 +1,4 @@
-import type { Evidence, PersonhoodResult } from '@corroborate/sdk'
+import type { Evidence, PersonhoodResult } from '@print/sdk'
 import { makeClient, type ProbeEvent, type ProbeState } from './client.ts'
 import { adapterNotes } from './known.ts'
 import { saturationBlock } from './compare.ts'
@@ -122,7 +122,7 @@ function thresholdControl(result: PersonhoodResult): HTMLElement {
       readout.textContent = 'not set'
       verdict.append(
         h('b', {}, 'No verdict. '),
-        'Corroborate does not choose a threshold for you, and will not guess one. Move the slider to see what your own cutoff would decide — the decision, and its consequences for the person on the other side, belong to whoever is doing the admitting.',
+        'Print does not choose a threshold for you, and will not guess one. Move the slider to see what your own cutoff would decide — the decision, and its consequences for the person on the other side, belong to whoever is doing the admitting.',
       )
       return
     }

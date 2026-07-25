@@ -12,7 +12,7 @@ import { Agent, ObservedAgent } from './agent.js'
 import { REGISTERED_AGENTS, OPERATOR_ADDRESS_SET } from './fixtures.js'
 import { banner, renderTrace, colour as C } from './trace.js'
 import { agentPrivateKey, world } from './config.js'
-import { scanAgentBook } from '@corroborate/sdk'
+import { scanAgentBook } from '@print/sdk'
 
 /** The human running the most agents, found by scanning rather than by being told. */
 function largestFleet(index) {
@@ -26,7 +26,7 @@ function largestFleet(index) {
 
 async function main() {
   console.log('')
-  console.log(C.bold('Corroborate × World AgentKit — human-backing verification for agents'))
+  console.log(C.bold('Print × World AgentKit — human-backing verification for agents'))
   console.log(
     C.dim(
       'A counterparty demands proof that a real human stands behind an agent, and shows its work.\n' +
@@ -170,7 +170,7 @@ async function main() {
     · A World ID-verified human registered that wallet        (AgentBook, on-chain)
     · Independent evidence exists for a human behind the
       declared address set, priced by what it would cost an
-      adversary to fake                                       (Corroborate, 3 trust roots)
+      adversary to fake                                       (Print, 3 trust roots)
     · Two agents can be one human, and were                   (run 3)
     · A counterparty can bound a fleet *before* serving it,
       because the registry names every agent a human

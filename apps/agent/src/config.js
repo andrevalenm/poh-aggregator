@@ -57,7 +57,7 @@ export const hasRpSigningKey = Boolean(process.env.WORLD_SIGNER_PRIVATE_KEY)
 /** Read lazily and never returned to a caller that might print it. */
 export const rpSigningKey = () => process.env.WORLD_SIGNER_PRIVATE_KEY
 
-export const corroborate = {
+export const print = {
   /**
    * Sepolia registry holding the trust-root ontology and its weights.
    *

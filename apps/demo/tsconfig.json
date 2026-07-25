@@ -13,7 +13,7 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "paths": {
-      "@corroborate/sdk": ["../../packages/sdk/src/index.ts"]
+      "@print/sdk": ["../../packages/sdk/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "vite.config.ts"]

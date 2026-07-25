@@ -6,23 +6,23 @@ import type { FleetAgent, HumanBacking } from './fleet.ts'
 /**
  * ENS as the carrier of *agent* identity.
  *
- * `resolveSubject()` already reads `corroborate.subjects` — a human naming their wallets. This
+ * `resolveSubject()` already reads `print.subjects` — a human naming their wallets. This
  * file is the other half: an agent's name naming the human behind it, and that human's name
  * naming the agents it accepts responsibility for.
  *
- *   alpha.corroborate.eth   addr                  → the agent's wallet
- *                           corroborate.human     → corroborate.eth
- *   corroborate.eth         addr                  → the human's primary wallet
- *                           corroborate.subjects  → every wallet the human declares
- *                           corroborate.agents    → the agent names the human acknowledges
+ *   alpha.print.eth   addr                  → the agent's wallet
+ *                           print.human     → print.eth
+ *   print.eth         addr                  → the human's primary wallet
+ *                           print.subjects  → every wallet the human declares
+ *                           print.agents    → the agent names the human acknowledges
  *
- * A counterparty handed `alpha.corroborate.eth` resolves the whole picture from public
+ * A counterparty handed `alpha.print.eth` resolves the whole picture from public
  * infrastructure — no server of ours, no registration with us, and no API key. That is the
  * same permissionless-read constraint every adapter in this SDK is held to.
  *
  * ## Why the acknowledgement record exists, and why the cap is worthless without it
  *
- * `corroborate.human` alone is a claim an agent makes about a person. Two failure modes follow,
+ * `print.human` alone is a claim an agent makes about a person. Two failure modes follow,
  * and only the second is usually noticed:
  *
  *   1. **Riding a stranger.** An agent can name any address, including one holding a strong
@@ -33,7 +33,7 @@ import type { FleetAgent, HumanBacking } from './fleet.ts'
  *      the cap binds nothing — while every individual answer stays true.
  *
  * The fix is not more cryptography, it is the other direction: the human's own name publishes
- * `corroborate.agents`, and a binding both ends assert is `mutual`. Writing that record costs a
+ * `print.agents`, and a binding both ends assert is `mutual`. Writing that record costs a
  * transaction from the key that controls the human's name, so an operator can still mint humans
  * — but each one must be a name they control and pay for, and each one is then visibly a
  * *separate* human with a separate (usually empty) credential set. The evasion becomes
@@ -41,7 +41,7 @@ import type { FleetAgent, HumanBacking } from './fleet.ts'
  *
  * A mutual binding is still not a proof of personhood, of distinctness, or that the human is
  * *operating* the agent. It proves that whoever controls the human's name accepts this agent.
- * The live tree carries an unacknowledged agent (`unverified.corroborate.eth`) precisely so the
+ * The live tree carries an unacknowledged agent (`unverified.print.eth`) precisely so the
  * demo shows the weak case working, and shows the policy closing it.
  *
  * ## What this file will not do
@@ -61,11 +61,11 @@ import type { FleetAgent, HumanBacking } from './fleet.ts'
 export const ENS_REGISTRY = '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e' as const
 
 /** Text record on an agent's name: the name or address of the human behind it. */
-export const AGENT_HUMAN_RECORD = 'corroborate.human'
+export const AGENT_HUMAN_RECORD = 'print.human'
 /** Text record on a human's name: the agent names that human acknowledges. */
-export const HUMAN_AGENTS_RECORD = 'corroborate.agents'
+export const HUMAN_AGENTS_RECORD = 'print.agents'
 /** Text record on a human's name: the wallets that human declares. Read by `resolveSubject`. */
-export const HUMAN_SUBJECTS_RECORD = 'corroborate.subjects'
+export const HUMAN_SUBJECTS_RECORD = 'print.subjects'
 
 export const ENS_REGISTRY_ABI = parseAbi([
   'function owner(bytes32 node) view returns (address)',
@@ -81,7 +81,7 @@ export const NEW_OWNER_TOPIC = '0xce0457fe73731f824cc272376169235128c118b49d3448
  *
  *  - `mutual`         both names assert it: the agent names the human, the human lists the agent.
  *  - `agent-asserted` only the agent says so. Scores the human's evidence, but see the header.
- *  - `unbound`        the agent's name carries no `corroborate.human` record at all.
+ *  - `unbound`        the agent's name carries no `print.human` record at all.
  *  - `unreadable`     the record could not be read. Not a negative — see the header.
  */
 export type EnsBinding = 'mutual' | 'agent-asserted' | 'unbound' | 'unreadable'
@@ -93,9 +93,9 @@ export interface EnsHuman {
   name?: string
   /** The address the human resolves to. */
   address?: Address
-  /** `corroborate.subjects` — every wallet this human declares. Self-asserted. */
+  /** `print.subjects` — every wallet this human declares. Self-asserted. */
   subjects: Address[]
-  /** `corroborate.agents` — the agent names this human acknowledges, normalized. */
+  /** `print.agents` — the agent names this human acknowledges, normalized. */
   acknowledges: string[]
   /**
    * Stable key for the fleet engine.
@@ -198,7 +198,7 @@ export interface ResolveEnsAgentOptions {
 /**
  * Resolve one agent name into an identity, plus the human it names.
  *
- * Four reads on the agent side (addr, `corroborate.human`, registry owner) and three on the
+ * Four reads on the agent side (addr, `print.human`, registry owner) and three on the
  * human side (addr, subjects, acknowledgements), issued concurrently within each side. The
  * human side cannot start until the agent's record names it, which is the one unavoidable
  * round trip.

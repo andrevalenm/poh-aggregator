@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
 const env = Object.fromEntries(readFileSync('.env.local','utf8').split('\n')
   .filter(l=>l.includes('=')&&!l.startsWith('#')).map(l=>{const i=l.indexOf('=');return [l.slice(0,i).trim(),l.slice(i+1).trim()]}))
 
-const LABEL='corroborate', NAME='corroborate.eth'
+const LABEL='print', NAME='print.eth'
 const DURATION=365n*24n*3600n
 const SUBJECTS='0xd267eba602e692216703626a81157214b24c85fb,0x7D8459e2ca3f62E6d8599E98ebf8c42d88218C87'
 const controller=JSON.parse(readFileSync('scripts/abi/ens-controller-sepolia.json','utf8'))
@@ -60,8 +60,8 @@ if (available) {
 console.log('writing records as owner…')
 for (const [fn,args] of [
   ['setAddr',[node,account.address]],
-  ['setText',[node,'corroborate.subjects',SUBJECTS]],
-  ['setText',[node,'description','Corroborate — personhood scored by independent trust roots. subjects record = the wallets this name asserts as one person.']],
+  ['setText',[node,'print.subjects',SUBJECTS]],
+  ['setText',[node,'description','Print — personhood scored by independent trust roots. subjects record = the wallets this name asserts as one person.']],
 ]) {
   try {
     const h=await wallet.writeContract({address:resolver.address,abi:resolver.abi,functionName:fn,args})
@@ -71,10 +71,10 @@ for (const [fn,args] of [
 }
 
 const addr=await pub.getEnsAddress({name:NAME})
-const subjects=await pub.getEnsText({name:NAME,key:'corroborate.subjects'})
+const subjects=await pub.getEnsText({name:NAME,key:'print.subjects'})
 console.log(`\n${NAME} -> ${addr}\ncorroborate.subjects -> ${subjects}`)
 if(!addr||!subjects){console.error('resolution failed');process.exit(1)}
 writeFileSync('deployments/ens-sepolia.json',JSON.stringify({name:NAME,owner:account.address,node,
-  resolver:resolver.address,controller:controller.address,textRecords:{'corroborate.subjects':subjects}},null,2)+'\n')
+  resolver:resolver.address,controller:controller.address,textRecords:{'print.subjects':subjects}},null,2)+'\n')
 try{unlinkSync('deployments/.ens-commit.json')}catch{}
 console.log('saved deployments/ens-sepolia.json')

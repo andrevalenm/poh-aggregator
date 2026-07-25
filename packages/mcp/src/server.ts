@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Corroborate MCP server.
+ * Print MCP server.
  *
  * Lets an agent ask whether a real human stands behind an address, and — more usefully —
  * *why*. Every response carries the evidence, its trust roots, and what was discounted as
@@ -18,7 +18,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { readFileSync } from 'node:fs'
-import { Corroborate, DEFAULT_REGISTRY, weightHistory, type PersonhoodResult } from '@corroborate/sdk'
+import { Print, DEFAULT_REGISTRY, weightHistory, type PersonhoodResult } from '@print/sdk'
 
 const ontologyPath = new URL('../../../ontology/adapters.json', import.meta.url)
 let knownIds: string[] = []
@@ -33,21 +33,21 @@ try {
   // Hashes instead of names; degraded but correct.
 }
 
-const client = new Corroborate({
-  registryAddress: (process.env.CORROBORATE_REGISTRY as `0x${string}`) ?? DEFAULT_REGISTRY,
+const client = new Print({
+  registryAddress: (process.env.PRINT_REGISTRY as `0x${string}`) ?? DEFAULT_REGISTRY,
   // The subgraph supplies trust-graph position, and issuance dates for protocols that keep
   // none on chain. Without it the server still works — PoH is dated from the contract either
   // way — but Circles results carry the issuance-date-unknown caveat.
-  ...(process.env.CORROBORATE_SUBGRAPH_URL ? { subgraphUrl: process.env.CORROBORATE_SUBGRAPH_URL } : {}),
+  ...(process.env.PRINT_SUBGRAPH_URL ? { subgraphUrl: process.env.PRINT_SUBGRAPH_URL } : {}),
   // Only as_of needs this one — it is where the ontology's own history lives.
-  ...(process.env.CORROBORATE_REGISTRY_SUBGRAPH_URL
-    ? { registrySubgraphUrl: process.env.CORROBORATE_REGISTRY_SUBGRAPH_URL }
+  ...(process.env.PRINT_REGISTRY_SUBGRAPH_URL
+    ? { registrySubgraphUrl: process.env.PRINT_REGISTRY_SUBGRAPH_URL }
     : {}),
   knownIds,
   knownRoots,
 })
 
-const server = new McpServer({ name: 'corroborate', version: '0.1.0' })
+const server = new McpServer({ name: 'print', version: '0.1.0' })
 
 /** Compact, agent-legible rendering. Full detail stays available via the raw result. */
 function render(r: PersonhoodResult): string {
@@ -186,13 +186,13 @@ server.tool(
     adapter_id: z.string().describe('Adapter id, e.g. world-id-orb, poh-v2, circles-v2'),
   },
   async ({ adapter_id }) => {
-    const url = process.env.CORROBORATE_REGISTRY_SUBGRAPH_URL
+    const url = process.env.PRINT_REGISTRY_SUBGRAPH_URL
     if (!url) {
       return {
         content: [
           {
             type: 'text',
-            text: 'CORROBORATE_REGISTRY_SUBGRAPH_URL is not set. The audit trail lives in the registry subgraph; without it, use explain_trust_roots for current weights (each carries its sourceURI).',
+            text: 'PRINT_REGISTRY_SUBGRAPH_URL is not set. The audit trail lives in the registry subgraph; without it, use explain_trust_roots for current weights (each carries its sourceURI).',
           },
         ],
       }

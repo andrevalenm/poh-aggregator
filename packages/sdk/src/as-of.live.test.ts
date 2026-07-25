@@ -12,7 +12,7 @@
 import { test, describe, before } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { Corroborate, DEFAULT_REGISTRY } from './index.ts'
+import { Print, DEFAULT_REGISTRY } from './index.ts'
 import {
   REGISTRY_GENESIS_BLOCK,
   headRevisionOf,
@@ -33,8 +33,8 @@ const knownRoots: string[] = [
 ]
 
 const REGISTRY_SUBGRAPH =
-  process.env.CORROBORATE_REGISTRY_SUBGRAPH_URL ??
-  'http://localhost:8100/subgraphs/name/corroborate-registry'
+  process.env.PRINT_REGISTRY_SUBGRAPH_URL ??
+  'http://localhost:8100/subgraphs/name/print-registry'
 
 /**
  * A Sepolia block inside revision 15 — after the first seed and before the landscape
@@ -263,7 +263,7 @@ describe('the registry really did say something different', () => {
 
 describe('a real subject, scored twice', () => {
   test('asOf without a registry subgraph refuses rather than answering with today', async () => {
-    const client = new Corroborate({ knownIds, knownRoots, adapters: [pohV1Adapter()] })
+    const client = new Print({ knownIds, knownRoots, adapters: [pohV1Adapter()] })
     await assert.rejects(
       () => client.resolve(POH_V1_SURVIVOR, { asOf: REVISION_15_BLOCK }),
       /requires registrySubgraphUrl/,
@@ -281,7 +281,7 @@ describe('a real subject, scored twice', () => {
    */
   test('the same credential scores differently against the ontology of that morning', async (t) => {
     if (skipIfUnreachable(t)) return
-    const client = new Corroborate({
+    const client = new Print({
       knownIds,
       knownRoots,
       registrySubgraphUrl: REGISTRY_SUBGRAPH,
@@ -326,7 +326,7 @@ describe('a real subject, scored twice', () => {
     // exclusion path is exercised by asking for a block whose ontology has no poh-v1 at all,
     // above. What this checks is the other half: the instant used is the block's, and a
     // credential dated after it would be dropped rather than counted.
-    const client = new Corroborate({
+    const client = new Print({
       knownIds,
       knownRoots,
       registrySubgraphUrl: REGISTRY_SUBGRAPH,

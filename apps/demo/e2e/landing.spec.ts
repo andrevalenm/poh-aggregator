@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test'
 
 const BEACON = '0x58b849f60b0515871fcfa80c7907d097571f2a12'
 
-test.describe('Corroborate landing', () => {
+test.describe('Print landing', () => {
   test('hero loads with the live registry line', async ({ page }) => {
     await page.goto('/')
     await expect(page.locator('h1')).toContainText(/to be human/i)
@@ -79,11 +79,11 @@ test.describe('Corroborate landing', () => {
 
   test('MCP picker switches clients and shows a copyable command', async ({ page }) => {
     await page.goto('/')
-    await expect(page.locator('#mcp-command')).toContainText('claude mcp add corroborate')
+    await expect(page.locator('#mcp-command')).toContainText('claude mcp add print')
     await page.getByRole('tab', { name: 'Cursor' }).click()
     await expect(page.locator('#mcp-command')).toContainText('mcpServers')
     await page.getByRole('tab', { name: 'Any MCP client' }).click()
-    await expect(page.locator('#mcp-command')).toContainText('npx -y @corroborate/mcp')
+    await expect(page.locator('#mcp-command')).toContainText('npx -y @print/mcp')
     await expect(page.locator('#mcp-command .copy-btn')).toBeVisible()
   })
 
@@ -114,7 +114,7 @@ test.describe('Corroborate landing', () => {
 
   test('the workbench deep-link still renders (unlinked, kept for tooling)', async ({ page }) => {
     await page.goto('/app.html')
-    await expect(page.locator('h1')).toContainText('Corroborate')
+    await expect(page.locator('h1')).toContainText('Print')
     await expect(page.locator('#lookup-form')).toBeVisible()
     // And the landing itself no longer links to it — the experience is one page.
     await page.goto('/')

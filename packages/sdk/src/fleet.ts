@@ -75,7 +75,7 @@ export type UnbackedHandling =
 export interface FleetPolicy {
   /** Whose policy this is. Appears in the decision so the trace names the party that drew it. */
   name: string
-  /** Corroborate score the human behind an agent must reach. */
+  /** Print score the human behind an agent must reach. */
   minScore: number
   /** Independent trust roots that score must be spread across. */
   minIndependentRoots: number
@@ -89,7 +89,7 @@ export interface FleetPolicy {
    * Off by default, because the registry this engine was written against attests every
    * backing it returns: an AgentBook humanId is a nullifier hash out of a World ID proof, and
    * nobody can make one up. It matters the moment a *self-published* binding is admitted —
-   * an ENS `corroborate.human` record, say — because then the cap is only as strong as the
+   * an ENS `print.human` record, say — because then the cap is only as strong as the
    * cost of naming a human, and naming one is free. Turning it on is a counterparty deciding
    * that an unacknowledged claim about a person is not evidence about that person.
    */

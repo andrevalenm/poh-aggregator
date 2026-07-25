@@ -3,8 +3,8 @@
  * Register the agent-identity name tree on Sepolia ENS.
  *
  * One parent name for the operator (a human, or a party acting for one) and one subname per
- * agent. The parent carries `corroborate.subjects` — the wallets the operator declares as
- * theirs. Each agent subname carries `corroborate.human` — the name or address of the human
+ * agent. The parent carries `print.subjects` — the wallets the operator declares as
+ * theirs. Each agent subname carries `print.human` — the name or address of the human
  * who stands behind it. That pair is the whole ENS story: identity for the person, identity
  * for the agent, and a link between them that a counterparty can resolve without asking us.
  *
@@ -118,7 +118,7 @@ const DURATION = 31_536_000n
  * consented, which is the weaker shape the caveat is really about — kept in the tree on
  * purpose, because a demo that only shows the good case teaches nothing about the bad one.
  */
-const PARENT_LABEL = process.env.ENS_AGENT_PARENT_LABEL ?? env.ENS_AGENT_PARENT_LABEL ?? 'corroborate'
+const PARENT_LABEL = process.env.ENS_AGENT_PARENT_LABEL ?? env.ENS_AGENT_PARENT_LABEL ?? 'print'
 const PARENT = `${PARENT_LABEL}.eth`
 
 const OPERATOR_SUBJECTS = [
@@ -218,7 +218,7 @@ async function main() {
     //
     // So: register bare, then write records as the owner. The name is briefly live without
     // records, which is a real (if small) window and is why the SDK treats a missing
-    // `corroborate.human` as "not an agent name" rather than as an error.
+    // `print.human` as "not an agent name" rather than as an error.
     await send(`register ${PARENT}`, {
       address: REGISTRAR_CONTROLLER,
       abi: controllerAbi,
@@ -246,8 +246,8 @@ async function main() {
   //
   // Two records, and the second is the one that makes the first enforceable.
   //
-  //   `corroborate.subjects` — the wallets this human declares. Self-asserted, always.
-  //   `corroborate.agents`   — the agents this human *acknowledges*. Also self-asserted, but
+  //   `print.subjects` — the wallets this human declares. Self-asserted, always.
+  //   `print.agents`   — the agents this human *acknowledges*. Also self-asserted, but
   //                            it points the other way, and a binding both ends assert is a
   //                            different claim from one an agent makes about a stranger.
   //
@@ -257,21 +257,21 @@ async function main() {
   const subjects = OPERATOR_SUBJECTS.map((a) => getAddress(a)).join(',')
   const acknowledged = AGENTS.filter((a) => a.acknowledged).map((a) => `${a.label}.${PARENT}`).join(',')
   if (dryRun) {
-    console.log(`  would set ${PARENT} addr=${account.address} corroborate.subjects=${subjects}`)
-    console.log(`  would set ${PARENT} corroborate.agents=${acknowledged}`)
+    console.log(`  would set ${PARENT} addr=${account.address} print.subjects=${subjects}`)
+    console.log(`  would set ${PARENT} print.agents=${acknowledged}`)
   } else {
     const currentAgents = await pub.readContract({
       address: PUBLIC_RESOLVER,
       abi: resolverAbi,
       functionName: 'text',
-      args: [parentNode, 'corroborate.agents'],
+      args: [parentNode, 'print.agents'],
     })
     if (currentAgents !== acknowledged) {
-      await send(`set ${PARENT} corroborate.agents → ${acknowledged}`, {
+      await send(`set ${PARENT} print.agents → ${acknowledged}`, {
         address: PUBLIC_RESOLVER,
         abi: resolverAbi,
         functionName: 'setText',
-        args: [parentNode, 'corroborate.agents', acknowledged],
+        args: [parentNode, 'print.agents', acknowledged],
       })
     }
     const [addr, current] = await Promise.all([
@@ -280,7 +280,7 @@ async function main() {
         address: PUBLIC_RESOLVER,
         abi: resolverAbi,
         functionName: 'text',
-        args: [parentNode, 'corroborate.subjects'],
+        args: [parentNode, 'print.subjects'],
       }),
     ])
     if (!eq(addr, account.address)) {
@@ -292,11 +292,11 @@ async function main() {
       })
     }
     if (current !== subjects) {
-      await send(`set ${PARENT} corroborate.subjects → ${OPERATOR_SUBJECTS.length} addresses`, {
+      await send(`set ${PARENT} print.subjects → ${OPERATOR_SUBJECTS.length} addresses`, {
         address: PUBLIC_RESOLVER,
         abi: resolverAbi,
         functionName: 'setText',
-        args: [parentNode, 'corroborate.subjects', subjects],
+        args: [parentNode, 'print.subjects', subjects],
       })
     }
   }
@@ -325,7 +325,7 @@ async function main() {
     }
 
     if (dryRun) {
-      console.log(`  would set ${name} addr=${agent.address} corroborate.human=${agent.human}`)
+      console.log(`  would set ${name} addr=${agent.address} print.human=${agent.human}`)
       continue
     }
 
@@ -335,7 +335,7 @@ async function main() {
         address: PUBLIC_RESOLVER,
         abi: resolverAbi,
         functionName: 'text',
-        args: [node, 'corroborate.human'],
+        args: [node, 'print.human'],
       }),
     ])
     if (!eq(currentAddr, agent.address)) {
@@ -347,11 +347,11 @@ async function main() {
       })
     }
     if (currentHuman !== agent.human) {
-      await send(`set ${name} corroborate.human → ${agent.human}`, {
+      await send(`set ${name} print.human → ${agent.human}`, {
         address: PUBLIC_RESOLVER,
         abi: resolverAbi,
         functionName: 'setText',
-        args: [node, 'corroborate.human', agent.human],
+        args: [node, 'print.human', agent.human],
       })
     }
   }
@@ -370,7 +370,7 @@ async function main() {
     address: PUBLIC_RESOLVER,
     abi: resolverAbi,
     functionName: 'text',
-    args: [parentNode, 'corroborate.subjects'],
+    args: [parentNode, 'print.subjects'],
   })
   const expires = await pub.readContract({
     address: BASE_REGISTRAR,
@@ -382,7 +382,7 @@ async function main() {
   console.log(`    owner    ${await pub.readContract({ address: ENS_REGISTRY, abi: registryAbi, functionName: 'owner', args: [parentNode] })}`)
   console.log(`    addr     ${parentAddr}`)
   console.log(`    subjects ${subjectsRecord}`)
-  console.log(`    agents   ${await pub.readContract({ address: PUBLIC_RESOLVER, abi: resolverAbi, functionName: 'text', args: [parentNode, 'corroborate.agents'] })}`)
+  console.log(`    agents   ${await pub.readContract({ address: PUBLIC_RESOLVER, abi: resolverAbi, functionName: 'text', args: [parentNode, 'print.agents'] })}`)
   console.log(`    expires  ${new Date(Number(expires) * 1000).toISOString()}`)
 
   let ok = eq(parentAddr, account.address) && subjectsRecord.split(',').every((s) => isAddress(s.trim()))
@@ -410,7 +410,7 @@ async function main() {
         address: PUBLIC_RESOLVER,
         abi: resolverAbi,
         functionName: 'text',
-        args: [node, 'corroborate.human'],
+        args: [node, 'print.human'],
       }),
     ])
     console.log(`  ${name}`)

@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "corroborate-demo",
+      "name": "print-demo",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@corroborate/demo", "dev"],
+      "runtimeArgs": ["--filter", "@print/demo", "dev"],
       "port": 5173
     }
   ]

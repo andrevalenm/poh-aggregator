@@ -1,7 +1,7 @@
 /**
  * The counterparty's policy.
  *
- * Every number in this file belongs to the counterparty, not to Corroborate and not to
+ * Every number in this file belongs to the counterparty, not to Print and not to
  * World. That separation is the whole architectural claim of this demo: the verification
  * layer returns evidence, and the party bearing the loss picks the line.
  *
@@ -20,12 +20,12 @@
  * it holds is the realistic part.
  */
 
-/** @type {import('@corroborate/sdk').FleetPolicy} */
+/** @type {import('@print/sdk').FleetPolicy} */
 export const fleetPolicy = {
   name: 'Meridian Exchange',
 
   /**
-   * The threshold, in Corroborate score units (log10 of adversary cost in cents).
+   * The threshold, in Print score units (log10 of adversary cost in cents).
    *
    * 2.5 means: an attacker must spend on the order of $3 in credential rent per fake
    * operator, spread across independent trust roots. Chosen because Meridian's per-agent
@@ -108,7 +108,7 @@ export const counterparty = {
 /**
  * Caveats Meridian is required to record even when it accepts.
  *
- * These are Meridian's, not Corroborate's — they are facts about what Meridian did and did
+ * These are Meridian's, not Print's — they are facts about what Meridian did and did
  * not check, and they sit alongside the caveats the SDK returns.
  */
 export const COUNTERPARTY_CAVEATS = {

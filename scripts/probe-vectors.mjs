@@ -1,4 +1,4 @@
-import { Corroborate } from '../packages/sdk/dist/index.js'
+import { Print } from '../packages/sdk/dist/index.js'
 import { readFileSync, writeFileSync } from 'node:fs'
 const ont = JSON.parse(readFileSync('ontology/adapters.json','utf8'))
 const knownIds = ont.adapters.map(a=>a.id), knownRoots = Object.keys(ont.trustRoots)
@@ -13,7 +13,7 @@ const candidates = [
   '0x02d8520991855aa20af158cbcead471792539892',
   '0xa38ba430ce67a8dc6b511204ce7a0fe6e8c60c51',
 ]
-const client = new Corroborate({ knownIds, knownRoots })
+const client = new Print({ knownIds, knownRoots })
 const results = []
 for (const a of candidates) {
   const r = await client.resolve(a)

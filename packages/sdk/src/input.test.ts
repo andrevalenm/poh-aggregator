@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { Corroborate } from './index.ts'
+import { Print } from './index.ts'
 import type { Address } from './types.ts'
 
 /**
@@ -10,7 +10,7 @@ import type { Address } from './types.ts'
  * kind of thing a first user hits in the first minute.
  */
 describe('subject input handling', () => {
-  const c = new Corroborate({})
+  const c = new Print({})
   const ADDR = '0xd267eba602e692216703626a81157214b24c85fb'
 
   test('a space-padded address is still an address', async () => {

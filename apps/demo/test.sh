@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the full Corroborate test sweep: contracts, SDK (unit + live chains), browser E2E.
+# Run the full Print test sweep: contracts, SDK (unit + live chains), browser E2E.
 # Live suites hit real RPCs and take a few minutes; nothing is mocked, deliberately.
 set -euo pipefail
 cd "$(dirname "$0")"

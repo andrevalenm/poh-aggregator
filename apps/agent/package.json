@@ -1,9 +1,9 @@
 {
-  "name": "@corroborate/agent-demo",
+  "name": "@print/agent-demo",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "World AgentKit demo: a counterparty verifies that a real human backs an agent, using AgentBook + Corroborate.",
+  "description": "World AgentKit demo: a counterparty verifies that a real human backs an agent, using AgentBook + Print.",
   "scripts": {
     "start": "node src/demo.js",
     "worldid": "node src/verify-worldid.js",
@@ -11,7 +11,7 @@
     "ens": "node src/ens-demo.js"
   },
   "dependencies": {
-    "@corroborate/sdk": "file:../../packages/sdk",
+    "@print/sdk": "file:../../packages/sdk",
     "@worldcoin/agentkit": "^0.2.0",
     "@worldcoin/idkit-core": "^4.2.2",
     "dotenv": "^17.0.0",
