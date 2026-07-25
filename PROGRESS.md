@@ -3174,3 +3174,162 @@ humanities, where it happened to be complete.
 lottery per commit; did not bite this time), and iteration 1's two notes, `pnpm-lock.yaml` untracked
 beside a tracked `package-lock.json` and `MISSION.md` pointing at a `./test.sh` that lives at
 `apps/demo/test.sh`.
+
+## Iteration 24 — 2026-07-26
+
+**Did:** iteration 23's next-step 2 — **nothing watches `humanityLifespan()` for a change**. It was
+queued as "the cheap version is a live test asserting the term is still what the derivation
+assumes", and a test was the wrong instrument: a tripwire tells you a date moved, it does not tell
+you what the date should have been. The contract has been publishing the answer since 2024.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: the same two tests in `as-of.live.test.ts` are red (the chain has
+`human-passport-eas` and `lens-account`, this tree does not) and nothing else is. MORNING "Needs
+you" item 18 stands, unchanged for a tenth iteration.
+
+**Every PoH v2 date is one subtraction with two premises, and only one had been checked.**
+Iteration 23 checked *whose* term: `ccGrantHumanity` copies expiries settled elsewhere, so the
+subtraction is arithmetic about a contract we did not read. The second premise sits in the same
+line and is about *which* term — `humanityLifespan()` is read at **head**, while the expiry was
+written at some past block:
+
+```solidity
+function changeDurations(uint40 _humanityLifespan, …) external onlyGovernor {
+    humanityLifespan = _humanityLifespan;              // and nothing writes any stored expiry
+    …
+    emit DurationsChanged(_humanityLifespan, …);
+```
+
+A change leaves every `expirationTime` in storage alone and moves only the number we subtract from
+it. So one governance transaction shifts **every derived date in the registry at once**, in the same
+direction, by the full size of the change, with nothing positioned to notice — and on `poh-v2`'s
+365-day Ramp that is a whole cohort re-priced because a knob turned.
+
+**It is this protocol's own history, not a scenario.** PoH **v1**'s `submissionDuration` has already
+moved, 31,557,600 → 63,115,200, and v1's `changeDurations` (L563-568 of the verified source) emits
+**nothing at all**. v2's authors added the event v1 lacked. The only reason it was not being read is
+that nobody asked.
+
+**Swept both instances over their whole lives. Zero logs, ever.**
+
+| instance | range | logs | wall | `humanityLifespan()` at head |
+|---|---|---:|---:|---:|
+| Gnosis `0xa4AC94C4…57bc` | 35,846,827 → 47,391,312 | **0** | 124 ms | 31,557,600 |
+| mainnet `0xbE983409…480A` | 20,685,061 → 25,613,069 | **0** | 95 ms | 31,557,600 |
+
+Both served the full range in a single `eth_getLogs`. **Zero is the strongest answer available, not
+the weakest**: `changeDurations` is the only writer after `initialize`, so with none ever emitted
+head's value *is* the value the contract launched with, and every PoH date since 2024 rests on a
+checked fact instead of a hope. Nothing at head moved — which is the point.
+
+**The rule solves for the era rather than assuming one.** `readTermHistory` turns the sweep into
+half-open eras `[from, until)` — half-open because a change takes effect in the block it is mined
+in and a claim resolved in that block is written under the new value. `termForLocalExpiry` then
+solves `expirationTime = claimedAt + term(era)` for the era `claimedAt` lands in. With one era it
+*is* the deployment-floor guard the probe already had. With more it does what a tripwire cannot: it
+dates the change, so each cohort is dated with the term that was in force for it rather than every
+date being thrown away. Three refusals, each a different fact — two eras that both explain an expiry
+(`termAmbiguous`, reachable with a term shortened by two days), only the era `initialize` never
+published (`termEraUnpublished`), and no era at all (`dateRejected`, generalising both old guards
+into one statement).
+
+**Three decisions inside it.**
+
+- **A sweep that did not answer is not a sweep that found nothing** — the `IndexView.entity: null`
+  distinction in a third place. Memoised on success only, falls back to head's term assumed eternal,
+  and the date carries `term-origin-unverified`. A caller who supplied *no* history is a different
+  case and is told nothing: nobody asked, so no check was skipped.
+- **A sweep that cannot explain head has not answered.** If the newest logged value differs from
+  `humanityLifespan()` at head, something other than `changeDurations` wrote the field, and the
+  timeline the logs build is wrong however real the logs are. Reported exactly as an unreachable
+  node is. This is what makes `observed: true` mean something.
+- **A known era beats the unpublished first one rather than tying with it.** That era can be
+  assigned a term to fit *any* expiry, so treating it as a rival would make every date unrecoverable
+  the moment a governor touched the field once.
+
+**Mainnet gets the same check; v1 needs none, and the asymmetry is the interesting part.** PoH v2 on
+mainnet publishes only an expiry, so its date is the identical subtraction and now gets the
+identical timeline (swept once, on the first import a process sees, never for a subject with none).
+PoH v1 publishes `submissionTime` directly and uses its term only to *check* an equality — so a
+change there costs the match and therefore the date. Degradation, never a wrong answer. The instance
+whose term actually moved is the one that needed no fix.
+
+**Verified:** on this box, at this commit.
+
+- `CORROBORATE_SUBGRAPH_URL=…/poh/v0.0.3 ./apps/demo/test.sh` → **all suites green, exit 0**:
+  forge **18 passed**; sdk live **23/23, 0 skipped, 0 failed**; Playwright **13 passed**.
+- `cd packages/sdk && npm test` → `# tests 551 # pass 549 # fail 2 # skipped 0` (**+18** over
+  iteration 23's 533: 17 unit in a new `poh-lifespan.test.ts`, 1 live). The 2 failures are iteration
+  15's registry-drift pair, unchanged and untouched.
+- `npm run build` and `tsc --noEmit` clean in `packages/sdk`; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` → DENY / ALLOW **3.6177 over 6 roots** / DENY naming the sibling /
+  DENY the fleet. Iterations 20–23 recorded 3.6178; **measured at the parent commit too and it is
+  also 3.6177**, so the last digit is a Decay curve moving with the clock and not this change.
+- End to end on live subjects: an ordinary local claim still dates to `expirationTime - 31557600`
+  exactly (`0x4e6654f3…1f05`, 1816580105 − 31557600 = 1785022505) with no extra note and no
+  `termAtClaim`; the imported `0x6687c671…8dd6` is unchanged at `2024-09-06 → 2026-01-29` with
+  `termOrigin: poh-v1-mainnet`.
+- **Cost, measured against the parent commit rather than estimated** (four probes per process, two
+  processes each): cold 447/566 → 558/583 ms, warm 193–231 → 200–292 ms. One extra request per
+  process, none warm; the warm spread is noise on an unchanged path.
+- **The acceptance test** re-derives every number each run — the term at head, the head block and
+  the whole log set come off the chain — and asserts *mechanism*: that the timeline explains head,
+  that it starts at the deployment, that its eras leave no gap, and that every boundary is the
+  timestamp of its own block. All of those stay true on the day a change lands. The
+  `assert.equal(lifespan, 31_557_600)` it replaces did not.
+
+**Committed:** `a5873bb` fix(sdk): the term we subtract was read at head, and the expiry was written
+in the past. (`git commit` worked; iteration 19's root-owned-`.git` lottery did not bite.)
+
+**Write-up:** `research/protocols/poh-lifespan-timeline.md` — the three writers of the field from
+the deployed source, the v1 contrast, both sweeps with their ranges and timings, the era rule and
+its three decisions, the mainnet/v1 asymmetry, the measured cost table, what is deliberately not
+done, and three open questions. Indexed in `research/INDEX.md` (header recount: 43 files / ~25,940
+lines). `docs/scoring.md` gains the second premise beside the first, which is easily confused with
+it; README gains honest limit 15 and **closes limit 14's open clause**, which said in as many words
+that a change to Gnosis's term would silently invalidate every locally derived date.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved: this decides
+which date a credential gets, not what one is worth. Registry stays as the chain has it (32 adapters
+/ revision 36, written by the other tree; this tree still has 30).
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15–23, still
+   the only *real* red in the suite, still Hugo's call.
+2. **Ask the same question of the other adapters.** Open question 2 of the new write-up. Holonym and
+   World both read an expiry and both have a live test pinning the term — but a pin is a tripwire,
+   not a timeline, and whether either protocol publishes its changes has not been asked. This is
+   iteration 22's ending audit and this iteration's term audit aimed at a third mechanism, and the
+   pattern says the answer will differ per protocol rather than being uniformly fine.
+3. **Index the two cross-chain events** (`HumanityGrantedDirectly`, `HumanityDischargedDirectly`)
+   and give `PohHuman` an `expirationTime`. Iteration 22's next-step 3 and iteration 23's next-step
+   3, still standing: it is what would earn PoH `observesEveryEnding: true` and would move both
+   per-process sweeps into our own index. A mapping change, a schema field, a ~2.5-hour resync.
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read
+   appears. Iteration 7's measurement stands.
+
+**Worth keeping, because it generalises.** Iteration 23's lesson was *a derivation has a premise,
+and the premise is a claim about the world that can be false*. This is the same subtraction, and the
+finding is that **it had two premises, and finding one of them made the other harder to see**. The
+grant sweep answered "whose term is this?" so completely that the line read as settled — but "whose"
+and "which" are different questions about the same expression, and the second one had been sitting
+in `humanityLifespan()`'s parentheses the whole time. *Checking one premise of an expression is
+evidence that the expression has premises, not that you have found them all.*
+
+The other one is about the shape of the fix, and it is the more useful. The queue asked for a
+**tripwire** — "a live test asserting the term is still what the derivation assumes" — and a
+tripwire would have been cheap, correct, and the wrong instrument. It fires *after* the term moves
+and it has nothing to put in place of the broken date; every PoH date would go red at once and the
+only remedy would be to hard-code a new number. Reading the same governance action as **data**
+instead of as an alarm costs about the same and produces a timeline that keeps dating credentials
+correctly through the change. **When the queue asks for a tripwire, check whether the event it
+watches is one the chain publishes** — if it is, the alarm and the repair are the same read.
+
+**Blocked:** nothing. Nothing new for Hugo this iteration; MORNING is untouched. Carried: iteration
+15's ontology/registry drift (Hugo), iteration 19's root-owned `.git` objects (still a ~1-in-128
+lottery per commit; did not bite this time), and iteration 1's two notes, `pnpm-lock.yaml` untracked
+beside a tracked `package-lock.json` and `MISSION.md` pointing at a `./test.sh` that lives at
+`apps/demo/test.sh`. One environment note, not a defect: Studio's `poh/version/latest` endpoint was
+returning "Too many requests" for the whole session, so every run here pins `poh/v0.0.3`; the
+unpinned default makes four live tests skip or fail on quota alone.
