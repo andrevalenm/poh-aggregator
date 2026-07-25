@@ -117,6 +117,37 @@ describe('Coinbase Verified Account', () => {
     assert.equal(r.detail?.expired, undefined)
   })
 
+  test('the window closes at whichever came first, not at whichever we checked first', () => {
+    // The revocation branch is reported because it is the more informative negative, but the
+    // credential stopped counting at the expiry. Handing an as-of score the revocation date
+    // would grant the subject the months between the two, which they did not have.
+    const r = read({
+      attestation: attestation({ revocationTime: 1_760_000_000n, expirationTime: 1_750_000_000n }),
+    })
+    assert.equal(r.detail?.revokedAt, 1_760_000_000, 'the revocation is still the reported reason')
+    assert.equal(r.heldUntil, 1_750_000_000, 'but the credential stopped counting at the expiry')
+  })
+
+  test('a revoked attestation closes its window at the revocation', () => {
+    const r = read({ attestation: attestation({ revocationTime: 1_760_000_000n }) })
+    assert.equal(r.heldUntil, 1_760_000_000)
+    assert.equal(r.issuedAt, 1_744_000_000, 'both ends, so an instant between them is decidable')
+  })
+
+  test('an expired attestation closes its window at the expiry', () => {
+    const r = read({ attestation: attestation({ expirationTime: BigInt(NOW - 1) }) })
+    assert.equal(r.heldUntil, NOW - 1)
+    assert.equal(r.issuedAt, 1_744_000_000)
+  })
+
+  test('a credential that is simply held, or simply absent, dates no ending', () => {
+    // `heldUntil` may only ever mean "the chain says this ended here". A live credential has
+    // not ended, and an address the indexer knows nothing about never had one to end.
+    assert.equal(read({ attestation: attestation({ expirationTime: BigInt(NOW + 1) }) }).heldUntil, undefined)
+    assert.equal(read({ attestation: attestation() }).heldUntil, undefined)
+    assert.equal(read({ uid: ZERO, attestation: undefined }).heldUntil, undefined)
+  })
+
   test('a uid EAS cannot follow is an error, not a negative', () => {
     // EAS returns a zeroed struct rather than reverting for a uid it does not know, so the
     // fault arrives looking exactly like an ordinary record.

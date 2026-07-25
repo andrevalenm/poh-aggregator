@@ -79,6 +79,19 @@ export interface Evidence {
    * unknown-age midpoint, so index lag can no longer be worth anything to an attacker.
    */
   issuedAfter?: number
+  /**
+   * The instant this credential stopped counting, when the chain dates it — a revocation
+   * timestamp, an expiry that has passed, a verification term that lapsed. Only ever set
+   * alongside `held: false`, and only when the *end* is a number the protocol stores rather
+   * than something inferred from the credential's absence.
+   *
+   * It exists for `asOf` scoring, which otherwise reads every credential at head and so cannot
+   * see one that was held at the instant asked about and has ended since. With this and an
+   * exact `issuedAt`, "held then" stops being a guess: `issuedAt <= t < heldUntil` is a proof.
+   * Nothing at head uses it — a credential that has ended is not held today, and this field
+   * does not soften that.
+   */
+  heldUntil?: number
   /** Which source decided held and the date, and at which blocks. */
   provenance?: ProbeProvenance
   /** Decay multiplier in [0,1] derived from issuedAt and the adapter's half-life. */
@@ -156,6 +169,8 @@ export interface AdapterProbeResult {
   issuedAt?: number
   /** See `Evidence.issuedAfter`: a proven lower bound on issuance, used to cap ramp weight. */
   issuedAfter?: number
+  /** See `Evidence.heldUntil`: the dated instant a credential we no longer hold stopped counting. */
+  heldUntil?: number
   /** How this answer was reached — which source decided held, which dated it, at what block. */
   provenance?: ProbeProvenance
   detail?: Record<string, unknown>

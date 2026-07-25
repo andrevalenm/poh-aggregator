@@ -24,10 +24,18 @@
  *
  * 2. **Credentials are read at chain head, and the result says so.** Probes read contracts
  *    now; there is no cross-chain archive path that would let ten adapters answer as of a
- *    Sepolia block. What we *can* do exactly is exclude credentials that did not exist yet:
- *    a dated credential issued after the as-of instant is dropped. That leaves one direction
- *    of error — a credential held then and revoked since is missed — which understates the
- *    subject rather than the adversary, and is named in a caveat either way.
+ *    Sepolia block. Two corrections are nonetheless exact, and they run in opposite directions.
+ *
+ *    A dated credential issued *after* the as-of instant certainly did not exist then, and is
+ *    dropped. And a credential the chain dates the *end* of — an EAS revocation, an expiry, a
+ *    World verification term that ran out — was certainly held at any instant between its
+ *    issuance and that end, so it is restored. Both are proofs from numbers the protocol
+ *    stores, not inferences from absence, which is why `heldUntil` is only ever set by a probe
+ *    that read the end date rather than one that failed to find a credential.
+ *
+ *    What remains is narrower than it was: a credential held then and ended since whose end
+ *    the protocol does not date, and one superseded by a later record that hides it. Both
+ *    understate the subject rather than the adversary, and both are named in a caveat.
  *
  * 3. **The reconstruction is checked, not assumed.** `AdapterSet` carries the whole record and
  *    the indexer stores it; `AdapterLivenessSet` carries only a hash, and the deployed mapping
@@ -42,6 +50,7 @@ import { createPublicClient, http, type PublicClient } from 'viem'
 import { sepolia } from 'viem/chains'
 import { REGISTRY_ABI, decodeAgeCurve, decodeEvidenceClass, rootKey } from './ontology.ts'
 import type { Ontology } from './ontology.ts'
+import { effectiveCost } from './scoring.ts'
 import type { Adapter, Evidence } from './types.ts'
 
 /**
@@ -93,6 +102,17 @@ export interface AsOfScoring extends AsOfContext {
   issuedAfterAsOf: string[]
   /** Held now with no issuance date, so we cannot show they existed then. Counted, and flagged. */
   existenceUnverified: string[]
+  /**
+   * Not held now, but the chain dates both ends of the credential and the as-of instant falls
+   * inside them. Restored and counted: the subject held these then.
+   */
+  ceasedAfterAsOf: string[]
+  /**
+   * The chain dates the *end* after the as-of instant but not the start, so holding it then is
+   * likely and unproven. Left out, and named — this is the residue of rule 2, made visible
+   * rather than absorbed into the score in either direction.
+   */
+  ceasedStartUndated: string[]
 }
 
 // ------------------------------------------------------------------ time → block
@@ -367,29 +387,51 @@ export async function loadOntologyAsOf(
 // -------------------------------------------------- credentials at a past instant
 
 /**
- * Drop credentials that did not exist yet, and name the ones we cannot place either way.
+ * Move head-observed evidence to the as-of instant in both directions, and name what cannot be
+ * moved either way.
  *
  * Probes read the chain at head (rule 2 in the header), which leaves two ways for a
- * head-observed credential to be wrong about the past, and they are not symmetric. A
- * credential *dated after* the as-of instant certainly did not exist then, and that we can fix
- * exactly — it is dropped here. A credential held then and revoked since we cannot see at all,
- * and that one understates the subject, so it stays a caveat rather than a correction.
+ * head-observed credential to be wrong about the past, and only one of them used to be fixed.
  *
- * The third case is the one worth naming: a credential held now with no issuance date. Every
- * protocol we probe that reports no date is one where the contract stores none, so there is
- * nothing to check it against. Dropping them would gut an honest subject's result over a
- * missing field; keeping them silently would let a credential minted this morning count toward
- * a score from last week. They are kept and listed, and the caveat says which.
+ * **Forward:** a credential *dated after* the as-of instant certainly did not exist then. It is
+ * dropped, which is the direction that protects the counterparty.
+ *
+ * **Backward:** a credential the chain dates the *end* of — `heldUntil`, set only by a probe
+ * that read a revocation timestamp, an expiry or a lapsed term — was held for the whole window
+ * `[issuedAt, heldUntil)`. If the as-of instant falls inside it, the subject held it then, and
+ * it is restored. This one has a hard precondition: `issuedAt` must be *exact*. `issuedAfter`
+ * is only a lower bound, so `issuedAfter <= t` shows the credential *could* have existed at `t`
+ * and never that it did, and using it here would turn a bound into a credential. Those cases
+ * are listed in `ceasedStartUndated` instead of quietly counted or quietly dropped.
+ *
+ * Restoring recomputes the effective cost from `freshness`, which the caller already evaluated
+ * at the as-of instant — a credential restored at a moment it was 30 days old is worth what a
+ * 30-day-old credential is worth, not what its ghost is worth today.
+ *
+ * The last case is the oldest one: a credential held now with no issuance date. Every protocol
+ * we probe that reports no date is one where the contract stores none, so there is nothing to
+ * check it against. Dropping them would gut an honest subject's result over a missing field;
+ * keeping them silently would let a credential minted this morning count toward a score from
+ * last week. They are kept and listed, and the caveat says which.
  */
 export function applyAsOfToEvidence(
   evidence: Evidence[],
   asOfTimestamp: number,
-): { evidence: Evidence[]; issuedAfterAsOf: string[]; existenceUnverified: string[] } {
+  adapters: Map<string, Adapter>,
+): {
+  evidence: Evidence[]
+  issuedAfterAsOf: string[]
+  existenceUnverified: string[]
+  ceasedAfterAsOf: string[]
+  ceasedStartUndated: string[]
+} {
   const issuedAfterAsOf: string[] = []
   const existenceUnverified: string[] = []
+  const ceasedAfterAsOf: string[] = []
+  const ceasedStartUndated: string[] = []
 
   const out = evidence.map((e) => {
-    if (!e.held) return e
+    if (!e.held) return restoreIfHeldThen(e, asOfTimestamp, adapters, ceasedAfterAsOf, ceasedStartUndated)
     // `issuedAfter` is a proven lower bound on issuance, so the credential is younger than it.
     const notBefore = e.issuedAt ?? e.issuedAfter
     if (notBefore === undefined) {
@@ -407,7 +449,46 @@ export function applyAsOfToEvidence(
     }
   })
 
-  return { evidence: out, issuedAfterAsOf, existenceUnverified }
+  return { evidence: out, issuedAfterAsOf, existenceUnverified, ceasedAfterAsOf, ceasedStartUndated }
+}
+
+/** The backward correction, kept separate because every branch of it is a refusal but one. */
+function restoreIfHeldThen(
+  e: Evidence,
+  asOfTimestamp: number,
+  adapters: Map<string, Adapter>,
+  ceasedAfterAsOf: string[],
+  ceasedStartUndated: string[],
+): Evidence {
+  // No dated end: an ordinary negative, a never-held credential, or a probe that failed. None
+  // of those is evidence the subject held anything, at any instant.
+  if (e.heldUntil === undefined) return e
+  // Ended at or before the instant asked about, so it was already gone. Nothing to correct.
+  if (e.heldUntil <= asOfTimestamp) return e
+  if (e.issuedAt === undefined) {
+    ceasedStartUndated.push(e.adapterId)
+    return e
+  }
+  // Dated end after the instant, dated start after it too: the credential's whole life is in
+  // the future of the question. The forward rule would have dropped it; so does this one.
+  if (e.issuedAt > asOfTimestamp) return e
+
+  const adapter = adapters.get(e.adapterId)
+  // Unpriceable at this revision — the adapter did not exist yet. `adaptersNotYetInRegistry`
+  // already reports that, and restoring evidence we cannot weigh would put a held credential
+  // worth zero cents into the root table.
+  if (!adapter) return e
+
+  ceasedAfterAsOf.push(e.adapterId)
+  return {
+    ...e,
+    held: true,
+    effectiveCostCents: effectiveCost(adapter, e.freshness),
+    detail: {
+      ...(e.detail ?? {}),
+      restoredByAsOf: `held from ${new Date(e.issuedAt * 1000).toISOString()} until ${new Date(e.heldUntil * 1000).toISOString()}, which contains the as-of instant`,
+    },
+  }
 }
 
 /** A Sepolia client for the registry, matching what `loadOntology` uses. */

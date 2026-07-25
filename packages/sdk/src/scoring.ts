@@ -295,7 +295,7 @@ function asOfCaveats(asOf: AsOfScoring): Caveat[] {
   const out: Caveat[] = [
     {
       code: 'scored-as-of-past-block',
-      message: `Scored against the ontology as it stood at Sepolia block ${asOf.block} (${new Date(asOf.timestamp * 1000).toISOString()}), registry revision ${asOf.registryRevision} with ${asOf.adapterCount} adapters. The weights and trust roots are reconstructed exactly from the registry's own event history. Credentials, though, were read from their chains at head: a credential dated after that instant has been excluded, but one held then and revoked since cannot be seen, so this can understate the subject and never the adversary.`,
+      message: `Scored against the ontology as it stood at Sepolia block ${asOf.block} (${new Date(asOf.timestamp * 1000).toISOString()}), registry revision ${asOf.registryRevision} with ${asOf.adapterCount} adapters. The weights and trust roots are reconstructed exactly from the registry's own event history. Credentials, though, were read from their chains at head: one dated after that instant has been excluded, and one whose end the chain dates after it has been restored, but a credential held then and ended since without a date on the ending cannot be seen, so what remains can understate the subject and never the adversary.`,
     },
   ]
 
@@ -310,6 +310,20 @@ function asOfCaveats(asOf: AsOfScoring): Caveat[] {
     out.push({
       code: 'credential-issued-after-asof',
       message: `Excluded as not yet existing at this block: ${asOf.issuedAfterAsOf.join(', ')}. Each is held today and dated after ${new Date(asOf.timestamp * 1000).toISOString()}.`,
+    })
+  }
+
+  if (asOf.ceasedAfterAsOf.length) {
+    out.push({
+      code: 'credential-ceased-after-asof',
+      message: `Counted although not held today: ${asOf.ceasedAfterAsOf.join(', ')}. The chain dates both the issuance and the ending of each — a revocation, an expiry, or a verification term that ran out — and ${new Date(asOf.timestamp * 1000).toISOString()} falls between them, so the subject held them at this block whatever the position is now.`,
+    })
+  }
+
+  if (asOf.ceasedStartUndated.length) {
+    out.push({
+      code: 'asof-ceased-start-undated',
+      message: `${asOf.ceasedStartUndated.join(', ')} ended after this block, but the protocol does not date the issuance, so nothing proves the subject already held them at it. They are left out. That is the one direction this score can still be wrong in, and it is against the subject rather than for them.`,
     })
   }
 

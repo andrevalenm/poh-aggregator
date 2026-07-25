@@ -51,6 +51,7 @@ import {
   WORLD_RPC,
 } from './world.ts'
 import { freshnessOf } from '../scoring.ts'
+import { applyAsOfToEvidence } from '../as-of.ts'
 import {
   AGENT_BOOK_ABI,
   AGENT_BOOK_LOG_ENDPOINTS,
@@ -58,7 +59,7 @@ import {
   AGENT_BOOK_FIRST_REGISTRATION_BLOCK,
   registrationOf,
 } from '../agentbook.ts'
-import type { Address, Adapter } from '../types.ts'
+import type { Address, Adapter, AdapterProbeResult, Evidence } from '../types.ts'
 
 /** Nobody holds the key to this address, so nobody has ever verified with it. */
 const NEVER_VERIFIED = '0x000000000000000000000000000000000000dEaD' as Address
@@ -78,6 +79,35 @@ const ontologyJson = JSON.parse(
   readFileSync(new URL('../../../../ontology/adapters.json', import.meta.url), 'utf8'),
 ) as { adapters: (Adapter & { id: string; implemented?: boolean; notes?: string })[] }
 const entryFor = (id: string) => ontologyJson.adapters.find((a) => a.id === id)!
+
+/**
+ * One probe result, priced as of an instant — what `Corroborate.resolve` builds internally,
+ * assembled here so a live probe can be fed straight to the as-of layer without a registry
+ * subgraph in the loop. Freshness is evaluated at `at` for the same reason the scorer does it:
+ * a credential restored at a past instant is worth what it was worth then.
+ */
+const evidenceAt = (
+  adapter: Adapter,
+  observedOn: Address,
+  r: AdapterProbeResult,
+  at: number,
+): Evidence => ({
+  adapterId: adapter.id,
+  adapterName: adapter.name,
+  evidenceClass: adapter.evidenceClass,
+  trustRoot: adapter.trustRoot,
+  observedOn,
+  held: r.held,
+  ...(r.issuedAt !== undefined ? { issuedAt: r.issuedAt } : {}),
+  ...(r.issuedAfter !== undefined ? { issuedAfter: r.issuedAfter } : {}),
+  ...(r.heldUntil !== undefined ? { heldUntil: r.heldUntil } : {}),
+  freshness: freshnessOf(adapter, r.issuedAt, at, r.issuedAfter),
+  effectiveCostCents: 0,
+  forgeCostCents: adapter.forgeCostCents,
+  rentCostCents: adapter.rentCostCents,
+  live: adapter.live,
+  sourceURI: adapter.sourceURI,
+})
 
 /** Public endpoints throttle; an exhausted quota says nothing about the mechanism. */
 async function onChain(t: { skip: (m: string) => void }, what: string, body: () => Promise<void>) {
@@ -356,7 +386,69 @@ describe('World ID on World Chain', () => {
         assert.notEqual(current, 0n, 'the mapping still holds a number')
         assert.equal(r.held, false, 'and the probe still says not held')
         assert.equal(r.detail?.addressBookLapsedAt, Number(current))
-        assert.equal(r.issuedAt, undefined)
+        return
+      }
+      t.skip('every sampled historical account has re-verified since')
+    })
+  })
+
+  test('a lapsed entry closes a window an as-of score can ask a question of', async (t) => {
+    await onChain(t, 'lapsed window', async () => {
+      // The point of a registry that never clears its mapping: a lapsed entry is not an
+      // absence, it is a *dated interval*. Both ends come off the chain here — the stored
+      // `addressVerifiedUntil` and the term the contract reports — and neither is written into
+      // this test. What is asserted is that an instant inside the interval restores the
+      // credential and an instant after it does not, which is the difference between a
+      // historical score that reflects what the subject had and one that reflects what is left.
+      const head = await c.getBlockNumber()
+      const now = Number((await c.getBlock({ blockNumber: head })).timestamp)
+      const term = Number(
+        await c.readContract({
+          address: WORLD_ID_ADDRESS_BOOK,
+          abi: WORLD_ADDRESS_BOOK_ABI,
+          functionName: 'verificationLength',
+        }),
+      )
+      const logs = await verificationsNear(head - 20_000_000n)
+      assert.ok(logs.length, 'expected a historical cohort to sample')
+
+      const adapter = entryFor('world-id-orb') as Adapter
+      for (const log of logs.slice(0, 10)) {
+        const account = getAddress(log.args.account)
+        const current = await c.readContract({
+          address: WORLD_ID_ADDRESS_BOOK,
+          abi: WORLD_ADDRESS_BOOK_ABI,
+          functionName: 'addressVerifiedUntil',
+          args: [account],
+        })
+        if (current === 0n || current > BigInt(now)) continue
+        const r = await worldIdOrbAdapter().probe(account)
+        if (r.issuedAt === undefined) continue // term changed under this entry; a different test
+
+        const lapsedAt = Number(current)
+        assert.equal(r.held, false)
+        assert.equal(r.heldUntil, lapsedAt, 'the end is the number the contract stores')
+        assert.equal(r.issuedAt, lapsedAt - term, 'the start is that number less the term')
+        assert.ok(r.provenance?.notes.includes('date-from-lapsed-verification'))
+
+        // The window is anchored in a block the chain really mined. Not asserted *equal* to the
+        // sampled log: the mapping holds only the latest verification, so an address that
+        // re-verified after this log and then lapsed has a later start — which is the same
+        // supersession the Coinbase suite meets, and it can only move the start forwards.
+        const minedAt = Number((await c.getBlock({ blockNumber: log.blockNumber! })).timestamp)
+        assert.ok(r.issuedAt >= minedAt, `${r.issuedAt} predates the log it was sampled from`)
+
+        const priced = new Map([[adapter.id, adapter]])
+        const inside = Math.floor((r.issuedAt + lapsedAt) / 2)
+        const restored = applyAsOfToEvidence([evidenceAt(adapter, account, r, inside)], inside, priced)
+        assert.deepEqual(restored.ceasedAfterAsOf, ['world-id-orb'])
+        assert.equal(restored.evidence[0]!.held, true)
+        assert.ok(restored.evidence[0]!.effectiveCostCents > 0, 'and it is priced, not merely flagged')
+
+        const outside = lapsedAt + 1
+        const after = applyAsOfToEvidence([evidenceAt(adapter, account, r, outside)], outside, priced)
+        assert.deepEqual(after.ceasedAfterAsOf, [])
+        assert.equal(after.evidence[0]!.held, false, 'a second after the term ran out, it is gone')
         return
       }
       t.skip('every sampled historical account has re-verified since')

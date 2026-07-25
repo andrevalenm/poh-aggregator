@@ -232,13 +232,33 @@ export function interpretCoinbaseVerification(read: CoinbaseVerificationRead): A
   // Revoked and expired are both "not held" and both keep their date, because the date is what
   // makes the negative legible: a credential revoked last week is a different story from one
   // that lapsed in 2024, and `detail` is where a caller reads which.
+  //
+  // Both also carry `heldUntil`, and the *earlier* of the two ends it: an attestation that
+  // expired in March and was revoked in June stopped being a credential in March, and reporting
+  // June would hand an as-of score three months the subject did not have. EAS stores both
+  // numbers, so taking the minimum of the non-zero ones is a read, not an estimate.
+  const ends = [att.revocationTime, att.expirationTime].filter((t) => t !== 0n).map(Number)
+  const heldUntil = ends.length ? Math.min(...ends) : undefined
+
   if (att.revocationTime !== 0n) {
     detail.revokedAt = Number(att.revocationTime)
-    return { held: false, provenance: { ...provenance, dateFrom: 'chain' }, detail, issuedAt }
+    return {
+      held: false,
+      provenance: { ...provenance, dateFrom: 'chain' },
+      detail,
+      issuedAt,
+      ...(heldUntil !== undefined ? { heldUntil } : {}),
+    }
   }
   if (att.expirationTime !== 0n && Number(att.expirationTime) <= read.now) {
     detail.expired = true
-    return { held: false, provenance: { ...provenance, dateFrom: 'chain' }, detail, issuedAt }
+    return {
+      held: false,
+      provenance: { ...provenance, dateFrom: 'chain' },
+      detail,
+      issuedAt,
+      ...(heldUntil !== undefined ? { heldUntil } : {}),
+    }
   }
 
   return { held: true, issuedAt, provenance: { ...provenance, dateFrom: 'chain' }, detail }

@@ -104,6 +104,13 @@ export type ProvenanceNote =
    * is a ceiling under `Decay` and a floor under `Ramp`, exactly as for a re-attestation.
    */
   | 'date-from-agent-registration'
+  /**
+   * The credential is not held now and the registry keeps the term of the binding that ended, so
+   * the date is the start of a *closed window* — `heldUntil` is its other end. It dates nothing
+   * about today, and exists so an as-of score can decide whether an instant falls inside a
+   * credential the subject has since lost. Nothing at head weighs it: the credential is absent.
+   */
+  | 'date-from-lapsed-verification'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {

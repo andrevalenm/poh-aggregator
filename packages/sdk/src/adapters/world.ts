@@ -43,6 +43,13 @@ import { AGENT_BOOK_DEPLOYED_AT, registrationOf, type RegistrationOfOptions } fr
  * Coverage is not comparable to AgentBook's: sampled 100-block windows give ~28,000 verifications
  * a day at head and 60,000–80,000 a day through 2025, against a 168-day term.
  *
+ * Because the mapping is never cleared, a lapsed entry is a *dated window* rather than an
+ * absence: `[verifiedUntil - verificationLength, verifiedUntil)` is exactly when this address was
+ * bound, and both ends are readable at head. That is what `heldUntil` reports, and it is the
+ * whole reason an as-of score can say "held then, lapsed since" for this credential without an
+ * archive node. It is set only when nothing else holds the credential up — a lapsed AddressBook
+ * entry beside a live AgentBook binding has not ended anything.
+ *
  * ## What the date means, and why it is honest to use it
  *
  * `verifiedUntil - verificationLength` is when this address last re-proved a World ID — not when
@@ -211,15 +218,22 @@ export function interpretWorldRead(r: WorldChainRead): AdapterProbeResult {
     }
   }
 
+  // The same derivation, run for a lapsed entry as well as a live one. On a live entry it dates
+  // the credential. On a lapsed one it dates the *start* of a window whose end `verifiedUntil`
+  // already gives, and a window with both ends is the only thing that lets an as-of score say
+  // this address held an Orb binding at an instant inside it — the AddressBook keeps the lapsed
+  // number forever, so this history is readable at head and needs no archive node.
   let addressBookIssuedAt: number | undefined
-  if (addressBookHeld && r.verificationLength > 0) {
+  let lapsedIssuedAt: number | undefined
+  if (r.verificationLength > 0 && r.verifiedUntil > 0) {
     const derived = r.verifiedUntil - r.verificationLength
     // A date before the registry existed, or in the future, means `verificationLength` is not the
     // term this entry was written under. Better no date than a fabricated one — and on a decay
     // curve an over-fresh date is the expensive direction to be wrong in.
     if (derived >= WORLD_ADDRESS_BOOK_DEPLOYED_AT && derived <= r.now) {
-      addressBookIssuedAt = derived
       detail.addressBookIssuedAt = derived
+      if (addressBookHeld) addressBookIssuedAt = derived
+      else lapsedIssuedAt = derived
     } else {
       detail.dateRejected = derived
     }
@@ -239,16 +253,26 @@ export function interpretWorldRead(r: WorldChainRead): AdapterProbeResult {
 
   if (sources.length) detail.source = sources.join('+')
 
+  const held = sources.length > 0
+  // A lapsed AddressBook entry only ends this credential when nothing else holds it up. An
+  // address whose term ran out but whose AgentBook binding stands still holds a World ID today,
+  // and dating an end for it would be a lie about a credential the subject has.
+  const ended = !held && r.verifiedUntil > 0
+  if (ended && lapsedIssuedAt !== undefined) notes.push('date-from-lapsed-verification')
+
+  const reportedIssuedAt = issuedAt ?? (ended ? lapsedIssuedAt : undefined)
+
   const provenance: ProbeProvenance = {
     heldFrom: 'chain',
-    dateFrom: issuedAt === undefined ? 'none' : 'chain',
+    dateFrom: reportedIssuedAt === undefined ? 'none' : 'chain',
     headBlock: r.block,
     notes,
   }
 
   return {
-    held: sources.length > 0,
-    ...(issuedAt === undefined ? {} : { issuedAt }),
+    held,
+    ...(reportedIssuedAt === undefined ? {} : { issuedAt: reportedIssuedAt }),
+    ...(ended ? { heldUntil: r.verifiedUntil } : {}),
     provenance,
     detail,
   }

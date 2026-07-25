@@ -67,9 +67,47 @@ describe('World ID address book', () => {
     const verifiedUntil = NOW - 86_400
     const r = read({ verifiedUntil, agentBookHumanId: '0' })
     assert.equal(r.held, false)
-    assert.equal(r.issuedAt, undefined, 'a dead credential is not dated as if it were alive')
     assert.equal(r.detail?.addressBookLapsedAt, verifiedUntil)
     assert.equal(r.detail?.oneLiveAddressPerHuman, undefined)
+  })
+
+  test('a lapsed verification is a closed window, and both of its ends are on chain', () => {
+    // The date on a dead credential weighs nothing at head — `held` is false and the scorer
+    // never prices an absence. What it does is close the window: this address was bound from
+    // `verifiedUntil - term` until `verifiedUntil`, so an as-of score can decide whether an
+    // instant falls inside it instead of reporting the subject had nothing.
+    const verifiedUntil = NOW - 86_400
+    const r = read({ verifiedUntil, agentBookHumanId: '0' })
+    assert.equal(r.held, false)
+    assert.equal(r.heldUntil, verifiedUntil)
+    assert.equal(r.issuedAt, verifiedUntil - TERM)
+    assert.equal(r.provenance?.dateFrom, 'chain')
+    assert.ok(r.provenance?.notes.includes('date-from-lapsed-verification'))
+    assert.ok(!r.provenance?.notes.includes('date-from-latest-reattestation'))
+  })
+
+  test('an address that was never verified has no window to close', () => {
+    // `heldUntil` must mean "the chain dates the end of this credential", never "we found
+    // nothing". A never-verified address is the ordinary negative and gets no date at all.
+    const r = read({ verifiedUntil: 0, agentBookHumanId: '0' })
+    assert.equal(r.held, false)
+    assert.equal(r.heldUntil, undefined)
+    assert.equal(r.issuedAt, undefined)
+  })
+
+  test('a term the contract cannot have written leaves the window open at the start', () => {
+    // The end is still exact — it is the stored number. The start is not, so it is withheld,
+    // and an as-of score is left unable to prove the subject held this rather than free to
+    // assume it. Refusing the date is the whole point of the plausibility guard.
+    const r = read({
+      verifiedUntil: NOW - 100,
+      agentBookHumanId: '0',
+      verificationLength: NOW - 100 - WORLD_ADDRESS_BOOK_DEPLOYED_AT + 1,
+    })
+    assert.equal(r.held, false)
+    assert.equal(r.heldUntil, NOW - 100)
+    assert.equal(r.issuedAt, undefined)
+    assert.equal(r.detail?.dateRejected, WORLD_ADDRESS_BOOK_DEPLOYED_AT - 1)
   })
 
   test('expiry uses the contract’s own comparison, so the exact second of expiry is over', () => {
@@ -99,8 +137,12 @@ describe('World ID address book', () => {
     assert.equal(r.held, true)
     assert.equal(r.issuedAt, REGISTERED_AT, 'the dead AddressBook entry cannot date a live binding')
     assert.equal(r.detail?.addressBookLapsedAt, NOW - 10)
-    assert.equal(r.detail?.addressBookIssuedAt, undefined)
     assert.equal(r.detail?.source, 'world-agentbook')
+    // Nothing ended here. The AddressBook term ran out, but the credential is still held
+    // through AgentBook, and dating an end for a credential the subject has would let an as-of
+    // score restore something that never went away — or worse, read as lost at head.
+    assert.equal(r.heldUntil, undefined)
+    assert.ok(!r.provenance?.notes.includes('date-from-lapsed-verification'))
   })
 
   test('both registries answering is reported as both, not collapsed to one', () => {

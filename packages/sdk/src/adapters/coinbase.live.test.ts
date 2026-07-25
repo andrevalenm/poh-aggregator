@@ -47,10 +47,46 @@ import {
   type EasAttestation,
 } from './coinbase.ts'
 import { freshnessOf } from '../scoring.ts'
-import type { Address, Adapter } from '../types.ts'
+import { applyAsOfToEvidence } from '../as-of.ts'
+import type { Address, Adapter, AdapterProbeResult, Evidence } from '../types.ts'
+import { readFileSync } from 'node:fs'
 
 /** Nobody holds the key to this address, so nobody has ever verified with it. */
 const NO_CREDENTIAL = '0x000000000000000000000000000000000000dEaD' as Address
+
+const ontologyJson = JSON.parse(
+  readFileSync(new URL('../../../../ontology/adapters.json', import.meta.url), 'utf8'),
+) as { adapters: (Adapter & { id: string })[] }
+const entryFor = (id: string) => ontologyJson.adapters.find((a) => a.id === id)!
+
+/**
+ * One probe result, priced as of an instant — what `Corroborate.resolve` builds internally,
+ * assembled here so a live probe can be fed straight to the as-of layer without a registry
+ * subgraph in the loop. Freshness is evaluated at `at`, because a credential restored at a past
+ * instant is worth what it was worth then and not what a credential of that age is worth today.
+ */
+const evidenceAt = (
+  adapter: Adapter,
+  observedOn: Address,
+  r: AdapterProbeResult,
+  at: number,
+): Evidence => ({
+  adapterId: adapter.id,
+  adapterName: adapter.name,
+  evidenceClass: adapter.evidenceClass,
+  trustRoot: adapter.trustRoot,
+  observedOn,
+  held: r.held,
+  ...(r.issuedAt !== undefined ? { issuedAt: r.issuedAt } : {}),
+  ...(r.issuedAfter !== undefined ? { issuedAfter: r.issuedAfter } : {}),
+  ...(r.heldUntil !== undefined ? { heldUntil: r.heldUntil } : {}),
+  freshness: freshnessOf(adapter, r.issuedAt, at, r.issuedAfter),
+  effectiveCostCents: 0,
+  forgeCostCents: adapter.forgeCostCents,
+  rentCostCents: adapter.rentCostCents,
+  live: adapter.live,
+  sourceURI: adapter.sourceURI,
+})
 
 /**
  * The only keyless Base endpoint that serves archive `eth_getLogs` at all: publicnode answers
@@ -303,6 +339,34 @@ describe('Coinbase Verified Account (Base, live)', () => {
       assert.equal(probed.detail?.revoked, true)
       assert.equal(probed.detail?.revokedAt, found.revokedAt)
       assert.equal(probed.issuedAt, found.issuedAt)
+
+      // Both ends of the credential's life, off the chain, in one read. A revocation is the
+      // most common way a Coinbase credential ends — 5,143 of them in the sampled windows —
+      // and until now every one of them silently understated any score asked about a block
+      // before it, because the probe reads at head and a revoked attestation reads as absent.
+      assert.equal(probed.heldUntil, found.revokedAt)
+      assert.ok(probed.issuedAt! < probed.heldUntil!, 'a window, not a point')
+
+      const adapter = entryFor('coinbase-verification')
+      const priced = new Map([[adapter.id, adapter]])
+      const inside = Math.floor((found.issuedAt + found.revokedAt) / 2)
+      const restored = applyAsOfToEvidence(
+        [evidenceAt(adapter, found.recipient, probed, inside)],
+        inside,
+        priced,
+      )
+      assert.deepEqual(restored.ceasedAfterAsOf, ['coinbase-verification'])
+      assert.equal(restored.evidence[0]!.held, true, 'they held this at the instant asked about')
+      assert.ok(restored.evidence[0]!.effectiveCostCents > 0)
+
+      const after = found.revokedAt + 1
+      const gone = applyAsOfToEvidence(
+        [evidenceAt(adapter, found.recipient, probed, after)],
+        after,
+        priced,
+      )
+      assert.deepEqual(gone.ceasedAfterAsOf, [])
+      assert.equal(gone.evidence[0]!.held, false, 'and did not, a second after Coinbase revoked it')
     })
   })
 

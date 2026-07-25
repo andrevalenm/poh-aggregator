@@ -349,6 +349,7 @@ export class Corroborate {
         held: result.held,
         ...(result.issuedAt !== undefined ? { issuedAt: result.issuedAt } : {}),
         ...(result.issuedAfter !== undefined ? { issuedAfter: result.issuedAfter } : {}),
+        ...(result.heldUntil !== undefined ? { heldUntil: result.heldUntil } : {}),
         ...(result.provenance ? { provenance: result.provenance } : {}),
         freshness,
         effectiveCostCents: result.held ? effectiveCost(adapter, freshness) : 0,
@@ -359,13 +360,15 @@ export class Corroborate {
     let scored = evidence
     let asOf: AsOfScoring | undefined
     if (historical) {
-      const applied = applyAsOfToEvidence(evidence, historical.context.timestamp)
+      const applied = applyAsOfToEvidence(evidence, historical.context.timestamp, ontology.adapters)
       scored = applied.evidence
       asOf = {
         ...historical.context,
         adaptersNotYetInRegistry: [...notYetInRegistry].sort(),
         issuedAfterAsOf: [...new Set(applied.issuedAfterAsOf)].sort(),
         existenceUnverified: [...new Set(applied.existenceUnverified)].sort(),
+        ceasedAfterAsOf: [...new Set(applied.ceasedAfterAsOf)].sort(),
+        ceasedStartUndated: [...new Set(applied.ceasedStartUndated)].sort(),
       }
     }
 

@@ -406,9 +406,20 @@ we knew, not in the subject*. The surviving PoH credential is priced at 10.72 ce
 11.19, because the survival ramp is evaluated at the as-of block's timestamp and not at the wall
 clock. It refuses rather than degrades: without `registrySubgraphUrl` it throws, because answering
 a question about the past with today's weights and stamping a block number on it is worse than not
-answering. And it says what it cannot see — credentials are read at chain head, so one dated after
-the as-of instant is excluded, but one held then and revoked since is invisible, which understates
-the subject and never the adversary.
+answering. And it says what it cannot see — credentials are read at chain head, so the corrections
+it can make it makes exactly, and it names the residue.
+
+Both corrections come from dates the protocol already stores. One dated *after* the as-of instant
+did not exist then and is dropped. And one the chain dates the *end* of — an EAS revocation, an
+expiry, a World verification term that ran out — was held for the whole window between its
+issuance and that end, so if the instant falls inside it the credential is **restored and priced
+at what it was worth then**, and the result says so in `ceasedAfterAsOf`. That matters more than
+it sounds: 5,143 of the Coinbase attestations in our sampled windows are revoked, and every one of
+them used to make a historical score quietly lower than the subject's real position. Restoring
+requires an *exact* issuance date, never a lower bound — a bound shows a credential could have
+existed at an instant, never that it did — so the cases where only the ending is dated are listed
+in `ceasedStartUndated` and left out. What remains invisible is a credential whose ending the
+protocol does not date at all, which still understates the subject and never the adversary.
 
 At a plausible 2% residual sybil rate, a classifier with 90% TPR and 95% specificity has
 **26.9% precision** — it is wrong about roughly three out of four people it flags, excluding
