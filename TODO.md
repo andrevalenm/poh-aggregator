@@ -17,7 +17,12 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
 
 - [ ] **Name decision** — thumb / print / corroborate. Gates: npm scope, mainnet ENS,
       public repo name, og/meta copy. Rename is a find-replace; do it BEFORE publish/push.
-- [ ] **Repo push** — fork to Hugo0 or collaborator access; judges need a URL.
+- [x] **Repo push (private)** — https://github.com/Hugo0/poh-aggregator (private),
+      full history pushed after a secrets audit (only `0x...` placeholders in history;
+      no real keys). andrevalenm invited with write access — she continues from here.
+      Local remote name: `github` (origin still points at the original clone source).
+      Judges still need a PUBLIC URL eventually — flip visibility or re-push after the
+      name decision.
 - [ ] **Domain + HTTPS** — point a (sub)domain at ax41; Claude wires TLS through the
       existing traefik stack. Kills the "Not secure" bar and the http-clipboard class of
       bugs for good.
