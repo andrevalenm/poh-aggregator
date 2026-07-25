@@ -36,6 +36,7 @@
       <div class="nav-links">
         <a href="#try">Live demo</a>
         <a href="#how">How it works</a>
+        <a href="#research">Research</a>
         <a href="#install">Install</a>
         <a href="#hackathon">Hackathon</a>
         <a href="/app.html">Console</a>
@@ -168,6 +169,441 @@
       </div>
     </section>
 
+    <!--
+      Research. Every figure and link here is drawn from research/ in this repository, which
+      cites its own sources and date-stamps them. Two instruments let a visitor derive the
+      thesis rather than be told it — the numbers they compute with are the deployed registry
+      weights, not illustrative ones. Styles and behaviour live in src/landing/research.{css,ts}
+      so this section stays out of landing.css.
+    -->
+    <section class="research" id="research" aria-labelledby="research-title">
+      <div class="band-inner">
+        <header class="research-head reveal">
+          <p class="eyebrow">The reading</p>
+          <h2 id="research-title">Everything here is downstream of someone else's fieldwork</h2>
+          <p>
+            The saturation rule is not a clever idea we had. It is the conclusion of a decade of
+            people watching personhood systems get captured and writing down exactly how. Below
+            are the cases that shaped the design, the papers worth your evening, and two
+            instruments you can operate yourself — because a claim you can test beats a claim
+            you have to accept.
+          </p>
+          <p>
+            The most damaging criticisms of a product like ours are included, quoted, and
+            unanswered where we cannot answer them. That is not modesty. A scorer that hides its
+            strongest counter-argument is exactly the thing this field keeps producing.
+          </p>
+        </header>
+
+        <!-- ------------------------------------------------ instrument one -->
+        <div class="instrument reveal" data-instrument="saturation">
+          <div class="instrument-label">
+            <span class="idx">Instrument 01</span>
+            <h3>Try to buy a high score</h3>
+          </div>
+          <p class="instrument-hint">
+            Nine real credentials, priced at what the deployed registry says an adversary pays
+            for each — <code>min(forge, rent)</code>, because a holder willing to rent theirs out
+            defeats any amount of cryptography. Switch them on and watch two scorers disagree.
+            Then try to work out which number a consumer should actually gate on.
+          </p>
+
+          <div class="sat">
+            <div>
+              <div class="sat-presets">
+                <button class="sat-preset" type="button" data-preset="farm" aria-pressed="false">
+                  Load: a sybil farm
+                </button>
+                <button class="sat-preset" type="button" data-preset="person" aria-pressed="false">
+                  Load: a real person
+                </button>
+                <button class="sat-preset" type="button" data-preset="clear" aria-pressed="false">
+                  Clear
+                </button>
+              </div>
+              <ul class="sat-list" data-sat-list></ul>
+            </div>
+
+            <div class="sat-readout">
+              <div class="meter" data-meter="additive" data-kind="additive">
+                <div class="meter-top">
+                  <span class="meter-name">Additive — what ships today</span>
+                  <span class="meter-val">0.00</span>
+                </div>
+                <div class="meter-bar"><div class="meter-fill"></div></div>
+                <p class="meter-note">no evidence</p>
+              </div>
+
+              <div class="meter" data-meter="ours" data-kind="ours">
+                <div class="meter-top">
+                  <span class="meter-name">Root-cost — saturate, then sum</span>
+                  <span class="meter-val">0.00</span>
+                </div>
+                <div class="meter-bar"><div class="meter-fill"></div></div>
+                <p class="meter-note">no evidence</p>
+              </div>
+
+              <div class="roots-readout">
+                <span class="roots-count" data-roots-count>0</span>
+                <span class="roots-label">independent trust roots — the number that actually separates a person from a farm</span>
+              </div>
+
+              <p class="verdict" data-sat-verdict></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ------------------------------------------------------ the cases -->
+        <h3 class="reveal" style="margin-top: 3.5rem">Three protocols that taught us something</h3>
+
+        <div class="cases">
+          <article class="case reveal">
+            <h4>Case 01 — Idena</h4>
+            <p>
+              Idena did the hard thing. It filtered bots with a synchronous cognitive ceremony,
+              and — uniquely — it beat account <em>trading</em>, using identity staking and
+              periodic re-authentication. It still collapsed. Not into sybils: into
+              <strong>puppets</strong>. Real, verified, unique humans paid a few dollars an epoch
+              to perform ceremonies while an operator held the keys and took the rewards.
+            </p>
+            <ul class="case-figures">
+              <li><span class="f-label">Peak network, Apr 2022</span><span class="f-val">15,778 accounts</span></li>
+              <li><span class="f-label">Human identities, Jul 2026</span><span class="f-val">98</span></li>
+              <li><span class="f-label">Large pools, Jun 2021 → May 2022</span><span class="f-val">22% → 61%</span></li>
+              <li><span class="f-label">23 entities (&lt;0.6%) controlled</span><span class="f-val">~40% of accounts</span></li>
+              <li><span class="f-label">The bribe that did it</span><span class="f-val">$2–$14 / epoch</span></li>
+            </ul>
+            <p>
+              Two findings changed our design. First, the operators' on-chain signature —
+              simultaneous one-way transfers to one wallet — is <em>identical</em> for
+              puppeteering and for voluntary cooperation. They differ only in the off-chain
+              distribution of power, so no amount of chain analysis can separate them. Someone
+              even shipped a
+              <a href="https://github.com/haritowa/idena-mirror" rel="noopener">forked client</a>
+              whose purpose was to hide a user's own private key from them.
+            </p>
+            <p>
+              Second, the accident that saved the network. Voting was one-node-one-vote and pools
+              had consolidated onto single nodes, so by May 2022 large pools held 61% of accounts
+              but only ~2.4% of votes, while solo accounts held 27% of accounts and ~89% of votes.
+              <strong>An unintended correlation discount let the honest minority fork the protocol
+              out of the crisis.</strong> That is the single most constructive datum in the
+              literature for anyone building a scoring system, and it is why we discount
+              correlation rather than try to detect fraud.
+            </p>
+            <p>
+              The fix that came next is a warning of its own. Sublinear identity staking
+              (<a href="https://docs.idena.io/docs/iip/iip-5" rel="noopener">IIP-5</a>,
+              <code>stake^0.9</code>) did kill the puppet pools — and human identities fell 97.6%
+              from the fork to today. Concave weighting is a tax on your honest users too, and the
+              exponent decides who leaves.
+            </p>
+          </article>
+
+          <article class="case reveal">
+            <h4>Case 02 — Circles</h4>
+            <p>
+              Circles is the only genuinely biometric-free, document-free trust root in the
+              landscape: no passport, no iris, no liveness check anywhere in the protocol. Every
+              registered human mints their own token at 1 CRC/hour, and a public directed trust
+              graph decides whose money you will accept.
+            </p>
+            <p>
+              Which makes the registration bit close to worthless as evidence, and the arithmetic
+              is in <a href="https://github.com/aboutcircles/circles-contracts-v2/blob/beta/src/hub/Hub.sol" rel="noopener">Hub.sol</a>:
+              an invite burns 96 CRC from the inviter and mints a 48 CRC welcome bonus to the
+              invitee. At 24 CRC/day of issuance that is a net <strong>two days of freely-minted
+              currency</strong> per new node, plus gas. A rate limiter with a two-day doubling
+              time, not a sybil barrier.
+            </p>
+            <ul class="case-figures">
+              <li><span class="f-label">v2 humans (Jul 2026)</span><span class="f-val">26,040</span></li>
+              <li><span class="f-label">v2 trust edges</span><span class="f-val">~473,000</span></li>
+              <li><span class="f-label">Cost to add a node</span><span class="f-val">~2 days of CRC</span></li>
+              <li><span class="f-label">Documents / biometrics required</span><span class="f-val">none</span></li>
+            </ul>
+            <p>
+              The FAQ's <a href="https://aboutcircles.com/faqs" rel="noopener">“one human, one
+              account”</a> is a norm, not an invariant — enforced by the team's discretion, with
+              no technical mechanism in the contract. There is on-chain evidence of a
+              5,000-account farm run by a single maintainer.
+            </p>
+            <p>
+              So we do not score the boolean. The signal is <em>position in the trust graph</em>,
+              and the
+              <a href="https://whitepaper.aboutcircles.com/" rel="noopener">whitepaper</a>
+              supplies the right metric itself: max-flow to a seed set. That is a traversal over a
+              large event history — a question about relationships, not a storage slot — which is
+              precisely why an indexer is load-bearing here and an <code>eth_call</code> is not.
+            </p>
+          </article>
+
+          <article class="case reveal">
+            <h4>Case 03 — World, and the market that shouldn't exist</h4>
+            <p>
+              An Orb enrolment costs an adversary about fifty cents to <em>rent</em> and hundreds
+              of dollars to forge. We score the fifty. Every protocol that hardened, hardened
+              against <em>sale</em> — user-presence checks, identity staking — and none against
+              rental, because the human stays willing.
+            </p>
+            <p>
+              There is a counter-intuitive lesson buried in the credential black markets that
+              followed World's 2023 launch: a protocol with <em>no</em> observable credential
+              market may be further along the corruption curve, not safer. Idena beat trading, and
+              the displaced demand reappeared as puppeteering. <strong>Hardening one channel
+              prices the adjacent channel in.</strong>
+            </p>
+            <blockquote class="pull">
+              “Illicit account trading in protocols should not be treated as evidence of advanced
+              mechanisms or protections; to the contrary, illicit trading may signal a lack of
+              them and be a precursor to puppeteering.”
+              <cite>Ohlhaver, Nikulin &amp; Berman — Compressed to 0 (2024)</cite>
+            </blockquote>
+          </article>
+        </div>
+
+        <!-- ------------------------------------------------ instrument two -->
+        <div class="instrument reveal" data-instrument="curves">
+          <div class="instrument-label">
+            <span class="idx">Instrument 02</span>
+            <h3>Why age cuts both ways</h3>
+          </div>
+          <p class="instrument-hint">
+            Most scorers decay every credential uniformly. That is wrong for vouching registries,
+            and wrong in the attacker's favour. Proof of Humanity took roughly 95% of its lifetime
+            registrations inside a four-month airdrop window — so there, the <em>fresh</em> cohort
+            is the suspect one. Drag the age and watch two curves disagree.
+          </p>
+
+          <div class="curves">
+            <svg class="curve-plot" data-curve-plot role="img"
+              aria-label="Two weighting curves against credential age: a decay curve falling from 1, and a survival ramp rising from 0."></svg>
+
+            <div class="curve-controls">
+              <label for="curve-slider">Credential age</label>
+              <input id="curve-slider" type="range" min="0" max="1825" step="5" value="0" data-curve-slider />
+              <p class="curve-age" data-curve-age>0 days old</p>
+
+              <ul class="curve-legend">
+                <li class="decay">
+                  <span class="curve-swatch" aria-hidden="true"></span>
+                  <span>Decay — biometrics, KYC, liveness<br /><small>Orb, 3-year half-life</small></span>
+                  <span class="curve-weight" data-weight-decay>1.000</span>
+                </li>
+                <li class="ramp">
+                  <span class="curve-swatch" aria-hidden="true"></span>
+                  <span>Ramp — vouching registries<br /><small>PoH, 1-year half-life</small></span>
+                  <span class="curve-weight" data-weight-ramp>0.000</span>
+                </li>
+              </ul>
+
+              <p class="curve-caption" data-curve-caption></p>
+            </div>
+          </div>
+
+          <p class="instrument-hint" style="margin-top: 1.6rem">
+            One consequence worth stating: when we cannot learn a credential's age, a Ramp
+            credential is held at the 0.5 midpoint and never granted full weight. Otherwise an
+            attacker profits from making our indexer unreachable.
+          </p>
+        </div>
+
+        <!-- ------------------------------------------------------- lineage -->
+        <div class="instrument reveal">
+          <div class="instrument-label">
+            <span class="idx">Lineage</span>
+            <h3>The argument we are standing on, including where it cuts against us</h3>
+          </div>
+          <p>
+            Puja Ohlhaver's corpus is three papers in four years, and each is load-bearing. In
+            2022 she was first author on <em>Decentralized Society</em>, which proposed discounting
+            the votes of participants whose credentials correlate — <em>without</em> deciding
+            whether they are colluding:
+          </p>
+          <blockquote class="pull">
+            “A vote supported by many Souls who all share the same SBT(s) is more likely to be a
+            Sybil attack and — even if not a Sybil attack — such a vote is more likely to be a
+            group of Souls who are making the same error in judgment or who share the same bias.”
+            <cite>Ohlhaver, Weyl &amp; Buterin — Decentralized Society (2022), §4.5</cite>
+          </blockquote>
+          <p>
+            That move is the ancestor of our saturation rule, and it is why we never try to
+            classify anyone. Fraud and shared bias do the same damage, so they get the same
+            treatment. The appendix's pairwise formula bounds an attacker's gain at
+            <code>M(N² − N)</code> without requiring you to correctly identify who is colluding —
+            which is precisely our epistemic situation.
+          </p>
+          <p>
+            Two years later she audited her own proposal against Idena's wreckage and found the
+            load-bearing assumption false: non-transferability cannot be enforced when the
+            <em>human</em> is willing. And in 2025 she wrote the sentence that does the most damage
+            to a product like ours:
+          </p>
+          <blockquote class="pull">
+            “Ironically, whereas global sybil resistance makes participants the same and reduces
+            the cost of influence, the pursuit of local sybil resistance makes participants more
+            unique, raising the cost of influence.”
+            <cite>Ohlhaver — Community Currencies (2025), p.27</cite>
+          </blockquote>
+          <p>
+            We have no rebuttal to that, and we are not going to pretend to one. If a universal
+            credential standardises people, and standardised things are cheaper to buy in bulk,
+            then aggregating credentials into one number is a step in the wrong direction — and her
+            answer is locality: <em>one person cannot physically show up as two</em>. That is a
+            property a global, remote, API-mediated aggregator structurally cannot have.
+          </p>
+          <p>
+            What we take from it is a boundary rather than a defence. We refuse to be the party
+            that holds the join key, we publish a threshold-free API so no one inherits our
+            judgment as a default, and we carry a permanent caveat saying no protocol here proves a
+            human acts for themselves. Her critique is the reason those three choices are
+            load-bearing rather than decorative.
+          </p>
+          <p>
+            One encouraging note from the same lineage: correlation discounting is not theoretical.
+            Gitcoin's
+            <a href="https://www.gitcoin.co/blog/leveling-the-field-how-connection-oriented-cluster-matching-strengthens-quadratic-funding" rel="noopener">Connection-Oriented Cluster Matching</a>
+            is a direct descendant of that 2022 appendix, live across 20+ rounds and $5.5M+ of
+            real money. Its worked example of a caught attack — wallets with identical donation
+            amounts and near-simultaneous creation dates — is the <em>same</em> co-movement
+            signature Ohlhaver found on Idena, discovered independently, on a different chain,
+            against a different attack.
+          </p>
+        </div>
+
+        <!-- --------------------------------------------------- reading list -->
+        <div class="papers reveal">
+          <h3>The reading list</h3>
+          <p>
+            Primary sources, deep-linked. Where a paper has a free PDF we link that too, because
+            a paywall is a bad reason to lose an argument.
+          </p>
+
+          <ul class="paper-list">
+            <li>
+              <span class="paper-year">2024</span>
+              <div>
+                <p class="paper-title">
+                  <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4749892" rel="noopener">Compressed to 0: The Silent Strings of Proof of Personhood</a>
+                </p>
+                <p class="paper-who">Puja Ohlhaver, Mikhail Nikulin, Paula Berman</p>
+                <p class="paper-why">
+                  The empirical heart of this whole field. Idena filtered bots successfully and
+                  was captured anyway, by puppeteers renting verified humans. Read §IV.D for the
+                  “silent strings” argument — inference from the <em>absence</em> of the artefacts
+                  an accountable custody market would have produced. Note the authors' own
+                  disclosure: two of three hold IDNA, and the findings are unflattering to Idena.
+                </p>
+                <p class="paper-links">
+                  <a href="https://ash.harvard.edu/wp-content/uploads/2024/06/proof-of-personhood_ohlhaver.pdf" rel="noopener">free PDF ↗</a>
+                  <a href="https://stanford-jblp.pubpub.org/pub/compressed-to-0-proof-personhood" rel="noopener">Stanford JBLP ↗</a>
+                  <a href="https://www.youtube.com/watch?v=oTAsln1RDWg" rel="noopener">author talk ↗</a>
+                </p>
+              </div>
+            </li>
+
+            <li>
+              <span class="paper-year">2022</span>
+              <div>
+                <p class="paper-title">
+                  <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4105763" rel="noopener">Decentralized Society: Finding Web3's Soul</a>
+                </p>
+                <p class="paper-who">Puja Ohlhaver, E. Glen Weyl, Vitalik Buterin — Ohlhaver is first author</p>
+                <p class="paper-why">
+                  Remembered for soulbound tokens; the part that matters is §4.5 and Appendix A —
+                  correlation-discounted governance and the pairwise matching formula. Also §4.3,
+                  where identity is the intersection of groups and a credential is made unsellable
+                  by rooting it in relationships that cannot themselves be transferred.
+                </p>
+                <p class="paper-links">
+                  <a href="https://www.radicalxchange.org/updates/papers/desoc.pdf" rel="noopener">free PDF ↗</a>
+                </p>
+              </div>
+            </li>
+
+            <li>
+              <span class="paper-year">2025</span>
+              <div>
+                <p class="paper-title">
+                  <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5136037" rel="noopener">Community Currencies: The Price of Attention and Cost of Influence</a>
+                </p>
+                <p class="paper-who">Puja Ohlhaver</p>
+                <p class="paper-why">
+                  Her most recent paper, and not a personhood paper at all — which is the point.
+                  Contains the strongest argument against what we are building (p.27), plus a neat
+                  unification: a plain airdrop and a soulbound token are the two endpoints of one
+                  dial. Names our exact attack surface as “account splitting.”
+                </p>
+              </div>
+            </li>
+
+            <li>
+              <span class="paper-year">2024</span>
+              <div>
+                <p class="paper-title">
+                  <a href="https://pujaohlhaver.substack.com/p/common-knowledge-machines" rel="noopener">Common Knowledge Machines: From Community Notes to Community Posts</a>
+                </p>
+                <p class="paper-who">Puja Ohlhaver</p>
+                <p class="paper-why">
+                  Where she applies correlation discounting to identity directly — “followers with
+                  similar behavior are grouped as the same entity” — and warns that no single actor
+                  should have totalistic access to a feed. An aggregator with cross-protocol
+                  visibility is exactly the actor being warned about. Worth reading as a
+                  specification of what we must not become.
+                </p>
+              </div>
+            </li>
+
+            <li>
+              <span class="paper-year">2018</span>
+              <div>
+                <p class="paper-title">
+                  <a href="http://hackingdistributed.com/2018/07/02/on-chain-vote-buying/" rel="noopener">On-Chain Vote Buying and the Rise of Dark DAOs</a>
+                </p>
+                <p class="paper-who">Philip Daian, Tyler Kell, Ian Miers, Ari Juels</p>
+                <p class="paper-why">
+                  Why credential rental is structural rather than incidental. Pair it with
+                  <a href="https://www.cs.cornell.edu/~babel/papers/ck.pdf" rel="noopener">Complete Knowledge</a>,
+                  which proves unencumbered key access — and with Ohlhaver's objection that a
+                  puppeteer holding the key produces a perfectly valid proof. Cryptography binds a
+                  key to access, never a key to a person.
+                </p>
+                <p class="paper-links">
+                  <a href="https://ethresear.ch/t/minimal-anti-collusion-infrastructure/5413" rel="noopener">MACI ↗</a>
+                </p>
+              </div>
+            </li>
+
+            <li>
+              <span class="paper-year">2024</span>
+              <div>
+                <p class="paper-title">
+                  <a href="https://whitepaper.aboutcircles.com/" rel="noopener">The Circles whitepaper</a>
+                </p>
+                <p class="paper-who">Circles / Gnosis</p>
+                <p class="paper-why">
+                  §4.2–4.3 formalise the trust graph and give the attack-resistant metric —
+                  max-flow to a seed set — that the boolean “is registered” throws away. A protocol
+                  supplying the correct way to read it is rarer than it should be.
+                </p>
+                <p class="paper-links">
+                  <a href="https://www.frontiersin.org/journals/blockchain/articles/10.3389/fbloc.2024.1362939/full" rel="noopener">peer-reviewed analysis ↗</a>
+                  <a href="https://gnosisscan.io/address/0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8" rel="noopener">Hub v2 on-chain ↗</a>
+                </p>
+              </div>
+            </li>
+          </ul>
+
+          <p class="curve-caption" style="margin-top: 1.6rem">
+            Our own working notes — protocol-by-protocol, with what we could and could not verify,
+            and every claim date-stamped — live in <code>research/</code> in the repository. Where
+            a source contradicted a project's own marketing, the notes say so and side with the
+            contract.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <section class="install" id="install">
       <div class="band-inner">
         <header class="band-head reveal">
@@ -271,9 +707,14 @@ person.isHuman(Thresholds.standard)</code></pre>
       convenient — it uses only the existing custom properties and adds none.
     -->
     <style>
+      /*
+       * Retuned for v4's light ground. These were bone-on-kiln when the page was dark; --kiln
+       * and --paper no longer exist, so the tilework is now ink on field paper and the opacities
+       * came down, because dark strokes on a light sheet read far heavier than the reverse.
+       */
       .azulejo-band {
-        color: var(--bone);
-        opacity: 0.14;
+        color: var(--ink);
+        opacity: 0.1;
         line-height: 0;
         overflow: hidden;
         height: 80px;
@@ -291,8 +732,8 @@ person.isHuman(Thresholds.standard)</code></pre>
       .hackathon-wash {
         position: absolute;
         inset: 0;
-        color: var(--bone);
-        opacity: 0.045;
+        color: var(--ink);
+        opacity: 0.035;
         pointer-events: none;
         z-index: 0;
         mask-image: radial-gradient(60% 55% at 88% 8%, #000 0%, transparent 72%);
@@ -309,23 +750,21 @@ person.isHuman(Thresholds.standard)</code></pre>
         margin: 2rem 0 0;
       }
       /*
-       * The official mark keeps its own colours — navy and cornflower — which disappear on
-       * the kiln ground, so it sits on a paper chip instead of being recoloured. Same reason
-       * the daylight bands exist: this palette already has a light surface to stand on.
+       * The official mark keeps its own colours — navy and cornflower — and is never recoloured.
+       * On v4's light sheet it no longer needs a chip to be legible, so the chip is gone and a
+       * hairline rule holds it instead, the way the rest of the page frames things.
        */
       .built-at-mark {
         display: inline-flex;
         align-items: center;
-        background: var(--paper);
-        border-radius: 3px;
+        border: 1px solid var(--hairline);
+        border-radius: 2px;
         padding: 0.7rem 1rem;
         text-decoration: none;
-        box-shadow: 0 1px 0 rgb(255 255 255 / 0.4) inset,
-          0 12px 30px -20px rgb(0 0 0 / 0.7);
-        transition: transform 0.25s ease;
+        transition: border-color 0.25s ease;
       }
       .built-at-mark:hover {
-        transform: translateY(-1px);
+        border-color: var(--hairline-strong);
       }
       .built-at-mark img {
         display: block;
@@ -334,8 +773,8 @@ person.isHuman(Thresholds.standard)</code></pre>
         width: auto;
       }
       .calcada-rule {
-        color: var(--bone);
-        opacity: 0.16;
+        color: var(--ink);
+        opacity: 0.14;
         line-height: 0;
         height: 32px;
         overflow: hidden;
@@ -401,8 +840,8 @@ person.isHuman(Thresholds.standard)</code></pre>
               />
             </a>
             <p class="built-at-note">
-              The tilework and the wave are drawn, not photographed — the same way the
-              fingerprint above them is.
+              The azulejo tilework and the calçada wave in these pages are drawn, not
+              photographed — like the fingerprint they sit beside.
             </p>
           </div>
         </header>
@@ -623,5 +1062,7 @@ person.isHuman(Thresholds.standard)</code></pre>
 
     <div class="grain" aria-hidden="true"></div>
     <script type="module" src="/src/landing/main.ts"></script>
+    <!-- Separate entry so the research instruments stay independent of main.ts. -->
+    <script type="module" src="/src/landing/research.ts"></script>
   </body>
 </html>

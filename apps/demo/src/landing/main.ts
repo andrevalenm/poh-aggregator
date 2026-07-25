@@ -89,7 +89,8 @@ function mountPicker(): void {
       h('code', {}, chosen.command),
       copyButton(chosen.command, `Copy the ${chosen.label} command`),
     )
-    commandEl.append(pre)
+    // The wrapper bounds the right-edge fade to the code area, clear of the note below.
+    commandEl.append(h('div', { class: 'pre-wrap' }, pre))
     if (chosen.note) commandEl.append(h('p', { class: 'command-note' }, chosen.note))
   }
 

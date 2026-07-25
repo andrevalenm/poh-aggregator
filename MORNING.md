@@ -65,6 +65,16 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Round-2 jury verdict: 7/10 → fixes landed for the named path to 8.5.** Confirmed good:
+10 of 12 round-1 fixes (tear, choreography, numeric canon, recomposition at 1440…). The
+three shipping bugs it found are fixed: 768 sponsor grid (was two viewport-heights of
+half-empty night — now single column below 1100), the MCP install command hidden under
+its own COPY button at 390/768 (button moved below the code line, scrollbar chrome
+hidden, right-edge fade signals overflow), and the ETHGlobal badge invisible on night
+(now seated on a paper chip, caption reworded). Also: rules go single-column at tablet
+(no orphaned third card), print survives as a watermark at 768, reduced-motion covers
+the ledger unfold.
+
 **Juror-agent findings worked through** (12 ranked): showstopper fixed (a sed slip had
 eaten the h1 reveal rule — headline never rendered; E2E now asserts real visibility),
 reveal choreography tightened, section rhythm unified, the numeric story made canonical
