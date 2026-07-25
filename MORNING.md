@@ -1,7 +1,7 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 4. All four suites green: 18 forge, 96 SDK, 10 Playwright — 124 total._
+detail. _Last updated 2026-07-25, after unattended iteration 5. All four suites green: 18 forge, 113 SDK, 10 Playwright — 141 total._
 
 ---
 
@@ -117,6 +117,44 @@ contract keeps no per-fid subscription state — a bytecode scan finds no fid-ke
 and its `PurchasedTier` logs need a Base archive key. It stays out of the ontology rather than
 entering it as a number we cannot check. No weight moved, so the registry stays at **30 adapters,
 revision 34**. Write-up: `research/protocols/farcaster-onchain-read.md`.
+
+**Iteration 5 read Holonym — and closed the loop iteration 3 opened.** Seventh and eighth
+adapters, both off one contract (Hub V3 on Optimism): the government-ID check and the FaceTec
+biometric. The queue said this one was blocked on us publishing a stable action-id. It was not:
+that is only true of Holonym's REST endpoint, and the Hub's `getSBT(address, circuitId)` returns
+the action-id *inside* the proof, so we report whichever namespace the credential was minted for
+instead of choosing one. Reading the contract instead of the vendor also drops an off-chain
+blocklist we cannot see, and a gov-id endpoint that quietly falls back to the passport circuit —
+which would have merged an ICAO root into a KYC root and let one document score twice.
+
+The demo beat: iteration 3 read `0xA6b7471f…67b1`'s Human Passport score of 22.027 and found it
+was **a Holonym gov-id check plus a Holonym biometric and nothing else**. Today that address reads
+directly against Holonym's own contract and both credentials are there — minted three minutes
+apart, under Holonym's issuer keys, nullifiers burned. Same collapse, now observed from both
+directions instead of inferred from a stamp name. The address scores **3.6088 across three
+independent roots**, up from 2.0025, and nothing double-counts: the passport still contributes its
+wallet-history dollar and still names the two adapters it restates.
+
+Three things worth knowing:
+
+- **Presence alone was forgeable, and Holonym's own contract says so.** `Hub.sol` warns that a
+  proof under the right circuit id proves nothing unless you check the public values, because
+  anyone can run an issuer key. The probe pins the issuer, and separately confirms that the
+  nullifier the circuit derived is the one the Hub actually burned — the contract burns the
+  nullifier it is *handed*, which nothing forces to match.
+- **The date is a ZK constraint.** There is no issuance timestamp on chain and the expiry is
+  chosen by the holder — the circuit tells them to randomise it for anonymity. But it also
+  constrains `expiry − iat < 31,536,001`, so *expiry minus one year* is a proven lower bound on
+  issuance: the oldest the credential can be, hence the least weight it can support. Measured
+  against thirteen real mints, that bound sits 4–29 days before the mint for eleven of them and
+  187 and 257 days for two. All of the slack costs the subject weight and none of it can gain
+  them any, and a held credential can never decay below 2^(−365/half-life).
+- **238,706 credentials minted**, measured by bisecting the ERC-721 `ownerOf` (the Hub has no
+  enumeration and a private counter). That is the hard population number our research file asked
+  for, without the event index it proposed.
+
+No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/holonym-human-id-onchain-read.md`.
 
 ---
 
@@ -368,8 +406,8 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    ontology describes fifteen" — it describes thirty. Both are one-word fixes. The live counts
    in the hero are read from the chain at runtime and are already correct. The deployed demo
    bundle predates this change, which is harmless (adapter and root counts come from the
-   registry; only the six implemented probes are ever named in results), but the next
-   `scripts/deploy-demo-ax41.sh` run picks it up.
+   registry; only the implemented probes — eight of them now — are ever named in results), but
+   the next `scripts/deploy-demo-ax41.sh` run picks it up.
 
 ## Honest state of weak points
 
