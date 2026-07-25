@@ -463,6 +463,14 @@ a {
      deepest descender the display face draws; the negative margin keeps layout identical. */
   padding-bottom: 0.24em;
   margin-bottom: -0.24em;
+  /* Same story sideways, and this is the one that reads as a clipped question mark: the
+     mask is shrink-to-fit, so its right edge lands on the line's advance width, and the
+     italic WONK 1 "?" throws its swash 0.105em past that — the cut runs vertically through
+     the top of the swash, which looks like the glyph is clipped along its top. Measured
+     ink overflow is 13.6px at the 130.6px hero size; 0.14em covers it with room to spare.
+     Top needs nothing: the swash still stops 17px inside the line box. */
+  padding-right: 0.14em;
+  margin-right: -0.14em;
 }
 
 .sl-line {
