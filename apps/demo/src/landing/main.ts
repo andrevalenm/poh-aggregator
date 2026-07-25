@@ -6,6 +6,7 @@ import { mountFingerprint, stampPrint } from './fingerprint.ts'
 import { mountPaper } from './paper.ts'
 import { mountContours } from './contours.ts'
 import { mountCursor } from './cursor.ts'
+import { mountInkPress } from './inkpress.ts'
 import { mountWidget } from './widget.ts'
 
 // ------------------------------------------------------------- registry line
@@ -238,6 +239,7 @@ mountFingerprint(document.getElementById('print') as HTMLCanvasElement, {
   narrowAlpha: 0.16,
 })
 mountCursor()
+mountInkPress()
 mountWidget()
 mountPicker()
 mountReveals()

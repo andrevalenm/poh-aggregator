@@ -60,12 +60,12 @@ export function mountContours(canvas: HTMLCanvasElement, seed = 0x7e44a1): void 
     }
 
     const LEVELS = 14
-    ctx.lineWidth = 0.7
+    ctx.lineWidth = 0.85
     ctx.lineCap = 'round'
     for (let l = 0; l < LEVELS; l++) {
       const iso = -2.1 + (l / (LEVELS - 1)) * 4.2
       // Index contours (every 4th) run slightly heavier, like a real topo sheet.
-      ctx.strokeStyle = l % 4 === 0 ? 'rgb(74 60 44 / 0.5)' : 'rgb(74 60 44 / 0.3)'
+      ctx.strokeStyle = l % 4 === 0 ? 'rgb(74 60 44 / 0.62)' : 'rgb(74 60 44 / 0.38)'
       ctx.beginPath()
       for (let j = 0; j < ROWS; j++) {
         for (let i = 0; i < COLS; i++) {

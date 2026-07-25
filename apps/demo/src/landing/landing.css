@@ -72,8 +72,8 @@ body.landing {
   background: var(--paper-solid);
   color: var(--ink);
   font-family: var(--body);
-  font-size: 1.0625rem;
-  line-height: 1.6;
+  font-size: 1.125rem;
+  line-height: 1.62;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
@@ -139,7 +139,7 @@ a {
   inset: -12% 0;
   width: 100%;
   height: 124%;
-  opacity: 0.14;
+  opacity: 0.26;
   pointer-events: none;
   will-change: transform;
 }
@@ -335,7 +335,7 @@ a {
   font-family: var(--display);
   font-variation-settings: 'opsz' 144, 'SOFT' 34, 'WONK' 0;
   font-weight: 460;
-  font-size: clamp(3rem, 9vw, 7rem);
+  font-size: clamp(3.2rem, 9.5vw, 7.6rem);
   line-height: 0.99;
   letter-spacing: -0.018em;
   margin: 0 0 2rem;
@@ -370,7 +370,7 @@ a {
 
 .hero-answer {
   max-width: 52ch;
-  font-size: clamp(1.02rem, 1.6vw, 1.2rem);
+  font-size: clamp(1.08rem, 1.7vw, 1.28rem);
   line-height: 1.6;
   color: var(--ink-soft);
   margin: 0 0 2.4rem;
@@ -394,8 +394,117 @@ a {
     border-color 0.3s, box-shadow 0.3s;
 }
 
-.cta:active {
-  transform: scale(0.97);
+/* Soft-body press: squish under the pointer; the sprung class (inkpress.ts) plays the
+ * jelly recovery on release. */
+.cta:active,
+#lookup-submit:active,
+.example-chip:active,
+.picker button:active,
+.copy-btn:active,
+.threshold-clear:active {
+  transform: scale(0.93, 0.88);
+}
+
+.sprung {
+  animation: unsquish 0.55s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+@keyframes unsquish {
+  0% {
+    transform: scale(0.93, 0.88);
+  }
+  45% {
+    transform: scale(1.05, 0.96);
+  }
+  75% {
+    transform: scale(0.985, 1.015);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Press inverts to the negative — ink where there was colour, bone where there was ink. */
+.example-chip:active {
+  background: var(--ink);
+  color: var(--bone);
+  border-color: var(--ink);
+}
+
+.cta-primary:active,
+#lookup-submit:active {
+  background: var(--ink);
+}
+
+.picker button:active {
+  background: var(--bone);
+  color: var(--night);
+  border-color: var(--bone);
+}
+
+/* Ink blots — bloom from the press point, soak in, gone. */
+.press-blot {
+  position: absolute;
+  pointer-events: none;
+  animation: blot-bloom 0.7s ease-out forwards;
+}
+
+.press-blot path {
+  fill: rgb(42 35 27 / 0.22);
+}
+
+.cta-primary .press-blot path,
+#lookup-submit .press-blot path {
+  fill: rgb(18 13 9 / 0.4);
+}
+
+.picker .press-blot path,
+.copy-btn .press-blot path {
+  fill: rgb(232 224 210 / 0.3);
+}
+
+@keyframes blot-bloom {
+  from {
+    transform: scale(0.15);
+    opacity: 0.95;
+  }
+  60% {
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.sheet-blot {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  animation: sheet-soak 2.4s ease-out forwards;
+}
+
+.sheet-blot path {
+  fill: rgb(42 35 27 / 0.55);
+}
+
+.sheet-blot.is-bone path {
+  fill: rgb(232 224 210 / 0.5);
+}
+
+@keyframes sheet-soak {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  10% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 0;
+  }
 }
 
 .cta-primary {
@@ -547,7 +656,7 @@ a {
   font-family: var(--display);
   font-variation-settings: 'opsz' 100, 'SOFT' 40, 'WONK' 0;
   font-weight: 440;
-  font-size: clamp(1.8rem, 4.6vw, 3.4rem);
+  font-size: clamp(2rem, 5vw, 3.8rem);
   line-height: 1.16;
   margin: 0 auto;
   max-width: 62rem;
@@ -588,7 +697,7 @@ a {
 .band-inner {
   position: relative;
   z-index: 1;
-  max-width: 68rem;
+  max-width: 72rem;
   margin: 0 auto;
 }
 
@@ -596,7 +705,7 @@ a {
   font-family: var(--display);
   font-variation-settings: 'opsz' 110, 'SOFT' 34, 'WONK' 0;
   font-weight: 500;
-  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-size: clamp(2.2rem, 5.4vw, 3.8rem);
   line-height: 1.05;
   margin: 0 0 1.1rem;
   letter-spacing: -0.014em;
@@ -786,7 +895,7 @@ a {
   font-family: var(--display);
   font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;
   font-weight: 480;
-  font-size: clamp(3.6rem, 8vw, 6rem);
+  font-size: clamp(3.8rem, 8.5vw, 6.5rem);
   line-height: 1;
   letter-spacing: -0.02em;
   color: var(--ink);
@@ -852,6 +961,162 @@ a {
 .w-error {
   margin-top: 1.4rem;
   font-size: 0.92rem;
+  color: var(--iron-deep);
+}
+
+/* --------------------------------------------------- inline console pieces */
+
+.th-block {
+  margin-top: 1.6rem;
+  border-top: 1px dashed var(--hairline);
+  padding-top: 1.3rem;
+}
+
+.th-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  max-width: 34rem;
+}
+
+.th-slider {
+  flex: 1 1 18rem;
+  accent-color: var(--iron);
+}
+
+.th-slider.is-unset {
+  opacity: 0.45;
+}
+
+.th-readout {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 500;
+  min-width: 4.5rem;
+}
+
+.th-verdict {
+  margin: 0.7rem 0 0;
+  font-size: 0.92rem;
+  max-width: var(--measure);
+}
+
+.th-verdict.is-unset {
+  color: var(--ink-soft);
+}
+
+.th-verdict.is-pass {
+  color: var(--sage-deep);
+  font-weight: 570;
+}
+
+.th-verdict.is-fail {
+  color: var(--iron-deep);
+  font-weight: 570;
+}
+
+.ledger-details {
+  margin-top: 1.2rem;
+  border-top: 1px dashed var(--hairline);
+  padding-top: 1rem;
+}
+
+.ledger-details summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 660;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sage-deep);
+  list-style: none;
+}
+
+.ledger-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.ledger-details summary::after {
+  content: ' +';
+  color: var(--iron);
+}
+
+.ledger-details[open] summary::after {
+  content: ' −';
+}
+
+.ledger-details summary:hover {
+  color: var(--ink);
+}
+
+.evd-rows {
+  margin-top: 0.9rem;
+}
+
+.evd-row {
+  padding: 0.65rem 0;
+  border-bottom: 1px dashed var(--hairline);
+  opacity: 0.75;
+}
+
+.evd-row.is-held {
+  opacity: 1;
+}
+
+.evd-head {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.evd-name {
+  font-weight: 620;
+}
+
+.evd-verdict {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.evd-row.is-held .evd-verdict {
+  color: var(--iron-deep);
+}
+
+.evd-cost {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+}
+
+.evd-meta {
+  margin: 0.25rem 0 0;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+}
+
+.cv-list {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.cv-list li {
+  display: grid;
+  gap: 0.15rem;
+  max-width: 80ch;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+
+.cv-list code {
+  font-family: var(--mono);
+  font-size: 0.74rem;
   color: var(--iron-deep);
 }
 
