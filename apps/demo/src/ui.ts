@@ -74,8 +74,17 @@ export function rootChip(root: string, extra = ''): HTMLElement {
   return chip
 }
 
+/**
+ * Always show the multiplier that was actually applied. An adapter on a Ramp curve with an
+ * unknown issue date is discounted rather than waved through, and a UI saying "no decay
+ * applied" would misreport that.
+ */
 export function freshnessLabel(freshness: number, issuedAt?: number): string {
-  if (issuedAt === undefined) return 'age unknown — no decay applied'
+  if (issuedAt === undefined) {
+    return freshness === 1
+      ? 'age unknown — no age adjustment'
+      : `age unknown — weight ×${freshness.toFixed(2)} applied anyway`
+  }
   const days = Math.round((Date.now() / 1000 - issuedAt) / 86_400)
-  return `issued ${days}d ago · freshness ×${freshness.toFixed(2)}`
+  return `issued ${days}d ago · age weight ×${freshness.toFixed(2)}`
 }

@@ -182,7 +182,7 @@ function caveatsFor(evidence: Evidence[], roots: RootContribution[]): Caveat[] {
   if (unknownAge.length) {
     caveats.push({
       code: 'issuance-date-unknown',
-      message: `Issue date unavailable, so no decay applied and the credential may be stale: ${unknownAge.map((e) => e.adapterId).join(', ')}.`,
+      message: `Issue date unavailable for: ${unknownAge.map((e) => e.adapterId).join(', ')}. Decay-class credentials keep full weight and may be stale; survival-ramp credentials are held at the 0.5 midpoint rather than granted full weight.`,
     })
   }
 

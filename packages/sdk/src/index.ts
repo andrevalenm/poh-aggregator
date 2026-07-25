@@ -2,6 +2,7 @@ import { createPublicClient, http, isAddress } from 'viem'
 import { mainnet } from 'viem/chains'
 import { normalize } from 'viem/ens'
 import { loadOntology } from './ontology.ts'
+import ontologyData from './ontology-data.json' with { type: 'json' }
 import { defaultAdapters } from './adapters/index.ts'
 import { score, freshnessOf, effectiveCost } from './scoring.ts'
 import type { Address, AdapterProbe, Evidence, PersonhoodResult } from './types.ts'
@@ -75,14 +76,21 @@ export class Corroborate {
       opts.adapters ?? defaultAdapters(opts.subgraphUrl ? { subgraphUrl: opts.subgraphUrl } : undefined)
   }
 
-  /** Ontology is cached per instance; call `refresh()` after a registry update. */
+  /**
+   * Ontology is cached per instance; call `refresh()` after a registry update.
+   *
+   * The bundled id/root preimages are only for reversing on-chain hashes into readable
+   * names — the registry stays the source of truth for every weight. Without defaults,
+   * omitting knownIds silently keyed adapters by hash, matched nothing, and returned
+   * score 0 with a no-evidence caveat: a wrong answer in the adversary's favour.
+   */
   async ontology() {
     if (!this.#ontology) {
       this.#ontology = await loadOntology({
         registryAddress: this.#opts.registryAddress,
         ...(this.#opts.registryRpcUrl ? { rpcUrl: this.#opts.registryRpcUrl } : {}),
-        ...(this.#opts.knownIds ? { knownIds: this.#opts.knownIds } : {}),
-        ...(this.#opts.knownRoots ? { knownRoots: this.#opts.knownRoots } : {}),
+        knownIds: this.#opts.knownIds ?? ontologyData.adapters.map((a) => a.id),
+        knownRoots: this.#opts.knownRoots ?? Object.keys(ontologyData.trustRoots),
       })
     }
     return this.#ontology

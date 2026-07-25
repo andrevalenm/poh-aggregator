@@ -57,7 +57,7 @@ export function makeClient(onEvent?: (e: ProbeEvent) => void): Corroborate {
   return new Corroborate({
     knownIds,
     knownRoots,
-    ...(onEvent ? { adapters: instrumentedAdapters(onEvent) } : {}),
+    adapters: onEvent ? instrumentedAdapters(onEvent) : baseAdapters(),
   })
 }
 
