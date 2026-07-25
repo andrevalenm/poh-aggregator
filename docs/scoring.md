@@ -143,6 +143,30 @@ had anyway — and where the index only covers a *window* of history, absence pr
 old fallback applies unchanged, and `index-coverage-partial` says so. Full decision table:
 [`packages/sdk/src/reconcile.ts`](../packages/sdk/src/reconcile.ts).
 
+**Whether an index has complete history is the index's claim to make, not ours.** It used to be a
+constant in the SDK describing a manifest in another package, which is a thing that drifts
+silently and in the dangerous direction — a windowed index called complete turns "we cannot see
+it" into "it did not exist". Each data source now records the earliest event it indexed, and the
+SDK compares that against the block the protocol's first credential was created in (PoH's first
+`HumanityClaimed` at Gnosis 36029465; Circles' first `RegisterHuman` at 36501311, both measured
+from the protocol's own deployment block). Coverage rides along in the same request as the entity
+and the head, because a cached "complete history" outliving the deployment that earned it is the
+same class of error the entity exists to remove.
+
+**A side-event is not an issuance, and which way it errs decides how it may be used.** An index
+often holds a credential only because something adjacent to it was indexed, and that event's
+timestamp is not the issuance date. The direction is what matters, and it is protocol-specific. A
+Circles trust edge cannot precede the registration it points at — the registration handler
+overwrites the date — so it *understates* age: the date is kept, `issuance-date-lower-bound` calls
+it a floor, and on a `Ramp` a floor costs the honest subject weight rather than granting any. A
+PoH vouch is cast on a claim that has not resolved yet, so it *precedes* issuance and would
+overstate age; there the timestamp is not used as a date at all but as a lower bound on issuance,
+which caps ramp weight exactly as an absence bound does (`index-date-precedes-issuance`). Above
+the half-life that cap bites: a three-year-old vouch read as an issuance date prices a 365-day
+ramp at 0.875 for a credential that may have been claimed yesterday, and as a bound it is capped
+at the 0.5 an undated credential gets. Where the direction has not been established, the unsafe
+reading is assumed, because the safe-looking default is the one that pays an adversary.
+
 **A hard expiry truncates a decay curve, so a half-life longer than the expiry never
 completes.** Four of the nine implemented adapters have this shape, and it is easy to misread
 their half-lives as the range over which weight falls. Human Passport hard-expires at 90 days

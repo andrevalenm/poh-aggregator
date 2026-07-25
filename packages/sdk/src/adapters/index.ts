@@ -320,9 +320,10 @@ export function circlesAdapter(
     probe: (subject: Address) =>
       safe(async () => {
         // The Hub stores no registration timestamp, so unlike PoH the date can only come from
-        // an index — which is exactly why the reconciler has to be careful here. The deployed
-        // subgraph indexes a ~2-month window of Circles, so an avatar's absence from it proves
-        // nothing and must not be turned into an age bound.
+        // an index — which is exactly why the reconciler has to be careful here. Whether an
+        // avatar's absence from the index proves anything is the index's own claim to make: the
+        // read carries the earliest event that index holds, and the reconciler turns absence
+        // into an age bound only when that edge is at or before the Hub's first registration.
         const [index, chain] = await Promise.all([
           subgraphUrl ? circlesIndexRead(subgraphUrl, subject) : undefined,
           readChain(subject),

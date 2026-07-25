@@ -146,18 +146,39 @@ describe('index and chain, reconciled against live data', () => {
   const POH_HALF_LIFE_DAYS = 365 // must match ontology/adapters.json poh-v2
 
   /**
-   * A Circles avatar registered at block 36503055, more than ten million blocks before the
-   * subgraph's Circles window opens at 46300000, and never trusted inside that window — so it
-   * is genuinely held on chain and genuinely absent from our index. Found by walking the Hub's
-   * own RegisterHuman history; the test re-verifies both halves rather than trusting the note.
+   * Two Circles avatars that the ~2-month window used to get wrong, in the two available ways.
+   *
+   * `0x3fc5c255…` (registered block 36503055) was outside the window entirely: held on chain,
+   * absent from the index, so its age could not be bounded and it scored at the flagged 0.5
+   * midpoint. `0xd40133ea…` (block 36501311, one of the Hub's first registrations) was *in* the
+   * index only because a trust edge materialised it, so its `registeredAt` was ~1.6 years late.
+   * With the data source starting at the Hub's deployment both are dated from their own
+   * `RegisterHuman`, and these tests check that against the chain's own logs rather than
+   * against a number written here.
    */
-  const CIRCLES_BEFORE_WINDOW = '0x3fc5c255a43aa5bc07a3129a0feb6c9e212ecb6d' as Address
-  /**
-   * A Circles avatar from the Hub's very first registrations (block 36501311) that the index
-   * *does* have — but only because a trust edge inside the window materialised it, so its
-   * `registeredAt` is ~1.6 years late and its `inviter` is null.
-   */
-  const CIRCLES_SIDE_EVENT_DATED = '0xd40133ea712e7012a95fdd3c008ab58f7918b446' as Address
+  const CIRCLES_FIRST_REGISTRATIONS = [
+    '0x3fc5c255a43aa5bc07a3129a0feb6c9e212ecb6d',
+    '0xd40133ea712e7012a95fdd3c008ab58f7918b446',
+  ] as Address[]
+  /** The Hub's own first RegisterHuman, and the yardstick coverage is measured against. */
+  const CIRCLES_FIRST_REGISTRATION_BLOCK = 36_501_311
+  /** keccak256("RegisterHuman(address,address)"), the event the Circles date comes from. */
+  const REGISTER_HUMAN_TOPIC = '0xfea7c1e1973c8be64c654eb06dc19ffbfc2e924d57544b9da0c0a27d3f893d77'
+  /** keccak256("HumanityClaimed(bytes20,uint256)"). Not indexed, so the humanity id is in `data`. */
+  const HUMANITY_CLAIMED_TOPIC = '0x8f7a3d8342a820e0b4964cc989eda69c533342896a0fa4a8379336dc0904cbe9'
+
+  const gnosisRpc = async (method: string, params: unknown[]): Promise<any> => {
+    const res = await fetch('https://rpc.gnosischain.com', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    const json = (await res.json()) as { result?: unknown; error?: { message: string } }
+    if (json.error) throw new Error(`${method}: ${json.error.message}`)
+    return json.result
+  }
+  const hexBlock = (n: number) => `0x${n.toString(16)}`
 
   /**
    * Public RPCs blip. A probe that reported an `error` tells us nothing about the mechanism
@@ -235,44 +256,161 @@ describe('index and chain, reconciled against live data', () => {
     assert.ok(barePoh.provenance?.headBlock, 'the block the read was taken at is reported')
   })
 
-  test('a real credential outside the index window is flagged, not silently re-dated', async (t) => {
-    const r = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(
-      CIRCLES_BEFORE_WINDOW,
-    )
-    const circles = r.evidence.find((e) => e.adapterId === 'circles-v2')
-    if (!answered(t, circles, 'circles-v2')) return
-    assert.ok(circles!.held, 'vector must still be a registered Circles human')
-
-    // The index answered, at a block it named, and does not have this avatar. Absence in a
-    // windowed data source is not evidence, so no bound is derived from it.
-    assert.ok(circles.provenance?.indexedBlock, 'the indexed block is reported either way')
-    assert.equal(circles.issuedAt, undefined)
-    assert.equal(circles.issuedAfter, undefined, 'a windowed index must not bound the age')
-    assert.ok(circles.provenance?.notes.includes('index-outside-coverage'))
-    assert.ok(r.caveats.some((c) => c.code === 'index-coverage-partial'))
-    assert.equal(circles.freshness, 0.5, 'the flagged midpoint, exactly as before the change')
-  })
-
-  test('an index date inferred from a trust edge is reported as a floor on age', async (t) => {
-    const { circlesIndexRead } = await import('./subgraph.ts')
-    const index = await circlesIndexRead(SUBGRAPH, CIRCLES_SIDE_EVENT_DATED)
-    if (!index?.entity) {
-      t.skip('subgraph has not indexed a trust edge for this avatar')
+  test('the index reports how far back it can see, and the chain agrees with it', async (t) => {
+    // Coverage is what makes an index's silence evidence, so it must not be a constant this
+    // package asserts about a manifest in another one. The index states its own lower edge; the
+    // chain is then asked whether anything was missed below it.
+    const { indexCoverage, PROTOCOL_FIRST_CREDENTIAL_BLOCK } = await import('./subgraph.ts')
+    const coverage = await indexCoverage(SUBGRAPH, 'circles')
+    if (!coverage) {
+      t.skip(`no Circles coverage record yet (${coverage === null ? 'still syncing or legacy deployment' : 'index unreachable'})`)
       return
     }
     assert.equal(
-      index.entity.issuanceObserved,
-      false,
-      'this avatar registered before the window, so the index never saw its RegisterHuman',
+      PROTOCOL_FIRST_CREDENTIAL_BLOCK.circles,
+      CIRCLES_FIRST_REGISTRATION_BLOCK,
+      'the yardstick is the Hub\'s first registration',
     )
+    assert.ok(
+      coverage.firstEventBlock <= CIRCLES_FIRST_REGISTRATION_BLOCK,
+      `earliest indexed Circles event ${coverage.firstEventBlock} must be at or before the first registration`,
+    )
+    assert.equal(coverage.completeHistory, true)
 
-    const r = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(
-      CIRCLES_SIDE_EVENT_DATED,
-    )
-    const circles = r.evidence.find((e) => e.adapterId === 'circles-v2')
-    if (!answered(t, circles, 'circles-v2')) return
-    assert.ok(circles!.held)
-    assert.equal(circles!.issuedAt, index.entity.issuedAt, 'kept: it understates age, never inflates')
-    assert.ok(r.caveats.some((c) => c.code === 'issuance-date-lower-bound'))
+    // The chain-only half: no RegisterHuman exists below the edge the index claims. 36486014 is
+    // the block the Hub's code first appears at, so this covers the contract's whole life.
+    const below = await gnosisRpc('eth_getLogs', [
+      {
+        address: '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8',
+        topics: [REGISTER_HUMAN_TOPIC],
+        fromBlock: hexBlock(36_486_014),
+        toBlock: hexBlock(coverage.firstEventBlock - 1),
+      },
+    ])
+    assert.equal(below.length, 0, 'nothing the index cannot see ever registered a human')
+  })
+
+  test('the avatars a windowed index mis-dated are now dated from their own registration', async (t) => {
+    const { circlesIndexRead } = await import('./subgraph.ts')
+    // One wide, topic-filtered query gives the registration block of both subjects, from the
+    // chain, at run time — so the date being asserted is never a number written in this file.
+    const logs: { blockNumber: string; topics: string[] }[] = await gnosisRpc('eth_getLogs', [
+      {
+        address: '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8',
+        topics: [REGISTER_HUMAN_TOPIC],
+        fromBlock: hexBlock(CIRCLES_FIRST_REGISTRATION_BLOCK),
+        toBlock: hexBlock(CIRCLES_FIRST_REGISTRATION_BLOCK + 5_000),
+      },
+    ])
+    for (const subject of CIRCLES_FIRST_REGISTRATIONS) {
+      const log = logs.find((l) => l.topics[1]?.toLowerCase().endsWith(subject.slice(2).toLowerCase()))
+      assert.ok(log, `${subject} must have a RegisterHuman in the Hub's first registrations`)
+      const registeredIn = parseInt(log.blockNumber, 16)
+
+      const index = await circlesIndexRead(SUBGRAPH, subject)
+      if (!index) {
+        t.skip('the index did not answer')
+        return
+      }
+      if (index.block < registeredIn || !index.entity) {
+        t.skip(`index at block ${index.block} has not reached ${subject}'s registration (${registeredIn})`)
+        return
+      }
+      assert.equal(
+        index.entity.issuanceObserved,
+        true,
+        'the index saw the RegisterHuman itself, so the date is the date',
+      )
+
+      const header = await gnosisRpc('eth_getBlockByNumber', [hexBlock(registeredIn), false])
+      assert.equal(
+        index.entity.issuedAt,
+        parseInt(header.timestamp, 16),
+        `${subject}: the index's registeredAt is the timestamp of the block its RegisterHuman is in`,
+      )
+
+      const r = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(subject)
+      const circles = r.evidence.find((e) => e.adapterId === 'circles-v2')
+      if (!answered(t, circles, 'circles-v2')) return
+      assert.ok(circles!.held, 'vector must still be a registered Circles human')
+      assert.equal(circles!.issuedAt, index.entity.issuedAt)
+      assert.equal(circles!.provenance?.dateFrom, 'index')
+      assert.ok(
+        !r.caveats.some((c) => c.code === 'index-coverage-partial' || c.code === 'issuance-date-lower-bound'),
+        'neither approximation applies any more',
+      )
+      assert.notEqual(circles!.freshness, 0.5, 'a computed weight, not the unknown-age midpoint')
+    }
+  })
+
+  test('an entity the index holds only through a vouch is bounded, never dated', async (t) => {
+    // The direction claim, checked against the chain over the whole observable population: a
+    // vouch is cast on a request that has not resolved, so a claim that follows it is the only
+    // thing the chain should ever show. If one preceded a vouch-dated entity, `before-issuance`
+    // would be wrong and the SDK would be capping ages it should be reading.
+    const { pohIndexRead } = await import('./subgraph.ts')
+    const res = await fetch(SUBGRAPH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        query: '{ pohHumans(first: 50, where: {claimObserved: false}, orderBy: claimedAtBlock, orderDirection: asc) { id claimedAt claimedAtBlock } }',
+      }),
+      signal: AbortSignal.timeout(20_000),
+    })
+    const body = (await res.json()) as {
+      data?: { pohHumans: { id: string; claimedAt: string; claimedAtBlock: string }[] }
+      errors?: { message: string }[]
+    }
+    if (body.errors?.length || !body.data) {
+      t.skip(`the index cannot report claimObserved: ${body.errors?.[0]?.message ?? 'no data'}`)
+      return
+    }
+    const vouchDated = body.data.pohHumans
+    assert.ok(vouchDated.length > 0, 'the index should hold some humanities only through a vouch')
+
+    const claims: { blockNumber: string; data: string }[] = await gnosisRpc('eth_getLogs', [
+      {
+        address: '0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc',
+        topics: [HUMANITY_CLAIMED_TOPIC],
+        fromBlock: hexBlock(35_846_827),
+        toBlock: 'latest',
+      },
+    ])
+    const firstClaim = new Map<string, number>()
+    for (const log of claims) {
+      const humanityId = `0x${log.data.slice(2, 42)}`
+      const block = parseInt(log.blockNumber, 16)
+      if (!firstClaim.has(humanityId) || block < firstClaim.get(humanityId)!) firstClaim.set(humanityId, block)
+    }
+    assert.ok(claims.length > 1_000, `expected the protocol's full claim history, got ${claims.length}`)
+
+    let laterClaim = 0
+    let neverClaimed = 0
+    for (const e of vouchDated) {
+      const claimedIn = firstClaim.get(e.id.toLowerCase())
+      if (claimedIn === undefined) {
+        neverClaimed++
+        continue
+      }
+      assert.ok(
+        claimedIn > Number(e.claimedAtBlock),
+        `${e.id}: the claim (block ${claimedIn}) must follow the vouch the index dated it from (${e.claimedAtBlock})`,
+      )
+      laterClaim++
+    }
+    assert.ok(laterClaim + neverClaimed === vouchDated.length)
+
+    // And the SDK turns that into a bound rather than a date.
+    const subject = vouchDated[0]!
+    const view = await pohIndexRead(SUBGRAPH, subject.id)
+    assert.equal(view?.entity?.issuanceObserved, false)
+    const { reconcileIndexAndChain } = await import('./reconcile.ts')
+    const r = reconcileIndexAndChain({
+      chain: { held: true, block: view!.block + 100 },
+      index: view!,
+    })
+    assert.equal(r.issuedAt, undefined, 'a vouch timestamp is not an issuance date')
+    assert.equal(r.issuedAfter, Number(subject.claimedAt))
+    assert.ok(r.provenance.notes.includes('index-date-precedes-issuance'))
   })
 })

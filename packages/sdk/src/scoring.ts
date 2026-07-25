@@ -380,7 +380,15 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
   if (lowerBound.length) {
     out.push({
       code: 'issuance-date-lower-bound',
-      message: `The index dated ${ids(lowerBound)} from a side-event (a vouch or a trust edge) rather than from the issuance event itself, because the issuance falls outside its indexed window. The real credential is therefore older than the date used, and on a survival ramp its weight here is a floor rather than an estimate.`,
+      message: `The index dated ${ids(lowerBound)} from a side-event (a trust edge) rather than from the issuance event itself, because the issuance falls outside its indexed window. The real credential is therefore older than the date used, and on a survival ramp its weight here is a floor rather than an estimate.`,
+    })
+  }
+
+  const precedes = withNote('index-date-precedes-issuance').filter((e) => e.held)
+  if (precedes.length) {
+    out.push({
+      code: 'index-date-precedes-issuance',
+      message: `The index holds ${ids(precedes)} only through an event that happened before the credential was issued — a vouch is cast on a claim that has not resolved yet — so that timestamp does not date the credential, it bounds it. Used as a lower bound on issuance, which caps the age this credential can be credited with rather than granting it. Reading it as the issuance date would have made the credential look older than it is, and on a survival ramp that is worth more.`,
     })
   }
 

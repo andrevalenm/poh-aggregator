@@ -564,14 +564,18 @@ priced, rooted and `implemented: false`, with the measurements behind that in
 [`research/protocols/world-id-onchain-read.md`](research/protocols/world-id-onchain-read.md) §5.
 What *is* readable — the Orb tier — is now read from the registry World actually populates.
 
-**8. The subgraph covers only a two-month window of Circles.** It is synced and reports no
-indexing errors, but its Circles data source starts at block 46300000 while the Hub's first
-registration was at 36501311, so the oldest and most legitimate avatars are missing from it — and
-avatars it *does* have may be dated from a trust edge rather than their registration, which
-understates their age. Both cases are now detected and flagged (`index-coverage-partial`,
-`issuance-date-lower-bound`) instead of silently mis-dated, and both are fixed by widening the
-window and re-syncing. PoH is indexed from its deployment block and is dated from the chain
-regardless.
+**8. The index is trusted about its own coverage, and only about that.** Both data sources now
+run from their protocol's own first block — Circles from the Hub's deployment (36486014) rather
+than the two-month window that shipped first — so an avatar's absence is evidence about the world
+and its date is its own `RegisterHuman`. The index states its earliest indexed event in an
+`IndexCoverage` entity and the SDK compares that against the protocol's first credential block to
+decide whether absence counts; a redeploy with a narrower window therefore loses the claim to
+complete history by itself instead of leaving a constant in this package asserting it. What is
+*not* fixed by this: a credential the index holds only through a side-event still cannot be dated
+from it, and which direction that error runs is protocol-specific — a Circles trust edge cannot
+precede the registration it points at (`issuance-date-lower-bound`, a floor), while a PoH vouch is
+cast on a claim that has not resolved and therefore precedes it (`index-date-precedes-issuance`, a
+bound that caps weight rather than a date).
 
 **9. We cannot offer maximal unlinkability and maximal dedup at once.** An aggregator is a
 cross-application deduplicator by definition; app-scoped nullifiers make cross-app dedup

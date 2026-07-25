@@ -33,11 +33,13 @@ export interface ProbeProvenance {
   /** Which source decided `held`. */
   heldFrom: 'chain' | 'index'
   /**
-   * Which source dated the credential. 'index-absence-bound' means the date is not known but
-   * is bounded: the credential was absent from a complete index at `indexedBlock`, so it was
-   * issued after that block's timestamp.
+   * Which source dated the credential. The two `-bound` values mean the date is not known but
+   * is bounded from below: `index-absence-bound` because the credential was absent from a
+   * complete index at `indexedBlock`, so it was issued after that block's timestamp;
+   * `index-side-event-bound` because the index holds the credential only through an event that
+   * provably preceded its issuance, so it was issued after *that*.
    */
-  dateFrom: 'chain' | 'index' | 'index-absence-bound' | 'none'
+  dateFrom: 'chain' | 'index' | 'index-absence-bound' | 'index-side-event-bound' | 'none'
   /** Block the index had reached. Present whenever the index answered at all. */
   indexedBlock?: number
   /** Timestamp of `indexedBlock`, when it could be established. */
@@ -70,6 +72,13 @@ export type ProvenanceNote =
   | 'credential-ceased-since-index'
   /** The index's date came from a side-event, so it is a lower bound on age, not the date. */
   | 'index-date-is-lower-bound'
+  /**
+   * The index's date came from a side-event that provably happened *before* issuance (a vouch is
+   * cast on a claim that has not resolved yet), so it does not date the credential at all — it
+   * bounds it. Using it as the date would make the credential look older than it is, and on a
+   * survival ramp older is worth more, so this is the one direction that pays an adversary.
+   */
+  | 'index-date-precedes-issuance'
   /** Index and contract disagree about the issuance date by more than the tolerance. */
   | 'index-date-disagrees-with-chain'
   /** The contract read failed, so nothing confirms the index's state is still current. */
@@ -138,10 +147,28 @@ export interface IndexedCredential {
   /**
    * True when the index observed the issuance event itself. False when the entity was
    * materialised as a side effect of another event (a vouch, a trust edge), in which case
-   * `issuedAt` is that event's timestamp — later than the real issuance, so it understates
-   * the credential's age rather than inventing one.
+   * `issuedAt` is that event's timestamp rather than the issuance.
    */
   issuanceObserved: boolean
+  /**
+   * Which side of the real issuance an unobserved `issuedAt` falls on. Only meaningful when
+   * `issuanceObserved` is false, and the index that produced the view must be able to *prove*
+   * it, because the two directions are handled oppositely:
+   *
+   * - `after-issuance` — the side-event cannot precede issuance. A Circles trust edge on an
+   *   avatar whose registration was never indexed is one: the registration handler overwrites
+   *   the date, so an unobserved registration is necessarily older than the indexed range.
+   *   The date understates age, which understates weight on a ramp, so it is usable as a floor.
+   * - `before-issuance` — the side-event cannot follow issuance. A PoH vouch is cast on a
+   *   request that has not resolved, so with complete history an unobserved claim is one that
+   *   had not happened yet. The date would *overstate* age, so it is not used as a date at all;
+   *   it becomes a lower bound on issuance (`issuedAfter`), which caps ramp weight instead of
+   *   granting it.
+   *
+   * Absent means the direction is unknown, which is treated as `before-issuance`: the safe
+   * reading of a date nobody can place is the one that cannot inflate a score.
+   */
+  sideEventOrder?: 'after-issuance' | 'before-issuance'
   /** The index believes the credential has ended: revoked, stopped, expired. */
   ended: boolean
 }
@@ -181,6 +208,20 @@ export interface Reconciled {
  */
 export const DATE_AGREEMENT_TOLERANCE_SECONDS = 3600
 
+/**
+ * True when an unobserved index date cannot be used as a date, because it sits *below* the real
+ * issuance and would therefore overstate the credential's age.
+ *
+ * The default matters: a missing `sideEventOrder` means nobody established the direction, and an
+ * unplaced date is treated as the unsafe one. Only an index that can prove its side-events follow
+ * issuance gets to have its date used, which is the reverse of the old behaviour — that assumed
+ * `after-issuance` for every protocol, on an argument that happens to hold for Circles trust
+ * edges and is false for PoH vouches.
+ */
+function datesFromBelow(entity: IndexedCredential): boolean {
+  return entity.sideEventOrder !== 'after-issuance'
+}
+
 export function reconcileIndexAndChain(input: {
   chain: ChainView
   index?: IndexView
@@ -217,7 +258,17 @@ export function reconcileIndexAndChain(input: {
     if (index.entity.ended) {
       return { held: false, provenance: { heldFrom: 'index', dateFrom: 'none', ...base, notes } }
     }
-    if (!index.entity.issuanceObserved) notes.push('index-date-is-lower-bound')
+    if (!index.entity.issuanceObserved) {
+      if (datesFromBelow(index.entity)) {
+        notes.push('index-date-precedes-issuance')
+        return {
+          held: true,
+          issuedAfter: index.entity.issuedAt,
+          provenance: { heldFrom: 'index', dateFrom: 'index-side-event-bound', ...base, notes },
+        }
+      }
+      notes.push('index-date-is-lower-bound')
+    }
     return {
       held: true,
       issuedAt: index.entity.issuedAt,
@@ -254,7 +305,13 @@ export function reconcileIndexAndChain(input: {
       index.entity &&
       Math.abs(index.entity.issuedAt - chain.issuedAt) > DATE_AGREEMENT_TOLERANCE_SECONDS
     ) {
-      notes.push(index.entity.issuanceObserved ? 'index-date-disagrees-with-chain' : 'index-date-is-lower-bound')
+      notes.push(
+        index.entity.issuanceObserved
+          ? 'index-date-disagrees-with-chain'
+          : datesFromBelow(index.entity)
+            ? 'index-date-precedes-issuance'
+            : 'index-date-is-lower-bound',
+      )
     }
     return {
       held: true,
@@ -264,10 +321,23 @@ export function reconcileIndexAndChain(input: {
   }
 
   if (index.entity && !index.entity.issuanceObserved) {
-    // The entity exists because something else touched it (a vouch, a trust edge), and that
-    // event happened after issuance. Using its timestamp understates the credential's age,
-    // which on a survival ramp understates its weight — wrong, but wrong in the subject's
-    // disfavour rather than the adversary's, so we keep it and flag it.
+    if (datesFromBelow(index.entity)) {
+      // The side-event provably precedes issuance, so its timestamp would make the credential
+      // look *older* than it is — the direction that pays an adversary on a survival ramp. It
+      // bounds issuance from below instead, which caps ramp weight exactly as an absence bound
+      // does. This is the whole reason the index reports which events it actually saw.
+      notes.push('index-date-precedes-issuance')
+      return {
+        held: true,
+        issuedAfter: index.entity.issuedAt,
+        provenance: { heldFrom: 'chain', dateFrom: 'index-side-event-bound', ...base, notes },
+      }
+    }
+    // The entity exists because something else touched it (a trust edge on an avatar registered
+    // before the indexed range), and that event cannot precede issuance. Using its timestamp
+    // understates the credential's age, which on a survival ramp understates its weight —
+    // wrong, but wrong in the subject's disfavour rather than the adversary's, so we keep it
+    // and flag it.
     notes.push('index-date-is-lower-bound')
     return {
       held: true,

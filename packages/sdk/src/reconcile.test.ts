@@ -95,16 +95,96 @@ describe('reconciling an index against a chain head', () => {
     assert.ok(r.provenance.notes.includes('index-outside-coverage'))
   })
 
-  test('a date the index inferred from a side-event is flagged as a lower bound on age', () => {
+  test('a side-event that cannot precede issuance is flagged as a lower bound on age', () => {
     const r = reconcileIndexAndChain({
       chain: chain(),
       index: syncedIndex({
         completeHistory: false,
-        entity: { issuedAt: NOW - 30 * DAY, issuanceObserved: false, ended: false },
+        entity: {
+          issuedAt: NOW - 30 * DAY,
+          issuanceObserved: false,
+          sideEventOrder: 'after-issuance',
+          ended: false,
+        },
       }),
     })
     assert.equal(r.issuedAt, NOW - 30 * DAY, 'kept: it understates age, so it cannot inflate')
     assert.ok(r.provenance.notes.includes('index-date-is-lower-bound'))
+  })
+
+  test('a side-event that precedes issuance bounds the age instead of dating the credential', () => {
+    // A PoH vouch is cast on a request that has not resolved, so its timestamp sits *below* the
+    // claim. Using it as the date would credit the subject with age they have not accrued.
+    const r = reconcileIndexAndChain({
+      chain: chain(),
+      index: syncedIndex({
+        entity: {
+          issuedAt: NOW - 900 * DAY,
+          issuanceObserved: false,
+          sideEventOrder: 'before-issuance',
+          ended: false,
+        },
+      }),
+    })
+    assert.equal(r.held, true)
+    assert.equal(r.issuedAt, undefined, 'the index cannot date this credential')
+    assert.equal(r.issuedAfter, NOW - 900 * DAY, 'it bounds it: issuance came after the vouch')
+    assert.equal(r.provenance.dateFrom, 'index-side-event-bound')
+    assert.ok(r.provenance.notes.includes('index-date-precedes-issuance'))
+  })
+
+  test('an unplaced side-event date takes the reading that cannot inflate a score', () => {
+    // No sideEventOrder means nobody established the direction. The default is the safe one, and
+    // it is the reverse of the old behaviour, which assumed every side-event followed issuance.
+    const r = reconcileIndexAndChain({
+      chain: chain(),
+      index: syncedIndex({
+        entity: { issuedAt: NOW - 900 * DAY, issuanceObserved: false, ended: false },
+      }),
+    })
+    assert.equal(r.issuedAt, undefined)
+    assert.equal(r.issuedAfter, NOW - 900 * DAY)
+    assert.ok(r.provenance.notes.includes('index-date-precedes-issuance'))
+  })
+
+  test('a vouch-dated entity contradicting a chain date is named for what it is', () => {
+    // PoH is dated from the contract, so the index is only a cross-check here — but a
+    // disagreement caused by a vouch timestamp is not a fault in our indexing, and calling it
+    // one would send whoever reads the caveat looking for a bug that is not there.
+    const r = reconcileIndexAndChain({
+      chain: chain({ issuedAt: NOW - 100 * DAY }),
+      index: syncedIndex({
+        entity: {
+          issuedAt: NOW - 900 * DAY,
+          issuanceObserved: false,
+          sideEventOrder: 'before-issuance',
+          ended: false,
+        },
+      }),
+    })
+    assert.equal(r.issuedAt, NOW - 100 * DAY, 'the contract dates it and needs no index')
+    assert.equal(r.provenance.dateFrom, 'chain')
+    assert.ok(r.provenance.notes.includes('index-date-precedes-issuance'))
+    assert.ok(!r.provenance.notes.includes('index-date-disagrees-with-chain'))
+  })
+
+  test('with the chain unreachable, a vouch-dated entity still only bounds the age', () => {
+    const r = reconcileIndexAndChain({
+      chain: { held: false, unavailable: true },
+      index: syncedIndex({
+        entity: {
+          issuedAt: NOW - 900 * DAY,
+          issuanceObserved: false,
+          sideEventOrder: 'before-issuance',
+          ended: false,
+        },
+      }),
+    })
+    assert.equal(r.held, true, 'the index is all we have, and it has the credential')
+    assert.equal(r.issuedAt, undefined)
+    assert.equal(r.issuedAfter, NOW - 900 * DAY)
+    assert.ok(r.provenance.notes.includes('freshness-check-unavailable'))
+    assert.ok(r.provenance.notes.includes('index-date-precedes-issuance'))
   })
 
   test('gone at head but live in the index: the chain wins and the divergence is reported', () => {
@@ -290,12 +370,44 @@ describe('subgraph lag can no longer move a score in silence', () => {
       chain: chain(),
       index: syncedIndex({
         completeHistory: false,
-        entity: { issuedAt: NOW - 30 * DAY, issuanceObserved: false, ended: false },
+        entity: {
+          issuedAt: NOW - 30 * DAY,
+          issuanceObserved: false,
+          sideEventOrder: 'after-issuance',
+          ended: false,
+        },
       }),
     })
     const result = scoreOf(evidenceFor(r))
     const expected = 1 - 2 ** (-30 / 365)
     assert.ok(Math.abs(result.evidence[0]!.freshness - expected) < 1e-9)
     assert.ok(result.caveats.some((c) => c.code === 'issuance-date-lower-bound'))
+  })
+
+  test('a side-event below issuance cannot buy more than the unknown-age midpoint', () => {
+    // This is the size of the fix. A vouch three years old, read as the issuance date, prices a
+    // 365-day-half-life ramp at 0.875 — a credential that may have been claimed yesterday. Read
+    // as the bound it is, the same evidence is capped at the 0.5 an undated credential gets, and
+    // the result says the date is a bound rather than reporting one it does not have.
+    const asDate = freshnessOf(pohLike, NOW - 3 * 365 * DAY, NOW)
+    const r = reconcileIndexAndChain({
+      chain: chain(),
+      index: syncedIndex({
+        entity: {
+          issuedAt: NOW - 3 * 365 * DAY,
+          issuanceObserved: false,
+          sideEventOrder: 'before-issuance',
+          ended: false,
+        },
+      }),
+    })
+    const result = scoreOf(evidenceFor(r))
+    assert.ok(Math.abs(asDate - 0.875) < 1e-9, `the old reading was ${asDate}`)
+    assert.equal(result.evidence[0]!.freshness, 0.5, 'capped at the unknown-age midpoint')
+    assert.ok(result.caveats.some((c) => c.code === 'index-date-precedes-issuance'))
+    assert.ok(
+      !result.caveats.some((c) => c.code === 'issuance-date-unknown'),
+      'the age is bounded, not unknown — claiming otherwise would be false',
+    )
   })
 })
