@@ -413,4 +413,227 @@ describe('index and chain, reconciled against live data', () => {
     assert.equal(r.issuedAfter, Number(subject.claimedAt))
     assert.ok(r.provenance.notes.includes('index-date-precedes-issuance'))
   })
+
+  // ------------------------------------------- the humanity the subject has since lost
+  //
+  // PoH v2 never deletes an expired humanity, so the end of a credential it stopped honouring
+  // is still in current state — which is the only reason an as-of score can see one. The index
+  // is used here to *find* lapsed subjects and never to assert anything about them: every
+  // claim below is checked against the contract, its own storage, and its own event log.
+
+  const POH_V2 = '0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc'
+
+  /** Humanities the index knows about, oldest claim first — the cohort most likely to have lapsed. */
+  async function indexedHumanities(t: { skip: (m: string) => void }, first = 60) {
+    const res = await fetch(SUBGRAPH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        query: `{ pohHumans(first: ${first}, orderBy: claimedAt, orderDirection: asc) { id humanityId claimedAt } }`,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    })
+    const body = (await res.json()) as {
+      data?: { pohHumans: { id: string; humanityId: string; claimedAt: string }[] }
+      errors?: { message: string }[]
+    }
+    if (body.errors?.length || !body.data?.pohHumans.length) {
+      t.skip(`the index could not list humanities: ${body.errors?.[0]?.message ?? 'no data'}`)
+      return undefined
+    }
+    return body.data.pohHumans
+  }
+
+  /**
+   * The registry's own view of a humanity, read through viem against a fresh client rather
+   * than through the adapter — the adapter is the thing under test.
+   */
+  const POH_V2_READ_ABI = [
+    'function getHumanityInfo(bytes20) view returns (bool vouching, bool pendingRevocation, uint48 nbPendingRequests, uint40 expirationTime, address owner, uint256 nbRequests)',
+    'function humanityOf(address) view returns (bytes20)',
+    'function humanityLifespan() view returns (uint40)',
+  ] as const
+
+  async function pohV2Client() {
+    const { createPublicClient, http, parseAbi } = await import('viem')
+    const { gnosis } = await import('viem/chains')
+    const client = createPublicClient({ chain: gnosis, transport: http('https://rpc.gnosischain.com') })
+    const abi = parseAbi(POH_V2_READ_ABI)
+    return {
+      humanityInfo: async (humanityId: string) => {
+        const i = await client.readContract({
+          address: POH_V2,
+          abi,
+          functionName: 'getHumanityInfo',
+          args: [humanityId as `0x${string}`],
+        })
+        return { expirationTime: Number(i[3]), owner: i[4] as string, nbRequests: Number(i[5]) }
+      },
+      humanityOf: (account: string) =>
+        client.readContract({ address: POH_V2, abi, functionName: 'humanityOf', args: [account as `0x${string}`] }),
+      lifespan: () =>
+        client.readContract({ address: POH_V2, abi, functionName: 'humanityLifespan' }).then(Number),
+    }
+  }
+
+  test('a humanity that expired is a closed window, and the claim log is its start', async (t) => {
+    // The mechanism, not a magic number: the probe reads state only, and the assertion holds
+    // that state against a completely different subsystem of the node — the event log the
+    // protocol emitted when it accepted the claim. If `expirationTime - humanityLifespan()` is
+    // the claim second, the log for that humanity is in a block with exactly that timestamp.
+    const humanities = await indexedHumanities(t)
+    if (!humanities) return
+
+    const probe = pohAdapter()
+    let found: { subject: Address; evidence: Awaited<ReturnType<typeof probe.probe>> } | undefined
+    for (const h of humanities) {
+      const evidence = await probe.probe(h.id as Address)
+      if (evidence.heldUntil !== undefined && evidence.issuedAt !== undefined) {
+        found = { subject: h.id as Address, evidence }
+        break
+      }
+    }
+    if (!found) {
+      t.skip('no lapsed humanity with a locally resolved claim in the sampled cohort')
+      return
+    }
+    const { subject, evidence } = found
+
+    assert.equal(evidence.held, false, 'a lapsed humanity is not held today, whatever else is true')
+    assert.equal(evidence.error, undefined)
+    assert.ok(evidence.provenance?.notes.includes('date-from-lapsed-verification'))
+
+    // 1. the end is the number the contract still holds, and the contract still says it is theirs
+    const poh = await pohV2Client()
+    const humanityId = String(evidence.detail!.lapsedHumanityId)
+    const info = await poh.humanityInfo(humanityId)
+    assert.equal(info.owner.toLowerCase(), subject.toLowerCase(), 'the record is still attributable')
+    assert.equal(info.expirationTime, evidence.heldUntil)
+    assert.ok(info.nbRequests >= 1, 'this contract resolved the request that wrote the expiry')
+    assert.equal(
+      (await poh.humanityOf(subject)).toLowerCase(),
+      '0x0000000000000000000000000000000000000000',
+      'and the contract itself will no longer name the humanity — which is why storage is read',
+    )
+
+    // 2. the start is that end minus the term the contract publishes
+    const lifespan = await poh.lifespan()
+    assert.equal(lifespan, 31_557_600, 'humanityLifespan is the year the derivation assumes')
+    assert.equal(evidence.issuedAt, evidence.heldUntil! - lifespan)
+
+    // 3. and that second is the block the chain accepted the claim in — the probe never looked
+    const claims: { blockNumber: string; data: string }[] = await gnosisRpc('eth_getLogs', [
+      { address: POH_V2, topics: [HUMANITY_CLAIMED_TOPIC], fromBlock: hexBlock(35_846_827), toBlock: 'latest' },
+    ])
+    const mine = claims.filter((l) => `0x${l.data.slice(2, 42)}` === humanityId.toLowerCase())
+    assert.ok(mine.length >= 1, `the registry logged no claim for ${humanityId}`)
+    const latest = mine.reduce((a, b) => (parseInt(a.blockNumber, 16) > parseInt(b.blockNumber, 16) ? a : b))
+    const claimBlock = await gnosisRpc('eth_getBlockByNumber', [latest.blockNumber, false])
+    assert.equal(
+      parseInt(claimBlock.timestamp, 16),
+      evidence.issuedAt,
+      'the derived start is the second the claim was mined in',
+    )
+
+    // 4. an instant inside the window is a credential; one second after it is not
+    const { applyAsOfToEvidence } = await import('./as-of.ts')
+    const { adapters } = await new Corroborate({ knownIds, knownRoots }).ontology()
+    const asEvidence = [
+      {
+        adapterId: 'poh-v2',
+        adapterName: 'Proof of Humanity v2',
+        evidenceClass: 'Uniqueness' as const,
+        trustRoot: 'social-vouching:poh',
+        observedOn: subject,
+        forgeCostCents: 0,
+        rentCostCents: 0,
+        live: true,
+        sourceURI: '',
+        held: false,
+        issuedAt: evidence.issuedAt,
+        heldUntil: evidence.heldUntil,
+        freshness: 0.5,
+        effectiveCostCents: 0,
+      },
+    ]
+    const midpoint = Math.floor((evidence.issuedAt! + evidence.heldUntil!) / 2)
+    const inside = applyAsOfToEvidence(asEvidence, midpoint, adapters)
+    assert.equal(inside.evidence[0]!.held, true, 'held at an instant inside its own window')
+    assert.deepEqual(inside.ceasedAfterAsOf, ['poh-v2'])
+    assert.ok(inside.evidence[0]!.effectiveCostCents > 0, 'and priced at what it was worth then')
+
+    const after = applyAsOfToEvidence(asEvidence, evidence.heldUntil!, adapters)
+    assert.equal(after.evidence[0]!.held, false, 'and gone at the instant it expired')
+  })
+
+  test('the account mapping is where a humanity survives its own expiry', async (t) => {
+    // `humanityOf` applies the expiry check, so it returns zero for exactly the subjects this
+    // feature is about. The link that survives is the private `accountHumanity` mapping, and the
+    // slot it lives in is re-derived here every run rather than trusted: for a subject the
+    // contract still answers for, the storage word must equal what `humanityOf` returns.
+    const humanities = await indexedHumanities(t, 40)
+    if (!humanities) return
+    const { keccak256, encodeAbiParameters, pad } = await import('viem')
+    const { POH_V2_ACCOUNT_HUMANITY_SLOT } = await import('./adapters/index.ts')
+    const slotOf = (account: string) =>
+      keccak256(
+        encodeAbiParameters(
+          [{ type: 'bytes32' }, { type: 'uint256' }],
+          [pad(account as `0x${string}`, { size: 32 }), POH_V2_ACCOUNT_HUMANITY_SLOT],
+        ),
+      )
+    const poh = await pohV2Client()
+    const humanityOf = (account: string) => poh.humanityOf(account).then((id) => id.toLowerCase())
+    const stored = async (account: string) => {
+      const raw: string = await gnosisRpc('eth_getStorageAt', [POH_V2, slotOf(account), 'latest'])
+      return `0x${raw.slice(26)}`
+    }
+
+    let checkedLive = 0
+    let checkedLapsed = 0
+    for (const h of humanities) {
+      const live = await humanityOf(h.id)
+      const slot = await stored(h.id)
+      if (live !== '0x0000000000000000000000000000000000000000') {
+        assert.equal(slot, live, `${h.id}: the account mapping must agree with humanityOf`)
+        checkedLive++
+      } else if (slot !== '0x0000000000000000000000000000000000000000') {
+        // Exactly the case the feature exists for: the contract has stopped answering, and the
+        // link back to the humanity is still sitting in storage.
+        const info = await poh.humanityInfo(slot)
+        if (info.owner.toLowerCase() === h.id.toLowerCase()) checkedLapsed++
+      }
+      if (checkedLive >= 3 && checkedLapsed >= 1) break
+    }
+    assert.ok(checkedLive >= 1, 'no live humanity in the sample to derive the slot against')
+    assert.ok(
+      checkedLapsed >= 1,
+      'no lapsed humanity whose account mapping outlived it — the premise of the read',
+    )
+
+    // And an address that never claimed has nothing in the slot, so absence stays absence.
+    assert.equal(await stored(UNREGISTERED), '0x0000000000000000000000000000000000000000')
+    const dead = await pohAdapter().probe(UNREGISTERED)
+    assert.equal(dead.heldUntil, undefined, 'an ordinary negative is never handed a window')
+  })
+
+  test('a humanity whose owner was cleared is not restored, because nothing dates that end', async (t) => {
+    // Revocation and cross-chain transfer both `delete humanity.owner` and leave no timestamp.
+    // The subject may have lost the credential years before its expiry, so the expiry is not
+    // the end of anything we can prove — and the probe reports no window at all.
+    const humanities = await indexedHumanities(t, 60)
+    if (!humanities) return
+    const poh = await pohV2Client()
+    let checked = 0
+    for (const h of humanities) {
+      const info = await poh.humanityInfo(h.humanityId)
+      if (info.owner !== '0x0000000000000000000000000000000000000000') continue
+      const evidence = await pohAdapter().probe(h.id as Address)
+      assert.equal(evidence.held, false)
+      assert.equal(evidence.heldUntil, undefined, `${h.id}: an undated ending must not close a window`)
+      checked++
+      if (checked >= 2) break
+    }
+    if (checked === 0) t.skip('no owner-cleared humanity in the sampled cohort')
+  })
 })

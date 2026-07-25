@@ -410,10 +410,14 @@ answering. And it says what it cannot see — credentials are read at chain head
 it can make it makes exactly, and it names the residue.
 
 Both corrections come from dates the protocol already stores. One dated *after* the as-of instant
-did not exist then and is dropped. And one the chain dates the *end* of — an EAS revocation, an
-expiry, a World verification term that ran out — was held for the whole window between its
-issuance and that end, so if the instant falls inside it the credential is **restored and priced
-at what it was worth then**, and the result says so in `ceasedAfterAsOf`. That matters more than
+did not exist then and is dropped. And one the chain dates the *end* of — an EAS revocation, a
+World verification term that ran out, a Proof of Humanity registration or humanity whose term
+expired — was held for the whole window between its issuance and that end, so if the instant falls
+inside it the credential is **restored and priced at what it was worth then**, and the result says
+so in `ceasedAfterAsOf`. Four registries produce those windows, and each does so for the same
+reason: none of them deletes the ending. EAS attestations are immutable, `WorldIDAddressBook`
+keeps a lapsed `addressVerifiedUntil` forever, PoH v1 never clears `submission.registered` when a
+term runs out, and PoH v2 leaves `owner` and `expirationTime` on an expired humanity. That matters more than
 it sounds: 5,143 of the Coinbase attestations in our sampled windows are revoked, and every one of
 them used to make a historical score quietly lower than the subject's real position. Restoring
 requires an *exact* issuance date, never a lower bound — a bound shows a credential could have

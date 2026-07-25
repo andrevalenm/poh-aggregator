@@ -67,10 +67,82 @@ describe('Proof of Humanity v1', () => {
     const submissionTime = NOW - TERM - 86_400
     const r = read({ isRegistered: false, registeredFlag: true, submissionTime, index: 4_012, numberOfRequests: 2 })
     assert.equal(r.held, false)
-    assert.equal(r.issuedAt, undefined, 'a dead credential is not dated as if it were alive')
     assert.equal(r.detail?.registeredFlagOutlivedTerm, true)
     assert.equal(r.detail?.lapsedDaysAgo, 1)
     assert.equal(r.detail?.expiresAt, submissionTime + TERM)
+  })
+
+  test('the flag that outlived the term also dates the term, so the window closes', () => {
+    // The same read as above, from the other side: `registered && !isRegistered` says the
+    // credential ended by arithmetic and nothing else, so both ends of it are still in the
+    // registry. `held` stays false — nothing here weighs a dead credential — and the window is
+    // what lets an as-of score decide an instant inside it.
+    const submissionTime = NOW - TERM - 86_400
+    const r = read({ isRegistered: false, registeredFlag: true, submissionTime, index: 4_012, numberOfRequests: 1 })
+    assert.equal(r.held, false)
+    assert.equal(r.issuedAt, submissionTime)
+    assert.equal(r.heldUntil, submissionTime + TERM)
+    assert.ok(r.provenance?.notes.includes('date-from-lapsed-verification'))
+    assert.equal(r.provenance?.dateFrom, 'chain')
+    assert.equal(r.detail?.source, undefined, 'a closed window is not a source of evidence today')
+  })
+
+  test('a window whose latest term is a renewal says so, because earlier terms are invisible', () => {
+    const submissionTime = NOW - TERM - 10
+    const r = read({ isRegistered: false, registeredFlag: true, submissionTime, numberOfRequests: 3 })
+    assert.equal(r.heldUntil, submissionTime + TERM)
+    assert.ok(r.provenance?.notes.includes('date-from-latest-reattestation'))
+  })
+
+  test('a registration the ForkModule retired gets no window: that end is undated', () => {
+    // v2's overlay is a bare boolean. The credential may have died the day v2 retired it, long
+    // before its v1 term ran out, and nothing on chain says which day that was — so restoring a
+    // window from the term would hand back time the subject may not have had.
+    const submissionTime = NOW - TERM - 86_400
+    const r = read({
+      isRegistered: false,
+      registeredFlag: true,
+      submissionTime,
+      numberOfRequests: 1,
+      forkRemoved: true,
+    })
+    assert.equal(r.held, false)
+    assert.equal(r.heldUntil, undefined)
+    assert.equal(r.issuedAt, undefined)
+    assert.equal(r.detail?.endUndated, 'retired by PoH v2, which records the removal without a timestamp')
+  })
+
+  test('a cleared registration flag gets no window either', () => {
+    // `registered == false` with a submission time behind it is a governor removal or a lost
+    // revocation request. Both end the credential at an instant the contract does not keep.
+    const submissionTime = NOW - TERM - 86_400
+    const r = read({ isRegistered: false, registeredFlag: false, submissionTime, numberOfRequests: 1 })
+    assert.equal(r.heldUntil, undefined)
+    assert.equal(r.issuedAt, undefined)
+  })
+
+  test('an address that never submitted is never handed a window', () => {
+    // The safety property the whole mechanism rests on: an ordinary absence and a failed read
+    // reach the same branch as a lapsed credential, and only the one carrying a real end date
+    // comes back. There is nothing here to bring back.
+    assert.equal(read({}).heldUntil, undefined)
+    assert.equal(read({ submissionDuration: undefined }).heldUntil, undefined)
+  })
+
+  test('a window that has not closed yet is not a window', () => {
+    // `isRegistered` false with a term still running means the contract disagrees with our
+    // arithmetic — a duration change, or a struct we have misread. Reporting an end in the
+    // future would be a claim about a credential that is not over.
+    const submissionTime = NOW - 10
+    const r = read({ isRegistered: false, registeredFlag: true, submissionTime, numberOfRequests: 1 })
+    assert.equal(r.heldUntil, undefined)
+  })
+
+  test('a live registration reports no ending at all', () => {
+    const submissionTime = NOW - 100 * 86_400
+    const r = read({ isRegistered: true, registeredFlag: true, submissionTime, numberOfRequests: 1 })
+    assert.equal(r.held, true)
+    assert.equal(r.heldUntil, undefined, 'a credential that is held has not ended')
   })
 
   test('held follows the contract’s own comparison, not our arithmetic', () => {

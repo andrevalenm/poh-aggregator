@@ -352,10 +352,23 @@ credential 100 days old then is scored at 100 days.
 
 **Credential state is not reconstructed**, and the result says so every time. Probes read their
 own chains at head; there is no cross-chain archive path that would let ten adapters answer as of
-a Sepolia block. What *is* fixed exactly is the direction that would favour an adversary: a
-credential dated after the as-of instant did not exist then and is excluded. What remains is a
-credential held then and revoked since, which we cannot see — so an as-of score can understate the
-subject and never the adversary. Undated credentials are the third case: they are counted, because
+a Sepolia block. Two corrections are nonetheless exact, and they come from dates the protocols
+already store. A credential dated *after* the as-of instant did not exist then and is excluded —
+the direction that would otherwise favour an adversary. And a credential the chain dates the *end*
+of was held for the whole window between its issuance and that end, so an instant inside the window
+**restores** it, priced at what it was worth then (`asOf.ceasedAfterAsOf`).
+
+Four registries produce such a window, and all four for one reason: **none of them deletes the
+ending.** EAS attestations are immutable and keep `revocationTime` and `expirationTime`;
+`WorldIDAddressBook` keeps a lapsed `addressVerifiedUntil` forever; PoH v1 never clears
+`submission.registered` when a term runs out; PoH v2 leaves `owner` and `expirationTime` on an
+expired humanity. A protocol that erases the ending instead — Circles' undated `stopped()`, PoH
+v2's `delete humanity.owner` on revocation, PoH v1's ForkModule boolean — produces no window, and
+those credentials stay invisible rather than being restored from an ending nobody can date.
+Restoring also requires an *exact* issuance date: `issuedAfter` is a lower bound and shows only
+that a credential could have existed at an instant, so those go to `asOf.ceasedStartUndated` and
+are left out. The residual therefore still runs one way — it understates the subject, never the
+adversary. Undated credentials are the third case: they are counted, because
 dropping them would penalise a subject for a field their protocol does not store, and they are
 listed in `asOf.existenceUnverified` so that part of the score is legibly a statement about today.
 
@@ -388,5 +401,5 @@ evaluated twelve hours earlier.
 - It does not compute confidence intervals, and it should. Every weight is a point estimate
   with no stated error.
 - It does not reconstruct credential *state* at a past block, only the ontology. `asOf` scores
-  the past against credentials read at head, minus the ones provably issued since. See above for
-  which direction the residual error runs in.
+  the past against credentials read at head — minus the ones provably issued since, plus the ones
+  whose ending the chain dates. See above for which direction the residual error runs in.

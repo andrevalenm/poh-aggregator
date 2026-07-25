@@ -27,9 +27,10 @@
  *    Sepolia block. Two corrections are nonetheless exact, and they run in opposite directions.
  *
  *    A dated credential issued *after* the as-of instant certainly did not exist then, and is
- *    dropped. And a credential the chain dates the *end* of — an EAS revocation, an expiry, a
- *    World verification term that ran out — was certainly held at any instant between its
- *    issuance and that end, so it is restored. Both are proofs from numbers the protocol
+ *    dropped. And a credential the chain dates the *end* of — an EAS revocation, a World
+ *    verification term that ran out, a Proof of Humanity registration or humanity whose term
+ *    expired — was certainly held at any instant between its issuance and that end, so it is
+ *    restored. Both are proofs from numbers the protocol
  *    stores, not inferences from absence, which is why `heldUntil` is only ever set by a probe
  *    that read the end date rather than one that failed to find a credential.
  *

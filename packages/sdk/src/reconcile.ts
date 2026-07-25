@@ -118,8 +118,21 @@ export type ProvenanceNote =
    * the date is the start of a *closed window* — `heldUntil` is its other end. It dates nothing
    * about today, and exists so an as-of score can decide whether an instant falls inside a
    * credential the subject has since lost. Nothing at head weighs it: the credential is absent.
+   *
+   * Three registries produce it, and every one of them is a registry that declines to delete:
+   * `WorldIDAddressBook` keeps a lapsed `addressVerifiedUntil` forever, PoH v1 never clears
+   * `submission.registered` when a term runs out, and PoH v2 leaves `owner` and `expirationTime`
+   * on an expired humanity. A protocol that erases the ending instead cannot produce this note,
+   * and its credentials stay invisible to an as-of score — which is the honest outcome, not a
+   * gap to paper over.
    */
   | 'date-from-lapsed-verification'
+  /**
+   * The credential has a dated ending and no usable start, so the window cannot be closed and
+   * an as-of score can prove nothing about it. Reported rather than absorbed: a subject whose
+   * evidence is excluded for want of a date should be told which credential and why.
+   */
+  | 'lapsed-credential-start-undated'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {
@@ -181,6 +194,13 @@ export interface ChainView {
    * and needs no indexer. PoH v2 gives this up as `expirationTime - humanityLifespan`.
    */
   issuedAt?: number
+  /**
+   * The instant the contract says this credential stopped counting, for a credential it says is
+   * *not* held now — a term that ran out, an expiry that passed. Only ever a number the protocol
+   * stores; never inferred from absence. Together with `issuedAt` it closes a window an as-of
+   * score can decide membership of, which is the only thing that reads it.
+   */
+  heldUntil?: number
   block?: number
   /** Set when the contract read itself failed. */
   unavailable?: boolean
@@ -189,6 +209,8 @@ export interface ChainView {
 export interface Reconciled {
   held: boolean
   issuedAt?: number
+  /** See `ChainView.heldUntil`. Passed through untouched: nothing here infers an ending. */
+  heldUntil?: number
   /**
    * Lower bound on issuance: the credential provably did not exist at this time. Set only
    * when the exact date is unknown. Scoring uses it as an upper bound on age, which on a
@@ -277,10 +299,37 @@ export function reconcileIndexAndChain(input: {
   }
 
   // ---- no index answered: contract only, exactly as before, and it says so.
+  if (!index) notes.push('index-unavailable')
+
+  // ---- the credential is gone at head. The index, if it answered, may not know that yet.
+  if (!chain.held) {
+    if (index?.entity && !index.entity.ended) notes.push('credential-ceased-since-index')
+    // A protocol that keeps the ending of a credential it no longer honours hands us a closed
+    // window. It changes nothing today — `held` stays false and nothing at head weighs it —
+    // and it is the only way an as-of score can see a credential the subject has since lost.
+    if (chain.heldUntil !== undefined) {
+      if (chain.issuedAt === undefined) {
+        notes.push('lapsed-credential-start-undated')
+        return {
+          held: false,
+          heldUntil: chain.heldUntil,
+          provenance: { heldFrom: 'chain', dateFrom: 'none', ...base, notes },
+        }
+      }
+      notes.push('date-from-lapsed-verification')
+      return {
+        held: false,
+        issuedAt: chain.issuedAt,
+        heldUntil: chain.heldUntil,
+        provenance: { heldFrom: 'chain', dateFrom: 'chain', ...base, notes },
+      }
+    }
+    return { held: false, provenance: { heldFrom: 'chain', dateFrom: 'none', ...base, notes } }
+  }
+
   if (!index) {
-    notes.push('index-unavailable')
     return {
-      held: chain.held,
+      held: true,
       ...(chain.issuedAt !== undefined ? { issuedAt: chain.issuedAt } : {}),
       provenance: {
         heldFrom: 'chain',
@@ -289,12 +338,6 @@ export function reconcileIndexAndChain(input: {
         notes,
       },
     }
-  }
-
-  // ---- the credential is gone at head but the index still lists it as live.
-  if (!chain.held) {
-    if (index.entity && !index.entity.ended) notes.push('credential-ceased-since-index')
-    return { held: false, provenance: { heldFrom: 'chain', dateFrom: 'none', ...base, notes } }
   }
 
   // ---- held at head. Date it as precisely as the evidence allows.

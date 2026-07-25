@@ -1,4 +1,4 @@
-import { createPublicClient, http, type PublicClient } from 'viem'
+import { createPublicClient, encodeAbiParameters, http, keccak256, pad, type PublicClient } from 'viem'
 import { gnosis, worldchain } from 'viem/chains'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
 import { circlesIndexRead, pohIndexRead } from '../subgraph.ts'
@@ -152,6 +152,121 @@ const POH_ABI = [
 ] as const
 
 /**
+ * Timestamp of the Gnosis block the PoH v2 proxy's code first appears at (35,846,827,
+ * 2024-09-05T14:58:40Z — measured in iteration 1 by bisecting `eth_getCode`). A claim this
+ * contract resolved itself cannot predate it, so it is the floor a derived claim date has to
+ * clear. Note it lands 161 seconds after `POH_V1_FORK_TIME`, which is the same deployment.
+ */
+export const POH_V2_DEPLOYED_AT = 1_725_548_320
+
+/**
+ * Storage slot index of `mapping(address => bytes20) private accountHumanity` in the PoH v2
+ * implementation, so the account → humanity link can be read for an account the contract has
+ * stopped answering for.
+ *
+ * `private` is a Solidity concept and not a chain one: the mapping is at
+ * `keccak256(pad32(account) ++ pad32(62))` like any other, and `eth_getStorageAt` is as
+ * permissionless as `eth_call`. The slot was not taken from a storage layout somebody
+ * published — it was found by scanning slots 0..119 for a live subject and matching the value
+ * against what `humanityOf` returns, and the live suite re-derives it every run.
+ *
+ * Reading the wrong slot cannot produce a wrong answer, only a missing one: whatever id comes
+ * back is used solely to look up `getHumanityInfo`, and nothing is reported unless that
+ * record's `owner` **is the subject**. A layout change after a proxy upgrade therefore costs us
+ * the lapsed window and can never invent one.
+ */
+export const POH_V2_ACCOUNT_HUMANITY_SLOT = 62n
+
+/** `bytes20(0)` — what the account mapping holds for an address that has never claimed. */
+const ZERO_HUMANITY_ID = '0x0000000000000000000000000000000000000000' as const
+
+/** One head-pinned read of an account's humanity record, after `isHuman` has said false. */
+export interface LapsedHumanityRead {
+  /** The address asked about. */
+  subject: Address
+  /** `accountHumanity[subject]`, or the conventional id, whichever the record was found under. */
+  humanityId: `0x${string}`
+  /** `getHumanityInfo(humanityId).owner` — zero once a revocation or a transfer clears it. */
+  owner: Address
+  /** `.expirationTime`: the second the humanity stopped being honoured. */
+  expirationTime: number
+  /** `.requests.length`: claims and renewals this contract has resolved for the humanity. */
+  nbRequests: number
+  /** `humanityLifespan()` at the same block. */
+  lifespan: number
+  /** Header timestamp of the block all of it was read at. */
+  now: number
+}
+
+/**
+ * Close the window on a humanity this contract no longer honours — or decline to, and say why.
+ *
+ * PoH v2 does not delete an expired humanity: `owner` and `expirationTime` stay in storage
+ * forever, and only `isHuman`, `boundTo` and `humanityOf` apply the expiry comparison on the way
+ * out. So the end of the credential is a number the chain still holds at head, and no archive
+ * node is involved. What has to be established is the *start*, and two of the three ways this
+ * can fail are real cases measured on the live registry (21 lapsed humanities, 2026-07-25):
+ *
+ * - **`owner` is not the subject.** A revocation (`delete humanity.owner`), a cross-chain
+ *   transfer out (the same `delete`), or somebody else re-claiming the id after it lapsed. In
+ *   every one of those the credential ended at an instant the contract does not date — 196 of
+ *   the 1,569 indexed humanities are in this state — so there is no window and we report none.
+ * - **`nbRequests == 0`.** The humanity was written by `grantHumanityDirectly`, the cross-chain
+ *   path, which copies the expiry from the instance it came from rather than deriving it here.
+ *   `expirationTime - humanityLifespan` is then arithmetic about a claim that happened
+ *   somewhere else, and the measurement says so out loud: across the 21 lapsed humanities the
+ *   derived start equals the index's observed `claimedAt` **to the second in all 19 with a
+ *   locally resolved request, and misses by −215.5 and +144.7 days in exactly the two with
+ *   none**. The +144.7 is the direction that would hand a subject a window they never had, so
+ *   these get `heldUntil` and no start, and `asOf` lists them rather than restoring them.
+ *
+ * `nbRequests >= 1` proves this contract resolved a request for the humanity; it does not prove
+ * the *last* write to `expirationTime` was that resolution, because a humanity transferred out
+ * and back would be granted directly over an existing request history. The residual is bounded
+ * by both instances running the same `humanityLifespan` (31,557,600 s on Gnosis and on mainnet,
+ * read 2026-07-25), which makes the derivation identical either way — and if those two ever
+ * diverge, this is the assumption that breaks.
+ */
+export function closeLapsedHumanityWindow(r: LapsedHumanityRead): {
+  heldUntil?: number
+  issuedAt?: number
+  detail: Record<string, unknown>
+} {
+  const detail: Record<string, unknown> = {}
+  if (r.owner.toLowerCase() !== r.subject.toLowerCase()) {
+    // Nothing about this subject: either they never held the humanity, or whatever ended it
+    // wiped the only link back to them. Both are silence rather than a negative.
+    if (r.owner !== '0x0000000000000000000000000000000000000000' && r.expirationTime > 0) {
+      detail.humanityOwnedByAnother = true
+    }
+    return { detail }
+  }
+  if (r.expirationTime <= 0 || r.expirationTime > r.now) return { detail }
+
+  detail.lapsedHumanityId = r.humanityId
+  detail.expirationTime = r.expirationTime
+  detail.nbRequests = r.nbRequests
+  detail.lapsedDaysAgo = Math.round(((r.now - r.expirationTime) / 86_400) * 10) / 10
+
+  if (r.nbRequests === 0) {
+    detail.grantedWithoutLocalRequest = true
+    return { heldUntil: r.expirationTime, detail }
+  }
+  if (r.lifespan <= 0 || r.expirationTime <= r.lifespan) return { heldUntil: r.expirationTime, detail }
+
+  const claimedAt = r.expirationTime - r.lifespan
+  // A start before this contract existed, or after the block we read, means `humanityLifespan`
+  // is not the term this expiry was written under — a governance change, or a record we have
+  // misread. Better a window we decline to close than one we invent.
+  if (claimedAt < POH_V2_DEPLOYED_AT || claimedAt > r.now) {
+    detail.dateRejected = claimedAt
+    return { heldUntil: r.expirationTime, detail }
+  }
+  detail.claimedAt = claimedAt
+  return { heldUntil: r.expirationTime, issuedAt: claimedAt, detail }
+}
+
+/**
  * Proof of Humanity v2 on Gnosis.
  *
  * Weight this by registration age rather than the boolean. Roughly 1,299 of 1,364 lifetime
@@ -172,18 +287,109 @@ const POH_ABI = [
  * Note `nbRequests > 1` means the humanity was re-claimed or renewed, so the derived date is
  * the latest claim rather than the first registration. It is surfaced in `detail` because on
  * a survival ramp the difference matters.
+ *
+ * A subject the contract answers `false` for gets one more question asked of them: *did you
+ * hold a humanity that has since expired?* The registry never deletes one — `owner` and
+ * `expirationTime` outlive the credential — so both ends of that window are readable at head,
+ * and `closeLapsedHumanityWindow` decides whether they can be trusted to close it. Nothing at
+ * head changes: `held` stays false and the credential weighs nothing. It exists so `asOf` can
+ * answer a question about a Tuesday the subject was still registered on.
  */
 export function pohAdapter(rpcUrl: string = RPC.gnosis, subgraphUrl?: string): AdapterProbe {
   const c = client(gnosis, rpcUrl)
   /** Governance-settable but effectively constant; one read per adapter instance. */
   let lifespan: Promise<number> | undefined
 
+  /**
+   * The subject holds no humanity now. Ask whether they held one that has since expired, and
+   * bring back both ends of it if the contract can date them.
+   *
+   * Two candidate ids, because neither is sufficient alone. `accountHumanity[subject]` from
+   * storage is the general answer and survives expiry, where `humanityOf` returns zero.
+   * `bytes20(subject)` is the convention every claim in the registry has followed so far, and
+   * it is the fallback for the day the storage layout moves under a proxy upgrade. Whichever
+   * answers, the record is only used when its `owner` is the subject — see
+   * `closeLapsedHumanityWindow`.
+   *
+   * Every failure here is swallowed. The subject does not hold this credential either way; an
+   * unreadable *history* must not turn a clean negative into a probe error.
+   */
+  const readLapsedHumanity = async (
+    subject: Address,
+    block: number,
+    now: number,
+  ): Promise<{ heldUntil?: number; issuedAt?: number; detail: Record<string, unknown> }> => {
+    const conventionalId = subject.toLowerCase() as `0x${string}`
+    try {
+      const slot = keccak256(
+        encodeAbiParameters(
+          [{ type: 'bytes32' }, { type: 'uint256' }],
+          [pad(subject, { size: 32 }), POH_V2_ACCOUNT_HUMANITY_SLOT],
+        ),
+      )
+      const [stored, conventional, term] = await Promise.all([
+        c.getStorageAt({ address: CONTRACTS.pohV2, slot, blockNumber: BigInt(block) }).catch(() => undefined),
+        c
+          .readContract({
+            address: CONTRACTS.pohV2,
+            abi: POH_ABI,
+            functionName: 'getHumanityInfo',
+            args: [conventionalId],
+            blockNumber: BigInt(block),
+          })
+          .catch(() => undefined),
+        (lifespan ??= c
+          .readContract({ address: CONTRACTS.pohV2, abi: POH_ABI, functionName: 'humanityLifespan' })
+          .then(Number)),
+      ])
+
+      const storedId =
+        stored && stored.length === 66 ? (`0x${stored.slice(26)}` as `0x${string}`) : undefined
+      const candidates: `0x${string}`[] = []
+      if (storedId && storedId !== ZERO_HUMANITY_ID) candidates.push(storedId)
+      if (!candidates.includes(conventionalId)) candidates.push(conventionalId)
+
+      for (const humanityId of candidates) {
+        const info =
+          humanityId === conventionalId && conventional
+            ? conventional
+            : await c
+                .readContract({
+                  address: CONTRACTS.pohV2,
+                  abi: POH_ABI,
+                  functionName: 'getHumanityInfo',
+                  args: [humanityId],
+                  blockNumber: BigInt(block),
+                })
+                .catch(() => undefined)
+        if (!info) continue
+        const closed = closeLapsedHumanityWindow({
+          subject,
+          humanityId,
+          owner: info[4] as Address,
+          expirationTime: Number(info[3]),
+          nbRequests: Number(info[5]),
+          lifespan: term,
+          now,
+        })
+        if (closed.heldUntil !== undefined) {
+          if (storedId && humanityId === storedId) closed.detail.humanityIdFrom = 'account-mapping'
+          else closed.detail.humanityIdFrom = 'address-convention'
+          return closed
+        }
+      }
+      return { detail: {} }
+    } catch {
+      return { detail: {} }
+    }
+  }
+
   const readChain = async (subject: Address): Promise<ChainView & { detail: Record<string, unknown> }> => {
     const detail: Record<string, unknown> = {}
     let block: number | undefined
     try {
       const [head, held] = await Promise.all([
-        c.getBlockNumber(),
+        c.getBlock(),
         c.readContract({
           address: CONTRACTS.pohV2,
           abi: POH_ABI,
@@ -191,8 +397,18 @@ export function pohAdapter(rpcUrl: string = RPC.gnosis, subgraphUrl?: string): A
           args: [subject],
         }),
       ])
-      block = Number(head)
-      if (!held) return { held: false, block, detail }
+      block = Number(head.number)
+      if (!held) {
+        const lapsed = await readLapsedHumanity(subject, block, Number(head.timestamp))
+        Object.assign(detail, lapsed.detail)
+        return {
+          held: false,
+          block,
+          ...(lapsed.issuedAt !== undefined ? { issuedAt: lapsed.issuedAt } : {}),
+          ...(lapsed.heldUntil !== undefined ? { heldUntil: lapsed.heldUntil } : {}),
+          detail,
+        }
+      }
 
       const humanityId = await c.readContract({
         address: CONTRACTS.pohV2,
@@ -260,6 +476,7 @@ export function pohAdapter(rpcUrl: string = RPC.gnosis, subgraphUrl?: string): A
           held: r.held,
           ...(r.issuedAt !== undefined ? { issuedAt: r.issuedAt } : {}),
           ...(r.issuedAfter !== undefined ? { issuedAfter: r.issuedAfter } : {}),
+          ...(r.heldUntil !== undefined ? { heldUntil: r.heldUntil } : {}),
           provenance: r.provenance,
           ...(r.error ? { error: (detail.chainError as string) ?? r.error } : {}),
           detail: {

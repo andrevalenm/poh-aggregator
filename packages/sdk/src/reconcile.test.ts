@@ -235,6 +235,55 @@ describe('reconciling an index against a chain head', () => {
     assert.ok(r.provenance.notes.includes('freshness-check-unavailable'))
   })
 
+  test('a credential the chain dates the end of comes back as a closed window', () => {
+    // The chain says it is gone; the chain also says when it went. `held` is unmoved — nothing
+    // here weighs a dead credential — and the two dates travel together so an as-of instant
+    // inside them can be decided. `date-from-lapsed-verification` says the date is about a
+    // window and not about today.
+    const r = reconcileIndexAndChain({
+      chain: chain({ held: false, issuedAt: NOW - 400 * DAY, heldUntil: NOW - 35 * DAY }),
+      index: syncedIndex({
+        entity: { issuedAt: NOW - 400 * DAY, issuanceObserved: true, ended: false },
+      }),
+    })
+    assert.equal(r.held, false)
+    assert.equal(r.issuedAt, NOW - 400 * DAY)
+    assert.equal(r.heldUntil, NOW - 35 * DAY)
+    assert.equal(r.provenance.dateFrom, 'chain')
+    assert.ok(r.provenance.notes.includes('date-from-lapsed-verification'))
+    // The index still lists it, which is a different fact and is still reported.
+    assert.ok(r.provenance.notes.includes('credential-ceased-since-index'))
+  })
+
+  test('an ending with no start is named rather than closed over', () => {
+    const r = reconcileIndexAndChain({ chain: chain({ held: false, heldUntil: NOW - 35 * DAY }) })
+    assert.equal(r.heldUntil, NOW - 35 * DAY)
+    assert.equal(r.issuedAt, undefined)
+    assert.equal(r.provenance.dateFrom, 'none')
+    assert.ok(r.provenance.notes.includes('lapsed-credential-start-undated'))
+  })
+
+  test('an ordinary negative is still an ordinary negative', () => {
+    // The safety property: only a probe that read an ending sets one. Absence, silence and a
+    // subject who never held anything all reach this branch and none of them acquires a window.
+    const r = reconcileIndexAndChain({ chain: chain({ held: false }), index: syncedIndex() })
+    assert.equal(r.held, false)
+    assert.equal(r.heldUntil, undefined)
+    assert.equal(r.issuedAt, undefined)
+  })
+
+  test('a failed chain read never produces a window, however the index answered', () => {
+    // `heldUntil` is a statement the chain makes. When the chain did not answer there is no
+    // such statement, and the index's own `ended` flag is not one — it carries no date.
+    const r = reconcileIndexAndChain({
+      chain: { held: false, unavailable: true, heldUntil: NOW - 35 * DAY },
+      index: syncedIndex({
+        entity: { issuedAt: NOW - 400 * DAY, issuanceObserved: true, ended: true },
+      }),
+    })
+    assert.equal(r.heldUntil, undefined)
+  })
+
   test('both sources failing is an error, never a negative', () => {
     const noIndex = reconcileIndexAndChain({ chain: { held: false, unavailable: true } })
     assert.equal(noIndex.held, false)
