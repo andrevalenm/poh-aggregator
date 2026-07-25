@@ -506,7 +506,11 @@ No weight, root, curve or cost moved, so no registry write. New write-up:
 `research/protocols/protocol-subgraph-coverage.md`. **One thing worth knowing operationally:**
 Studio's `/version/latest` tracks the latest *synced* version, not the newest deployed one — so
 deploying a resync does not repoint consumers at a half-indexed subgraph, and the flip happens by
-itself when it catches up.
+itself when it catches up. **v0.0.3 was still syncing when I stopped** (40.2M of 47.4M, hours to
+go at the rate through the dense region), so until it lands the hosted demo and the default
+endpoint keep the old flagged behaviour for those two avatars; the numbers above were measured
+against both deployments, not predicted. Nothing to do — but if `version/latest` has *not* flipped
+by the time you read this, pin `SUBGRAPH_URL` to `v0.0.3`.
 
 ---
 
@@ -517,7 +521,7 @@ itself when it catches up.
 | `PersonhoodRegistry` v2 | Sepolia `0x977b028b900cce8ee89c46877e814eff3060aa07` | 18 forge tests; age curves + plaintext event ids with on-chain integrity check |
 | Ontology | 30 adapters, 18 trust roots, per-adapter age curves | `ontology/adapters.json`, every entry cites `research/` |
 | SDK | builds, publishes clean types | 142 unit + 86 live tests; 10 adapters with live probes |
-| Subgraph | Studio, syncing, serving | `api.studio.thegraph.com/query/77602/poh/version/latest` — feeds claimedAt into the ramp weights |
+| Subgraph | Studio; v0.0.2 serving at head, v0.0.3 (full Circles history + self-reported coverage) syncing | `api.studio.thegraph.com/query/77602/poh/version/latest` — feeds claimedAt and registeredAt into the ramp weights, and now states its own lower edge |
 | MCP server | verified over stdio | 3 tools; agents get evidence and caveats, never bare booleans |
 | Demo app | Vite SPA, live against real chains | **6/6 Playwright E2E in a real browser** |
 | Agent flow | fully live, nothing stubbed | AgentKit 402/SIWE + AgentBook + Corroborate; fleet-detection demo included |
