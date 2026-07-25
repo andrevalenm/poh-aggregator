@@ -35,11 +35,10 @@
       <a class="wordmark" href="/">corroborate</a>
       <div class="nav-links">
         <a href="#try">Live demo</a>
+        <a href="#install">Install</a>
         <a href="#how">How it works</a>
         <a href="#research">Research</a>
-        <a href="#install">Install</a>
         <a href="#hackathon">Hackathon</a>
-        <a href="/app.html">Console</a>
       </div>
     </nav>
 
@@ -124,12 +123,50 @@
           <div id="probe-stream" class="probe-stream" aria-live="polite"></div>
           <div id="widget-result"></div>
         </div>
-        <p class="band-foot reveal">
-          Want the full evidence table, the threshold slider and every caveat in the SDK’s own
-          words? <a href="/app.html">Open the console →</a>
-        </p>
       </div>
     </section>
+
+    <section class="install" id="install">
+      <div class="band-inner">
+        <header class="band-head reveal">
+          <h2>Put it where you work</h2>
+        </header>
+        <div class="install-grid">
+          <div class="install-col reveal">
+            <h3>The MCP server</h3>
+            <p>
+              Four tools — look up a subject, check a threshold, explain the trust roots,
+              audit any weight’s history. One line, then ask your agent about any address.
+            </p>
+            <div class="picker" id="mcp-picker" role="tablist" aria-label="Choose your client"></div>
+            <div class="command-block" id="mcp-command"></div>
+          </div>
+          <div class="install-col reveal">
+            <h3>The SDK</h3>
+            <p>
+              Typed, client-side, no key. Ontology from the public registry, credentials from
+              public chains, scoring in your process.
+            </p>
+            <div class="command-block">
+              <pre><code id="sdk-install">npm install @corroborate/sdk</code><button class="copy-btn" data-copy="npm install @corroborate/sdk" aria-label="Copy install command">copy</button></pre>
+            </div>
+            <pre class="code-sample"><code><span class="tk">import</span> { Corroborate, Thresholds } <span class="tk">from</span> <span class="ts">'@corroborate/sdk'</span>
+
+<span class="tk">const</span> person = <span class="tk">await new</span> Corroborate().resolve(<span class="ts">'name.eth'</span>)
+person.score            <span class="tc">// log₁₀ of adversary cost</span>
+person.independentRoots <span class="tc">// uncorrelated evidence</span>
+person.isHuman(Thresholds.standard)</code></pre>
+          </div>
+        </div>
+        <div class="protocol-links reveal" id="protocol-links">
+          <span class="protocol-label">Everything public:</span>
+          <a href="https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07" rel="noopener">Registry on Sepolia</a>
+          <a href="https://api.studio.thegraph.com/query/77602/poh/version/latest" rel="noopener">Protocol subgraph</a>
+          <a href="http://37.27.67.44:8100/subgraphs/name/corroborate-registry" rel="noopener">Weight audit trail</a>
+        </div>
+      </div>
+    </section>
+
 
     <section class="daylight how" id="how">
       <div class="band-inner">
@@ -604,47 +641,6 @@
       </div>
     </section>
 
-    <section class="install" id="install">
-      <div class="band-inner">
-        <header class="band-head reveal">
-          <h2>Put it where you work</h2>
-        </header>
-        <div class="install-grid">
-          <div class="install-col reveal">
-            <h3>The MCP server</h3>
-            <p>
-              Four tools — look up a subject, check a threshold, explain the trust roots,
-              audit any weight’s history. One line, then ask your agent about any address.
-            </p>
-            <div class="picker" id="mcp-picker" role="tablist" aria-label="Choose your client"></div>
-            <div class="command-block" id="mcp-command"></div>
-          </div>
-          <div class="install-col reveal">
-            <h3>The SDK</h3>
-            <p>
-              Typed, client-side, no key. Ontology from the public registry, credentials from
-              public chains, scoring in your process.
-            </p>
-            <div class="command-block">
-              <pre><code id="sdk-install">npm install @corroborate/sdk</code><button class="copy-btn" data-copy="npm install @corroborate/sdk" aria-label="Copy install command">copy</button></pre>
-            </div>
-            <pre class="code-sample"><code><span class="tk">import</span> { Corroborate, Thresholds } <span class="tk">from</span> <span class="ts">'@corroborate/sdk'</span>
-
-<span class="tk">const</span> person = <span class="tk">await new</span> Corroborate().resolve(<span class="ts">'name.eth'</span>)
-person.score            <span class="tc">// log₁₀ of adversary cost</span>
-person.independentRoots <span class="tc">// uncorrelated evidence</span>
-person.isHuman(Thresholds.standard)</code></pre>
-          </div>
-        </div>
-        <div class="protocol-links reveal" id="protocol-links">
-          <span class="protocol-label">Everything public:</span>
-          <a href="https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07" rel="noopener">Registry on Sepolia</a>
-          <a href="https://api.studio.thegraph.com/query/77602/poh/version/latest" rel="noopener">Protocol subgraph</a>
-          <a href="http://37.27.67.44:8100/subgraphs/name/corroborate-registry" rel="noopener">Weight audit trail</a>
-          <a href="/app.html">Live console</a>
-        </div>
-      </div>
-    </section>
 
     <!--
       Hackathon section. Plain semantic markup on purpose — structural hooks only
@@ -1046,7 +1042,6 @@ person.isHuman(Thresholds.standard)</code></pre>
           </div>
           <div class="colophon-col">
             <h4>Build</h4>
-            <a href="/app.html">Console</a>
             <a href="#install">MCP server</a>
             <a href="#install">SDK</a>
           </div>

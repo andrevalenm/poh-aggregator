@@ -486,7 +486,8 @@ html.js .sl-in .sl-line {
 .picker button:active,
 .copy-btn:active,
 .threshold-clear:active,
-.sat-preset:active {
+.sat-preset:active,
+.detail-btn:active {
   transform: scale(0.93, 0.88);
 }
 
@@ -1048,6 +1049,41 @@ html.js .sl-in .sl-line {
   font-weight: 620;
 }
 
+.detail-btn {
+  font-family: var(--body);
+  font-size: 0.92rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--iron-deep);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 0.5rem 1.2rem;
+  cursor: pointer;
+  transition: border-color 0.25s, background 0.25s, color 0.25s, transform 0.3s;
+}
+
+.detail-btn:hover {
+  border-color: var(--iron);
+  background: rgb(166 67 31 / 0.06);
+}
+
+.detail-btn[aria-expanded='true'] {
+  color: var(--ink);
+}
+
+.w-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.w-full-detail .ledger-details summary {
+  /* The one button drives these; the summaries stay for per-section folding. */
+  font-size: 0.78rem;
+}
+
 .w-error {
   margin-top: 1.4rem;
   font-size: 0.92rem;
@@ -1313,7 +1349,7 @@ html.js .sl-in .sl-line {
 /* ------------------------------------------------------------------ rules */
 
 .how {
-  padding-top: 0;
+  padding-top: var(--band-pad);
 }
 
 .tablets {
