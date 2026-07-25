@@ -12,7 +12,7 @@ detail. _Last updated 2026-07-25, ~06:00._
 | `PersonhoodRegistry` v2 | Sepolia `0x977b028b900cce8ee89c46877e814eff3060aa07` | 18 forge tests; age curves + plaintext event ids with on-chain integrity check |
 | Ontology | 15 adapters, 10 trust roots, per-adapter age curves | `ontology/adapters.json`, every entry cites `research/` |
 | SDK | builds, publishes clean types | 23 unit + 11 live tests |
-| Subgraph | Studio, syncing, serving | `api.studio.thegraph.com/query/77602/poh/v0.0.1` — feeds claimedAt into the ramp weights |
+| Subgraph | Studio, syncing, serving | `api.studio.thegraph.com/query/77602/poh/version/latest` — feeds claimedAt into the ramp weights |
 | MCP server | verified over stdio | 3 tools; agents get evidence and caveats, never bare booleans |
 | Demo app | Vite SPA, live against real chains | **6/6 Playwright E2E in a real browser** |
 | Agent flow | fully live, nothing stubbed | AgentKit 402/SIWE + AgentBook + Corroborate; fleet-detection demo included |
@@ -66,7 +66,14 @@ cd ../agent && npm start                                   # live agent flow
 - **The Graph's load-bearing claim is now measured, not asserted**: the same Sept-2024 PoH
   wallet scores 2.40 with a flagged 0.5 midpoint when the subgraph is absent, and 2.56 with
   a computed 0.726 survival weight (caveat cleared) when present. Good judge-facing number.
-- Subgraph sync: block ~40.6M of ~47.4M, no indexing errors; Circles range still pending.
+- Subgraph sync: **redeployed as v0.0.2 and resyncing from scratch** after a real bug found
+  by interrogating the data: my hand-written ABI declared HumanityClaimed/Revoked's
+  humanityId as indexed, but on-chain both events carry only topic0 — so graph-node matched
+  the events and silently skipped them on decode (vouches decoded fine, which masked it:
+  every pohHuman entity had been created by the vouch handler, and claimedAt was really the
+  vouch timestamp). ProtocolDay rollups being empty was the tell. All consumers now point
+  at the version-agnostic /version/latest endpoint. PoH range resyncs in well under an
+  hour; the 2.40-vs-2.56 demonstration reruns identically once caught up.
 
 ## Needs you (in priority order)
 

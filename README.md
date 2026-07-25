@@ -98,7 +98,7 @@ and nothing to subpoena. Every weight change emits an event carrying the full re
 monotonic revision, so a subject can ask "why did my score move?" and get an answer with a
 block number.
 
-### 2. Subgraph — [`api.studio.thegraph.com/query/77602/poh/v0.0.1`](https://api.studio.thegraph.com/query/77602/poh/v0.0.1)
+### 2. Subgraph — [`api.studio.thegraph.com/query/77602/poh/version/latest`](https://api.studio.thegraph.com/query/77602/poh/version/latest)
 
 Indexes Proof of Humanity v2 and Circles v2 on Gnosis. It supplies the two things a boolean
 contract read cannot: **issuance dates** and **graph position**.
@@ -219,7 +219,7 @@ cd packages/mcp && npm run build
       "command": "node",
       "args": ["/absolute/path/to/poh-aggregator/packages/mcp/dist/server.js"],
       "env": {
-        "CORROBORATE_SUBGRAPH_URL": "https://api.studio.thegraph.com/query/77602/poh/v0.0.1"
+        "CORROBORATE_SUBGRAPH_URL": "https://api.studio.thegraph.com/query/77602/poh/version/latest"
       }
     }
   }
@@ -329,7 +329,7 @@ Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 | Deploy tx | [`0xe6b715cd…4677e427`](https://sepolia.etherscan.io/tx/0xe6b715cde4c0d7cb27041ee61f8b4de8d06dfe7bd2e2f306b67e0ca24677e427) at block 11344158 |
 | Curator (EOA, burner) | `0xE3C03709B2b8439Eb07Aac06CC4Fa9886CE5BF87` |
 | `PersonhoodRegistry` (v1) | [`0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9`](https://sepolia.etherscan.io/address/0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9) — superseded by v2 (age curves, plaintext event ids), left deployed, same ontology |
-| Subgraph | `https://api.studio.thegraph.com/query/77602/poh/v0.0.1` |
+| Subgraph | `https://api.studio.thegraph.com/query/77602/poh/version/latest` |
 | World ID (Orb) read | AgentBook `0xA23aB2712eA7BBa896930544C7d6636a96b944dA` — World Chain |
 | Proof of Humanity v2 | `0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc` — Gnosis |
 | Circles v2 Hub | `0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8` — Gnosis |
