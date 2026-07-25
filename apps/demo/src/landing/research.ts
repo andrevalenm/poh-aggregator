@@ -15,6 +15,19 @@
  */
 
 import './research.css'
+import { suggestEnrollment } from '@corroborate/sdk'
+import type { Adapter } from '@corroborate/sdk'
+import ontologyJson from '../../../../ontology/adapters.json'
+
+/**
+ * The routing half runs on the page too, through the real SDK function rather than a
+ * reimplementation — so what a visitor is told here is what a consumer's code would be told.
+ * Priced against the whole 30-adapter ontology, not just the eleven credentials on screen,
+ * because the roots worth routing someone to are mostly ones we cannot yet probe.
+ */
+const ONTOLOGY: Map<string, Adapter> = new Map(
+  (ontologyJson as unknown as { adapters: Adapter[] }).adapters.map((a) => [a.id, a]),
+)
 
 interface Cred {
   id: string
@@ -114,6 +127,70 @@ function initSaturation(root: HTMLElement) {
     if (countEl) countEl.textContent = String(roots)
 
     verdict!.innerHTML = verdictFor(held.length, byRoot.size, collapsed, roots, additiveCents, ourCents)
+    renderRouting(held, ourCents, roots)
+  }
+
+  /**
+   * "What would actually help" — the same question the SDK answers for a real subject. The
+   * point of showing it here is the negative case: load the farm and it tells you the passport
+   * root you already have is worth nothing more to you.
+   */
+  function renderRouting(held: Cred[], ourCents: number, roots: number) {
+    const el = root.querySelector<HTMLElement>('[data-routing]')
+    if (!el) return
+
+    const advice = suggestEnrollment(
+      {
+        score: Number(Math.log10(ourCents + 1).toFixed(4)),
+        totalCostCents: ourCents,
+        independentRoots: roots,
+        evidence: held.map((c) => ({
+          adapterId: c.id,
+          adapterName: c.name,
+          evidenceClass: 'Uniqueness' as const,
+          trustRoot: c.root,
+          observedOn: '0x0000000000000000000000000000000000000001' as const,
+          forgeCostCents: c.forge,
+          rentCostCents: c.rent,
+          live: true,
+          sourceURI: '',
+          held: true,
+          freshness: 1,
+          effectiveCostCents: cost(c),
+        })),
+      },
+      ONTOLOGY,
+    )
+
+    const best = advice.suggestions.slice(0, 3)
+    const dead = advice.wouldAddNothing.filter((w) => held.some((c) => c.root === w.trustRoot))
+
+    el.innerHTML = `
+      <h4>What would actually raise this</h4>
+      ${
+        best.length
+          ? `<ol class="route-list">${best
+              .map(
+                (s) => `<li>
+                  <span class="route-root">${s.trustRoot}</span>
+                  <span class="route-gain">+${s.scoreGain.toFixed(2)}</span>
+                  <span class="route-opts">${s.options
+                    .map((o) => `<a href="${o.url}" rel="noopener" target="_blank">${o.name} ↗</a>`)
+                    .join(' · ')}</span>
+                  <span class="route-give">${s.options[0]?.youGive ?? ''}</span>
+                </li>`,
+              )
+              .join('')}</ol>`
+          : `<p class="route-none">Nothing left to route to in this ontology.</p>`
+      }
+      ${
+        dead.length
+          ? `<p class="route-dead"><strong>Would add nothing:</strong> you already hold
+             ${dead.map((d) => `<code>${d.trustRoot}</code>`).join(', ')}. More credentials in
+             a root you already have is the mistake this whole page is about.</p>`
+          : ''
+      }
+      <p class="route-caveat">${advice.caveat}</p>`
   }
 
   function setMeter(kind: string, value: number, cents: number, ceil: number) {

@@ -290,6 +290,86 @@
   font-weight: 650;
 }
 
+/* ------------------------------------------------------------- routing */
+
+.routing {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--hairline-strong);
+  margin-top: 2rem;
+  padding-top: 1.2rem;
+}
+
+.route-list {
+  list-style: none;
+  counter-reset: route;
+  margin: 1rem 0;
+  padding: 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.route-list li {
+  border-bottom: 1px solid var(--hairline);
+  padding: 0.75rem 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.5rem minmax(0, 1.1fr);
+  grid-template-areas: 'root gain opts' 'give give give';
+  gap: 0.3rem 1rem;
+  align-items: baseline;
+}
+
+@media (max-width: 720px) {
+  .route-list li {
+    grid-template-columns: minmax(0, 1fr) 3.5rem;
+    grid-template-areas: 'root gain' 'opts opts' 'give give';
+  }
+}
+
+.route-root {
+  grid-area: root;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+
+.route-gain {
+  grid-area: gain;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--sage-deep);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.route-opts {
+  grid-area: opts;
+  font-size: 0.85rem;
+}
+
+.route-opts a {
+  color: var(--iron-deep);
+  text-decoration-color: var(--hairline-strong);
+  text-underline-offset: 3px;
+}
+
+.route-give {
+  grid-area: give;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+
+.route-dead {
+  font-size: 0.88rem;
+  border-left: 2px solid var(--iron);
+  padding-left: 0.9rem;
+  margin: 1rem 0;
+}
+
+.route-caveat,
+.route-none {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  max-width: 74ch;
+}
+
 /* ------------------------------------------------- playable: age curves */
 
 .curves {
