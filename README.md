@@ -130,6 +130,26 @@ path. PoH scores are therefore identical with and without the subgraph — there
 asserting exactly that — and the index becomes a cross-check whose disagreements are reported
 as our fault rather than the subject's.
 
+**The registry subgraph makes the audit trail executable rather than printable.** The weights are
+dated human judgements and they change: one seed moved three trust roots, retired a placeholder
+root and added fifteen adapters. Every such edit silently rewrites history for anybody holding an
+old score. `resolve(addr, { asOf: block })` scores against the ontology as the registry actually
+held it then — and that is the one read here an archive node cannot serve, because reconstructing
+an entity *set* at block N means already knowing every adapter id. Graph Node keeps each mutable
+entity version with the block range it was current for, so it is one query. The reconstruction is
+checked rather than trusted: a live test requires the ontology the indexer reports at head to
+equal `allAdapters()` from the chain field by field, all thirty adapters. See
+[`packages/sdk/src/as-of.ts`](packages/sdk/src/as-of.ts).
+
+Building on it found a real bug in the audit trail. `AdapterLivenessSet` carries only the hashed
+adapter key, and the mapping loaded `Adapter` by that hash while entities are keyed on the
+plaintext id — so it matched nothing and **every liveness flip was dropped silently**. It had
+never fired on the deployed registry, which is why nobody noticed; it also happens to be the
+mutation a score feels hardest, since `live: false` zeroes a credential outright. There is now an
+`AdapterKey` reverse index (asserted live to be `keccak256("adapter:" ++ id)` for all thirty
+adapters) and a `LivenessChange` entity, so the flip lands in the audit trail beside the reason
+the curator gave for it.
+
 ### 3. SDK — [`packages/sdk`](packages/sdk)
 
 Reads the ontology from the registry, probes chains directly, and scores **in the caller's
@@ -324,6 +344,35 @@ result.isHuman(Thresholds.standard)  // false  (standard = 2.5)
 result.isHuman()                     // TypeError: isHuman requires an explicit numeric threshold
 ```
 
+**A score is only meaningful with the revision it was computed against, so you can ask for a
+past one:**
+
+```ts
+const corroborate = new Corroborate({
+  registrySubgraphUrl: 'http://37.27.67.44:8100/subgraphs/name/corroborate-registry',
+})
+
+const subject = [
+  '0xd267eba602e692216703626a81157214b24c85fb', // Proof of Humanity v2
+  '0xA6b7471fe0338F8B45266734A1346E6f1D7267b1', // Holonym gov-ID + biometric, Human Passport
+]
+
+await corroborate.resolve(subject)                          // 3.61  · 4 roots · revision 34
+await corroborate.resolve(subject, { asOf: 11_345_000 })    // 1.07  · 1 root  · revision 15
+await corroborate.resolve(subject, { asOf: '2026-07-25T02:00:00Z' })  // same, by instant
+```
+
+Nothing about that subject moved between those two calls. What moved is what we knew: at revision
+15 the ontology had fifteen adapters and Holonym and Human Passport were not among them, so the
+result names them in `adaptersNotYetInRegistry` and the caveat says the drop is *a change in what
+we knew, not in the subject*. The surviving PoH credential is priced at 10.72 cents rather than
+11.19, because the survival ramp is evaluated at the as-of block's timestamp and not at the wall
+clock. It refuses rather than degrades: without `registrySubgraphUrl` it throws, because answering
+a question about the past with today's weights and stamping a block number on it is worse than not
+answering. And it says what it cannot see — credentials are read at chain head, so one dated after
+the as-of instant is excluded, but one held then and revoked since is invisible, which understates
+the subject and never the adversary.
+
 At a plausible 2% residual sybil rate, a classifier with 90% TPR and 95% specificity has
 **26.9% precision** — it is wrong about roughly three out of four people it flags, excluding
 ~4,900 real people per 100,000. Reaching 95% precision needs ~99.90% specificity, which
@@ -368,9 +417,9 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 195 SDK tests: 121 unit (scoring model, index reconciliation, input, ontology, SBT
+# 228 SDK tests: 142 unit (scoring model, index reconciliation, input, ontology, SBT
 # interpretation, Verax attestation selection, World address-book interpretation, PoH v1
-# submission interpretation) + 74 live
+# submission interpretation, as-of reconstruction) + 86 live
 cd packages/sdk && npm test
 
 # the live ones alone — real chains, the deployed registry, no mocks
@@ -381,12 +430,13 @@ cd packages/sdk && node --test --experimental-strip-types src/adapters/holonym.l
 cd packages/sdk && node --test --experimental-strip-types src/adapters/linea-poh.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/world.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/poh-v1.live.test.ts
+cd packages/sdk && node --test --experimental-strip-types src/as-of.live.test.ts
 
 # 10 browser E2E against the built demo, real chains
 cd apps/demo && npx playwright test
 ```
 
-All 223 pass as of 2026-07-25 (18 forge + 195 SDK + 10 browser; two of the SDK live tests skip
+All 256 pass as of 2026-07-25 (18 forge + 228 SDK + 10 browser; two of the SDK live tests skip
 loudly when the third-party Verax indexer they cross-check against returns HTTP 429). The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
 assert the seeded ontology loads, that the ICAO cluster really does have three protocols on
@@ -399,7 +449,12 @@ Decoder computes in Solidity and returns in its revert payload, on whatever addr
 pointed at. The Farcaster suite does the same for a date rather than a number: the block our
 counter search picks must be the block the registry's own `Register` log for that fid is in, with
 none in the thousand blocks before it — two subsystems of the node agreeing about one fid, where
-the probe only ever consulted the first.
+the probe only ever consulted the first. The as-of suite asserts the reconstruction against the
+chain rather than against itself: the ontology the indexer reports at head must equal
+`allAdapters()` field by field, every revision the registry counted must appear in the audit
+trail, and the acceptance test scores one real PoH v1 registration twice — unchanged on a
+contract frozen since 2021, worth $3.51 under revision 34 and nothing under revision 15, because
+that is when we had not researched the protocol yet.
 
 ---
 

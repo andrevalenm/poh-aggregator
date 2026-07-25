@@ -297,6 +297,62 @@ should.
 
 ---
 
+## The revision is part of the answer
+
+Every number above comes from a weight that is a **dated human judgement**, and judgements get
+corrected. Revision 34 alone moved three trust roots, retired a placeholder root and added
+fifteen adapters. Each of those edits changes historical scores retroactively: a subject told
+"2.56 on Tuesday" cannot reproduce that number on Wednesday, and a counterparty who denied
+somebody at a threshold cannot show what the ontology said at the moment they did it.
+
+So a score is only meaningful alongside the revision it was computed against — `registryRevision`
+is on every result for that reason — and the registry's own event history can be replayed:
+
+```ts
+await corroborate.resolve(subject, { asOf: 11_345_000 })            // a Sepolia registry block
+await corroborate.resolve(subject, { asOf: '2026-07-25T02:00:00Z' }) // or an instant
+```
+
+Two things change, and it is worth being exact about which.
+
+**The ontology is reconstructed exactly.** Weights, roots, curves, liveness and the adapter set
+come from the registry's own `AdapterSet`/`AdapterLivenessSet` events as an indexer stored them,
+and a live test requires that reconstruction to equal `allAdapters()` from the chain, field by
+field, at head. Whether it is exact at *every* block reduces to one checkable fact: both mutations
+bump `revision`, so recorded revisions forming exactly `1..revision()` proves nothing is missing.
+When that fails the result says so and stops claiming exactness.
+
+**The age curve is evaluated at the as-of instant**, not at the wall clock — the block's own
+timestamp, so two instants inside one block do not produce two different states of the world. A
+credential 100 days old then is scored at 100 days.
+
+**Credential state is not reconstructed**, and the result says so every time. Probes read their
+own chains at head; there is no cross-chain archive path that would let ten adapters answer as of
+a Sepolia block. What *is* fixed exactly is the direction that would favour an adversary: a
+credential dated after the as-of instant did not exist then and is excluded. What remains is a
+credential held then and revoked since, which we cannot see — so an as-of score can understate the
+subject and never the adversary. Undated credentials are the third case: they are counted, because
+dropping them would penalise a subject for a field their protocol does not store, and they are
+listed in `asOf.existenceUnverified` so that part of the score is legibly a statement about today.
+
+Worked, on a real subject holding Proof of Humanity v2 plus two Holonym credentials and a Human
+Passport:
+
+| | now (revision 34) | as of block 11,345,000 (revision 15) |
+|---|---|---|
+| Score | **3.61** | **1.07** |
+| Independent roots | 4 | 1 |
+| Total cost | $40.73 | $0.11 |
+| PoH v2 contribution | 11.19c | 10.72c |
+
+Nothing about the subject moved between those two calls. The Holonym and Passport credentials are
+unpriced at revision 15 because they had not been researched yet — named in
+`asOf.adaptersNotYetInRegistry`, with a caveat saying the drop is *a change in what we knew, not
+in the subject*. The PoH contribution differs by half a cent because the survival ramp was
+evaluated twelve hours earlier.
+
+---
+
 ## What the model does not do
 
 - It does not weight by evidence class. A `Uniqueness` credential and a `SocialTrust`
@@ -307,3 +363,6 @@ should.
   should probably concave off.
 - It does not compute confidence intervals, and it should. Every weight is a point estimate
   with no stated error.
+- It does not reconstruct credential *state* at a past block, only the ontology. `asOf` scores
+  the past against credentials read at head, minus the ones provably issued since. See above for
+  which direction the residual error runs in.

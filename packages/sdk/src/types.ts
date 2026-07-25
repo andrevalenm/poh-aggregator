@@ -9,6 +9,7 @@
  */
 
 import type { ProbeProvenance } from './reconcile.ts'
+import type { AsOfScoring } from './as-of.ts'
 
 export type Address = `0x${string}`
 
@@ -130,6 +131,12 @@ export interface PersonhoodResult {
   caveats: Caveat[]
   /** Registry revision the score was computed against, for reproducibility. */
   registryRevision?: number
+  /**
+   * Present when the score was computed as of a past block rather than now. Carries the
+   * block, its timestamp, the registry revision in force then, and what that did to this
+   * subject's evidence. See `as-of.ts` for what such a result may and may not claim.
+   */
+  asOf?: AsOfScoring
   computedAt: number
   /**
    * Verdict against a caller-supplied threshold. Deliberately a method, and deliberately

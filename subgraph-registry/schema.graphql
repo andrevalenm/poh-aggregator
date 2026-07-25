@@ -1,6 +1,11 @@
 """
 An adapter in the Corroborate trust-root ontology — one personhood protocol, what it
 proves, and what it costs an adversary to defeat.
+
+Mutable on purpose: Graph Node keeps every version of a mutable entity with the block range
+it was current for, so `adapters(block: {number: N})` returns the ontology exactly as the
+registry held it at N. That is what makes the SDK's as-of scoring possible, and it is the one
+read here an archive node cannot serve without already knowing every adapter id.
 """
 type Adapter @entity(immutable: false) {
   "Plaintext adapter id — emitted on-chain and provably the preimage of the hashed key."
@@ -18,6 +23,21 @@ type Adapter @entity(immutable: false) {
   revision: BigInt!
   updatedAt: BigInt!
   changes: [WeightChange!]! @derivedFrom(field: "adapter")
+  livenessChanges: [LivenessChange!]! @derivedFrom(field: "adapter")
+}
+
+"""
+Reverse index from the registry's hashed key to the plaintext adapter id.
+
+`AdapterSet` emits both, but `AdapterLivenessSet` emits only the hash — and mappings cannot
+enumerate entities, so without this the liveness handler has nothing to look the adapter up
+by. Its absence was a real bug: the handler loaded `Adapter` by hash hex against entities
+keyed on plaintext ids, matched nothing, and dropped every liveness event silently.
+"""
+type AdapterKey @entity(immutable: false) {
+  "keccak256('adapter:' ++ idString), hex."
+  id: ID!
+  adapter: Adapter!
 }
 
 """
@@ -31,6 +51,27 @@ type WeightChange @entity(immutable: true) {
   rentCostCents: BigInt!
   live: Boolean!
   sourceURI: String!
+  revision: BigInt!
+  timestamp: BigInt!
+  block: BigInt!
+  txHash: Bytes!
+}
+
+"""
+The other half of the audit trail: a protocol declared discontinued, or revived.
+
+Kept as its own type rather than folded into WeightChange because the event carries no
+weights — only a flag and the curator's stated reason. It matters more than its size
+suggests: `live: false` zeroes a credential's contribution outright, so a liveness flip can
+move a score further than any repricing, and until this existed it was the one registry
+mutation that left no trace here at all.
+"""
+type LivenessChange @entity(immutable: true) {
+  id: ID!
+  adapter: Adapter!
+  live: Boolean!
+  "Why the curator flipped it. Required on-chain; the accountability is the point."
+  reason: String!
   revision: BigInt!
   timestamp: BigInt!
   block: BigInt!

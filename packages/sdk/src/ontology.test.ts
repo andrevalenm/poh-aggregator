@@ -56,6 +56,22 @@ describe('ontology', () => {
     }
   })
 
+  test('retired roots are named, explained, and no longer in use', () => {
+    // Retired names exist so that as-of scoring can reverse a hash the registry still carries
+    // at an old revision. Two failure modes: a retired name that is still claimed by a live
+    // adapter (then it is not retired), and a name in both tables (then the same hash has two
+    // meanings, and the one that wins depends on map insertion order).
+    const retired = (ontologyData as { retiredTrustRoots?: Record<string, string> })
+      .retiredTrustRoots
+    assert.ok(retired, 'retiredTrustRoots is missing')
+    const declared = new Set(Object.keys(trustRoots))
+    for (const [name, why] of Object.entries(retired)) {
+      assert.ok(!declared.has(name), `${name} is both current and retired`)
+      assert.ok(!adapters.some((a) => a.trustRoot === name), `${name} is retired but still in use`)
+      assert.ok(why.length > 40, `${name} was retired without saying why`)
+    }
+  })
+
   test('no adapter sits on an unresolved root', () => {
     // "unknown" used to be a legal value. It is not a root — it is a research debt that
     // scores as full independence, which is the direction that pays the adversary.
