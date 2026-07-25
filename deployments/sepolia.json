@@ -7,7 +7,35 @@
   "previous": [
     {
       "PersonhoodRegistry": "0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9",
-      "note": "v1 \u2014 uniform decay, hashed-only event ids. Superseded by v2 (age curves + plaintext event ids) but left deployed; same ontology, revision 15."
+      "note": "v1 — uniform decay, hashed-only event ids. Superseded by v2 (age curves + plaintext event ids) but left deployed; same ontology, revision 15."
     }
-  ]
+  ],
+  "ontology": {
+    "adapters": 30,
+    "trustRoots": 18,
+    "revision": 34,
+    "seededAt": "2026-07-25",
+    "note": "Revision 34 is the landscape expansion: 15 adapters added and 4 corrected in one seed, from revision 15 (15 adapters over 10 roots). Corrections were anima-pou and civic-pass onto kyc-vendor:facetec, brightid off Proof of Humanity's root, and humanity-protocol off 'unknown'.",
+    "changedInLastSeed": [
+      "anima-pou",
+      "humanity-protocol",
+      "brightid",
+      "civic-pass",
+      "poh-v1",
+      "rarimo",
+      "anon-aadhaar",
+      "human-passport",
+      "holonym-gov-id",
+      "holonym-biometrics",
+      "billions",
+      "fractal-id",
+      "zkme-meid",
+      "sismo",
+      "nomis",
+      "trusta-sybil",
+      "farcaster-account",
+      "encointer",
+      "humanode"
+    ]
+  }
 }

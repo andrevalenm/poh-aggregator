@@ -84,9 +84,12 @@ Five pieces. Nothing runs on a server of ours; there is no server of ours.
 
 ### 1. Registry — `PersonhoodRegistry.sol`, Sepolia [`0x977b028b900cce8ee89c46877e814eff3060aa07`](https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07)
 
-The on-chain ontology: **15 adapters across 10 trust roots**, each with an evidence class, a
+The on-chain ontology: **30 adapters across 18 trust roots**, each with an evidence class, a
 forge cost, a rent cost, an age curve, a liveness flag, and the `research/` file its weight was
-derived from. Currently at revision 15.
+derived from. Currently at revision 34. The six largest roots carry 18 of the 30 adapters —
+one passport chip alone is read by four of them, which is the whole argument for saturation.
+`research/landscape/ontology-coverage.md` is the audit trail: every adapter, every root, every
+cost anchor, and the protocols we deliberately refuse to score.
 
 **It stores protocols. It never stores people.** The obvious design — a mapping from address
 to humanity score — is rejected on purpose. A permanent, globally enumerable record asserting
@@ -327,8 +330,10 @@ in October 2026 after the pool empties.
 change is an event — but not decentralised. There is no multisig, no timelock, and no appeal
 path. `transferCuratorship` exists and has not been used.
 
-**6. Coverage is 4 of 15 adapters.** The other eleven are priced in the ontology but not yet
+**6. Coverage is 4 of 30 adapters.** The other twenty-six are priced in the ontology but not yet
 probed. An absent credential is reported as absence of evidence, never as evidence of absence.
+Six of them are permissionlessly readable today and are queued in
+`research/landscape/ontology-coverage.md` §6; the rest are gated, off-chain or dead, and say so.
 
 **7. World ID has no verified positive vector yet.** The adapter is verified working against
 World Chain, but no Orb-verified address turned up in the windows scanned, so every World

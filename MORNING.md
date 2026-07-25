@@ -33,6 +33,30 @@ Two things for you, neither urgent:
   is next up in `PROGRESS.md`; it needs no decision from you unless you would rather I not spend
   the sync time before the deadline.
 
+**Iteration 2 doubled the landscape: the registry now prices 30 protocols over 18 trust roots,
+up from 15 over 10.** That is the "1inch for personhood" claim, and it was the weakest part of
+the product. Every new adapter carries an evidence class, a trust root, a forge and rent cost
+traced to a cited anchor, and an age curve;
+`research/landscape/ontology-coverage.md` is the audit trail — including a table of the
+protocols we deliberately refuse to score (EAS, Verax, AttestationStation and Disco are
+substrate, not credentials; Silk wraps Holonym, which we already price under its own roots).
+Registry reseeded on Sepolia, **revision 34**, verified by reading all 30 back through the SDK.
+
+Three defects in the existing ontology fell out of doing it, all now covered by tests:
+
+- **Civic Pass sat on Persona's root.** Its vendor is FaceTec, integrated directly.
+- **BrightID sat on Proof of Humanity's root**, which would have saturated two vouching graphs
+  that share no members and no vendor — they are independent evidence and now score that way.
+- **Humanity Protocol sat on `unknown`**, which is not a root: it scores as *full independence*,
+  the direction that pays an adversary. Resolved to `kyc-vendor:unattributed` and marked not-live
+  (their mainnet has been offline since the June key compromise; the oracle has processed 28
+  verifications in its entire life).
+
+Nobody's score changed — all three adapters are discontinued and contribute zero, which is
+exactly why the errors survived. `packages/sdk/src/ontology.test.ts` now asserts every root is
+declared and used, every source file exists, no adapter sits on `unknown`, and the shipped copy
+of the ontology matches the source of truth.
+
 ---
 
 ## State: every phase shipped and tested
@@ -255,6 +279,21 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
 6. **Demo videos.** Full shot-by-shot script with voiceover lines is written:
    `docs/demo-script.md` — 3 minutes, five beats, all live, with per-track cut notes.
    Rehearse once, record, done.
+7. **A pricing judgement I would not make on my own.** Every KYC-rooted adapter is priced at a
+   **$1,200 forge cost**, while our own research says a KYC-passing synthetic face costs
+   **under $20** (WEF, Jan 2026). Nothing turns on it today — scoring takes `min(forge, rent)`
+   and the $30 rental figure binds — but the forge column is wrong by roughly 60× and would
+   start mattering the moment a KYC credential's rental cost rose. I left it alone and wrote it
+   down rather than silently rewriting eleven weights. `research/landscape/ontology-coverage.md`
+   §4 has the full derivation table for every cost in the file if you want to check the rest.
+8. **Two stale counts in `apps/demo/index.html` that I am not allowed to touch** (the design
+   agent owns that file, and the harness enforces it). Line ~87 says a passport is "read by
+   three protocols" — it is now four, since Rarimo joined the ICAO root. Line ~573 says "the
+   ontology describes fifteen" — it describes thirty. Both are one-word fixes. The live counts
+   in the hero are read from the chain at runtime and are already correct. The deployed demo
+   bundle predates this change, which is harmless (adapter and root counts come from the
+   registry; only the four implemented probes are ever named in results), but the next
+   `scripts/deploy-demo-ax41.sh` run picks it up.
 
 ## Honest state of weak points
 

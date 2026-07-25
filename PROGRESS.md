@@ -122,3 +122,92 @@ only copy is `apps/demo/test.sh` and it `cd`s to its own directory before invoki
 `packages/sdk`, so it cannot work from there — it wants moving to the root. And `pnpm install`
 produced a `pnpm-lock.yaml` that is untracked and left uncommitted, since the repo tracks
 `package-lock.json`; Hugo's call which to keep.
+
+## Iteration 2 — 2026-07-25
+
+**Did:** P0 #2, job 1 — the landscape. The ontology went from **15 adapters over 10 trust roots
+to 30 over 18**, every entry with a trust root, an evidence class, forge and rent costs traced to
+a cited anchor, an age curve, a liveness flag and a `sourceURI` that resolves to a real file.
+Job 2 (probes) is deliberately untouched; the mission orders these two and they split cleanly.
+
+- **New write-up: `research/landscape/ontology-coverage.md`.** The audit trail from the 21k lines
+  of existing research to the deployed registry: the full roster with each protocol's disposition,
+  a table of what we *refuse* to score and why, the derivation of every cost figure, the two root
+  decisions that are judgement calls rather than documented facts, and a ranked queue of what is
+  permissionlessly readable next. Synthesis, not new field research — every fact carries the deep
+  dive it came from.
+- **15 adapters added:** poh-v1, rarimo, anon-aadhaar, human-passport, holonym-gov-id,
+  holonym-biometrics, billions, fractal-id, zkme-meid, sismo, nomis, trusta-sybil,
+  farcaster-account, encointer, humanode.
+- **Three defects found and fixed in the existing ontology.** (1) Civic Pass sat on
+  `kyc-vendor:persona`; its vendor is FaceTec integrated directly — the dedup table names Civic on
+  the FaceTec row and Persona's row names Coinbase. (2) BrightID sat on `social-vouching:poh`,
+  which would have saturated two vouching graphs that share no vendor and no members; the source
+  lists them as safe to count independently. (3) `humanity-protocol` sat on `trustRoot: "unknown"`
+  — the mission asked for this one by name. `unknown` is not a root: it scores as *full
+  independence*, the direction that pays an adversary. Resolved to `kyc-vendor:unattributed` (their
+  own config defines `is_human` as "KYC **or** palm enrollment" and the vendor is undisclosed) and
+  marked `live: false` — mainnet offline since the 2026-06 key compromise, 28 verifications in the
+  oracle's entire life, none since February, and every read needs an OAuth client and a fee.
+  No score moved: all three are `live: false` and contribute zero, which is exactly why the errors
+  survived unnoticed.
+- **Root widened deliberately:** `kyc-vendor:facetec-synaps` → `kyc-vendor:facetec`. FaceTec's 1:N
+  galleries are per-integrator, so Anima's and Holonym's databases really are separate — but a
+  technique that defeats FaceTec defeats every deployment, and a root prices the adversary's
+  cheapest path, not database boundaries. Four adapters now saturate where three roots stood.
+  More correlation costs an honest subject one root's worth; less pays the adversary a multiplier.
+- **`kyc-vendor:unattributed` is one root on purpose,** covering Humanity, Holonym `gov-id`
+  (one of Onfido/Sumsub/iDenfy/Veriff, and the credential does not say which) and zkMe. We cannot
+  prove they are different vendors, and if two are the same, separate roots let one check score as
+  two. The residual — Holonym `gov-id` might be a Sumsub check that ought to saturate against Galxe
+  — is written down rather than hidden.
+- **New test file `packages/sdk/src/ontology.test.ts`** (10 tests): every claimed root is declared
+  and every declared root is used, no adapter sits on `unknown`, ids are unique and kebab-case
+  (they are hashed into the registry key, so a rename silently forks history), curves and
+  half-lives agree, costs are whole cents with rent ≤ forge (nothing in the landscape is
+  rental-resistant), every `sourceURI` resolves to a file that exists, every `live: false` entry
+  says why, every `implemented: true` adapter has a probe and every probe has a live entry, and
+  the shipped `ontology-data.json` is byte-identical to `ontology/adapters.json`.
+- **`scripts/deploy.mjs` seeds incrementally.** It reads `allAdapters()` first and only writes what
+  actually differs. Every `setAdapter` bumps `revision` and emits the full record, and that event
+  stream *is* the audit trail a subject reads to ask why their score moved — re-seeding an
+  unchanged adapter fabricates a change that never happened. It now also records the deployed
+  adapter count, root count, revision and the ids that last moved it into `deployments/sepolia.json`.
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd packages/sdk && npm test` → `# tests 76 # pass 76 # fail 0` (was 66; +10 ontology invariants).
+- `cd apps/demo && npx playwright test` → `10 passed`.
+- `node scripts/deploy.mjs --seed-only` → wrote 19 adapters (15 new + 4 corrected), left 11
+  untouched, registry `0x977b028b…aa07` now **30 adapters, revision 34**. A second run wrote
+  nothing and reported "30 already identical on-chain", which is the incremental path proving
+  itself.
+- Read back independently through `loadOntology()`: 30 adapters, 0 unnamed, `humanity-protocol`
+  → `kyc-vendor:unattributed` `live=false`, `civic-pass` → `kyc-vendor:facetec`, `brightid` →
+  `social-vouching:brightid`.
+
+**Next, in the order I would do it:**
+
+1. **P0 #2, job 2 — probes.** The ranked queue is §6 of `ontology-coverage.md`, and the top of it
+   is **Human Passport**: `Decoder.getScore(address)` is a plain `eth_call` on seven mainnets with
+   addresses already tabulated in `research/protocols/passport-civic-fractal-zkme-galxe.md`, and it
+   is by far the largest user population available to us. Then Farcaster (`IdRegistry.idOf`, one
+   call), Holonym (Optimism state + unauthenticated REST), Linea PoH (Verax attestations), World's
+   document and Selfie tiers, and PoH v1 on a registry we already talk to. Read the *mechanism*,
+   not a magic number, per the checklist at the bottom of `MISSION.md`.
+2. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
+   the cheapest way to turn two flagged approximations into real dates (iteration 1's note 1).
+3. **Research debt named in the mission that I could not close honestly:** Quadrata and Talent
+   Protocol are both alive (checked, 200s, 2026-07-25) but have no deep dive, and their docs are
+   client-rendered so nothing about their trust roots is established. Binance BABT is probably the
+   highest-value missing entry — weighted equal to a government ID inside Human Passport, and an
+   ERC-721-shaped read on BNB Chain — but it needs a vendor attribution before it can be rooted.
+   All three are left *out* of the ontology on purpose: an entry with an invented root is worse
+   than an absent one.
+
+**Blocked:** nothing. Two notes for the morning, both in `MORNING.md`: the KYC forge figure is
+wrong by ~60× against our own research and I left it alone rather than silently rewriting eleven
+weights (it does not bind today, since scoring takes `min(forge, rent)`); and two count strings in
+`apps/demo/index.html` are now stale, which I cannot fix because the design agent owns that file
+and the harness enforces it.
