@@ -12,7 +12,7 @@
  * protocols are built to keep apart.
  */
 
-import { Corroborate } from '@corroborate/sdk'
+import { Corroborate, defaultAdapters } from '@corroborate/sdk'
 import { corroborate as cfg } from '../config.js'
 
 let client
@@ -42,4 +42,27 @@ export async function resolveHumanBacking({ agentAddress, operatorAddresses }) {
   const addresses = [agentAddress, ...operatorAddresses]
   const result = await getClient().resolve(addresses)
   return { result, addresses }
+}
+
+/**
+ * The ontology as the deployed registry holds it, for pricing the counterparty's policy.
+ *
+ * Read from the registry rather than from the copy bundled in the SDK, because the weights an
+ * adversary is priced against have to be the published ones — the whole point of putting them
+ * on chain. Cached inside the client after the first call.
+ */
+export async function ontologyAdapters() {
+  return (await getClient().ontology()).adapters
+}
+
+/**
+ * Adapter ids this deployment can actually read.
+ *
+ * An adversary cannot clear *our* score with a credential we have no probe for, so pricing the
+ * policy against the whole ontology would quote a floor nobody can reach and understate what
+ * the policy costs. Derived from the probe list rather than from an `implemented` flag, so it
+ * cannot drift from what the process will really look up.
+ */
+export function readableAdapterIds() {
+  return defaultAdapters().map((a) => a.adapterId)
 }
