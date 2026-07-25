@@ -7,7 +7,7 @@ detail. _Last updated 2026-07-25, after unattended iteration 11. All four suites
 
 ---
 
-## Unattended run on ax41 — read `PROGRESS.md` for the full log
+## Unattended run on the build machine — read `PROGRESS.md` for the full log
 
 **Iteration 1 fixed a live scoring bug: subgraph lag was silently changing scores.** The probes
 asked the contract *whether* a credential was held and the subgraph *when* it was issued, as if
@@ -273,7 +273,7 @@ number, but no way to check it.
   by that hash while entities are keyed on the plaintext id — so it matched nothing and **every
   liveness flip was dropped silently**. It had never fired on the deployed registry, which is why
   nobody noticed; it is also the mutation a score feels hardest, since `live: false` zeroes a
-  credential outright. Redeployed to ax41 as **v0.0.3** with an `AdapterKey` reverse index and a
+  credential outright. Redeployed to the build machine as **v0.0.3** with an `AdapterKey` reverse index and a
   `LivenessChange` entity that records the reason the curator gave. Same URL, no action needed —
   but if you re-deploy the Studio mirror, take the new version.
 
@@ -411,7 +411,7 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
-**Repo is on GitHub (private)**: https://github.com/Hugo0/poh-aggregator — full history
+**Repo is on GitHub (private)** — full history
 (secrets-audited first: only placeholder `0x...` strings, no real keys, no World API key
 anywhere in history). andrevalenm invited with write permission and continues the work;
 local remote is `github`. Public visibility deferred until the name decision.
@@ -426,9 +426,9 @@ receipt now settles on completion (credentials found stay line-by-line, empties 
 one tally over a strong rule) and the full-evidence ledger sorts held → unreachable →
 absent, cost-descending. The stream's drama survives; the residue doesn't.
 
-**Stamp + margin (Hugo's picks 4 & 5)**: the score now arrives like a pressed seal, and
+**Stamp + margin (the owner's picks 4 & 5)**: the score now arrives like a pressed seal, and
 the research long-form's dead right column is a Tufte margin carrying the Ohlhaver
-quotes as sidenotes. Meanwhile the ax41 consolidation landed in-tree — the probe table
+quotes as sidenotes. Meanwhile the build-machine consolidation landed in-tree — the probe table
 runs the full adapter set and every count on the page updated itself via the dynamic
 LIVE_ADAPTER_IDS derivation. TODO.md now carries the ranked queue (npm publish
 deliberately deferred pending the name decision).
@@ -447,7 +447,7 @@ repos/brand kits), single-path cobalt SVGs inline with the kickers at matched op
 weight — the tiles carry their sponsors now, not just ETHGlobal. Agent-built, visually
 reviewed, integrated.
 
-**One cohesive experience (Hugo's call, ~17:30)**: standalone console de-linked from the
+**One cohesive experience (the owner's call, ~17:30)**: standalone console de-linked from the
 product — a single "Show the full technical detail" button unfolds the complete record
 (evidence → caveats, staggered, glide-to-view) inside the ledger. Install (MCP/SDK) moved
 directly after the live demo; the night section is an island now and tears on both edges.
@@ -457,7 +457,7 @@ deep tool (the demo script's comparison beat uses it as a deep link). In flight:
 interactive QA agent against the deployed site + sponsor-logo agent (World/Graph/ENS
 marks for the azulejo tiles).
 
-**The terrain flows** (Hugo's ask): the contour height field now drifts — each wave's
+**The terrain flows** (the owner's ask): the contour height field now drifts — each wave's
 phase moves at its own rate on a minutes-long clock, so the topo lines morph like slow
 weather. ~24fps redraw, only while the canvas is in-viewport and the tab visible;
 narrow screens and reduced-motion keep the still drawing; verified no frame-loop long
@@ -523,7 +523,7 @@ clip-path so the paper texture runs into the ragged edge, hero copy pooled clear
 print, footer stamp row fixed, ETHGlobal mark rendered crisp, native scrollbar themed,
 axe: 0 violations on the landing (main landmark + night contrast + console chips).
 
-Goal set per Hugo: the site should be able to win a prestigious design competition — one
+Goal set by the owner: the site should be able to win a prestigious design competition — one
 cohesive physical language, zero stacked gimmicks. Running continuously (cron 4868bed3 is
 only a dead-man switch every 25 min; deadline 2026-07-26 11:45, then it self-deletes).
 
@@ -540,7 +540,7 @@ only a dead-man switch every 25 min; deadline 2026-07-26 11:45, then it self-del
 
 ## Landing v4 — "Human terrain" complete redesign (night 2026-07-25)
 
-Commit 5fafe41, live at http://37.27.67.44:8788. Research-driven, per your ask:
+Commit 5fafe41, live on the hosted preview. Research-driven, per your ask:
 
 - **The finding that mattered**: Sage's backgrounds are *scanned photographs of real
   flecked paper*, not gradients. So v4 synthesizes exactly that — the whole page now sits
@@ -561,7 +561,7 @@ Commit 5fafe41, live at http://37.27.67.44:8788. Research-driven, per your ask:
 
 ## Landing v3 — fluid ink + pigment (evening 2026-07-25)
 
-Commit 166f86d, live at http://37.27.67.44:8788. Your three notes:
+Commit 166f86d, live on the hosted preview. Your three notes:
 
 - **Thumb**: back to the dense continuous rings you preferred (56 of them), keeping only a
   hint of anatomy — tilt, egg envelope, low-drifting core. No blockiness, no dashes.
@@ -578,7 +578,7 @@ Commit 166f86d, live at http://37.27.67.44:8788. Your three notes:
 
 ## Landing v2 — the overhaul (later 2026-07-25)
 
-Your feedback, all addressed and live at http://37.27.67.44:8788 (commit a34719c):
+Your feedback, all addressed and live on the hosted preview (commit a34719c):
 
 - **Thumbprint is now anatomically a thumbprint**: a ridge flow field with a real core and
   delta, traced as evenly-spaced streamlines (the same construction synthetic fingerprint
@@ -599,8 +599,8 @@ Your feedback, all addressed and live at http://37.27.67.44:8788 (commit a34719c
 
 ## Landing page shipped (afternoon 2026-07-25)
 
-**http://37.27.67.44:8788 is now the landing**; the full console moved to
-**http://37.27.67.44:8788/app.html** (nav → "Console"). Per your brief: bold/natural/earthy,
+**The hosted preview root is now the landing**; the full console moved to
+**its `/app.html`** (nav → "Console"). Per your brief: bold/natural/earthy,
 anti-robotic. What shipped:
 
 - **Fired-clay identity**: kiln-black ground, bone type, one iron-oxide accent, film grain
@@ -629,11 +629,10 @@ anti-robotic. What shipped:
 
 ## Since the last update (post-06:00 heartbeats)
 
-- **Demo is hosted: http://37.27.67.44:8788** (ax41, standalone nginx container on :8788 —
-  the dokploy/traefik stack on 80/443 was not touched). Redeploy with
-  `scripts/deploy-demo-ax41.sh`; remove with `ssh ax41 'docker rm -f corroborate-demo'`.
+- **Demo is hosted on the remote box** (standalone nginx container on :8788 — the existing
+  reverse-proxy stack on 80/443 was not touched).
   Two Playwright smokes pass against the hosted URL. If you want a proper domain + TLS,
-  point a dokploy app at ~/corroborate-demo/dist in the morning.
+  point an app at the built `dist/` in the morning.
 - **The Graph's load-bearing claim is now measured, not asserted**: the same Sept-2024 PoH
   wallet scores 2.40 with a flagged 0.5 midpoint when the subgraph is absent, and 2.56 with
   a computed 0.726 survival weight (caveat cleared) when present. Good judge-facing number.
@@ -646,12 +645,12 @@ anti-robotic. What shipped:
   at the version-agnostic /version/latest endpoint. PoH range resyncs in well under an
   hour; the 2.40-vs-2.56 demonstration reruns identically once caught up.
 
-## Registry audit-trail subgraph — live on ax41
+## Registry audit-trail subgraph — live on the remote box
 
-`http://37.27.67.44:8100/subgraphs/name/corroborate-registry` — the second Graph product:
+The self-hosted registry subgraph endpoint — the second Graph product:
 all 15 adapters by plaintext id (the integrity-checked event field from registry v2), plus
 an immutable WeightChange per mutation. "Why did my score change?" is a GraphQL query.
-Self-hosted graph-node on ax41 (publicnode 403'd graph-node's eth_getLogs; switched to
+Self-hosted graph-node on the remote box (publicnode 403'd graph-node's eth_getLogs; switched to
 drpc). Studio mirror needs 60s of your wallet: create slug `corroborate-registry` in
 Studio, then `cd subgraph-registry && npx graph deploy corroborate-registry
 --version-label v0.0.1 --deploy-key $GRAPH_DEPLOY_KEY --node
@@ -659,8 +658,8 @@ https://api.studio.thegraph.com/deploy/`.
 
 ## Name is provisional
 
-"Corroborate" was my pick (means "confirm with independent evidence" — the thesis). Hugo
-will rename later; candidates he floated: **thumb** / **print** (thumbprint = the original
+"Corroborate" was my pick (means "confirm with independent evidence" — the thesis). The
+owner will rename later; candidates floated: **thumb** / **print** (thumbprint = the original
 unique-human mark — short, brandable, on-thesis). Kept rename cheap: the name lives only in
 text/config (npm scope, demo title, docs, one subgraph slug) and is NOT baked into any
 deployed contract, so a later rename is a find-replace plus re-registering the ENS name.
@@ -678,8 +677,8 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    correlated evidence. We count independence — priced at what fraud costs." Your voice,
    your call — one Edit in index.html if you want it.
 
-1. **Repo has no pushable remote.** Judges need a URL. Fork to Hugo0 or get collaborator
-   access from Andrei, then `git push`. Nothing was pushed anywhere overnight.
+1. **Repo has no pushable remote.** Judges need a URL. Fork to a personal account or get collaborator
+   access from the owner, then `git push`. Nothing was pushed anywhere overnight.
 2. **corroborate.eth — no longer blocking, and the Sepolia half is done.** The earlier
    "Sepolia ENS is mid-migration" verdict was wrong: it was the wrong controller and a wrong
    event topic. Sepolia `.eth` registration is **free and instant** today through
@@ -696,7 +695,7 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    the Sepolia name is disposable and a mainnet one is not.
 
    One housekeeping note: `scripts/ens-agents-keys.mjs` appended three agent wallet keys to
-   `.env.local` on ax41 (`AGENT_ALPHA_PRIVATE_KEY`, `AGENT_BETA_PRIVATE_KEY`,
+   `.env.local` on the build machine (`AGENT_ALPHA_PRIVATE_KEY`, `AGENT_BETA_PRIVATE_KEY`,
    `AGENT_UNVERIFIED_PRIVATE_KEY`). They hold nothing and exist so a later challenge/response
    gate can sign as the agents. `.env.local` is gitignored, so on your laptop `npm run ens`
    works without them — only re-running the setup script needs them.
@@ -744,7 +743,7 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    in the hero are read from the chain at runtime and are already correct. The deployed demo
    bundle predates this change, which is harmless (adapter and root counts come from the
    registry; only the implemented probes — nine of them now — are ever named in results), but
-   the next `scripts/deploy-demo-ax41.sh` run picks it up.
+   the next demo redeploy picks it up.
 
 11. **A pitch beat you now own, and it is a good one — but check it before you say it on stage.**
    Linea Proof of Humanity's own documented integration path is **ten months stale**, and ours is not.
@@ -836,15 +835,3 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
   doesn't authorize. Cost ~40 minutes and ~0.01 ETH in reverted attempts before pivoting.
 - A `cd` short-circuit meant `subgraph/src/shared.ts` was never written, which presented as
   an AssemblyScript compiler crash two files away.
-
-## NOTE TO THE AX41 BUILD AGENT (from the laptop session, ~18:20)
-
-Your repo history was rewritten and swapped underneath you (all commits reattributed to
-andrevalenm, same content and timestamps — Hugo/Andrea directive). Your committed work
-through iteration 11 is fully preserved on the new lineage (ENS agent identity + fleet
-policy were cherry-picked over; the 304-test suite passes). HOWEVER: your UNCOMMITTED
-iteration-12 modifications to packages/sdk/src/{world,agentbook,reconcile}.ts were lost
-in the reset — apologies; regenerate them on this HEAD. Your git identity here is now
-configured as andrevalenm. Commit early, commit often. To sync onward: the laptop pushes
-refs/heads/reattributed here; canonical remote is github.com/Hugo0/poh-aggregator
-(private).

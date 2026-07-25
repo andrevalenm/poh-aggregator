@@ -1,4 +1,4 @@
-# Autonomous build log — ax41
+# Autonomous build log — the build machine
 
 Append one block per iteration. Newest at the bottom. Read this before doing anything;
 future iterations start with a blank context and only know what is written here.
@@ -18,7 +18,7 @@ Format:
 
 ## Iteration 0 — 2026-07-25, handover
 
-**Did:** Set up this working copy on ax41 from Hugo's laptop at commit `fa6c924`. Nothing
+**Did:** Set up this working copy on the build machine from the owner's laptop at commit `fa6c924`. Nothing
 else — the queue in `MISSION.md` is untouched and P0 items are both open.
 
 **State of the world at handover:**
@@ -121,7 +121,7 @@ because PoH no longer uses the absence bound.
 only copy is `apps/demo/test.sh` and it `cd`s to its own directory before invoking
 `packages/sdk`, so it cannot work from there — it wants moving to the root. And `pnpm install`
 produced a `pnpm-lock.yaml` that is untracked and left uncommitted, since the repo tracks
-`package-lock.json`; Hugo's call which to keep.
+`package-lock.json`; the owner's call which to keep.
 
 ## Iteration 2 — 2026-07-25
 
@@ -307,7 +307,7 @@ Total minted population and the same question on Base/Linea/Scroll stayed **unme
 endpoints for those chains refuse historical `eth_getLogs` without a key, and buying an archive
 endpoint to answer a population question would put a vendor on a path we keep vendor-free.
 
-**Blocked:** nothing. Iteration 1's two notes still stand unresolved and are Hugo's calls, not
+**Blocked:** nothing. Iteration 1's two notes still stand unresolved and are the owner's calls, not
 blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md` says
 to run it, and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
 
@@ -427,7 +427,7 @@ tested, three serve full archive state, one serves it and throttles immediately,
 is sharing a budget of three endpoints with this one. The landmark ladder exists because of that:
 seeding the two blocks that straddle the import cliff takes the imported cohort from ~85 calls to 6.
 
-**Blocked:** nothing. Iteration 1's two notes still stand and are Hugo's calls, not blockers:
+**Blocked:** nothing. Iteration 1's two notes still stand and are the owner's calls, not blockers:
 `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it,
 and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`. One new item for the
 morning: `farcaster-account` carries `forgeCostCents: 12000`, which is the *Pro* subscription price
@@ -572,7 +572,7 @@ credential" adapter cannot be built from those constants alone. Separately, the 
 (`0xdD748977…Fce31`) returned `false` for every V3 holder sampled and for both Passport-stamped
 addresses; a live test now asserts that, so the day it changes we will hear about it.
 
-**Blocked:** nothing. Iteration 1's two notes still stand and are Hugo's calls, not blockers:
+**Blocked:** nothing. Iteration 1's two notes still stand and are the owner's calls, not blockers:
 `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run
 it, and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
 
@@ -735,7 +735,7 @@ question in the write-up rather than guessed: **how many distinct humans have ev
 99,577-id history was still recovering rate-limited batches after 28 minutes when I stopped it, and
 the paged indexer count hit the same 429 as the tests. The live figure (499 subjects for 500
 attestations) suggests renewal is rare and the answer is probably near 50,000, but "probably" is not
-a measurement and it is not in the ontology. Iteration 1's two notes still stand and are Hugo's
+a measurement and it is not in the ontology. Iteration 1's two notes still stand and are the owner's
 calls, not blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where
 `MISSION.md` says to run it, and `pnpm-lock.yaml` is still untracked beside a tracked
 `package-lock.json`.
@@ -872,7 +872,7 @@ emitted on the order of 10⁷ `AccountVerified` events and deduping them needs a
 no keyless endpoint will serve — the rate table is a sample and says so), and **what selector
 `0xad94e556` is** on the router shim (not in the AddressBook's verified ABI, unknown to both 4byte
 and OpenChain; the revert experiment pins the shim's behaviour either way). Iteration 1's two
-notes still stand and are Hugo's calls, not blockers: `./test.sh` lives at `apps/demo/test.sh`
+notes still stand and are the owner's calls, not blockers: `./test.sh` lives at `apps/demo/test.sh`
 rather than the repo root where `MISSION.md` says to run it, and `pnpm-lock.yaml` is still
 untracked beside a tracked `package-lock.json`.
 
@@ -1023,7 +1023,7 @@ Filtering by topic at the node took the same suite to 32 seconds.
 no answer, because the probe never applies a term itself) and **who the 63 governor-seeded
 submissions are** (recoverable from that day's calldata; it cannot move the population figure,
 but it would make the enumeration exhaustive rather than exhaustive-modulo-an-argument).
-Iteration 1's two notes still stand and are Hugo's calls, not blockers: `./test.sh` lives at
+Iteration 1's two notes still stand and are the owner's calls, not blockers: `./test.sh` lives at
 `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it, and
 `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
 
@@ -1135,7 +1135,7 @@ said when they did. Now they can.
 2. **P1's ENS agent track** — `corroborate.human` on an agent's name, the counterparty resolving
    it and checking the backing human's personhood, a second agent under the same tree refused
    because it is the same human. `corroborate.subjects` already works for humans; the record is
-   self-asserted and the caveat must keep saying so. Blocked on Hugo registering a mainnet name
+   self-asserted and the caveat must keep saying so. Blocked on the owner registering a mainnet name
    (`MORNING.md` item 2, open since before iteration 1).
 3. **Base EAS subgraph**, replacing the `easscan.org` GraphQL dependency in
    `coinbaseVerificationAdapter` — the last vendor on the critical path, and the last place the
@@ -1160,7 +1160,7 @@ only indexed to X") is otherwise unavailable.
 change not at all — 14 hours of chain history is indistinguishable from now. That is a property
 of the dataset rather than of the design, and it is why the credential half is a documented
 exclusion plus a caveat rather than a second reconstruction. Iteration 1's two notes still stand
-and are Hugo's calls, not blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo
+and are the owner's calls, not blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo
 root where `MISSION.md` says to run it, and `pnpm-lock.yaml` is still untracked beside a tracked
 `package-lock.json`. New and minor: `subgraph-registry/package-lock.json` moved because installing
 graph-cli resolved a floating `@types/node` range from 12.20.55 to 26.1.1; kept, since it is the
@@ -1307,7 +1307,7 @@ nothing. Registry stays at **30 adapters, revision 34**.
 3. **P1's ENS agent track** — `corroborate.human` on an agent's name, the counterparty resolving
    it and checking the backing human's personhood, a second agent under the same tree refused
    because it is the same human. The refusal half now exists as a policy engine and would only
-   need the ENS name tree; still blocked on Hugo registering a mainnet name (`MORNING.md` item 2).
+   need the ENS name tree; still blocked on the owner registering a mainnet name (`MORNING.md` item 2).
 4. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
    the cheapest way to turn two flagged approximations into real dates (iteration 1's next-step
    1, unchanged through nine iterations now).
@@ -1327,14 +1327,14 @@ does not need it and a guess would be an accusation) and **what `getNextNonce` i
 delegated registration** (`register` takes a nonce and the sampled call passed 0; if
 registrations can be relayed, the transaction sender is not the operator — which changes nothing
 we score, since the identifier comes from the proof, but it would change anyone's attempt to
-cluster fleets by funder). Iteration 1's two notes still stand and are Hugo's calls, not
+cluster fleets by funder). Iteration 1's two notes still stand and are the owner's calls, not
 blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md`
 says to run it, and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
 
 ## Iteration 11 — 2026-07-25
 
 **Did:** P1 — **ENS as the carrier of agent identity**, the one remaining mission item that
-every iteration since 1 has recorded as *blocked on Hugo registering a mainnet name*. It was
+every iteration since 1 has recorded as *blocked on the owner registering a mainnet name*. It was
 not blocked, and the block was the interesting part.
 
 - **Sepolia `.eth` registration is free and instant today.** Iteration 0's inherited verdict
@@ -1476,7 +1476,7 @@ is all the SDK uses.
 would let anyone absorb a stranger by copying their record) and **clustering an agent wallet to
 an operator by funding history** (a guess that reads as an accusation when it is wrong). Both are
 the same principle iteration 10 applied to the 27-agent operator. Iteration 1's two notes still
-stand and are Hugo's calls, not blockers: `./test.sh` lives at `apps/demo/test.sh` rather than
+stand and are the owner's calls, not blockers: `./test.sh` lives at `apps/demo/test.sh` rather than
 the repo root where `MISSION.md` says to run it, and `pnpm-lock.yaml` is still untracked beside a
 tracked `package-lock.json`. New and minor: `.env.local` gained three agent wallet keys
 (`AGENT_ALPHA_PRIVATE_KEY`, `AGENT_BETA_PRIVATE_KEY`, `AGENT_UNVERIFIED_PRIVATE_KEY`), generated
