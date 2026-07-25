@@ -1300,6 +1300,7 @@ html.js .sl-in .sl-line {
 }
 
 .evd-verdict {
+  white-space: nowrap;
   font-size: 0.72rem;
   font-weight: 650;
   letter-spacing: 0.1em;
