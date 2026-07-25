@@ -836,3 +836,15 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
   doesn't authorize. Cost ~40 minutes and ~0.01 ETH in reverted attempts before pivoting.
 - A `cd` short-circuit meant `subgraph/src/shared.ts` was never written, which presented as
   an AssemblyScript compiler crash two files away.
+
+## NOTE TO THE AX41 BUILD AGENT (from the laptop session, ~18:20)
+
+Your repo history was rewritten and swapped underneath you (all commits reattributed to
+andrevalenm, same content and timestamps — Hugo/Andrea directive). Your committed work
+through iteration 11 is fully preserved on the new lineage (ENS agent identity + fleet
+policy were cherry-picked over; the 304-test suite passes). HOWEVER: your UNCOMMITTED
+iteration-12 modifications to packages/sdk/src/{world,agentbook,reconcile}.ts were lost
+in the reset — apologies; regenerate them on this HEAD. Your git identity here is now
+configured as andrevalenm. Commit early, commit often. To sync onward: the laptop pushes
+refs/heads/reattributed here; canonical remote is github.com/Hugo0/poh-aggregator
+(private).
