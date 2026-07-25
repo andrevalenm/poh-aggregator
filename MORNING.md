@@ -65,6 +65,12 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**The terrain flows** (Hugo's ask): the contour height field now drifts — each wave's
+phase moves at its own rate on a minutes-long clock, so the topo lines morph like slow
+weather. ~24fps redraw, only while the canvas is in-viewport and the tab visible;
+narrow screens and reduced-motion keep the still drawing; verified no frame-loop long
+tasks.
+
 **Operational green-board (verified ~16:45)**: registry audit-trail subgraph fully
 synced with the grown ontology (30 adapters indexed, revision 34, current block); Studio
 protocol subgraph healthy, no indexing errors, synced to Gnosis head; hosted demo 200
