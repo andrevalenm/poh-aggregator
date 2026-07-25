@@ -2,6 +2,7 @@ import './landing.css'
 import { DEFAULT_REGISTRY, makeClient } from '../client.ts'
 import { h, shortAddr } from '../ui.ts'
 import { mountFingerprint, stampPrint } from './fingerprint.ts'
+import { mountFluid } from './fluid.ts'
 import { mountSmudge } from './smudge.ts'
 import { mountWidget } from './widget.ts'
 
@@ -121,10 +122,17 @@ function copyButton(text: string, label: string): HTMLElement {
 // ------------------------------------------------------------------ reveals
 
 function mountReveals(): void {
-  const els = document.querySelectorAll('.reveal')
+  const els = document.querySelectorAll<HTMLElement>('.reveal')
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     for (const el of els) el.classList.add('in')
     return
+  }
+  // Siblings cascade rather than arriving as one block: each element's delay is its
+  // reveal-index within its parent.
+  for (const el of els) {
+    const siblings = el.parentElement ? [...el.parentElement.children].filter((c) => c.classList.contains('reveal')) : []
+    const idx = Math.max(siblings.indexOf(el), 0)
+    el.style.transitionDelay = `${Math.min(idx * 110, 440)}ms`
   }
   const io = new IntersectionObserver(
     (entries) => {
@@ -169,7 +177,22 @@ function mountTornEdges(): void {
 // -------------------------------------------------------------------- mount
 
 mountFingerprint(document.getElementById('print') as HTMLCanvasElement)
-mountSmudge(document.getElementById('smudge') as HTMLCanvasElement)
+{
+  // The ink trail is a GPU fluid sim; the 2D ribbon (softened) is the fallback, both for
+  // machines without WebGL2 and for contexts that get dropped after init — a lost context
+  // cannot be revived as 2D on the same element, so the fallback gets a fresh canvas.
+  const smudgeCanvas = document.getElementById('smudge') as HTMLCanvasElement
+  let fellBack = false
+  const fallbackToRibbon = () => {
+    if (fellBack) return
+    fellBack = true
+    const fresh = smudgeCanvas.cloneNode(false) as HTMLCanvasElement
+    smudgeCanvas.replaceWith(fresh)
+    fresh.style.filter = 'blur(6px)'
+    mountSmudge(fresh)
+  }
+  if (!mountFluid(smudgeCanvas, fallbackToRibbon)) fallbackToRibbon()
+}
 mountWidget()
 mountPicker()
 mountReveals()
