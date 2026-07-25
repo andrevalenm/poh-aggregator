@@ -34,6 +34,30 @@ test.describe('Corroborate landing', () => {
     await expect(page.locator('.example-chip')).toHaveCount(3)
   })
 
+  test('the print deforms under the pointer — the signature interaction', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    // Let the draw-in finish (it starts at idle and runs ~2.6s).
+    await page.waitForTimeout(3600)
+    const sample = () =>
+      page.evaluate(() => {
+        const c = document.getElementById('print') as HTMLCanvasElement
+        const ctx = c.getContext('2d')!
+        const d = ctx.getImageData(Math.round(c.width * 0.68), Math.round(c.height * 0.4), 200, 200).data
+        let s = 0
+        for (let i = 3; i < d.length; i += 40) s += d[i]
+        return s
+      })
+    const before = await sample()
+    expect(before).toBeGreaterThan(0) // the print must actually be drawn
+    await page.mouse.move(1050, 430)
+    await page.mouse.move(1062, 446, { steps: 4 })
+    await page.waitForTimeout(400)
+    const after = await sample()
+    // Pressing near the core must displace ridges — pixel content changes in the region.
+    expect(after).not.toBe(before)
+  })
+
   test('widget resolves a live wallet and links to the console', async ({ page }) => {
     test.setTimeout(240_000)
     await page.goto('/')
