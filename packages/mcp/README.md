@@ -41,7 +41,7 @@ Or as JSON config (Claude Desktop / Cursor):
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `CORROBORATE_SUBGRAPH_URL` | *(unset)* | The Graph endpoint supplying issuance dates and graph position. Without it the server still works, but age weights fall back to flagged midpoints — measured effect on a real wallet: score 2.40 flagged vs 2.56 computed. |
+| `CORROBORATE_SUBGRAPH_URL` | *(unset)* | The Graph endpoint supplying issuance dates and graph position. Without it the server still works, but age weights fall back to flagged midpoints. With it, weights are computed from real registration age — a live PoH wallet moves from the 2.40 midpoint to a computed weight that reflects its actual age (freshly-renewed credentials weigh less, long-survived ones more). |
 | `CORROBORATE_REGISTRY` | Sepolia `0x977b…aa07` | The on-chain trust-root ontology to score against. |
 
 ## Tools

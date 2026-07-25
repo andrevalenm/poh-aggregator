@@ -131,40 +131,54 @@ describe('end to end', () => {
 
 describe('subgraph enrichment (live)', () => {
   /**
-   * The load-bearing claim, as a test: with the subgraph, a vouching-registry credential's
-   * weight is computed from its real on-chain age; without it, the weight falls to the
-   * flagged 0.5 midpoint. Skips (rather than fails) while the subgraph is still syncing —
-   * a fresh deployment should not redden the suite.
+   * The load-bearing claim, as a test: with the subgraph, a credential's age weight is
+   * computed from its real on-chain claimedAt and the unknown-age caveat clears; without
+   * it, the weight is the flagged 0.5 midpoint.
+   *
+   * It asserts the MECHANISM, not a specific age. PoH humanities expire (~1y) and must be
+   * renewed, so "a currently-live two-year-old registration" is not a stable premise — the
+   * durable invariant is that the enriched freshness is exactly the ramp value implied by
+   * whatever date the subgraph returns. (An earlier version hardcoded a Sept-2024 date that
+   * turned out to be a vouch-timestamp artifact of a subgraph indexing bug; asserting the
+   * mechanism is why the corrected data no longer breaks it.) Skips while the subgraph is
+   * still syncing so a fresh deployment does not redden the suite.
    */
   const SUBGRAPH = process.env.CORROBORATE_SUBGRAPH_URL ?? 'https://api.studio.thegraph.com/query/77602/poh/version/latest'
-  // Sept-2024 organic PoH registration (claimedAt 1726098850), well before the airdrop window.
-  const ORGANIC = '0x17a91203a9e9c3519c2f76210497ef7f4be2352f' as Address
+  // A currently-registered PoH human. Used only because it is live; the test reads its real
+  // claimedAt rather than assuming one.
+  const LIVE_POH = '0xd267eba602e692216703626a81157214b24c85fb' as Address
+  const POH_HALF_LIFE_DAYS = 365 // must match ontology/adapters.json poh-v2
 
-  test('ramp weight computes from real claimedAt when the subgraph has the range', async (t) => {
+  test('enriched freshness is the ramp value implied by the real claimedAt', async (t) => {
     const { subgraphReady, pohEnrichment } = await import('./subgraph.ts')
-    if (!(await subgraphReady(SUBGRAPH)) || !(await pohEnrichment(SUBGRAPH, ORGANIC))) {
-      t.skip('subgraph not synced past the organic PoH range yet')
+    const enrichment = (await subgraphReady(SUBGRAPH)) ? await pohEnrichment(SUBGRAPH, LIVE_POH) : undefined
+    if (!enrichment) {
+      t.skip('subgraph not synced past this claim yet')
       return
     }
 
-    const bare = await new Corroborate({ knownIds, knownRoots }).resolve(ORGANIC)
-    const enriched = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(ORGANIC)
+    const bare = await new Corroborate({ knownIds, knownRoots }).resolve(LIVE_POH)
+    const enriched = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(LIVE_POH)
 
     const barePoh = bare.evidence.find((e) => e.adapterId === 'poh-v2')
     const richPoh = enriched.evidence.find((e) => e.adapterId === 'poh-v2')
-    assert.ok(barePoh?.held && richPoh?.held, 'vector must still be registered')
+    assert.ok(barePoh?.held && richPoh?.held, 'vector must still be registered on-chain')
 
-    assert.equal(barePoh.freshness, 0.5, 'without ages, Ramp holds the flagged midpoint')
-    assert.ok(richPoh.issuedAt, 'subgraph supplies the issuance date')
+    // Without ages, Ramp holds the flagged midpoint and flags it.
+    assert.equal(barePoh.freshness, 0.5)
+    assert.ok(bare.caveats.some((c) => c.code === 'issuance-date-unknown'))
+
+    // With the subgraph, the date is real, the caveat clears, and the weight is exactly the
+    // ramp value that date implies — self-consistent, no magic number.
+    assert.equal(richPoh.issuedAt, enrichment.claimedAt)
+    assert.ok(!enriched.caveats.some((c) => c.code === 'issuance-date-unknown'))
+
+    const ageDays = (enriched.computedAt - enrichment.claimedAt) / 86_400
+    const expected = 1 - 2 ** (-ageDays / POH_HALF_LIFE_DAYS)
     assert.ok(
-      richPoh.freshness > 0.6,
-      `a ~2-year survivor must weigh well above the midpoint, got ${richPoh.freshness}`,
+      Math.abs(richPoh.freshness - expected) < 0.02,
+      `enriched freshness ${richPoh.freshness} should match ramp(${ageDays.toFixed(0)}d)=${expected.toFixed(3)}`,
     )
-    assert.ok(
-      bare.caveats.some((c) => c.code === 'issuance-date-unknown') &&
-        !enriched.caveats.some((c) => c.code === 'issuance-date-unknown'),
-      'the unknown-age caveat clears exactly when the age is known',
-    )
-    assert.ok(enriched.score > bare.score, 'survival earns more than uncertainty')
+    assert.notEqual(richPoh.freshness, 0.5, 'a computed weight is not the unknown-age midpoint')
   })
 })
