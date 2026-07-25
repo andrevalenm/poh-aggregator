@@ -10,13 +10,21 @@ import {
   type Reconciled,
 } from '../reconcile.ts'
 import {
+  assumedTermHistory,
   classifyHumanityTerm,
   originClient,
   readGrantedTerms,
+  readTermHistory,
   resolveImportedTerm,
+  termForLocalExpiry,
+  POH_V2_DEPLOY_BLOCK,
+  POH_V2_MAINNET,
+  POH_V2_MAINNET_DEPLOYED_AT,
+  POH_V2_MAINNET_DEPLOY_BLOCK,
   type HumanityGrant,
   type HumanityTermOrigin,
   type ImportedTermOrigin,
+  type TermHistory,
 } from './poh-term.ts'
 import { readCirclesStopped, type CirclesMintTime } from './circles.ts'
 import { humanPassportAdapter } from './human-passport.ts'
@@ -224,6 +232,18 @@ const ZERO_HUMANITY_ID = '0x0000000000000000000000000000000000000000' as const
  * Gnosis", and that cannot begin before the grant that created it here. Handing the origin's date
  * to an as-of query would restore a Gnosis credential for a Tuesday when the human's registration
  * was still on mainnet — the same fact, but a false statement about this adapter.
+ *
+ * `history` settles the other half of the premise: not *whose* term the expiry is, but *which* of
+ * this contract's terms. `humanityLifespan` is governance-settable, and the subtraction has always
+ * used its value at head — so a change would shift every derived date in the registry at once,
+ * silently, by the size of the change. `DurationsChanged` publishes every such change, and a
+ * full-range sweep of it is a complete timeline; `termForLocalExpiry` picks the era an expiry
+ * belongs to and subtracts *that* era's term. With no change ever emitted — the state of both
+ * instances today — the timeline is one era and the answer is identical to the old one, which is
+ * the point: nothing at head moves, and the assumption behind it is now a checked fact.
+ *
+ * Omitting `history` keeps the old behaviour exactly, for a caller with no network, and marks the
+ * date `term-origin-unverified` when the sweep was attempted and failed.
  */
 export function dateHumanityFromTerm(r: {
   expirationTime: number
@@ -232,6 +252,7 @@ export function dateHumanityFromTerm(r: {
   term: HumanityTermOrigin
   origin?: ImportedTermOrigin
   purpose?: 'age' | 'window'
+  history?: TermHistory
 }): { issuedAt?: number; note?: ProvenanceNote; detail: Record<string, unknown> } {
   const detail: Record<string, unknown> = {}
   if (r.term.kind === 'imported') {
@@ -253,19 +274,44 @@ export function dateHumanityFromTerm(r: {
   }
 
   if (r.term.kind === 'local' && r.term.renewedAfterImport) detail.renewed = true
+  // Degenerate inputs, kept ahead of the timeline because they are about the read failing rather
+  // than about which term applies: a lifespan of zero is an `eth_call` that did not answer.
   if (r.lifespan <= 0 || r.expirationTime <= r.lifespan) return { detail }
-  const claimedAt = r.expirationTime - r.lifespan
-  // A start before this contract existed, or after the block we read, means `humanityLifespan`
-  // is not the term this expiry was written under — a governance change, or a record we have
-  // misread. Better a window we decline to close than one we invent.
-  if (claimedAt < POH_V2_DEPLOYED_AT || claimedAt > r.now) {
-    detail.dateRejected = claimedAt
+
+  const history = r.history ?? assumedTermHistory(r.lifespan, POH_V2_DEPLOYED_AT)
+  const solved = termForLocalExpiry(history, r.expirationTime, r.now)
+  if (solved.kind === 'ambiguous') {
+    // Two terms the contract really did grant both place the write inside their own era. Nothing
+    // in the record distinguishes them, so there is no date here — only a choice of two.
+    detail.termAmbiguous = solved.terms
     return { detail }
   }
+  if (solved.kind === 'era-unknown') {
+    // Only the era before the first `DurationsChanged` explains this expiry, and `initialize`
+    // never published the term that era ran under.
+    detail.termEraUnpublished = true
+    return { detail }
+  }
+  if (solved.kind === 'no-era') {
+    // A start before this contract existed, or after the block we read, means no term this
+    // contract has ever granted wrote this expiry — a record we have misread, or one written by
+    // something we cannot see. Better a window we decline to close than one we invent.
+    detail.dateRejected = r.expirationTime - r.lifespan
+    return { detail }
+  }
+
+  const claimedAt = r.expirationTime - solved.term
+  if (solved.term !== r.lifespan) detail.termAtClaim = solved.term
   detail.claimedAt = claimedAt
   return {
     issuedAt: claimedAt,
-    ...(r.term.kind === 'unverified' ? { note: 'term-origin-unverified' as const } : {}),
+    // Either sweep failing leaves the date resting on the assumption that sweep exists to test:
+    // `grants` on *whose* term this is, `history` on *which* of ours. The note is the same
+    // because the consequence is. A caller who supplied no `history` at all is not in this case —
+    // they never asked, which is the pre-existing contract and stays silent.
+    ...(r.term.kind === 'unverified' || (r.history !== undefined && !r.history.observed)
+      ? { note: 'term-origin-unverified' as const }
+      : {}),
     detail,
   }
 }
@@ -294,6 +340,12 @@ export interface LapsedHumanityRead {
   term?: HumanityTermOrigin
   /** The origin instance's own registration, when the term was imported and could be traced. */
   origin?: ImportedTermOrigin
+  /**
+   * Every term this registry has granted, and when. Absent means nobody swept `DurationsChanged`,
+   * and `lifespan` is then assumed to have been in force since the deployment — the pre-sweep
+   * behaviour, kept so this stays callable without a network.
+   */
+  history?: TermHistory
 }
 
 /**
@@ -358,6 +410,7 @@ export function closeLapsedHumanityWindow(r: LapsedHumanityRead): {
     now: r.now,
     term: r.term ?? { kind: 'local' },
     ...(r.origin ? { origin: r.origin } : {}),
+    ...(r.history ? { history: r.history } : {}),
     purpose: 'window',
   })
   Object.assign(detail, dated.detail)
@@ -391,12 +444,20 @@ export function closeLapsedHumanityWindow(r: LapsedHumanityRead): {
  * the latest claim rather than the first registration. It is surfaced in `detail` because on
  * a survival ramp the difference matters.
  *
- * The subtraction has a premise — that *this* contract wrote the expiry — and the premise is
- * checked rather than assumed. `ccGrantHumanity` copies a term settled on another instance, and
- * for 7 of the 9 humanities ever imported that instance is PoH v1, whose term is twice as long.
- * One memoised sweep of `HumanityGrantedDirectly` says which humanities those are, and where the
- * origin still publishes the registration behind the expiry it is read from there instead. See
- * `poh-term.ts`.
+ * The subtraction has two premises, and both are now checked rather than assumed.
+ *
+ * *Whose term is this?* `ccGrantHumanity` copies a term settled on another instance, and for 7 of
+ * the 9 humanities ever imported that instance is PoH v1, whose term is twice as long. One memoised
+ * sweep of `HumanityGrantedDirectly` says which humanities those are, and where the origin still
+ * publishes the registration behind the expiry it is read from there instead.
+ *
+ * *Which of our terms is it?* `humanityLifespan` is governance-settable, and the subtraction uses
+ * its value at head — so a change would move every derived date in the registry at once, by the
+ * size of the change, with nothing to notice it. `changeDurations` is the only writer after
+ * `initialize` and it emits `DurationsChanged`, so a second memoised sweep is a complete timeline
+ * of the term, and the era an expiry falls in decides which value to subtract. **Zero changes on
+ * either instance to date**, so nothing at head moves — the assumption simply stopped being one.
+ * See `poh-term.ts` for both.
  *
  * A subject the contract answers `false` for gets one more question asked of them: *did you
  * hold a humanity that has since expired?* The registry never deletes one — `owner` and
@@ -415,8 +476,33 @@ export function pohAdapter(rpcUrl: string = RPC.gnosis, subgraphUrl?: string): A
    * holding it means the common case (no grant for this humanity) costs a map lookup.
    */
   let grants: Promise<Map<string, HumanityGrant[]> | undefined> | undefined
+  /**
+   * Every change the registry has made to `humanityLifespan`, read once and shared. Currently
+   * zero logs, and the sweep is a single full-range `eth_getLogs` measured at 124 ms — so the
+   * check that the term has never moved costs one request per process, not one per subject.
+   */
+  let terms: Promise<TermHistory | undefined> | undefined
   /** Mainnet, for the origin lookup only. Built lazily: most subjects never need it. */
   let origins: PublicClient | undefined
+  /** Mainnet PoH v2's own term timeline plus the block it was read at; only imports need it. */
+  let originTerms: Promise<{ history?: TermHistory; now: number } | undefined> | undefined
+
+  /**
+   * Which of this contract's terms wrote this expiry, as far as the chain says.
+   *
+   * Memoised on success only, exactly as the grant sweep is and for the same reason: a rate limit
+   * is a moment, not a property of the registry, and a failed sweep must not mark every later
+   * probe in the process `term-origin-unverified`.
+   */
+  const historyFor = async (lifespanAtHead: number, head: bigint): Promise<TermHistory | undefined> => {
+    const read = await (terms ??= readTermHistory(c, head, CONTRACTS.pohV2, {
+      deployBlock: POH_V2_DEPLOY_BLOCK,
+      deployedAt: POH_V2_DEPLOYED_AT,
+      lifespanAtHead,
+    }))
+    if (!read) terms = undefined
+    return read
+  }
 
   /**
    * Whose term wrote this expiry, and — when it was not this contract's — what the origin
@@ -448,7 +534,25 @@ export function pohAdapter(rpcUrl: string = RPC.gnosis, subgraphUrl?: string): A
       ...(known ? { grants: known } : {}),
     })
     if (classified.kind !== 'imported') return { term: classified }
-    const origin = await resolveImportedTerm((origins ??= originClient()), humanityId, expirationTime).catch(
+    const onMainnet = (origins ??= originClient())
+    // The origin's date is a subtraction on that instance too, so it wants the same timeline —
+    // read once, on the first import this process sees, and never for a subject with none.
+    const mainnetTerms = await (originTerms ??= (async () => {
+      const [block, lifespanAtHead] = await Promise.all([
+        onMainnet.getBlock(),
+        onMainnet
+          .readContract({ address: POH_V2_MAINNET, abi: POH_ABI, functionName: 'humanityLifespan' })
+          .then(Number),
+      ])
+      const history = await readTermHistory(onMainnet, block.number!, POH_V2_MAINNET, {
+        deployBlock: POH_V2_MAINNET_DEPLOY_BLOCK,
+        deployedAt: POH_V2_MAINNET_DEPLOYED_AT,
+        lifespanAtHead,
+      })
+      return { ...(history ? { history } : {}), now: Number(block.timestamp) }
+    })().catch(() => undefined))
+    if (!mainnetTerms) originTerms = undefined
+    const origin = await resolveImportedTerm(onMainnet, humanityId, expirationTime, mainnetTerms).catch(
       () => undefined,
     )
     return { term: classified, ...(origin ? { origin } : {}) }
@@ -535,8 +639,15 @@ export function pohAdapter(rpcUrl: string = RPC.gnosis, subgraphUrl?: string): A
         // humanity at all, which costs nothing; only then is it worth asking the network whose
         // term the expiry is. Discarded candidates never reach mainnet.
         if (closeLapsedHumanityWindow(record).heldUntil === undefined) continue
-        const whose = await termFor(humanityId, record.expirationTime, term, now, BigInt(block))
-        const closed = closeLapsedHumanityWindow({ ...record, ...whose })
+        const [whose, history] = await Promise.all([
+          termFor(humanityId, record.expirationTime, term, now, BigInt(block)),
+          historyFor(term, BigInt(block)),
+        ])
+        const closed = closeLapsedHumanityWindow({
+          ...record,
+          ...whose,
+          history: history ?? assumedTermHistory(term, POH_V2_DEPLOYED_AT),
+        })
         if (closed.heldUntil !== undefined) {
           if (storedId && humanityId === storedId) closed.detail.humanityIdFrom = 'account-mapping'
           else closed.detail.humanityIdFrom = 'address-convention'
@@ -603,15 +714,19 @@ export function pohAdapter(rpcUrl: string = RPC.gnosis, subgraphUrl?: string): A
         detail.expirationTime = expirationTime
         detail.nbRequests = nbRequests
         if (nbRequests > 1) detail.renewed = true
-        // Whose term this expiry is decides whether the subtraction below means anything. The
-        // guards inside `dateHumanityFromTerm` are the old ones: no date at all beats a
-        // fabricated one when either value is zero or the lifespan outruns the expiry.
-        const whose = await termFor(humanityId, expirationTime, term, Number(head.timestamp), head.number)
+        // Whose term this expiry is, and which of ours it is, decide whether the subtraction below
+        // means anything. The guards inside `dateHumanityFromTerm` are the old ones: no date at all
+        // beats a fabricated one when either value is zero or the lifespan outruns the expiry.
+        const [whose, history] = await Promise.all([
+          termFor(humanityId, expirationTime, term, Number(head.timestamp), head.number),
+          historyFor(term, head.number),
+        ])
         const dated = dateHumanityFromTerm({
           expirationTime,
           lifespan: term,
           now: Number(head.timestamp),
           ...whose,
+          history: history ?? assumedTermHistory(term, POH_V2_DEPLOYED_AT),
           purpose: 'age',
         })
         Object.assign(detail, dated.detail)

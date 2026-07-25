@@ -9,7 +9,16 @@ import { test, describe, before } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { Corroborate, DEFAULT_REGISTRY } from './index.ts'
-import { worldIdOrbAdapter, pohAdapter, circlesAdapter, coinbaseVerificationAdapter } from './adapters/index.ts'
+import {
+  worldIdOrbAdapter,
+  pohAdapter,
+  circlesAdapter,
+  coinbaseVerificationAdapter,
+  readTermHistory,
+  termForLocalExpiry,
+  POH_V2_DEPLOY_BLOCK,
+  POH_V2_DEPLOYED_AT,
+} from './adapters/index.ts'
 import type { Address } from './types.ts'
 
 const ontologyJson = JSON.parse(readFileSync(new URL('../../../ontology/adapters.json', import.meta.url), 'utf8'))
@@ -476,6 +485,65 @@ describe('index and chain, reconciled against live data', () => {
     }
   }
 
+  /**
+   * Every term the registry has ever granted, swept from `DurationsChanged` at run time.
+   *
+   * Memoised across the tests in this suite because it is one full-range `eth_getLogs` and the
+   * answer is a property of the contract, not of the subject being probed.
+   */
+  let termHistory: Promise<Awaited<ReturnType<typeof readTermHistory>>> | undefined
+  const pohTermHistory = async (lifespanAtHead: number) => {
+    const { createPublicClient, http } = await import('viem')
+    const { gnosis } = await import('viem/chains')
+    const client = createPublicClient({ chain: gnosis, transport: http('https://rpc.gnosischain.com') })
+    return (termHistory ??= (async () =>
+      readTermHistory(client, await client.getBlockNumber(), POH_V2, {
+        deployBlock: POH_V2_DEPLOY_BLOCK,
+        deployedAt: POH_V2_DEPLOYED_AT,
+        lifespanAtHead,
+      }))())
+  }
+
+  test('no term but the one at head has ever been granted, and the log is what says so', async () => {
+    // The premise behind every PoH v2 date: `expirationTime - humanityLifespan()` is the claim
+    // second only if the value at head is the value that was in force at the write. It is
+    // governance-settable — `changeDurations` writes it, and PoH v1's equivalent has already moved
+    // once — so the probe sweeps `DurationsChanged`, the only event any writer after `initialize`
+    // emits, and reads the answer off the timeline rather than assuming it.
+    //
+    // Nothing in here is remembered. The term at head, the head block, and the whole log set are
+    // read each run; the assertions are that the timeline *explains* head and covers the
+    // contract's life without a gap, which stays true on the day a change does land.
+    const { createPublicClient, http } = await import('viem')
+    const { gnosis } = await import('viem/chains')
+    const client = createPublicClient({ chain: gnosis, transport: http('https://rpc.gnosischain.com') })
+    const lifespanAtHead = await (await pohV2Client()).lifespan()
+    const history = await pohTermHistory(lifespanAtHead)
+
+    assert.ok(history, 'the sweep answered — an unread sweep is not an empty one')
+    assert.equal(history.observed, true)
+    assert.ok(history.eras.length >= 1)
+    assert.equal(history.eras[0]!.from, POH_V2_DEPLOYED_AT, 'the timeline starts at the deployment')
+
+    const running = history.eras[history.eras.length - 1]!
+    assert.equal(running.until, undefined, 'the last era is the one still running')
+    assert.equal(running.seconds, lifespanAtHead, 'and its term is the one the getter returns')
+
+    // Contiguous, with every boundary a real block on this chain — so a change, when one lands,
+    // is dated by the chain rather than by us.
+    for (let i = 1; i < history.eras.length; i++) {
+      assert.equal(history.eras[i - 1]!.until, history.eras[i]!.from, 'eras leave no gap')
+      const b = await client.getBlock({ blockNumber: BigInt(history.eras[i]!.block!) })
+      assert.equal(Number(b.timestamp), history.eras[i]!.from, 'each boundary is its own block')
+    }
+
+    // And the consequence, stated as arithmetic: a claim mined a day ago expires one running-era
+    // term from then, and the resolver hands back that same term rather than guessing.
+    const now = Number((await client.getBlock()).timestamp)
+    const solved = termForLocalExpiry(history, now - 86_400 + running.seconds!, now)
+    assert.equal(solved.kind === 'settled' ? solved.term : 0, running.seconds)
+  })
+
   test('a humanity that expired is a closed window, and the claim log is its start', async (t) => {
     // The mechanism, not a magic number: the probe reads state only, and the assertion holds
     // that state against a completely different subsystem of the node — the event log the
@@ -519,10 +587,16 @@ describe('index and chain, reconciled against live data', () => {
       'and the contract itself will no longer name the humanity — which is why storage is read',
     )
 
-    // 2. the start is that end minus the term the contract publishes
+    // 2. the start is that end minus the term the contract publishes — and specifically the term
+    //    that was in force when the expiry was written, which the registry's own change log names.
+    //    A literal here would have been a remembered number; `changeDurations` is governance-
+    //    settable, so the term is swept rather than recalled.
     const lifespan = await poh.lifespan()
-    assert.equal(lifespan, 31_557_600, 'humanityLifespan is the year the derivation assumes')
-    assert.equal(evidence.issuedAt, evidence.heldUntil! - lifespan)
+    const history = await pohTermHistory(lifespan)
+    assert.ok(history, 'the DurationsChanged sweep answered')
+    const era = termForLocalExpiry(history, evidence.heldUntil!, Math.floor(Date.now() / 1000))
+    assert.equal(era.kind, 'settled', 'exactly one term this registry granted explains the expiry')
+    assert.equal(evidence.issuedAt, evidence.heldUntil! - (era.kind === 'settled' ? era.term : 0))
 
     // 3. and that second is the block the chain accepted the claim in — the probe never looked
     const claims: { blockNumber: string; data: string }[] = await gnosisRpc('eth_getLogs', [

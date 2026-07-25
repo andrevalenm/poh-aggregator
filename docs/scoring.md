@@ -221,6 +221,21 @@ the second before it is believed. Two shapes of honesty ride along: an age cross
 a question about the instants **this** registry honoured the humanity, which cannot begin before
 the grant; and a sweep that failed is not a sweep that found nothing, so the date stands with
 `term-origin-unverified` saying which assumption it stands on.
+
+**The same subtraction has a second premise: that the term we subtract is the term that was in
+force at the write.** `humanityLifespan` is governance-settable and is read at *head*, while the
+expiry was written in the past — so one governance transaction would shift every derived date in
+the registry at once, in the same direction, by the size of the change. This is not a scenario:
+PoH **v1**'s equivalent field has already moved, 31,557,600 → 63,115,200, and v1 emits nothing when
+it does. v2 does emit — `changeDurations` is the only writer after `initialize`, and it publishes
+`DurationsChanged` — so the probe sweeps that one event over the contract's whole life and reads
+the term off a timeline instead of assuming it. **Zero changes on either instance to date**, which
+is the strongest available answer rather than the weakest: with none ever emitted, head's value is
+the value the contract launched with, and every PoH date since 2024 is derived from a checked fact.
+Where a change does land, the timeline dates it, so each cohort is dated with the term that was in
+force for it rather than every date being discarded — and where two eras both explain one expiry,
+or where only the era before the first change does (the term `initialize` never published), there
+is no date, because there is a choice rather than an answer.
 Circles has no such slot, which is why the reconciler above exists.
 
 ## 5. Zero out dead protocols, then sum and take log₁₀

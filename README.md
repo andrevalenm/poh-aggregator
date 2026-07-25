@@ -507,7 +507,7 @@ cd packages/sdk && node --test --experimental-strip-types src/ens-presentation.l
 cd apps/demo && npx playwright test
 ```
 
-564 of them exist as of 2026-07-26 (18 forge + 533 SDK + 13 browser) and 562 pass. Two SDK tests
+582 of them exist as of 2026-07-26 (18 forge + 551 SDK + 13 browser) and 580 pass. Two SDK tests
 are red and named: the deployed registry gained two adapters from another working copy and this
 tree's ontology has not caught up (`MORNING.md`, "Needs you" item 18). Nothing skips against a
 pinned subgraph version; against Studio's `version/latest` the free-tier quota can throttle the
@@ -660,11 +660,25 @@ registration and priced a two-year-old credential as one year old. The guard tha
 because a transfer out leaves the request history intact and a renewal after an import adds to it.
 Now the registry's own `HumanityGrantedDirectly` log decides it — one memoised sweep, ~400 ms once
 per process and nothing warm — and where the term is foreign the origin instance's own registration
-supplies the date, required to reproduce our expiry to the second first. What it does **not**
-close: both terms are governance-settable, and a change to Gnosis's would silently invalidate every
-locally derived date without anything noticing. The direction of the old error was in the subject's
-disfavour rather than an adversary's, which is why it survived this long.
+supplies the date, required to reproduce our expiry to the second first. The direction of the old
+error was in the subject's disfavour rather than an adversary's, which is why it survived this long.
+What it did not close is limit 15.
 [`research/protocols/poh-imported-terms.md`](research/protocols/poh-imported-terms.md).
+
+**15. The term we subtract is read at head; the expiry was written in the past.** `humanityLifespan`
+is governance-settable, so one `changeDurations` would leave every stored expiry alone and shift
+every date derived from one — the whole registry, at once, in the same direction, by the size of the
+change. PoH **v1**'s equivalent field has already moved (31,557,600 → 63,115,200) and v1's setter
+emits nothing at all, so this is a thing this protocol's governance does, not a scenario. v2 emits
+`DurationsChanged` and it is the only writer after `initialize`, so the probe now sweeps that one
+event over the contract's whole life and reads the term off a timeline: **zero changes ever, on
+Gnosis and on mainnet**, which makes every PoH date since 2024 rest on a checked fact rather than an
+assumption, and moves nothing at head. Where a change does land, each cohort is dated with the term
+that was in force for it. What it does **not** close: the era from the deployment to the first
+change has no published term, because `initialize` emits none — so if a change ever lands, expiries
+that only that era explains lose their date rather than getting a guessed one. Cost is ~100 ms once
+per process and nothing warm.
+[`research/protocols/poh-lifespan-timeline.md`](research/protocols/poh-lifespan-timeline.md).
 
 Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 
