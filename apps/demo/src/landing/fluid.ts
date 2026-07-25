@@ -14,11 +14,17 @@
 const SIM_RES = 144
 const DYE_RES = 512
 const PRESSURE_ITERS = 20
-const VELOCITY_DISSIPATION = 0.22
-const DYE_DISSIPATION = 0.75
-const SPLAT_FORCE = 5200
-const SPLAT_RADIUS = 0.0048
-const IDLE_STOP_MS = 6000
+/*
+ * Material calibration. This is ink dragged through slip, not smoke: the page's world is
+ * pressed and heavy, so the fluid must cling and settle rather than billow. High velocity
+ * dissipation kills plumes fast (swirl stays near the stroke), high dye dissipation keeps
+ * the trail short-lived, a tight splat radius makes it a stroke rather than a cloud.
+ */
+const VELOCITY_DISSIPATION = 1.3
+const DYE_DISSIPATION = 1.15
+const SPLAT_FORCE = 3600
+const SPLAT_RADIUS = 0.0026
+const IDLE_STOP_MS = 5000
 
 const VERT = `#version 300 es
 precision highp float;
@@ -117,8 +123,9 @@ uniform vec3 uTint;
 void main () {
   float d = texture(uDye, vUv).x;
   float a = clamp(d, 0.0, 1.0);
-  a = a * a * (3.0 - 2.0 * a); // smoothstep the falloff — softer edges
-  a *= 0.85;
+  // Dense core, quick falloff: wet ink has a body and an edge, haze has neither.
+  a = pow(a, 1.35);
+  a *= 0.9;
   o = vec4(uTint * a, a); // premultiplied
 }`
 
