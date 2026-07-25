@@ -3006,3 +3006,168 @@ ontology/registry drift (Hugo), iteration 19's root-owned `.git` objects (still 
 per commit; did not bite this time), and iteration 1's two notes, `pnpm-lock.yaml` untracked beside
 a tracked `package-lock.json` and `MISSION.md` pointing at a `./test.sh` that lives at
 `apps/demo/test.sh`.
+
+## Iteration 23 — 2026-07-26
+
+**Did:** iteration 22's next-step 2 — **`nbRequests == 0` at head**. It was queued as "decide what
+the derived date means for a cross-chain grant", and the decision turned out to be that the
+discriminator was wrong, the date was wrong for most of the population, and both had a better
+answer sitting in the registry's own logs.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: the same two tests in `as-of.live.test.ts` are red and nothing
+else is. MORNING "Needs you" item 18 stands, unchanged for a ninth iteration.
+
+**Every PoH score rests on one subtraction, and it has a premise nobody had checked.**
+`expirationTime - humanityLifespan()` recovers the claim second, exactly, because both local
+writers do `expirationTime = block.timestamp + humanityLifespan` (`executeRequest` L1176, `rule`
+L1358). There is a third writer:
+
+```solidity
+function ccGrantHumanity(bytes20 _humanityId, address _account, uint40 _expirationTime)
+    external onlyCrossChain returns (bool success) {
+    …
+    humanity.expirationTime = _expirationTime;        // copied, not computed
+    emit HumanityGrantedDirectly(_humanityId, _account, _expirationTime);
+```
+
+Swept the whole life of the proxy (35,846,827 → 47,390,776; the full range in one request,
+339 ms) and traced each grant back to mainnet. **Nine imports, ever. Seven came from PoH v1**, and
+v1's `submissionDuration()` is **63,115,200 s against this contract's 31,557,600** — every one
+reproducing `submissionTime + submissionDuration` to the second, so the attribution is a proof and
+not a resemblance.
+
+| origin | count | what our subtraction did |
+|---|---:|---|
+| PoH v1 mainnet (term 63,115,200) | **7** | landed **exactly one v2 lifespan — 365.25 days — after the true registration** |
+| PoH v2 mainnet (term 31,557,600) | 2 | right, by luck rather than by argument |
+
+A two-year-old credential reported as a one-year-old one: 0.75 of the adapter's weight on a
+365-day Ramp where 0.875 was earned. **Wrong in the subject's disfavour**, which is the safe
+direction and is probably why it survived twenty-two iterations — and it is also the direction that
+makes an as-of query about a real day in that first year answer "not held".
+
+**`nbRequests` was the wrong question.** The lapsed path already refused to date `nbRequests == 0`,
+which is sound — no local request, so this contract cannot have written the expiry. It is also
+**incomplete**: `requests` is only ever pushed to, `ccDischargeHumanity` does `delete humanity.owner`
+alone, so a humanity leaves and comes back over an intact history. **3 of the 9 imports carry
+`nbRequests >= 1`, two of them held at head today.** One of the three, `0xe7f13052…79bc`, arrived
+from v1 in 2024-09 and was **renewed here in 2025-07**, which moved the expiry and left
+`nbRequests` at 1 — so the existing `nbRequests > 1 → renewed` flag called a renewal a first claim.
+And the test can only ever *withhold* a date; it has nothing to put in its place.
+
+**The chain publishes the answer.** `HumanityGrantedDirectly(bytes20 indexed, address indexed,
+uint40)` carries the exact expiry it wrote and is immutable. Three states from one comparison
+against storage: a grant carrying **this** expiry → foreign; a grant carrying a **different** one →
+this contract wrote over it, which is a renewal whatever `nbRequests` says; no grant → ours. Nine
+logs over 22 months, so one memoised sweep answers it for every subject. Then the origin instance
+still publishes the registration behind the expiry, and *that* is the date — two mainnet calls, paid
+only for the ≤9 humanities the sweep has named, and required to reproduce our expiry **to the
+second** before it is believed.
+
+**Three decisions inside the rule.**
+
+- **An age crosses the bridge; a window does not.** `purpose: 'age'` asks how long this human has
+  held the credential — the answer is the origin's registration. `purpose: 'window'` asks which
+  instants *this* registry honoured the humanity for, which is what an as-of score turns into "held
+  on Gnosis", and that cannot begin before the grant. Handing the origin's date to an as-of query
+  would restore a Gnosis credential for a Tuesday when the registration was still on mainnet: the
+  same fact about the human, a false statement about this adapter.
+- **A sweep that did not answer is not a sweep that found nothing** — the same distinction
+  `IndexView.entity: null` draws, in a second place. `term-origin-unverified` keeps the date and
+  names the assumption it stands on, and the sweep is memoised **on success only**, so a rate limit
+  is a moment rather than a property of the run.
+- **One proof survives with no network at all.** No local write can put an expiry more than one
+  full term past the block we read at, so an expiry that does is imported — or `humanityLifespan`
+  has moved, in which case the subtraction is equally void and the same refusal is right.
+
+**Verified:** on this box, at this commit.
+
+- `CORROBORATE_SUBGRAPH_URL=…/poh/v0.0.3 ./apps/demo/test.sh` → **all suites green, exit 0**:
+  forge **18 passed**; sdk live **22/22, 0 skipped, 0 failed**; Playwright **13 passed**.
+- `cd packages/sdk && npm test` → `# tests 533 # pass 531 # fail 2 # skipped 0` (**+16** over
+  iteration 22's 517: 11 unit on `classifyHumanityTerm`/`dateHumanityFromTerm`, 4 on the lapsed
+  path, 1 live). The 2 failures are iteration 15's registry-drift pair, unchanged and untouched.
+- `npm run build` and `tsc --noEmit` clean in `packages/sdk`; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` → DENY / ALLOW **3.6178 over 6 roots** / DENY naming the sibling /
+  DENY `a fleet of 27 agents is still one human`. Byte-identical to iterations 20–22, which is the
+  point: nothing at head was wrong for that subject, so nothing at head moved.
+- **Cost, measured rather than waved at:** cold probe 293 → 692 ms (the sweep plus nine block
+  headers), warm probes 144/149/159 ms against 147/159 before — unchanged inside the noise.
+- End to end, four subjects: `0x6687c671…8dd6` went from `heldUntil` and **no start at all** to a
+  closed window `2024-09-06 → 2026-01-29` carrying `originRegisteredAt` 2024-01-30; `0x000bba72…2dbe`
+  keeps its date and gains `termOrigin: poh-v2-mainnet`; `0xe7f13052…79bc` gains `renewed: true`
+  where `nbRequests` could not see it; an ordinary local claim is unchanged at 1783963510.
+  **Six previously undatable lapsed windows are now closed and dated.**
+- **The acceptance test the mission asks for** ("a live test that hits the real chain and asserts
+  the mechanism, not a magic number") re-derives every number each run: the grant log is swept from
+  the chain, one import whose expiry is *still* the granted one is picked out of it, PoH v1 is
+  required to reproduce that expiry exactly, the two terms are asserted to still differ live, and
+  the probe is then held to the origin's date — with `assert.notEqual(evidence.issuedAt, naive)`
+  spelling out that it must not report the date it used to. Beside it, an assertion straight from
+  the chain that an import can land on a humanity with local request history, which is the argument
+  against `nbRequests` asserted rather than remembered.
+
+**One live test needed fixing, and the reason is worth recording.** `a humanity that expired is a
+closed window, and the claim log is its start` picks the first lapsed humanity the probe can date.
+Imported humanities are now datable, so it started picking one and then failed asserting the
+registry had logged a claim for it — a true assertion about a subject the test was never about. It
+now skips `termImported` candidates. **A fix that widens what can be dated widens what a sampling
+test can sample**, and that is a place to look after any change of this shape.
+
+**Committed:** `1c2f7f5` fix(sdk): a term this contract did not set may not have this contract's
+term subtracted from it. (`git commit` worked; iteration 19's root-owned-`.git` lottery did not
+bite.)
+
+**Write-up:** `research/protocols/poh-imported-terms.md` — the three expiry writers from the
+deployed source, the nine-row origin table with every reproduction, the `nbRequests` census, the
+rule and its three decisions, the end-to-end before/after, what is deliberately not done, and three
+open questions. Indexed in `research/INDEX.md` (header recount: 42 files / ~25,750 lines).
+`docs/scoring.md` gains the premise beside the subtraction it qualifies; README gains honest limit
+14 and its test-count paragraph is re-stamped (564 exist / 562 pass).
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved: this changes
+which date a credential gets, not what one is worth. Registry stays as the chain has it (32
+adapters / revision 36, written by the other tree; this tree still has 30).
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15–22, still
+   the only *real* red in the suite, still Hugo's call.
+2. **Nothing watches `humanityLifespan()` for a change.** Open question 1 of the new write-up, and
+   the sharpest remaining correctness item. Both PoH terms are governance-settable and v1's has
+   already moved once (31,557,600 → 63,115,200); a change to *Gnosis's* would silently invalidate
+   every locally derived date in the registry, and the only guard is the `dateRejected` floor,
+   which catches solely the cases that land before the deployment. The cheap version is a live test
+   asserting the term is still what the derivation assumes — the Holonym and World suites already
+   do exactly this for their expiries, so it is a pattern in the repo rather than a new idea.
+3. **Index the two cross-chain events** (`HumanityGrantedDirectly`, `HumanityDischargedDirectly`)
+   and give `PohHuman` an `expirationTime`. Iteration 22's next-step 3, still standing, and now
+   worth slightly more: the same sweep this iteration does per process would come from our own
+   index, and it is what would earn PoH `observesEveryEnding: true`. A mapping change, a schema
+   field and a ~2.5-hour resync.
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read
+   appears. Iteration 7's measurement stands.
+
+**Worth keeping, because it generalises.** Iteration 22's lesson was *an index's silence is only as
+strong as the set of events it handles*. This one is the same shape aimed at arithmetic:
+**a derivation has a premise, and the premise is a claim about the world that can be false.**
+`expirationTime - humanityLifespan` was verified against the index on a live registration in
+iteration 1 and has been correct every time it was checked — because every subject it was ever
+checked against was one this contract claimed. The failing population was 9 of 1,576, invisible to
+any spot check, and the thing that made it findable was asking *who else can write this field*.
+That is the same question iteration 21 asked of Passport's attester, one level down: not "who may
+write this credential" but "who may write the number I do arithmetic on".
+
+The other one is about how the queue framed it. The task was written as *decide what the derived
+date means when `nbRequests == 0`* — a question that takes the discriminator as given and asks only
+what to do downstream of it. Answered in those terms, the iteration ships a caveat and leaves seven
+subjects mis-dated. **When a queue item names the test to change, check whether the test is the
+right test first**: `nbRequests` was inherited from a measurement that only ever looked at lapsed
+humanities, where it happened to be complete.
+
+**Blocked:** nothing. Nothing new for Hugo this iteration; MORNING is untouched. Carried: iteration
+15's ontology/registry drift (Hugo), iteration 19's root-owned `.git` objects (still a ~1-in-128
+lottery per commit; did not bite this time), and iteration 1's two notes, `pnpm-lock.yaml` untracked
+beside a tracked `package-lock.json` and `MISSION.md` pointing at a `./test.sh` that lives at
+`apps/demo/test.sh`.

@@ -595,7 +595,7 @@ describe('index and chain, reconciled against live data', () => {
 
     const { createPublicClient, http, parseAbi } = await import('viem')
     const { mainnet } = await import('viem/chains')
-    const { POH_V1_REGISTRY, POH_V2_MAINNET } = await import('./adapters/index.ts')
+    const { POH_V1_REGISTRY } = await import('./adapters/index.ts')
     const eth = createPublicClient({ chain: mainnet, transport: http('https://ethereum-rpc.publicnode.com') })
     const originAbi = parseAbi([
       'function getSubmissionInfo(address) view returns (uint8 status, uint64 submissionTime, uint64 index, bool registered, bool hasVouched, uint256 numberOfRequests)',
@@ -683,7 +683,6 @@ describe('index and chain, reconciled against live data', () => {
     }
     assert.equal(evidence.detail?.termOrigin, 'poh-v1-mainnet')
     assert.equal(evidence.detail?.termSeconds, v1Term)
-    void POH_V2_MAINNET
   })
 
   test('the account mapping is where a humanity survives its own expiry', async (t) => {
