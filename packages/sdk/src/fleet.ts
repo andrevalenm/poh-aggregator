@@ -83,11 +83,36 @@ export interface FleetPolicy {
   maxAgentsPerHuman: number
   unbackedAgents: UnbackedHandling
   admission: FleetAdmission
+  /**
+   * Refuse agents whose link to their human is only the agent's own say-so.
+   *
+   * Off by default, because the registry this engine was written against attests every
+   * backing it returns: an AgentBook humanId is a nullifier hash out of a World ID proof, and
+   * nobody can make one up. It matters the moment a *self-published* binding is admitted —
+   * an ENS `corroborate.human` record, say — because then the cap is only as strong as the
+   * cost of naming a human, and naming one is free. Turning it on is a counterparty deciding
+   * that an unacknowledged claim about a person is not evidence about that person.
+   */
+  requireAttestedBinding?: boolean
 }
 
-/** AgentBook's answer for one agent wallet. */
+/**
+ * How the agent↔human link was established.
+ *
+ * `attested` means the human's own key did something: World ID's `register` carries a proof
+ * whose nullifier *is* the humanId, and an ENS mutual binding means the human's name published
+ * the agent back. `asserted` means only the agent said so.
+ *
+ * The distinction is load-bearing rather than descriptive. A cap of N agents per human groups
+ * agents by the human they name, so if naming a human is free, an operator names a fresh one
+ * per agent and the cap binds nothing while every individual answer stays true. See the header
+ * of `ens-agents.ts` for the worked version.
+ */
+export type BindingStrength = 'attested' | 'asserted'
+
+/** A registry's answer for one agent wallet. */
 export type HumanBacking =
-  | { status: 'backed'; humanId: string }
+  | { status: 'backed'; humanId: string; binding?: BindingStrength; bindingDetail?: string }
   | { status: 'unbacked' }
   /** The read failed. Not a negative — see the header. */
   | { status: 'unknown'; error: string }
@@ -122,7 +147,13 @@ export interface HumanEvidence {
 export type Verdict = 'allow' | 'deny' | 'indeterminate'
 
 export interface RuleOutcome {
-  rule: 'human-identified' | 'evidence-resolved' | 'min-score' | 'min-independent-roots' | 'max-agents-per-human'
+  rule:
+    | 'human-identified'
+    | 'human-binding'
+    | 'evidence-resolved'
+    | 'min-score'
+    | 'min-independent-roots'
+    | 'max-agents-per-human'
   /** `null` when the rule could not be evaluated, which is different from failing it. */
   pass: boolean | null
   detail: string
@@ -165,6 +196,11 @@ export interface FleetSummary {
   indeterminate: number
   /** Most agents any one human presented. */
   largestFleet: number
+  /**
+   * Agents whose human is named only by the agent itself. Under a policy that admits them the
+   * cap is soft by exactly this many agents, since each could have named a fresh human.
+   */
+  assertedBindings: number
   /**
    * Agents per identified human. The number a venue counting requesters gets wrong: 1.0 means
    * agent count and human count agree, 27.0 means it is off by 27×.
@@ -223,7 +259,10 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
       v.rules.push({
         rule: 'human-identified',
         pass: true,
-        detail: `AgentBook maps this wallet to human ${short(a.backing.humanId)}`,
+        // Source-neutral: this engine is fed by AgentBook's proof-derived identifiers and by
+        // ENS's self-published ones, and naming the wrong registry in a trace is a lie about
+        // where a fact came from. Which registry, and how strongly, is the next rule's job.
+        detail: `attributed to human ${short(a.backing.humanId)}`,
       })
       bucket(groups, a.backing.humanId, false).agents.push(a)
       continue
@@ -271,6 +310,27 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
 
     for (const a of group.agents) {
       const v = verdicts.get(a.agent)!
+
+      // Binding strength is checked before anything is spent on this agent, and before the
+      // slot allocation, so an agent refused for an unacknowledged claim never burns the
+      // allowance of a sibling that would have passed — the same ordering rule the score
+      // gates follow.
+      const binding = a.backing.status === 'backed' ? (a.backing.binding ?? 'attested') : undefined
+      if (binding !== undefined) {
+        const detail =
+          a.backing.status === 'backed' && a.backing.bindingDetail
+            ? a.backing.bindingDetail
+            : binding === 'attested'
+              ? 'the human identifier came from a proof, not from a claim'
+              : 'only the agent asserts this human'
+        if (binding === 'asserted' && policy.requireAttestedBinding) {
+          v.rules.push({ rule: 'human-binding', pass: false, detail })
+          v.verdict = 'deny'
+          v.because = `the human behind this agent has not acknowledged it (${detail}), and ${policy.name} does not admit one-way claims about a person`
+          continue
+        }
+        v.rules.push({ rule: 'human-binding', pass: binding === 'attested' ? true : null, detail })
+      }
 
       if (!ev || ev.error !== undefined) {
         v.rules.push({
@@ -358,6 +418,9 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
   const unresolved = agents.filter((a) => a.backing.status === 'unknown').length
   const attributed = agents.length - unbacked - unresolved
   const largestFleet = realHumans.reduce((m, h) => Math.max(m, h.agents.length), 0)
+  const assertedBindings = agents.filter(
+    (a) => a.backing.status === 'backed' && a.backing.binding === 'asserted',
+  ).length
 
   const summary: FleetSummary = {
     agents: agents.length,
@@ -373,6 +436,7 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
     ).length,
     indeterminate: all.filter((v) => v.verdict === 'indeterminate').length,
     largestFleet,
+    assertedBindings,
     collapseRatio: realHumans.length === 0 ? 0 : round(attributed / realHumans.length, 2),
   }
 
@@ -412,6 +476,12 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
       code: 'fleet-admission-order-degraded',
       message:
         'This policy allocates slots to the earliest registration, but some agents were supplied without a registration block. Those fall back to the order they were presented in, so which sibling keeps the slot depends on the caller rather than on the chain.',
+    })
+  }
+  if (assertedBindings > 0 && !policy.requireAttestedBinding) {
+    caveats.push({
+      code: 'fleet-cap-soft-on-asserted-bindings',
+      message: `${assertedBindings} agent(s) name a human who has not acknowledged them, and this policy admits one-way claims. The cap groups agents by the human they name, so an operator naming a fresh identifier per agent holds one slot each — and each such agent may also be riding credentials its named human never lent it. requireAttestedBinding refuses them.`,
     })
   }
   if (largestFleet > policy.maxAgentsPerHuman) {

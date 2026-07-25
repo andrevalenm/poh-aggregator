@@ -84,7 +84,7 @@ The test asserts both directions — that the person wins under our model, *and*
 sum would have inverted the ranking. If saturation ever broke, the second assertion fails.
 
 ```bash
-cd packages/sdk && npm test    # 34 tests
+cd packages/sdk && npm test    # 314 tests
 ```
 
 ---
@@ -289,6 +289,12 @@ fictional counterparty checks that a real human stands behind it via AgentBook p
 Corroborate, and picks its own limits. The limits live in the counterparty's policy file, not
 in our SDK — that separation is the point of the demo.
 
+`npm run ens` in the same app is the second flow: the same counterparty, the same policy
+engine, but the agent presents an **ENS name** instead of an AgentBook registration. It resolves
+the human behind the name, the human's acknowledgement of that agent, every sibling under the
+tree, and then shows what a self-published binding costs — one agent walks the per-human cap by
+naming a second wallet of its own operator, until the policy requires the acknowledgement.
+
 Its fourth gate is a **fleet policy**, `evaluateFleet()` in the SDK. A counterparty declares
 `maxAgentsPerHuman`, `minScore`, `minIndependentRoots`, what to do with agents nobody
 registered, and which of a human's agents keeps the slot; the engine allocates the slots and
@@ -436,9 +442,9 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 276 SDK tests: 178 unit (scoring model, index reconciliation, input, ontology, SBT
+# 314 SDK tests: 202 unit (scoring model, index reconciliation, input, ontology, SBT
 # interpretation, Verax attestation selection, World address-book interpretation, PoH v1
-# submission interpretation, as-of reconstruction, fleet policy) + 98 live
+# submission interpretation, as-of reconstruction, fleet policy, ENS agent identity) + 112 live
 cd packages/sdk && npm test
 
 # the live ones alone — real chains, the deployed registry, no mocks
@@ -451,13 +457,15 @@ cd packages/sdk && node --test --experimental-strip-types src/adapters/world.liv
 cd packages/sdk && node --test --experimental-strip-types src/adapters/poh-v1.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/as-of.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/agentbook.live.test.ts
+cd packages/sdk && node --test --experimental-strip-types src/ens-agents.live.test.ts
 
 # 13 browser E2E against the built demo, real chains
 cd apps/demo && npx playwright test
 ```
 
-All 307 pass as of 2026-07-25 (18 forge + 276 SDK + 13 browser; two of the SDK live tests skip
-loudly when the third-party Verax indexer they cross-check against returns HTTP 429). The live tests hit real chains on purpose: the failure mode we
+All 345 pass as of 2026-07-25 (18 forge + 314 SDK + 13 browser; two of the SDK live tests skip
+loudly when the third-party Verax indexer they cross-check against returns HTTP 429, and did not
+on this run). The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
 assert the seeded ontology loads, that the ICAO cluster really does have three protocols on
 one root, that discontinued protocols are marked dead, that every weight cites a `research/`
@@ -597,9 +605,27 @@ path of a score is a dependency we would rather not have.
 **ENS.** A subject is an address set, and a set needs a handle. The SDK resolves ENS names
 anywhere an address is accepted (`resolve('vitalik.eth')`, verified against mainnet), so a
 person with a PoH wallet and a separate Circles avatar can be referred to by one name rather
-than two hex strings the caller must keep in sync. Registering `corroborate.eth` on Sepolia and
-publishing the registry address as a text record was in flight at the time of writing — check
-[`deployments/`](deployments) for whether it landed.
+than two hex strings the caller must keep in sync.
+
+ENS also carries **agent** identity, which is the harder half. `corroborate.eth` and its
+subnames are live on Sepolia ([`deployments/ens-sepolia.json`](deployments/ens-sepolia.json)):
+each agent's name publishes `corroborate.human`, and the human's name publishes
+`corroborate.agents` back. A counterparty handed nothing but a name resolves the agent's wallet,
+the human behind it, that human's declared address set, and every sibling agent under the same
+tree — from public infrastructure, with no server of ours involved. `npm run ens` in
+[`apps/agent`](apps/agent) does exactly that, live, against the real tree.
+
+The second record is the one that matters, and it exists because of a defect we found by
+building the first. A cap of *N agents per human* groups agents by the human they name — and if
+naming a human is free, an operator names a fresh wallet per agent and the cap binds nothing
+while every individual answer stays true. Our own tree runs that attack against us:
+`unverified.corroborate.eth` names a wallet its own operator already declares, and walks the cap.
+An acknowledgement from the human's side makes the binding `mutual`, `requireAttestedBinding`
+refuses one-way claims, and the caveat `fleet-cap-soft-on-asserted-bindings` fires whenever a
+policy admits them. Full write-up:
+[`research/protocols/ens-agent-identity.md`](research/protocols/ens-agent-identity.md), which
+also documents how to register a Sepolia `.eth` name today (free, no commit/reveal — the
+migration made it easier, not harder).
 
 ---
 
@@ -614,7 +640,7 @@ publishing the registry address as a text record was in flight at the time of wr
 
 ## Research
 
-Every weight in the registry traces to [`research/INDEX.md`](research/INDEX.md) — **23 files,
+Every weight in the registry traces to [`research/INDEX.md`](research/INDEX.md) — **24 files,
 ~21,000 lines** of primary-source research written 2026-07-24 against live sources: contracts
 queried over RPC, repos read at HEAD, prices fetched the same day. Volatile facts are
 date-stamped; unconfirmed claims are marked `UNVERIFIED:` rather than guessed. If you read four
@@ -623,7 +649,7 @@ product should not exist, kept at full strength.
 
 ```
 research/
-  protocols/   9 deep-dives: contracts, SDKs, trust model, integration surface
+  protocols/  17 deep-dives: contracts, SDKs, trust model, integration surface
   landscape/  12 sweeps: prior art, standards, vendors, the adversary, the market
   references/  the Ohlhaver corpus, read in full and treated as an argument against us
   scripts/     reproducible on-chain measurement
@@ -634,13 +660,13 @@ research/
 ```
 contracts/       PersonhoodRegistry.sol + 18 Foundry tests
 ontology/        adapters.json — the trust-root ontology, source of truth for seeding
-packages/sdk/    scoring engine, adapters, subgraph client, ENS resolution
+packages/sdk/    scoring engine, adapters, subgraph client, ENS human + agent identity
 packages/mcp/    MCP server over the SDK
 subgraph/        The Graph subgraph: PoH v2 + Circles v2 on Gnosis
 apps/demo/       browser demo — same SDK, client-side, live registry
 apps/agent/      World AgentKit demo — human-backing check for an agent
 scripts/         deploy, seed, ENS, and the on-chain vector sweep
-research/        the 23 files every weight derives from
+research/        the 24 files every weight derives from
 docs/            scoring model and threat model
 ```
 

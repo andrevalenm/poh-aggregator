@@ -1,8 +1,9 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 10. All four suites green: 18 forge, 276 SDK
-(274 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 13 Playwright — 307 total._
+detail. _Last updated 2026-07-25, after unattended iteration 11. All four suites green: 18 forge, 314 SDK
+(314 pass, 0 fail, 0 skipped — the rate-limited third-party indexer answered this time),
+13 Playwright — 345 total._
 
 ---
 
@@ -317,6 +318,36 @@ rather than a re-implementation of it, so what a judge sees is what the 30 unit 
 
 No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
 `research/protocols/world-agentbook-fleets.md`.
+
+**Iteration 11 made ENS carry agent identity — and found that doing so quietly breaks the cap
+iteration 10 built, then closed it.** `corroborate.eth` and three agent subnames are **live on
+Sepolia**, records set and read back (`deployments/ens-sepolia.json`). An agent's name publishes
+`corroborate.human`; the human's name publishes `corroborate.agents` back. `npm run ens` in
+`apps/agent` resolves a name into a wallet, a human, that human's declared address set, every
+sibling under the tree, a live score across ten protocols, and a decision — all from public
+infrastructure, with the parent name as the only input.
+
+- **Sepolia ENS was never blocked.** The earlier "mid-migration, parked" verdict was the wrong
+  controller plus a wrong event topic. Registration today is **free and instant** via
+  `TestnetV1PremigrationRegistrar` (Sourcify exact match): no commit/reveal, no price oracle,
+  ≥3 characters, ≥28 days. 13 names were registered in the 10,000 blocks before I looked.
+- **The finding.** `maxAgentsPerHuman` groups agents by the human they *name*. AgentBook's
+  identifier is a nullifier hash and cannot be minted; an ENS record is whatever the agent
+  wrote, and addresses are free. So one agent in our own tree names a **second wallet of its own
+  operator**, becomes its own human, walks the cap, and inherits a credential set it never
+  acquired — with every individual answer still true and nothing looking wrong. The fix is not
+  cryptography: it is the human's acknowledgement record, which costs a transaction from the
+  key controlling the human's name, plus `requireAttestedBinding` in the policy. Both runs are
+  in the demo, and the caveat `fleet-cap-soft-on-asserted-bindings` fires whenever a policy
+  admits one-way claims.
+- **A name tree can be counted but never named.** Subnames are created with the label *hashed*
+  by the caller, so the string is in no transaction, event or storage slot anywhere. The
+  registry's `NewOwner` log still gives an exact count, owners and creation blocks — which is
+  what lets slot allocation be "earliest registration wins" with the chain deciding, and lets a
+  counterparty learn that a tree holds agents it was not shown.
+
+No weight moved; the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/ens-agent-identity.md`.
 
 ---
 
@@ -649,11 +680,26 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
 
 1. **Repo has no pushable remote.** Judges need a URL. Fork to Hugo0 or get collaborator
    access from Andrei, then `git push`. Nothing was pushed anywhere overnight.
-2. **corroborate.eth — 5 minutes on mainnet.** Sepolia ENS is mid-migration (the artifact
-   controller isn't authorized on the registrar; no NameRegistered events in weeks; details
-   in the b33e5d6 commit message). Register `corroborate.eth` on **mainnet** in the ENS app
-   (~$5/yr), set text record `corroborate.subjects` to your wallet list. The SDK feature is
-   done and tested; the demo lights up the moment the record exists.
+2. **corroborate.eth — no longer blocking, and the Sepolia half is done.** The earlier
+   "Sepolia ENS is mid-migration" verdict was wrong: it was the wrong controller and a wrong
+   event topic. Sepolia `.eth` registration is **free and instant** today through
+   `TestnetV1PremigrationRegistrar` (no commit/reveal, no price oracle — the migration made it
+   easier). `corroborate.eth` plus `alpha`/`beta`/`unverified` subnames are live on Sepolia
+   with all records set and verified, recorded in `deployments/ens-sepolia.json`, and both ENS
+   demos run against them (`cd apps/agent && npm run ens`). The write-up is
+   `research/protocols/ens-agent-identity.md`.
+
+   What is left for you is optional and cosmetic-for-judging: **register `corroborate.eth` on
+   mainnet** (~$5/yr) and set `corroborate.subjects` to your wallet list, if you want the demo
+   to point at a mainnet name rather than a testnet one. Nothing depends on it — every ENS
+   feature is live-tested against a real name today. Do it after the naming decision, since
+   the Sepolia name is disposable and a mainnet one is not.
+
+   One housekeeping note: `scripts/ens-agents-keys.mjs` appended three agent wallet keys to
+   `.env.local` on ax41 (`AGENT_ALPHA_PRIVATE_KEY`, `AGENT_BETA_PRIVATE_KEY`,
+   `AGENT_UNVERIFIED_PRIVATE_KEY`). They hold nothing and exist so a later challenge/response
+   gate can sign as the agents. `.env.local` is gitignored, so on your laptop `npm run ens`
+   works without them — only re-running the setup script needs them.
 3. **World tracks need your phone.** The written half is DONE —
    `docs/world-beta-feedback.md` has all developer feedback from the night's real
    integration work plus the data-minimization statement the Identity Check track asks

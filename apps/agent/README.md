@@ -209,6 +209,24 @@ npm run agentbook 0xYourAddress…   # …or any address you like
 npm run worldid           # live World ID 4.0 proof — needs a human
 ```
 
+```bash
+npm run ens               # the same counterparty, but the agent presents an ENS name
+```
+
+`npm run ens` is the second identity path. Instead of asking AgentBook who registered a wallet,
+it resolves `corroborate.human` from the agent's own name on Sepolia, resolves that human's
+declared wallet set and its `corroborate.agents` acknowledgement, enumerates every sibling under
+the same name tree from the ENS registry's `NewOwner` log, scores each human once, and runs the
+same `evaluateFleet()` policy engine over the result. Nothing is hard-coded: the only input is
+the parent name in `deployments/ens-sepolia.json`.
+
+It ends on the case worth watching. AgentBook's `humanId` is a nullifier hash and cannot be
+minted; an ENS `corroborate.human` record is whatever the agent wrote there, and an operator has
+as many addresses as it likes. So under the policy as written, a cap of *one agent per human*
+admits two of our three agents — the third named a second wallet of the same operator and became
+its own human. `requireAttestedBinding: true` refuses one-way claims and closes it. Both runs are
+printed, and the tree is re-registered with `node scripts/ens-agents-setup.mjs` at the repo root.
+
 `npm run worldid` prints a QR code and a URI, then blocks for up to five minutes.
 
 * **Staging (default).** Open <https://simulator.worldcoin.org>, paste the printed URI. The
@@ -234,6 +252,7 @@ src/
   demo.js                   npm start
   verify-worldid.js         npm run worldid — live World ID 4.0 proof
   agentbook-status.js       npm run agentbook — human-backing lookups
+  ens-demo.js               npm run ens — agent identity carried by ENS, live on Sepolia
   trace.js                  decision-trace rendering
   world/
     agentbook.js            lookupHuman on World Chain, errors kept distinct from negatives
