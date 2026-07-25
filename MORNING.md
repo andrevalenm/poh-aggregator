@@ -1,104 +1,97 @@
 # Morning brief
 
-Overnight build log for **Corroborate** — the personhood aggregator. Read this instead of
-the git log; the log has the detail if you want it.
-
-_Last updated: 2026-07-25, during the build._
+Overnight build log for **Corroborate**. Everything below is committed; the git log has the
+detail. _Last updated 2026-07-25, ~06:00._
 
 ---
 
-## What works right now
+## State: every phase shipped and tested
 
-| Piece | State | Where |
+| Piece | State | Proof |
 |---|---|---|
-| `PersonhoodRegistry.sol` | **Deployed + seeded** | Sepolia `0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9` |
-| Ontology | 15 adapters, 10 trust roots | `ontology/adapters.json` |
-| SDK | Builds, 30 tests green | `packages/sdk` |
-| MCP server | Verified over stdio | `packages/mcp` |
-| Subgraph | in progress | `subgraph/` |
-| ENS | not started | — |
-| World IDKit / AgentKit | not started | — |
-| Demo | not started | — |
+| `PersonhoodRegistry` v2 | Sepolia `0x977b028b900cce8ee89c46877e814eff3060aa07` | 18 forge tests; age curves + plaintext event ids with on-chain integrity check |
+| Ontology | 15 adapters, 10 trust roots, per-adapter age curves | `ontology/adapters.json`, every entry cites `research/` |
+| SDK | builds, publishes clean types | 23 unit + 11 live tests |
+| Subgraph | Studio, syncing, serving | `api.studio.thegraph.com/query/77602/poh/v0.0.1` — feeds claimedAt into the ramp weights |
+| MCP server | verified over stdio | 3 tools; agents get evidence and caveats, never bare booleans |
+| Demo app | Vite SPA, live against real chains | **6/6 Playwright E2E in a real browser** |
+| Agent flow | fully live, nothing stubbed | AgentKit 402/SIWE + AgentBook + Corroborate; fleet-detection demo included |
+| Docs | README, LICENSE, docs/scoring.md, docs/threat-model.md | every printed command was executed before being written down |
 
-Run it yourself:
-
+Run everything:
 ```bash
-cd packages/sdk && npm test          # 19 unit tests
-node --test --experimental-strip-types src/live.test.ts   # 11 live tests, real chains
-cd ../.. && PATH=$HOME/.foundry/bin:$PATH forge test      # 17 contract tests
+PATH=$HOME/.foundry/bin:$PATH forge test                  # 18
+cd packages/sdk && npm test                                # 23
+node --test --experimental-strip-types src/live.test.ts    # 11, live chains
+cd ../../apps/demo && npx playwright test                  # 6, real browser
+cd ../agent && npm start                                   # live agent flow
 ```
 
----
+## The demo's best moments (all live, none mocked)
 
-## Decisions I made without you
+- **Fleet detection:** two agents resolve to the *same* AgentBook humanId → the second is
+  denied. "A fleet of agents is still one human," on real data.
+- **Three wallets, three roots:** `0x58b849f6…2a12` (a real Orb-verified wallet found via
+  AgentBook) + our PoH vector + our Circles vector = 3 independent roots with the
+  multi-address caveat shown. The whole thesis in one lookup.
+- **The airdrop discounts itself:** under the Ramp age curve a week-old PoH registration
+  weighs ~0.01. Once the subgraph finishes backfilling, this computes from real claimedAt.
+- **Honesty as UI:** Orb scores 1.71 — *below* PoH — because we price at the observed $0.50
+  resale floor; the demo captions it "we score the anchor sponsor honestly." And the compare
+  panel states plainly that root-cost does not invert the raw score on the live pair — what
+  inverts is independence (roots 2 vs 1).
 
-All cheap to reverse. Say the word on any of them.
+## Overnight design changes you should know about
 
-1. **Name: Corroborate.** It means "confirm with independent evidence", which is the thesis.
-   npm scope `@corroborate/*`. Repo dir unchanged.
-2. **Deploy target moved from Base Sepolia to Sepolia** — you funded Sepolia, ENS's testnet is
-   there, and Graph Studio supports it. No bridging, and the registry shares a chain with the
-   ENS work.
-3. **Score is log₁₀ of summed root-cost**, roughly 0–4. Continuous, never a grade.
-4. **`isHuman(threshold)` throws without an explicit threshold.** At a 2% sybil rate a
-   95%-specificity classifier misjudges ~73% of the people it flags, so denial is the
-   caller's call. Enforced in the type system, not in a doc.
-5. **Cost is `min(forge, rent)`.** Every protocol that hardened did so against *sale* and
-   none against *rental*. Taking the min means security work addressing only resale cannot
-   inflate a score.
-6. **Registry curator is the burner EOA.** Honest and auditable, not decentralised, and the
-   README will say so.
+1. **Age curves (registry v2).** Uniform decay was a modeling error: it handed full weight
+   to exactly the airdrop-minted cohort. Vouching registries now *ramp* (weight rises with
+   survival), liveness/KYC *decay*. Unknown age under Ramp gets 0.5, never 1.0 — otherwise
+   subgraph downtime would be profitable for a farm.
+2. **ENS subjects record.** `resolveSubject()` reads `corroborate.subjects` from any ENS
+   name and expands the address set — ENS as the user-controlled home of "these wallets are
+   me". Self-asserted → dedicated caveat; countersigning is documented roadmap.
+3. **The Graph is now load-bearing**, not decorative: claimedAt feeds the ramp,
+   registeredAt + trustedByCount feed Circles. Without the subgraph, results degrade to
+   flagged midpoints.
+4. Thresholds: exported `Thresholds.lenient/standard/strict` constants (1.5/2.5/3.5) with
+   derivations — still no default inside `isHuman()`.
 
----
+## Needs you (in priority order)
 
-## The finding that changed the design
+1. **Repo has no pushable remote.** Judges need a URL. Fork to Hugo0 or get collaborator
+   access from Andrei, then `git push`. Nothing was pushed anywhere overnight.
+2. **corroborate.eth — 5 minutes on mainnet.** Sepolia ENS is mid-migration (the artifact
+   controller isn't authorized on the registrar; no NameRegistered events in weeks; details
+   in the b33e5d6 commit message). Register `corroborate.eth` on **mainnet** in the ENS app
+   (~$5/yr), set text record `corroborate.subjects` to your wallet list. The SDK feature is
+   done and tested; the demo lights up the moment the record exists.
+3. **World tracks need your phone.** Selfie Check + Identity Check beta submissions want
+   *user testing docs*. `apps/agent`: `npm run worldid` prints a live World ID 4.0 QR —
+   scan with World App (staging build works, no Orb needed for Selfie Check). 20 minutes.
+4. **Registry curator + deployer is the burner EOA** — fine for judging, say it out loud in
+   the pitch. Rotate the World portal API key after the event (it's in chat history).
+5. **ENS booth Sunday morning** (both ENS tracks require presenting).
 
-I went looking for a real address holding credentials from two protocols, to use in the demo.
-**There isn't one.** Across 31 credential-holding addresses found live on Gnosis and World
-Chain, not a single one held two protocols on the same address — and Proof of Humanity's own
-Circles proxy pairs a PoH address with a *separate* Circles avatar. One human, one wallet per
-protocol.
+## Honest state of weak points
 
-That breaks the address-keyed model. A real person with World ID on one wallet and Circles on
-another reads as two weak subjects instead of one strong one.
+- Subgraph still backfilling toward Circles' start block; until then most lookups carry
+  `issuance-date-unknown` and ramp midpoints. No action needed, just time.
+- The comparison's farm column is constructed evidence (labelled as such in the UI) —
+  no real wallet detectably holds three passport-rooted credentials, which is itself the
+  point (the protocols' nullifiers make it undetectable; the registry is how we price it
+  anyway).
+- Weights are dated curated judgments. Sources are on-chain; the dispute path is roadmap.
+- `independent-control-not-attested` on every result, permanently. That is Ohlhaver's
+  critique accepted into the API, and the agent README explains why it's load-bearing for
+  the human-backed-agents story.
 
-So `resolve()` now takes an **address set**, supplied and authenticated by the caller. We
-never infer that two addresses belong to one person — that inference is the linkage we exist
-to avoid. Saturation spans the set, so spreading correlated credentials over wallets does not
-pay, and there's a test asserting one passport on two wallets scores the same as on one.
+## Mistakes made and caught overnight (so you don't re-diagnose them)
 
-Verified live: two real wallets → 2 independent roots → score 2.74.
-
----
-
-## Needs your judgment
-
-**1. The demo's multi-root example.** Since no natural multi-credential address exists, the
-two-wallet comparison has to either use a real address *set* (honest, and now supported) or a
-constructed illustration. I'm building it with real sets. Flagging because it's a
-presentation choice you may feel differently about.
-
-**2. World ID has no positive vector yet.** AgentBook emitted no indexable registration events
-in the windows I scanned, so I have no confirmed Orb-verified address to demo against. Options:
-your own World App account if you have one verified, or the World ID Simulator. Doesn't block
-the build — the adapter is verified working, it just returns `false` for everyone I've tried.
-
-**3. ENS name.** Registering `corroborate.eth` on Sepolia unless you own something on mainnet
-you'd rather use.
-
-**4. That World portal API key is in the chat transcript.** Rotate it after the hackathon.
-
----
-
-## Known gaps and honest caveats
-
-- **PoH issuance dates are unavailable** from the contract read alone, so no decay is applied
-  and the result carries an `issuance-date-unknown` caveat. The subgraph will fix this.
-- **Registry weights are my dated judgements**, derived from `research/`, not measurements.
-  Each carries its `sourceURI`. This is the honest weak point of the whole design.
-- **PoH is currently airdrop-inflated** — ~1,299 of 1,364 lifetime registrations arrived in
-  four months tracking a $9.94 PNK claim. Its weight should be revisited in October when the
-  pool empties.
-- **Nothing attests independent control.** Every result carries a permanent
-  `independent-control-not-attested` caveat. That is Ohlhaver's critique accepted into the
-  design rather than argued away.
+- I fabricated a full address from an elided one in an E2E test (`0x58b849f6…` + invented
+  tail). Caught by the test failing against live data; fixed with the real address and a
+  corrected premise. Lesson applied: no address enters code except copied whole from a
+  source.
+- The ens-contracts `deployments/sepolia` artifacts point at a controller the registrar
+  doesn't authorize. Cost ~40 minutes and ~0.01 ETH in reverted attempts before pivoting.
+- A `cd` short-circuit meant `subgraph/src/shared.ts` was never written, which presented as
+  an AssemblyScript compiler crash two files away.
