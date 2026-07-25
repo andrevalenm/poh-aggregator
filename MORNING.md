@@ -65,6 +65,16 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**One cohesive experience (Hugo's call, ~17:30)**: standalone console de-linked from the
+product — a single "Show the full technical detail" button unfolds the complete record
+(evidence → caveats, staggered, glide-to-view) inside the ledger. Install (MCP/SDK) moved
+directly after the live demo; the night section is an island now and tears on both edges.
+The hosted copy-button bug was real and is fixed: navigator.clipboard doesn't exist on
+insecure origins — execCommand fallback shipped. /app.html still renders as an unlinked
+deep tool (the demo script's comparison beat uses it as a deep link). In flight: full
+interactive QA agent against the deployed site + sponsor-logo agent (World/Graph/ENS
+marks for the azulejo tiles).
+
 **The terrain flows** (Hugo's ask): the contour height field now drifts — each wave's
 phase moves at its own rate on a minutes-long clock, so the topo lines morph like slow
 weather. ~24fps redraw, only while the canvas is in-viewport and the tab visible;
