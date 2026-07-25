@@ -56,6 +56,18 @@ cd ../agent && npm start                                   # live agent flow
 4. Thresholds: exported `Thresholds.lenient/standard/strict` constants (1.5/2.5/3.5) with
    derivations — still no default inside `isHuman()`.
 
+## Since the last update (post-06:00 heartbeats)
+
+- **Demo is hosted: http://37.27.67.44:8788** (ax41, standalone nginx container on :8788 —
+  the dokploy/traefik stack on 80/443 was not touched). Redeploy with
+  `scripts/deploy-demo-ax41.sh`; remove with `ssh ax41 'docker rm -f corroborate-demo'`.
+  Two Playwright smokes pass against the hosted URL. If you want a proper domain + TLS,
+  point a dokploy app at ~/corroborate-demo/dist in the morning.
+- **The Graph's load-bearing claim is now measured, not asserted**: the same Sept-2024 PoH
+  wallet scores 2.40 with a flagged 0.5 midpoint when the subgraph is absent, and 2.56 with
+  a computed 0.726 survival weight (caveat cleared) when present. Good judge-facing number.
+- Subgraph sync: block ~40.6M of ~47.4M, no indexing errors; Circles range still pending.
+
 ## Needs you (in priority order)
 
 1. **Repo has no pushable remote.** Judges need a URL. Fork to Hugo0 or get collaborator
