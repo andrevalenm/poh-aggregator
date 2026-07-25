@@ -65,6 +65,11 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Sponsor marks on the tiles**: official World / The Graph / ENS logos (from their own
+repos/brand kits), single-path cobalt SVGs inline with the kickers at matched optical
+weight — the tiles carry their sponsors now, not just ETHGlobal. Agent-built, visually
+reviewed, integrated.
+
 **One cohesive experience (Hugo's call, ~17:30)**: standalone console de-linked from the
 product — a single "Show the full technical detail" button unfolds the complete record
 (evidence → caveats, staggered, glide-to-view) inside the ledger. Install (MCP/SDK) moved
