@@ -203,7 +203,122 @@ person.isHuman(Thresholds.standard)</code></pre>
       tilework and Atlantic light against the kiln ground; the sponsor list wants to read
       as three tiles, not three SaaS cards.
     -->
+    <!--
+      Azulejo motif, generated rather than photographed.
+      Lisbon tilework is geometric by construction, so it belongs in the same idiom as the
+      rest of this page's textures (fingerprint, smudge, torn edges) — drawn, not imported.
+      No stock photography, no licensing question, and it inherits the kiln/bone/iron palette
+      instead of fighting it with flat cobalt.
+
+      Seamless at 80×80: the corner arcs are quarter-circles that complete across tile
+      boundaries, and the spokes sit at edge midpoints so opposite edges mirror. Stroke is
+      currentColor, so colour is a CSS decision, not baked in here.
+    -->
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style="position: absolute">
+      <defs>
+        <pattern id="azulejo" width="80" height="80" patternUnits="userSpaceOnUse">
+          <g fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round">
+            <!-- corner quarter-arcs — four tiles meet to form one circle -->
+            <path d="M0 18A18 18 0 0 0 18 0" />
+            <path d="M62 0A18 18 0 0 0 80 18" />
+            <path d="M80 62A18 18 0 0 0 62 80" />
+            <path d="M18 80A18 18 0 0 0 0 62" />
+            <!-- spokes at the edge midpoints, meeting the diamond's points -->
+            <path d="M40 0V14M40 66V80M0 40H14M66 40H80" />
+            <!-- inscribed diamond -->
+            <path d="M40 14 66 40 40 66 14 40Z" />
+            <!-- quatrefoil rosette: four overlapping circles -->
+            <circle cx="40" cy="32" r="8" />
+            <circle cx="48" cy="40" r="8" />
+            <circle cx="40" cy="48" r="8" />
+            <circle cx="32" cy="40" r="8" />
+          </g>
+          <circle cx="40" cy="40" r="2.4" fill="currentColor" opacity="0.55" />
+        </pattern>
+      </defs>
+    </svg>
+
+    <!--
+      Scoped styles for this section only, kept here deliberately: landing.css is being
+      reworked in parallel, so this stays out of the way. Lift it into landing.css whenever
+      convenient — it uses only the existing custom properties and adds none.
+    -->
+    <style>
+      .azulejo-band {
+        color: var(--bone);
+        opacity: 0.14;
+        line-height: 0;
+        overflow: hidden;
+        height: 80px;
+      }
+      .azulejo-band svg {
+        display: block;
+        width: 100%;
+        height: 80px;
+      }
+      /* A single faint tile block behind the section, anchored so it never crowds the type. */
+      .hackathon {
+        position: relative;
+        overflow: hidden;
+      }
+      .hackathon-wash {
+        position: absolute;
+        inset: 0;
+        color: var(--bone);
+        opacity: 0.045;
+        pointer-events: none;
+        z-index: 0;
+        mask-image: radial-gradient(60% 55% at 88% 8%, #000 0%, transparent 72%);
+      }
+      .hackathon .band-inner {
+        position: relative;
+        z-index: 1;
+      }
+      .built-at {
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        flex-wrap: wrap;
+        margin: 2rem 0 0;
+      }
+      .built-at-mark {
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--bone-dim);
+        border: 1px solid var(--umber);
+        border-radius: 2px;
+        padding: 0.5rem 0.85rem;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .built-at-mark img {
+        display: block;
+        height: 1.6rem;
+        width: auto;
+      }
+      .built-at-note {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--smoke);
+        max-width: 44ch;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .hackathon .reveal {
+          opacity: 1;
+          transform: none;
+        }
+      }
+    </style>
+
     <section class="hackathon" id="hackathon" aria-labelledby="hackathon-title">
+      <div class="azulejo-band" aria-hidden="true">
+        <svg><rect width="100%" height="80" fill="url(#azulejo)" /></svg>
+      </div>
+      <div class="hackathon-wash" aria-hidden="true">
+        <svg width="100%" height="100%"><rect width="100%" height="100%" fill="url(#azulejo)" /></svg>
+      </div>
       <div class="band-inner">
         <header class="band-head reveal">
           <p class="eyebrow">ETHGlobal Lisbon · 2026</p>
@@ -222,6 +337,27 @@ person.isHuman(Thresholds.standard)</code></pre>
             think it is worth getting right in public, with the weights on-chain and the sources
             attached, whatever happens to us on Sunday.
           </p>
+
+          <!--
+            Event attribution. Text wordmark by default so nothing renders broken; when the
+            official vector lands at apps/demo/public/ethglobal-lisbon.svg, swap the span for
+            the commented <img> below and drop the .built-at-mark border.
+          -->
+          <div class="built-at reveal">
+            <a
+              class="built-at-mark"
+              href="https://ethglob.al/lisbon2026"
+              rel="noopener"
+              aria-label="ETHGlobal Lisbon 2026"
+            >
+              <!-- <img src="/ethglobal-lisbon.svg" alt="ETHGlobal Lisbon 2026" /> -->
+              <span>ETHGlobal Lisbon 2026</span>
+            </a>
+            <p class="built-at-note">
+              The tilework on this page is drawn, not photographed — the same way the
+              fingerprint above it is.
+            </p>
+          </div>
         </header>
 
         <h3 class="reveal">The three sponsors we are submitting to</h3>
