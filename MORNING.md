@@ -341,6 +341,11 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Consolidation verified + perf held**: the merged SDK passes its full suite (224 tests,
+0 failures — grown from 34). The research module (four sections below the fold) now
+lazy-loads at idle instead of competing with first paint; mobile Lighthouse holds at 85
+with TBT 80ms and clean CLS after all the growth.
+
 **Density absorbed**: with 10 live probes × 3 wallets the stream ran 30 rows — the
 receipt now settles on completion (credentials found stay line-by-line, empties fold to
 one tally over a strong rule) and the full-evidence ledger sorts held → unreachable →
