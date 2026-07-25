@@ -11,6 +11,22 @@ test.describe('Corroborate landing', () => {
   test('hero loads with the live registry line', async ({ page }) => {
     await page.goto('/')
     await expect(page.locator('h1')).toContainText(/to be human/i)
+    // The headline must be VISIBLE, not merely present — the split-line masks hide the
+    // text until a reveal class lands, and a missing CSS rule once shipped an invisible
+    // hero. Assert the first line has actually risen into place.
+    await expect
+      .poll(
+        async () =>
+          page
+            .locator('.sl-line')
+            .first()
+            .evaluate((el) => {
+              const t = getComputedStyle(el).transform
+              return (t === 'none' || t === 'matrix(1, 0, 0, 1, 0, 0)') && el.getBoundingClientRect().top < innerHeight
+            }),
+        { timeout: 10_000 },
+      )
+      .toBe(true)
     // Live Sepolia read, not copy: protocols + trust roots + revision.
     await expect(page.locator('#registry-line')).toContainText(/rev \d+/, { timeout: 60_000 })
     await expect(page.locator('#registry-line')).toContainText('trust roots')

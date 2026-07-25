@@ -1,6 +1,5 @@
 import './landing.css'
 import Lenis from 'lenis'
-import { DEFAULT_REGISTRY, makeClient } from '../client.ts'
 import { h, shortAddr } from '../ui.ts'
 import { mountFingerprint, stampPrint } from './fingerprint.ts'
 import { mountPaper } from './paper.ts'
@@ -16,6 +15,8 @@ async function paintRegistryLine(): Promise<void> {
   if (!el) return
   const pulse = h('span', { class: 'pulse', 'aria-hidden': 'true' })
   try {
+    // The SDK (and viem underneath) is 116 KiB gz — off the critical path, on demand.
+    const { DEFAULT_REGISTRY, makeClient } = await import('../client.ts')
     const { adapters, revision } = await makeClient().ontology()
     const roots = new Set([...adapters.values()].map((a) => a.trustRoot))
     el.textContent = ''
@@ -208,9 +209,13 @@ function mountScroll(): void {
   if (reduced) return
 
   const lenis = new Lenis({ autoRaf: false, lerp: 0.11 })
+  let lastApplied = -1
   const raf = (time: number) => {
     lenis.raf(time)
-    applyParallax()
+    if (scrollY !== lastApplied) {
+      lastApplied = scrollY
+      applyParallax()
+    }
     requestAnimationFrame(raf)
   }
   requestAnimationFrame(raf)
@@ -228,15 +233,27 @@ function mountScroll(): void {
 
 // -------------------------------------------------------------------- mount
 
-mountPaper(document.getElementById('paper') as HTMLCanvasElement)
-for (const canvas of document.querySelectorAll<HTMLCanvasElement>('canvas[data-contours]')) {
-  mountContours(canvas, 0x7e44a1 + Number(canvas.dataset['contours']) * 0x1f2e3d)
-}
-// The print is ink on paper now.
-mountFingerprint(document.getElementById('print') as HTMLCanvasElement, {
-  rgb: '42 35 27',
-  wideAlpha: 0.78,
-  narrowAlpha: 0.16,
+// Canvas work held past the first paint: the sheet lands one frame in, the print and
+// contours at idle. Mobile Lighthouse put 3s of element-render delay on these mounts
+// running synchronously at module scope.
+requestAnimationFrame(() => {
+  mountPaper(document.getElementById('paper') as HTMLCanvasElement)
+})
+const idle: (cb: () => void) => void =
+  'requestIdleCallback' in window ? (cb) => requestIdleCallback(cb, { timeout: 900 }) : (cb) => setTimeout(cb, 120)
+idle(() => {
+  // The print is ink on paper now. Narrow screens get the finished print instantly —
+  // at 0.16 alpha behind text, a 2.6s stroke animation is pure main-thread waste.
+  mountFingerprint(document.getElementById('print') as HTMLCanvasElement, {
+    rgb: '42 35 27',
+    wideAlpha: 0.78,
+    narrowAlpha: 0.16,
+  })
+})
+idle(() => {
+  for (const canvas of document.querySelectorAll<HTMLCanvasElement>('canvas[data-contours]')) {
+    mountContours(canvas, 0x7e44a1 + Number(canvas.dataset['contours']) * 0x1f2e3d)
+  }
 })
 mountCursor()
 mountInkPress()
@@ -246,8 +263,10 @@ mountReveals()
 mountTornEdges()
 mountScroll()
 
-// The headline rises line-by-line out of its masks once layout settles.
-requestAnimationFrame(() =>
+// The headline rises line-by-line out of its masks — after Fraunces is ready, so the
+// lines never slide up in a fallback face and swap mid-transition. 400ms cap: a slow
+// font must not hold the page hostage.
+void Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 400))]).then(() =>
   requestAnimationFrame(() => document.querySelector('.hero h1')?.classList.add('sl-in')),
 )
 
