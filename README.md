@@ -98,7 +98,7 @@ and nothing to subpoena. Every weight change emits an event carrying the full re
 monotonic revision, so a subject can ask "why did my score move?" and get an answer with a
 block number.
 
-### 2. Subgraph — [`api.studio.thegraph.com/query/77602/poh/version/latest`](https://api.studio.thegraph.com/query/77602/poh/version/latest)
+### 2. Subgraph — [`api.studio.thegraph.com/query/77602/poh/version/latest`](https://api.studio.thegraph.com/query/77602/poh/version/latest` — plus a second subgraph, the registry audit trail, self-hosted at `http://37.27.67.44:8100/subgraphs/name/corroborate-registry)
 
 Indexes Proof of Humanity v2 and Circles v2 on Gnosis. It supplies the two things a boolean
 contract read cannot: **issuance dates** and **graph position**.
