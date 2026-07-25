@@ -211,3 +211,102 @@ wrong by ~60× against our own research and I left it alone rather than silently
 weights (it does not bind today, since scoring takes `min(forge, rent)`); and two count strings in
 `apps/demo/index.html` are now stale, which I cannot fix because the design agent owns that file
 and the harness enforces it.
+
+## Iteration 3 — 2026-07-25
+
+**Did:** P0 #2, job 2 — the first probe off the ranked queue (§6 of `ontology-coverage.md`):
+**Human Passport**, read permissionlessly on all seven Decoder deployments. Five adapters
+implemented now, up from four.
+
+- **Read the resolver, not `getScore`.** `Decoder.getScore` is revert-driven — `AttestationNotFound()`
+  (`0x120a2e77`) when nothing was minted, `AttestationExpired(uint64)` (`0x06c09405`) when the score
+  aged out, both selectors confirmed against live reverts — and it throws away the issuance date.
+  That date is what the decay curve needs, so the probe calls `GitcoinResolver.getCachedScore`, the
+  same struct the Decoder consults, which returns `{score, time, expirationTime}` in one hop. The
+  resolver address is never hard-coded: each Decoder is asked which resolver it trusts
+  (`gitcoinResolver()`), cached per process, so their upgrade cannot leave us reading a resolver
+  the Decoder has stopped believing.
+- **Seven chains, because one is wrong.** A passport is minted per chain and the mints disagree:
+  `0xb0812e00…90F2` holds 50.015 on Optimism and Linea, 25.099 on Scroll from a year earlier, and
+  nothing on Base, Arbitrum, Shape or zkSync. We read all seven in parallel and take the freshest
+  unexpired mint. A chain that does not answer is dropped and *named* in `detail.chainsUnreadable`;
+  only a total failure returns an `error`, because an RPC outage must not read as "no wallet history".
+  Four subjects across seven chains resolve in ~1.1 s warm.
+- **Two facts the ontology did not record.** `maxScoreAge()` is 7,776,000 s on every deployment, so a
+  passport **hard-expires at 90 days** and the 180-day half-life only ever applies over the first 90;
+  the probe flips to `held: false` at exactly the instant the Decoder starts reverting. And
+  `threshold()` is 200000 — the "Passport 20+" convention as an on-chain constant. We report
+  `meetsPassportThreshold` and never consume it: adopting the number would be adopting their
+  weighting, adopting the threshold would be adopting their policy.
+- **The finding.** `getPassport()` shows the score is largely credentials we already price.
+  `0xA6b7471f…67b1`'s 22.027 is a Holonym gov-id check plus a Holonym FaceTec biometric and *nothing
+  else* — two roots already in the ontology, re-scored by somebody else's weights. Iteration 2's
+  pricing already defused the double count (wallet-history root, 100 cents), so **no arithmetic
+  changed**. What changed is that the collapse is visible: each stamp maps to the adapter that owns
+  it and the result carries `aggregate-restates-other-credentials` naming those adapters and their
+  roots, resolved from the deployed registry rather than a table in the SDK. That is the product
+  thesis on one address instead of in a pitch.
+- **Stamp names verified, not guessed** — from the Decoder's own on-chain provider array (102 names)
+  and the per-platform `Providers-config.ts` files in `passportxyz/passport`. `Biometrics` is
+  id.human.tech's FaceTec liveness; `CleanHands` is the sanctions screen built on the same gov-id
+  check, so it shares that root. `BinanceBABT` is deliberately **unmapped**: weighted like a
+  government ID and still with no vendor attribution in our research, and an invented root scores as
+  full independence. It stays visible in `detail.stamps`.
+- **Two vocabularies, one on chain.** The legacy bitmap stamps index into `getProviders()`; score-v2
+  attestations carry provider strings inline that never enter that array (`Biometrics`, `Steam` prove
+  it). The live test holds every mapped *legacy* name to the on-chain array so an upstream rename
+  fails loudly, with `Biometrics`/`CleanHands` declared as the v2-only exceptions rather than a
+  blanket exemption.
+- New write-up: `research/protocols/human-passport-onchain-read.md` — addresses, the expiry
+  derivation from both directions, what minting activity was and was not measurable on free
+  endpoints, and the stamp→root map with its two judgement calls. `ontology-coverage.md` §6 item 1
+  struck through, README updated (four adapters → five, test counts corrected to 114).
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd packages/sdk && npm test` → `# tests 86 # pass 86 # fail 0` (was 76: +6 Passport live,
+  +4 scoring). Per file: 32 scoring, 18 reconcile, 5 input, 10 ontology, 15 live, 6 passport-live.
+- `node --test --experimental-strip-types src/adapters/human-passport.live.test.ts` → 6/6, `skipped 0`,
+  positive path exercised (it sources a current minter from a recent EAS `Attested` log rather than
+  pinning an address, since every passport expires in 90 days).
+- `npm run build` clean; `node_modules/.bin/tsc -p tsconfig.json --noEmit` clean.
+- `cd apps/demo && npx playwright test` → `10 passed`.
+- End to end through `resolve()`: `0xA6b7471f…67b1` scores **2.0025**, one root, with
+  `aggregate-restates-other-credentials` naming `holonym-gov-id (kyc-vendor:unattributed)` and
+  `holonym-biometrics (kyc-vendor:facetec)`. The README's worked pair is unchanged at 1.5687/36.04c
+  and neither address holds a passport.
+- The acceptance test the mission asks for ("a live test that hits the real chain and asserts the
+  mechanism, not a magic number") is *"our derived expiry agrees with what the Decoder itself does,
+  on real addresses"*: it reads the cached struct, derives `expirationTime || time + maxScoreAge`,
+  and requires the Decoder's `AttestationExpired` revert payload to equal that number to the second —
+  or, if unexpired, requires `getScore` to return exactly the cached score.
+
+**No registry write, on purpose.** `implemented` and `notes` are off-chain fields and no weight
+moved, so a reseed would have bumped `revision` to record nothing — which is exactly what iteration
+2's incremental seeding exists to prevent. Registry stays at **30 adapters, revision 34**.
+
+**Next, in the order I would do it:**
+
+1. **Keep going down the queue.** Next is **Farcaster** (`IdRegistry.idOf` on OP Mainnet, one
+   `eth_call`), then **Holonym** (Optimism state — and note we now have live evidence that real
+   subjects hold Holonym credentials, since two of the three passports read today carried them),
+   **Linea PoH** (Verax), World's document/Selfie tiers, and **PoH v1** on a registry we already
+   talk to.
+2. **Binance BABT is now the most expensive piece of research debt**, not the third. It is no longer
+   a protocol we might add — it is a stamp *inside a score we read*, so a live passport can be one
+   third BABT with that third unattributable. `0x46760723…Df74` is exactly that.
+3. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still the
+   cheapest way to turn two flagged approximations into real dates (iteration 1's note 1, unchanged).
+
+**Measured while working, worth keeping:** on-chain Passport minting is *current*, not a 2023
+artefact — score-v2 attestations landed at Optimism blocks 154,646,860 and 154,643,503 against a head
+of ~154,689,600, i.e. within the last day. The legacy score schema clusters around blocks 130–132 M
+with nothing in the sampled windows nearer head, consistent with score-v2 having superseded it.
+Total minted population and the same question on Base/Linea/Scroll stayed **unmeasured**: the free
+endpoints for those chains refuse historical `eth_getLogs` without a key, and buying an archive
+endpoint to answer a population question would put a vendor on a path we keep vendor-free.
+
+**Blocked:** nothing. Iteration 1's two notes still stand unresolved and are Hugo's calls, not
+blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md` says
+to run it, and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
