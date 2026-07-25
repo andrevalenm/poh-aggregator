@@ -83,6 +83,10 @@ cd ../agent && npm start                                   # live agent flow
 4. **Registry curator + deployer is the burner EOA** — fine for judging, say it out loud in
    the pitch. Rotate the World portal API key after the event (it's in chat history).
 5. **ENS booth Sunday morning** (both ENS tracks require presenting).
+6. **Demo videos.** The Graph tracks require a 2–4 minute video; World wants a working
+   end-to-end demo. Script suggestion: hosted demo (three-wallet lookup → 3 roots) →
+   `apps/agent npm start` (fleet detection) → MCP in Claude (`explain_trust_roots`). The
+   2.40-vs-2.56 subgraph number and the fleet-denial moment are the two beats to hit.
 
 ## Honest state of weak points
 
