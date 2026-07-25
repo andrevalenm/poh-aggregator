@@ -137,7 +137,7 @@ that block, which caps its age, and the result says so. Where the index covers o
 history, absence proves nothing, the contract read stands alone as before, and the caveat names
 the gap. See [`packages/sdk/src/reconcile.ts`](packages/sdk/src/reconcile.ts).
 
-Proof of Humanity needs none of that, because it dates itself on chain:
+Proof of Humanity v2 needs none of that, because it dates itself on chain:
 `expirationTime − humanityLifespan()` is the claim timestamp, two `eth_call`s, no indexer in the
 path. PoH scores are therefore identical with and without the subgraph — there is a live test
 asserting exactly that — and the index becomes a cross-check whose disagreements are reported
@@ -171,7 +171,7 @@ honeypot the registry design exists to avoid.
 
 A subject is an **address set**, not an address. This was forced by a measurement: across 31
 credential-holding addresses found live on Gnosis and World Chain, not one held two protocols
-on the same address — and Proof of Humanity's own Circles proxy pairs a PoH address with a
+on the same address — and Proof of Humanity v2's own Circles proxy pairs a PoH address with a
 *separate* Circles avatar. One human, one wallet per protocol. The caller supplies and
 authenticates the set; we never infer that two addresses belong to one person, because that
 inference is the linkage we exist to avoid. Saturation spans the set, so splitting credentials
@@ -519,7 +519,7 @@ resistance at all, regardless of what the score says. Proving control is the int
 and duplicating it here would mean holding user state — but this is the most likely way to
 deploy it wrong.
 
-**4. Proof of Humanity is currently airdrop-inflated.** Roughly 1,299 of 1,364 lifetime
+**4. Proof of Humanity v2 is currently airdrop-inflated.** Roughly 1,299 of 1,364 lifetime
 registrations arrived in a four-month window tracking a ~$9.94 PNK claim one-for-one,
 `requiredNumberOfVouches()` is 1, and `HumanityRevoked` has fired exactly once ever. We weight
 by registration age rather than the boolean — a `Ramp` curve, where a week-old registration
@@ -591,7 +591,7 @@ that forced the cost model. We read the Orb tier permissionlessly from two World
 no API key, no relying-party id, no user interaction — which is why the adapter cannot be
 rate-limited or revoked out from under an integrator. It is also the
 protocol we price *down*: forging an iris enrolment costs ~$500, but renting one costs $0.50 at
-the observed resale floor, so it scores 1.71 — below Proof of Humanity. We own that result
+the observed resale floor, so it scores 1.71 — below Proof of Humanity v2. We own that result
 rather than fudging it: [`docs/scoring.md`](docs/scoring.md#the-world-id-wrinkle). The AgentKit
 demo in [`apps/agent`](apps/agent) puts the whole thing to work: an agent proves a human stands
 behind it, and the counterparty — not us — picks the line.

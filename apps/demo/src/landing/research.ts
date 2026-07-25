@@ -53,7 +53,7 @@ const CREDS: Cred[] = [
   { id: 'coinbase-verification', name: 'Coinbase Verification', root: 'kyc-vendor:persona', rootLabel: 'Persona KYC', forge: 120_000, rent: 3_000 },
   { id: 'galxe-passport', name: 'Galxe Passport', root: 'kyc-vendor:sumsub', rootLabel: 'Sumsub KYC', forge: 120_000, rent: 3_000 },
   { id: 'linea-poh', name: 'Linea PoH', root: 'kyc-vendor:sumsub', rootLabel: 'Sumsub KYC', forge: 120_000, rent: 3_000 },
-  { id: 'poh-v2', name: 'Proof of Humanity', root: 'social-vouching:poh', rootLabel: 'PoH vouching', forge: 1_000, rent: 500 },
+  { id: 'poh-v2', name: 'Proof of Humanity v2', root: 'social-vouching:poh', rootLabel: 'PoH vouching', forge: 1_000, rent: 500 },
   { id: 'circles-v2', name: 'Circles', root: 'social-trust:circles', rootLabel: 'Circles trust graph', forge: 100, rent: 50 },
   { id: 'human-passport', name: 'Human Passport', root: 'behavioral:wallet-history', rootLabel: 'wallet history', forge: 2_000, rent: 100 },
 ]
@@ -248,7 +248,7 @@ function verdictFor(
 /**
  * Decay vs Ramp, plotted from the same functions the SDK scores with.
  *
- * Ramp is the counter-intuitive one and the reason it exists is empirical: Proof of Humanity
+ * Ramp is the counter-intuitive one and the reason it exists is empirical: Proof of Humanity v2
  * took roughly 95% of its lifetime registrations inside a four-month airdrop window, so on a
  * vouching registry the fresh cohort IS the suspect cohort. Uniform decay would have handed
  * that cohort full weight and discounted the organic one — exactly backwards.
@@ -259,7 +259,7 @@ const freshness = (curve: 'decay' | 'ramp', ageDays: number, halfLife: number) =
 }
 
 const DECAY_HALF_LIFE = 1095 // World ID Orb, days
-const RAMP_HALF_LIFE = 365 // Proof of Humanity, days
+const RAMP_HALF_LIFE = 365 // Proof of Humanity v2, days
 const MAX_DAYS = 1825 // five years
 
 function initCurves(root: HTMLElement) {

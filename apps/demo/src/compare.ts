@@ -16,7 +16,7 @@ import { clear, fmtCents, fmtScore, h, rootChip, rootHue, shortAddr } from './ui
 const FARM_ADAPTER_IDS = ['world-id-document', 'zkpassport', 'self-protocol'] as const
 
 /**
- * Real wallets. Proof of Humanity on one, Circles on the other — verified live during the
+ * Real wallets. Proof of Humanity v2 on one, Circles on the other — verified live during the
  * build. No single address in the wild held two protocols, which is why `resolve()` takes a
  * set in the first place.
  */
@@ -202,7 +202,7 @@ function punchline(farm: Column, person: Column): HTMLElement {
       'p',
       { class: 'honest' },
       h('b', {}, 'Said plainly: '),
-      `root cost does not invert the raw score here, and we are not going to pretend it does. A passport is genuinely expensive to forge, so a subject holding one outscores a subject holding a Proof of Humanity registration and a Circles account — on cost. What inverts is independence: ${personRoots} roots against ${farmRoots}. A consumer who requires two independent roots admits the person and refuses the farm, and gets there with the same API call.`,
+      `root cost does not invert the raw score here, and we are not going to pretend it does. A passport is genuinely expensive to forge, so a subject holding one outscores a subject holding a Proof of Humanity v2 registration and a Circles account — on cost. What inverts is independence: ${personRoots} roots against ${farmRoots}. A consumer who requires two independent roots admits the person and refuses the farm, and gets there with the same API call.`,
     ),
   )
 }
@@ -220,7 +220,7 @@ function footnote(ontologyAdapters: Map<string, Adapter>): HTMLElement {
     h(
       'p',
       {},
-      `World ID (Orb) scores ${fmtScore(Math.log10(orbCost + 1))} in this model. Proof of Humanity scores ${fmtScore(Math.log10(pohCost + 1))}. Orb is by far the harder credential to forge — defeating iris dedup at an Orb is a serious undertaking — but a credential is only as strong as the cheaper of forging one and renting one, and Orb accounts resell from $0.50. We price at the rental floor, so forge cost ${fmtCents(orb?.forgeCostCents ?? 0)} loses to rent cost ${fmtCents(orb?.rentCostCents ?? 0)}.`,
+      `World ID (Orb) scores ${fmtScore(Math.log10(orbCost + 1))} in this model. Proof of Humanity v2 scores ${fmtScore(Math.log10(pohCost + 1))}. Orb is by far the harder credential to forge — defeating iris dedup at an Orb is a serious undertaking — but a credential is only as strong as the cheaper of forging one and renting one, and Orb accounts resell from $0.50. We price at the rental floor, so forge cost ${fmtCents(orb?.forgeCostCents ?? 0)} loses to rent cost ${fmtCents(orb?.rentCostCents ?? 0)}.`,
     ),
     h(
       'p',
@@ -317,7 +317,7 @@ export async function renderComparison(container: HTMLElement): Promise<void> {
     key: 'person',
     title: 'One person, two wallets',
     caption:
-      'Proof of Humanity on one address, Circles on another. Two unrelated trust roots — a vouching registry and a social graph — that no single document can produce.',
+      'Proof of Humanity v2 on one address, Circles on another. Two unrelated trust roots — a vouching registry and a social graph — that no single document can produce.',
     provenance: { label: 'Live — resolved against Gnosis, World Chain and Base', kind: 'live' },
     subjectLabel: person.subjects.map(shortAddr).join('  +  '),
     result: person,
