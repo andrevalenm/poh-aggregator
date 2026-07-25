@@ -75,6 +75,17 @@ cd ../agent && npm start                                   # live agent flow
   at the version-agnostic /version/latest endpoint. PoH range resyncs in well under an
   hour; the 2.40-vs-2.56 demonstration reruns identically once caught up.
 
+## Registry audit-trail subgraph — live on ax41
+
+`http://37.27.67.44:8100/subgraphs/name/corroborate-registry` — the second Graph product:
+all 15 adapters by plaintext id (the integrity-checked event field from registry v2), plus
+an immutable WeightChange per mutation. "Why did my score change?" is a GraphQL query.
+Self-hosted graph-node on ax41 (publicnode 403'd graph-node's eth_getLogs; switched to
+drpc). Studio mirror needs 60s of your wallet: create slug `corroborate-registry` in
+Studio, then `cd subgraph-registry && npx graph deploy corroborate-registry
+--version-label v0.0.1 --deploy-key $GRAPH_DEPLOY_KEY --node
+https://api.studio.thegraph.com/deploy/`.
+
 ## Needs you (in priority order)
 
 1. **Repo has no pushable remote.** Judges need a URL. Fork to Hugo0 or get collaborator
