@@ -310,3 +310,127 @@ endpoint to answer a population question would put a vendor on a path we keep ve
 **Blocked:** nothing. Iteration 1's two notes still stand unresolved and are Hugo's calls, not
 blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md` says
 to run it, and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
+
+## Iteration 4 — 2026-07-25
+
+**Did:** P0 #2, job 2 — the next probe off the ranked queue (§6 item 2 of `ontology-coverage.md`):
+**Farcaster**, read from `IdRegistry` on OP Mainnet. Six adapters implemented now, up from five.
+
+The interesting part is not the read — `idOf(address)` is one call — it is the **date**. A fid costs
+$0.44 one-off plus $0.20/yr (`IdGateway.price()` = 107,599,771,888,484 wei and
+`StorageRegistry.usdUnitPrice()` = 20,000,000 @ 8dp, both read today), and the registry tripled
+inside a nine-month subsidy window that ended in 2026-04. On the `Ramp` at 20 cents and a 730-day
+half-life, an id has to *predate that window* to clear the 10-cent negligible-cost floor at all, so
+the age carries the entire signal — and `IdRegistry` stores no timestamps.
+
+- **The counter dates the fid.** `Register` logs are out of reach (`mainnet.optimism.io` answers
+  `Block range is too large` above ~1,000 blocks, and 43,000 requests per lookup is not a read).
+  But `idCounter()` is monotone and `register()` does `id = ++idCounter` in the same transaction
+  that writes custody, so **the first block where `idCounter() >= fid` is the block that fid was
+  created in**. That is a monotone predicate over archive state, which two — now three — keyless
+  endpoints serve. Interpolation/bisection hybrid, 15–30 `eth_call`s, every sample cached, seeded
+  with a measured ladder of `(block, counter)` landmarks. No indexer on the critical path.
+- **The search verifies its own answer** before returning: `counter(B-1) < fid <= counter(B)`. That
+  is what makes the seeded landmarks safe — a stale landmark can cause an error, never a
+  plausible-but-early date, and on a Ramp an early date is free weight.
+- **Finding 1: 193,791 fids are older than their date.** `idCounter` is 0 from deployment (block
+  111,816,351, 2023-11-06) until block **111,904,738**, where it becomes 193,791 in one step. That
+  block registers nothing: it holds six transactions and exactly one registry event,
+  `SetIdCounter(0, 193791)` (topic `0x562044dc…4eed`, tx `0x84876178…dfb3`), and `custodyOf(1)` was
+  already written two blocks earlier while the counter was still 0. This deployment
+  (`VERSION` "2023.11.15") imported its predecessor's registry over a run of blocks and then set the
+  counter administratively. The discriminator needs no table — the counter immediately before the
+  creating block is zero — and the date is kept because too-late understates age (a weight floor,
+  never an inflation). Caveat `credential-imported-from-predecessor-registry`.
+- **Finding 2: fids are transferable, so we date custody, not the fid.** Fid 1 moved from
+  `0x8773442740C17C9d0F0B87022c722F9a136206eD` to `0x7071CfBA18280FD0bC1142D98f8e67fb094d9544` at
+  block 147,097,388 (2026-01-30); fid 200,000 moved at block 126,803,669 (2024-10-17). Crediting a
+  bought fid with the registry's age would sell survival weight at OTC prices, so `issuedAt` is when
+  *this address* acquired it, found by searching custody between the creating block and head. The
+  search is over a non-monotone predicate, so it returns *an* acquisition and not provably the
+  latest; a six-block continuity ladder restarts it above any later block where the subject does not
+  hold the fid, which reduces the error without eliminating it, and the caveat
+  (`credential-changed-hands`) says exactly that instead of implying a proof.
+- **Measured end to end through `resolve()`:** fid 5, still held by its importer, contributes
+  **12.19 cents and one independent root**; fid 1, bought in January, contributes **3.07 cents and
+  none**. Same protocol, four times the weight for the one that was not for sale. That is the ramp
+  doing its job on real data.
+- **Farcaster Pro is not readable, and that is the finding.** It is the only Farcaster signal with a
+  real recurring price — `TierRegistry.tierInfo(1)` on Base decodes to 328,767 @ 6dp/day = $119.9999
+  a year, verified today by raw `eth_call` — but the contract stores tier *configuration* and no
+  per-fid subscription state (a `PUSH4` scan of its bytecode finds 41 selectors and no fid-keyed
+  getter), so a subject's Pro status lives only in `PurchasedTier` logs, and no keyless Base endpoint
+  serves those over full history. It stays out of the ontology rather than entering it as a number
+  we cannot check.
+- **Two new provenance notes and two new caveats**, `date-from-registry-import` and
+  `credential-transferred-since-issuance`. They are the first notes in `reconcile.ts`'s vocabulary
+  that are not about index-vs-chain, and the header now says why they live there: they answer the
+  same question — how far can this date be trusted — and get the same caveat plumbing.
+- **Endpoints.** Three keyless OP endpoints serve archive `eth_call` and agree to the id:
+  `mainnet.optimism.io`, `optimism.drpc.org`, `gateway.tenderly.co/public/optimism`. Calls rotate
+  across them and retry the whole set twice, because a search is a couple of dozen historical calls
+  and every one of them will eventually say "your IP has exceeded its requests per second capacity".
+  `publicnode`, `1rpc.io/op` and `op-pokt.nodies.app` answer at head and refuse historical state;
+  `onfinality` serves archive and throttles within a handful of requests; `optimism.gateway.tenderly.co`
+  has pruned past ~130 M. An endpoint answering `0x` means "no code at that block"; a pruned node
+  *errors*, so a pruned node can never be mistaken for an empty registry.
+- **Fixed a flake I caused, at the root.** Human Passport's Optimism read used `mainnet.optimism.io`,
+  which is one of the few keyless *archive* endpoints — so the two adapters competed for the scarce
+  resource and the passport suite started failing. Passport only ever reads at head, so it moved to
+  `optimism-rpc.publicnode.com` (verified to return the same resolver, `maxScoreAge` and `threshold`).
+  Archive quota now goes to the reader that needs it.
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd packages/sdk && npm test` → `# tests 96 # pass 96 # fail 0 # skipped 0` (was 86: +8 Farcaster
+  live, +2 scoring). Run three times consecutively, all green. Per file: 34 scoring, 18 reconcile,
+  5 input, 10 ontology, 15 live, 6 passport-live, 8 farcaster-live.
+- `node --test --experimental-strip-types src/adapters/farcaster.live.test.ts` → 8/8, `skipped 0`,
+  three consecutive runs.
+- `npm run build` clean; `node_modules/.bin/tsc -p tsconfig.json --noEmit` clean.
+- `cd apps/demo && npx playwright test` → `10 passed`.
+- The acceptance test the mission asks for ("a live test that hits the real chain and asserts the
+  mechanism, not a magic number") is *"the date derived from idCounter is the block the Register
+  event is in"*: it takes a fid sampled from head, runs the counter search, then requires exactly one
+  `Register` log for that fid in the derived block, with the logged registrant equal to the custodian
+  the probe read from state, and **zero** such logs in the preceding 1,000 blocks. Two subsystems of
+  the node agreeing about one fid, where the probe only ever consulted the first. Plus a live test
+  that re-reads all 17 seeded counter landmarks against the chain, one that proves the import block
+  contains a `SetIdCounter` and no `Register` at all, and one that checks the transfer bisection's
+  answer at both sides of the boundary block.
+
+**No registry write, on purpose.** `implemented` and `notes` are off-chain fields and no weight
+moved, so a reseed would bump `revision` to record nothing. Registry stays at **30 adapters,
+revision 34**.
+
+**Next, in the order I would do it:**
+
+1. **Keep going down the queue.** §6 now reads: **Holonym / Human ID** (Optimism state plus a public
+   unauthenticated REST endpoint; needs us to publish a stable action-id first, which is a design
+   decision rather than a lookup — and note two of the three passports read in iteration 3 carried
+   Holonym credentials, so the population is real), then **Linea PoH** (Verax attestations),
+   **World's document/Selfie tiers** (which P1 wants anyway, so World appears in the score and not
+   only in the agent gate), and **PoH v1** on a registry we already talk to.
+2. **The predecessor Farcaster registry.** Its address would date the 193,791 imported fids exactly —
+   the oldest and, on a Ramp, the most valuable cohort in the registry. Neither the bulk-registration
+   calldata nor `SetIdCounter` points at it, and it is not in any research file here, so it needs a
+   source actually read rather than recalled.
+3. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still the
+   cheapest way to turn two flagged approximations into real dates (iteration 1's note 1, unchanged
+   through three iterations now).
+
+**Measured while working, worth keeping:** the OP archive situation is the real constraint on this
+class of probe, and it is worth knowing before building another one. Of eight keyless endpoints
+tested, three serve full archive state, one serves it and throttles immediately, one is pruned past
+~130 M, and three refuse historical state outright — so any future "search historical state" adapter
+is sharing a budget of three endpoints with this one. The landmark ladder exists because of that:
+seeding the two blocks that straddle the import cliff takes the imported cohort from ~85 calls to 6.
+
+**Blocked:** nothing. Iteration 1's two notes still stand and are Hugo's calls, not blockers:
+`./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it,
+and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`. One new item for the
+morning: `farcaster-account` carries `forgeCostCents: 12000`, which is the *Pro* subscription price
+on an adapter that does not read Pro — untrue about the world, non-binding today because
+`min(forge, rent)` takes the 20 cents, and left alone rather than silently rewritten, exactly as
+iteration 2 left the KYC forge figure.
