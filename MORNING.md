@@ -56,6 +56,27 @@ cd ../agent && npm start                                   # live agent flow
 4. Thresholds: exported `Thresholds.lenient/standard/strict` constants (1.5/2.5/3.5) with
    derivations — still no default inside `isHuman()`.
 
+## Landing v2 — the overhaul (later 2026-07-25)
+
+Your feedback, all addressed and live at http://37.27.67.44:8788 (commit a34719c):
+
+- **Thumbprint is now anatomically a thumbprint**: a ridge flow field with a real core and
+  delta, traced as evenly-spaced streamlines (the same construction synthetic fingerprint
+  generators use) — loop, recurve, delta, horizontal base ridges. Contained in the hero, no
+  fold overlap. The colophon now carries the same print as a small iron seal.
+- **Cursor trail works everywhere**: site-wide tapered ink ribbon, dissolves by age (no more
+  wipe), reads pale on the dark sections and pressed-dark on paper via exclusion blending.
+- **Console (/app.html) fully restyled** in the same identity — paper workshop, Fraunces,
+  earthy root-chip hues, nav back to the site. It no longer looks like a different product.
+- **Bolder throughout**: mono ticker strip under the hero, seeded torn-paper section edges,
+  warm glaze gradients, ghost wordmark buried in the footer, score counts up when a result
+  lands, scrollbars styled (the MCP "horizontal navbar" is gone).
+- **Hackathon section**: took the rich sponsor-submission copy that landed in index.html
+  (World/Graph/ENS with "why we qualify / load-bearing / what we do not claim") and gave it
+  the azulejo treatment the markup comment asked for — cobalt glaze tiles, corner diamonds,
+  Atlantic-light wash; the page's only cool notes, spent on the Lisbon section.
+- 10/10 E2E green locally and hosted.
+
 ## Landing page shipped (afternoon 2026-07-25)
 
 **http://37.27.67.44:8788 is now the landing**; the full console moved to
