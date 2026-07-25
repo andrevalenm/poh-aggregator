@@ -7,8 +7,11 @@
  * first visitor can feel.
  */
 import type { Evidence, PersonhoodResult } from '@corroborate/sdk'
-import { makeClient, type ProbeEvent } from '../client.ts'
+import type { ProbeEvent } from '../client.ts'
 import { clear, fmtCents, fmtScore, freshnessLabel, h, shortAddr } from '../ui.ts'
+
+/** viem + SDK load on demand — at idle in the background, or at first resolve. */
+const clientModule = () => import('../client.ts')
 
 const EXAMPLES: { label: string; value: string }[] = [
   {
@@ -247,6 +250,7 @@ export function mountWidget(): void {
     streamEl.append(slot)
 
     const events = new Map<string, ProbeEvent>()
+    const { makeClient } = await clientModule()
     const client = makeClient((ev) => {
       events.set(`${ev.adapterId}:${ev.address}`, ev)
       clear(slot)

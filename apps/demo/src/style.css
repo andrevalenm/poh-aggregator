@@ -9,11 +9,72 @@
  * the paper world.
  */
 
-@import '@fontsource-variable/fraunces/full.css';
-@import '@fontsource-variable/fraunces/full-italic.css';
-@import '@fontsource-variable/bricolage-grotesque/index.css';
-@import '@fontsource/spline-sans-mono/400.css';
-@import '@fontsource/spline-sans-mono/500.css';
+/*
+ * Self-hosted faces with stable URLs so they can be preloaded from the HTML head —
+ * fontsource's hashed imports made the fonts undiscoverable until CSS parse (+550ms on
+ * mobile). Latin only; the page is English. Metric-matched local fallbacks below kill
+ * the swap reflow (the CLS Lighthouse flagged).
+ */
+@font-face {
+  font-family: 'Fraunces Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Fraunces Variable';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin-italic.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Bricolage Grotesque Variable';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/bricolage-latin.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Spline Sans Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/spline-mono-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Spline Sans Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/spline-mono-500.woff2') format('woff2');
+}
+
+/* Metric-matched fallbacks: the fallback face occupies the same space as the webfont,
+ * so the swap moves nothing. Values tuned against Arial/Georgia metrics. */
+@font-face {
+  font-family: 'Bricolage Fallback';
+  src: local('Arial');
+  size-adjust: 103%;
+  ascent-override: 93%;
+  descent-override: 24%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Fraunces Fallback';
+  src: local('Georgia');
+  size-adjust: 99%;
+  ascent-override: 97%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
+
 
 :root {
   --paper-solid: #ede7da;
@@ -34,8 +95,8 @@
   --umber: #4a3a2e;
   --smoke: #8a7e6f;
 
-  --display: 'Fraunces Variable', 'Georgia', serif;
-  --body: 'Bricolage Grotesque Variable', 'Helvetica Neue', sans-serif;
+  --display: 'Fraunces Variable', 'Fraunces Fallback', 'Georgia', serif;
+  --body: 'Bricolage Grotesque Variable', 'Bricolage Fallback', 'Helvetica Neue', sans-serif;
   --mono: 'Spline Sans Mono', ui-monospace, SFMono-Regular, monospace;
 
   --measure: 62ch;
@@ -437,8 +498,7 @@ button:disabled {
 }
 
 .sat-chip.is-collapsed {
-  opacity: 0.65;
-  border-style: dashed;
+  color: var(--ink-soft);
   text-decoration: line-through;
   text-decoration-color: var(--iron);
 }

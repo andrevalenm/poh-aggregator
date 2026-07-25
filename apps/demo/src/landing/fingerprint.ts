@@ -153,6 +153,9 @@ export function mountFingerprint(
   const narrowAlpha = opts?.narrowAlpha ?? 0.3
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  // Narrow screens show the print at 0.16 alpha behind text — animating 56 ridges for
+  // 2.6s there is pure main-thread waste. Draw the finished print once instead.
+  const isStatic = () => reduced || w < 760
 
   let w = 0
   let h = 0
@@ -187,7 +190,7 @@ export function mountFingerprint(
   const PRESS_DEPTH = 20
 
   const draw = (now: number) => {
-    const p = reduced ? 1 : Math.min((now - start) / DRAW_MS, 1)
+    const p = isStatic() ? 1 : Math.min((now - start) / DRAW_MS, 1)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, w, h)
     ctx.lineCap = 'round'
@@ -246,12 +249,12 @@ export function mountFingerprint(
     else raf = 0
   }
   const wake = () => {
-    if (!raf && !reduced) raf = requestAnimationFrame(loop)
+    if (!raf && !isStatic()) raf = requestAnimationFrame(loop)
   }
 
   const hero = canvas.parentElement!
   hero.addEventListener('pointermove', (e) => {
-    if (reduced) return
+    if (isStatic()) return
     const rect = canvas.getBoundingClientRect()
     tx = e.clientX - rect.left
     ty = e.clientY - rect.top
@@ -271,11 +274,11 @@ export function mountFingerprint(
 
   addEventListener('resize', () => {
     layout()
-    if (reduced) draw(performance.now())
+    if (isStatic()) draw(performance.now())
     else wake()
   })
 
   layout()
-  if (reduced) draw(performance.now())
+  if (isStatic()) draw(performance.now())
   else raf = requestAnimationFrame(loop)
 }
