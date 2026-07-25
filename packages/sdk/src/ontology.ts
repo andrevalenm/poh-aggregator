@@ -60,6 +60,15 @@ const EVIDENCE_CLASSES: readonly (EvidenceClass | 'Unspecified')[] = [
 
 const AGE_CURVES: readonly AgeCurve[] = ['None', 'Decay', 'Ramp']
 
+/**
+ * The registry stores both enums as `uint8`. Decoding lives here rather than at each call
+ * site because `as-of.ts` reads the same two fields out of the audit-trail subgraph, and two
+ * copies of an ordinal table is exactly the thing that drifts when the contract gains a class.
+ */
+export const decodeEvidenceClass = (n: number): EvidenceClass =>
+  (EVIDENCE_CLASSES[n] ?? 'Behavioral') as EvidenceClass
+export const decodeAgeCurve = (n: number): AgeCurve => AGE_CURVES[n] ?? 'None'
+
 /** Adapter and root ids are hashed identically on-chain and here. */
 export const adapterKey = (id: string) => keccak256(toHex(`adapter:${id}`))
 export const rootKey = (root: string) => keccak256(toHex(`root:${root}`))
@@ -107,12 +116,12 @@ export async function loadOntology(opts: OntologyOptions): Promise<Ontology> {
     adapters.set(id, {
       id,
       name: row.name,
-      evidenceClass: (EVIDENCE_CLASSES[row.evidenceClass] ?? 'Behavioral') as EvidenceClass,
+      evidenceClass: decodeEvidenceClass(row.evidenceClass),
       trustRoot: rootByHash.get(row.trustRoot) ?? row.trustRoot,
       forgeCostCents: Number(row.forgeCostCents),
       rentCostCents: Number(row.rentCostCents),
       decayHalfLifeDays: row.decayHalfLifeDays,
-      ageCurve: AGE_CURVES[row.ageCurve] ?? 'None',
+      ageCurve: decodeAgeCurve(row.ageCurve),
       live: row.live,
       sourceURI: row.sourceURI,
     })

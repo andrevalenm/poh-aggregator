@@ -50,6 +50,10 @@
     "behavioral:wallet-history": "A model score over an address’s on-chain history. One root for every such scorer: they read the same public chain state, so two of them are one observation, and the market price of a farmed wallet caps all of them.",
     "aggregate:republished": "A protocol that republishes credentials issued elsewhere and adds no evidence of its own. Contributes no cost — whatever it carries is already counted under the root that issued it."
   },
+  "retiredTrustRoots": {
+    "unknown": "Never a root — an admission that the research was not done, which scores as full independence and therefore pays an adversary. Carried by humanity-protocol from revision 12 until revision 34 (Sepolia block 11347272, 2026-07-25), when it was resolved to kyc-vendor:unattributed. Kept here so a score computed as-of a block before that resolves the hash to a name rather than printing it raw.",
+    "kyc-vendor:facetec-synaps": "Superseded by the wider kyc-vendor:facetec at revision 34 (Sepolia block 11347272, 2026-07-25). FaceTec's 1:N galleries are per-integrator, so Synaps-hosted deployments really do hold separate databases — but a root prices the adversary's cheapest path, and a technique that defeats FaceTec defeats every deployment of it. Widening merged three roots into one and cost anima-pou and civic-pass their independence from Holonym's biometric check."
+  },
   "adapters": [
     {
       "id": "world-id-orb",

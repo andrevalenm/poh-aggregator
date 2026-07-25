@@ -1,4 +1,5 @@
 import type { Adapter, Caveat, Evidence, PersonhoodResult, RootContribution, Address } from './types.ts'
+import type { AsOfScoring } from './as-of.ts'
 
 /**
  * Root-cost aggregation.
@@ -44,6 +45,8 @@ export interface ScoreInput {
   evidence: Evidence[]
   registryRevision?: number
   now?: number
+  /** Set when scoring a past block; drives its own caveats and rides on the result. */
+  asOf?: AsOfScoring
 }
 
 /**
@@ -154,8 +157,9 @@ export function score(input: ScoreInput): PersonhoodResult {
     independentRoots,
     evidence: input.evidence,
     roots,
-    caveats: caveatsFor(input.evidence, roots, input.adapters),
+    caveats: caveatsFor(input.evidence, roots, input.adapters, input.asOf),
     ...(input.registryRevision !== undefined ? { registryRevision: input.registryRevision } : {}),
+    ...(input.asOf ? { asOf: input.asOf } : {}),
     computedAt: now,
     isHuman(threshold: number) {
       if (!Number.isFinite(threshold)) {
@@ -170,6 +174,7 @@ function caveatsFor(
   evidence: Evidence[],
   roots: RootContribution[],
   adapters: Map<string, Adapter>,
+  asOf?: AsOfScoring,
 ): Caveat[] {
   const caveats: Caveat[] = []
 
@@ -221,6 +226,7 @@ function caveatsFor(
 
   caveats.push(...restatementCaveats(evidence, adapters))
   caveats.push(...indexCaveats(evidence))
+  if (asOf) caveats.push(...asOfCaveats(asOf))
 
   const unknownRoot = roots.find((r) => r.trustRoot === 'unknown')
   if (unknownRoot) {
@@ -274,6 +280,53 @@ function restatementCaveats(evidence: Evidence[], adapters: Map<string, Adapter>
       message: `${e.adapterId} is an aggregate whose evidence includes credentials priced separately here: ${named.join(', ')}. It is scored only for what it can claim on its own — ${e.trustRoot} — so those credentials count under their own roots and not twice.`,
     })
   }
+  return out
+}
+
+/**
+ * Caveats for a score computed as of a past block.
+ *
+ * The first one is unconditional and deliberately blunt. An as-of score reconstructs the
+ * *ontology* exactly and the *credential state* only partially, and a reader who does not know
+ * which half is which will take the whole thing as a historical fact. So the result says, every
+ * time, which half is reconstructed and which direction the remaining error runs in.
+ */
+function asOfCaveats(asOf: AsOfScoring): Caveat[] {
+  const out: Caveat[] = [
+    {
+      code: 'scored-as-of-past-block',
+      message: `Scored against the ontology as it stood at Sepolia block ${asOf.block} (${new Date(asOf.timestamp * 1000).toISOString()}), registry revision ${asOf.registryRevision} with ${asOf.adapterCount} adapters. The weights and trust roots are reconstructed exactly from the registry's own event history. Credentials, though, were read from their chains at head: a credential dated after that instant has been excluded, but one held then and revoked since cannot be seen, so this can understate the subject and never the adversary.`,
+    },
+  ]
+
+  if (asOf.adaptersNotYetInRegistry.length) {
+    out.push({
+      code: 'adapter-not-in-registry-at-asof',
+      message: `${asOf.adaptersNotYetInRegistry.join(', ')} had no entry in the registry at revision ${asOf.registryRevision}, so any credential found for them is unpriced and contributes nothing. They were added later; that is a change in what we knew, not in the subject.`,
+    })
+  }
+
+  if (asOf.issuedAfterAsOf.length) {
+    out.push({
+      code: 'credential-issued-after-asof',
+      message: `Excluded as not yet existing at this block: ${asOf.issuedAfterAsOf.join(', ')}. Each is held today and dated after ${new Date(asOf.timestamp * 1000).toISOString()}.`,
+    })
+  }
+
+  if (asOf.existenceUnverified.length) {
+    out.push({
+      code: 'asof-existence-unverified',
+      message: `${asOf.existenceUnverified.join(', ')} publish no issuance date, so nothing here shows they were held at this block rather than acquired since. They are counted, because dropping every undated credential would penalise the subject for a field the protocol does not store — but this part of the score is a statement about today.`,
+    })
+  }
+
+  if (!asOf.auditTrailComplete) {
+    out.push({
+      code: 'registry-audit-trail-incomplete',
+      message: `The registry counted revisions ${(asOf.missingRevisions ?? []).join(', ')} that the audit trail has no record of. Those are liveness flips, which the indexer stores only by hash, so a protocol marked live here may have been marked dead at this block. The reconstruction is not exact.`,
+    })
+  }
+
   return out
 }
 
