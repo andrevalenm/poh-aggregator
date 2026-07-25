@@ -8,6 +8,9 @@
  * default we ship.
  */
 
+import type { ProbeProvenance } from './reconcile.ts'
+import type { AsOfScoring } from './as-of.ts'
+
 export type Address = `0x${string}`
 
 /** What a credential fundamentally demonstrates. Ordering is not significance. */
@@ -69,6 +72,15 @@ export interface Evidence {
   held: boolean
   /** Unix seconds the credential was issued, when the protocol exposes it. */
   issuedAt?: number
+  /**
+   * Lower bound on issuance, set when the exact date is unknown but the credential provably
+   * did not exist at this time — it was absent from an index with complete history at a block
+   * the index named. On a survival ramp this caps the weight instead of granting the
+   * unknown-age midpoint, so index lag can no longer be worth anything to an attacker.
+   */
+  issuedAfter?: number
+  /** Which source decided held and the date, and at which blocks. */
+  provenance?: ProbeProvenance
   /** Decay multiplier in [0,1] derived from issuedAt and the adapter's half-life. */
   freshness: number
   /** Effective adversary cost after decay and liveness, in cents. */
@@ -119,6 +131,12 @@ export interface PersonhoodResult {
   caveats: Caveat[]
   /** Registry revision the score was computed against, for reproducibility. */
   registryRevision?: number
+  /**
+   * Present when the score was computed as of a past block rather than now. Carries the
+   * block, its timestamp, the registry revision in force then, and what that did to this
+   * subject's evidence. See `as-of.ts` for what such a result may and may not claim.
+   */
+  asOf?: AsOfScoring
   computedAt: number
   /**
    * Verdict against a caller-supplied threshold. Deliberately a method, and deliberately
@@ -136,6 +154,10 @@ export interface AdapterProbe {
 export interface AdapterProbeResult {
   held: boolean
   issuedAt?: number
+  /** See `Evidence.issuedAfter`: a proven lower bound on issuance, used to cap ramp weight. */
+  issuedAfter?: number
+  /** How this answer was reached — which source decided held, which dated it, at what block. */
+  provenance?: ProbeProvenance
   detail?: Record<string, unknown>
   /** Set when the probe failed, so a network error is never silently a negative. */
   error?: string

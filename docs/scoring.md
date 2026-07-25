@@ -24,15 +24,18 @@ Five steps, in order.
 
 A trust root is the thing actually checked, underneath the branding. `state-document:icao-9303`
 is a passport chip signed by a national CSCA. `kyc-vendor:sumsub` is a document-plus-selfie
-check performed by Sumsub. The deployed ontology has 15 adapters over 10 roots.
+check performed by Sumsub. The deployed ontology has 30 adapters over 18 roots.
 
-Two adapters sharing a root are **one piece of evidence observed twice**. Three protocols read
-the ICAO root: World's document tier, ZKPassport, Self Protocol. A subject holding all three
-made one trip to a passport office.
+Two adapters sharing a root are **one piece of evidence observed twice**. Four protocols read
+the ICAO root: World's document tier, ZKPassport, Self Protocol, Rarimo. A subject holding all
+four made one trip to a passport office.
 
 The collapses are traced to primary sources in
 [`research/landscape/kyc-liveness-vendors.md`](../research/landscape/kyc-liveness-vendors.md) —
-that file is where the root assignments come from, not from vendor marketing.
+that file is where the root assignments come from, not from vendor marketing — and every
+adapter's assignment is justified individually in
+[`research/landscape/ontology-coverage.md`](../research/landscape/ontology-coverage.md), which
+also records the two roots that are judgement calls rather than documented facts.
 
 ## 2. Saturate within the root
 
@@ -127,8 +130,38 @@ penalise an honest subject. `Ramp` returns 0.5. Granting full Ramp weight on mis
 make "keep the indexer unreachable" a profitable move for an attacker, which is not a property
 you want in a scoring function. Both cases raise the `issuance-date-unknown` caveat.
 
-This is the half of the model the subgraph exists to feed. `isHuman(addr)` is a storage slot;
-`claimedAt` is an event.
+**An age that is bounded is not an age that is unknown.** Asking a contract *whether* a
+credential is held and an index *when* it was issued is a torn read: while the index is behind,
+a real credential comes back held with no date, which on a `Ramp` curve is the 0.5 midpoint —
+about twenty-three times the weight a week-old registration deserves. That made index lag worth
+buying. So absence in the index is now used as evidence in its own right. If the index has
+complete history for a credential class and does not have this credential at block *B*, then
+the credential was issued after *B*, which caps its age; the ramp is evaluated at that cap and
+the result carries `credential-not-yet-indexed` naming the block. The cap is `min(bound,
+midpoint)`, never a grant, so a lagging index can at worst recover the midpoint it would have
+had anyway — and where the index only covers a *window* of history, absence proves nothing, the
+old fallback applies unchanged, and `index-coverage-partial` says so. Full decision table:
+[`packages/sdk/src/reconcile.ts`](../packages/sdk/src/reconcile.ts).
+
+**A hard expiry truncates a decay curve, so a half-life longer than the expiry never
+completes.** Four of the nine implemented adapters have this shape, and it is easy to misread
+their half-lives as the range over which weight falls. Human Passport hard-expires at 90 days
+against a 180-day half-life; Holonym within a year of the check behind it against 730; World's
+address-book binding at 168 days against 1,095; Linea PoH at 90 against 90. Because the probe
+returns `held: false` the instant the credential expires, weight for these never falls below the
+value the *term* implies — 0.71, 0.71, 0.90 and 0.50 respectively — and the remainder of the curve
+is unreachable. That is not a defect in the half-lives, which describe how confidence in the
+underlying check decays; it means the credential's own renewal policy, not our curve, is what
+bounds these four. The Holonym and World live suites assert their floor directly; the Passport and
+Linea suites assert the term it is derived from — either way a term change upstream shows up as a
+failing test rather than as a quiet re-pricing.
+
+Where a protocol dates its own credentials on chain, none of this is needed. PoH v2's
+`getHumanityInfo` returns `expirationTime`, and `humanityLifespan()` is the fixed term granted
+at claim, so `expirationTime − humanityLifespan` is the claim timestamp — two `eth_call`s, no
+indexer in the path at all. The index then serves as a cross-check on the date rather than the
+source of it, and a disagreement between the two is reported as our fault, not the subject's.
+Circles has no such slot, which is why the reconciler above exists.
 
 ## 5. Zero out dead protocols, then sum and take log₁₀
 
@@ -264,6 +297,62 @@ should.
 
 ---
 
+## The revision is part of the answer
+
+Every number above comes from a weight that is a **dated human judgement**, and judgements get
+corrected. Revision 34 alone moved three trust roots, retired a placeholder root and added
+fifteen adapters. Each of those edits changes historical scores retroactively: a subject told
+"2.56 on Tuesday" cannot reproduce that number on Wednesday, and a counterparty who denied
+somebody at a threshold cannot show what the ontology said at the moment they did it.
+
+So a score is only meaningful alongside the revision it was computed against — `registryRevision`
+is on every result for that reason — and the registry's own event history can be replayed:
+
+```ts
+await corroborate.resolve(subject, { asOf: 11_345_000 })            // a Sepolia registry block
+await corroborate.resolve(subject, { asOf: '2026-07-25T02:00:00Z' }) // or an instant
+```
+
+Two things change, and it is worth being exact about which.
+
+**The ontology is reconstructed exactly.** Weights, roots, curves, liveness and the adapter set
+come from the registry's own `AdapterSet`/`AdapterLivenessSet` events as an indexer stored them,
+and a live test requires that reconstruction to equal `allAdapters()` from the chain, field by
+field, at head. Whether it is exact at *every* block reduces to one checkable fact: both mutations
+bump `revision`, so recorded revisions forming exactly `1..revision()` proves nothing is missing.
+When that fails the result says so and stops claiming exactness.
+
+**The age curve is evaluated at the as-of instant**, not at the wall clock — the block's own
+timestamp, so two instants inside one block do not produce two different states of the world. A
+credential 100 days old then is scored at 100 days.
+
+**Credential state is not reconstructed**, and the result says so every time. Probes read their
+own chains at head; there is no cross-chain archive path that would let ten adapters answer as of
+a Sepolia block. What *is* fixed exactly is the direction that would favour an adversary: a
+credential dated after the as-of instant did not exist then and is excluded. What remains is a
+credential held then and revoked since, which we cannot see — so an as-of score can understate the
+subject and never the adversary. Undated credentials are the third case: they are counted, because
+dropping them would penalise a subject for a field their protocol does not store, and they are
+listed in `asOf.existenceUnverified` so that part of the score is legibly a statement about today.
+
+Worked, on a real subject holding Proof of Humanity v2 plus two Holonym credentials and a Human
+Passport:
+
+| | now (revision 34) | as of block 11,345,000 (revision 15) |
+|---|---|---|
+| Score | **3.61** | **1.07** |
+| Independent roots | 4 | 1 |
+| Total cost | $40.73 | $0.11 |
+| PoH v2 contribution | 11.19c | 10.72c |
+
+Nothing about the subject moved between those two calls. The Holonym and Passport credentials are
+unpriced at revision 15 because they had not been researched yet — named in
+`asOf.adaptersNotYetInRegistry`, with a caveat saying the drop is *a change in what we knew, not
+in the subject*. The PoH contribution differs by half a cent because the survival ramp was
+evaluated twelve hours earlier.
+
+---
+
 ## What the model does not do
 
 - It does not weight by evidence class. A `Uniqueness` credential and a `SocialTrust`
@@ -274,3 +363,6 @@ should.
   should probably concave off.
 - It does not compute confidence intervals, and it should. Every weight is a point estimate
   with no stated error.
+- It does not reconstruct credential *state* at a past block, only the ontology. `asOf` scores
+  the past against credentials read at head, minus the ones provably issued since. See above for
+  which direction the residual error runs in.

@@ -1,5 +1,5 @@
 import { AdapterSet, AdapterLivenessSet } from '../generated/PersonhoodRegistry/PersonhoodRegistry'
-import { Adapter, WeightChange } from '../generated/schema'
+import { Adapter, AdapterKey, LivenessChange, WeightChange } from '../generated/schema'
 
 export function handleAdapterSet(event: AdapterSet): void {
   // The contract proved idString is the preimage of the key, so the plaintext id is safe
@@ -22,6 +22,12 @@ export function handleAdapterSet(event: AdapterSet): void {
   a.updatedAt = event.block.timestamp
   a.save()
 
+  // AdapterLivenessSet carries only the hashed key, and a mapping cannot enumerate entities,
+  // so the reverse record has to be written here — on the one event that carries both halves.
+  let key = new AdapterKey(event.params.id.toHexString())
+  key.adapter = id
+  key.save()
+
   let c = new WeightChange(event.transaction.hash.toHexString() + '-' + event.logIndex.toString())
   c.adapter = id
   c.forgeCostCents = event.params.forgeCostCents
@@ -35,16 +41,40 @@ export function handleAdapterSet(event: AdapterSet): void {
   c.save()
 }
 
+/**
+ * A protocol declared discontinued, or revived.
+ *
+ * This handler used to do `Adapter.load(event.params.id.toHexString())` — a load by hash hex
+ * against entities keyed on the plaintext id, which matches nothing. Every liveness flip was
+ * dropped and nothing said so: the adapter kept its old flag and the audit trail kept no
+ * record. It survived because it has never fired on the deployed registry, so the bug had no
+ * data to be wrong about. The SDK's as-of scoring is what made it matter — reconstructing the
+ * ontology at a past block reads exactly these entities.
+ *
+ * It is worth the reverse index because `live: false` zeroes a credential's contribution
+ * outright: this is the cheapest mutation the curator can make and the largest one a score can
+ * feel. An unresolvable key should be impossible — `setAdapterLiveness` reverts for an unknown
+ * adapter, so every event reaching here has had an AdapterSet before it — but the null checks
+ * stay, because an indexer that guesses is worse than one that skips.
+ */
 export function handleAdapterLivenessSet(event: AdapterLivenessSet): void {
-  // Liveness flips arrive keyed by hash only; find the adapter by its stored keyHash.
-  // Linear scan is fine at ontology scale (~tens of adapters), but entities cannot be
-  // enumerated in mappings — so we keep a reverse record instead: the AdapterSet handler
-  // stored the plaintext id, and liveness events for unknown hashes are ignored (they
-  // cannot exist, since setAdapterLiveness reverts for unknown adapters).
-  // We store the mapping via a deterministic lookup entity.
-  let probe = Adapter.load(event.params.id.toHexString())
-  if (probe != null) {
-    probe.live = event.params.live
-    probe.save()
-  }
+  let key = AdapterKey.load(event.params.id.toHexString())
+  if (key == null) return
+
+  let a = Adapter.load(key.adapter)
+  if (a == null) return
+  a.live = event.params.live
+  a.revision = event.params.revision
+  a.updatedAt = event.block.timestamp
+  a.save()
+
+  let c = new LivenessChange(event.transaction.hash.toHexString() + '-' + event.logIndex.toString())
+  c.adapter = a.id
+  c.live = event.params.live
+  c.reason = event.params.reason
+  c.revision = event.params.revision
+  c.timestamp = event.block.timestamp
+  c.block = event.block.number
+  c.txHash = event.transaction.hash
+  c.save()
 }

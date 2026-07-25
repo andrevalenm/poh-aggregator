@@ -44,6 +44,21 @@ model, and overlap with other protocols.
 | [eas-and-disco.md](protocols/eas-and-disco.md) | Ethereum Attestation Service, Disco.xyz | substrate, not a credential | EAS **as an output rail**; Disco is dead and its domain is now hostile |
 | [privado-id-and-verax.md](protocols/privado-id-and-verax.md) | Privado ID (iden3), Verax | credential plumbing | Verax as a narrow input; Privado neither |
 
+### Added after the sweep — how a protocol is actually read
+
+Written by the unattended build iterations while implementing a probe, so they cover the
+mechanism rather than the landscape: which call, at which address, what the numbers mean, and
+what the read cannot see. Each names the deep dive above that it builds on.
+
+| File | Covers | Adds |
+|---|---|---|
+| [human-passport-onchain-read.md](protocols/human-passport-onchain-read.md) | Human Passport across seven Decoder deployments | Read the resolver, not `getScore`; 90-day hard expiry; the stamp→trust-root map |
+| [farcaster-onchain-read.md](protocols/farcaster-onchain-read.md) | Farcaster `IdRegistry` on OP Mainnet | Dating a registry with no timestamps from `idCounter`; the 193,791-fid import; fids change hands |
+| [holonym-human-id-onchain-read.md](protocols/holonym-human-id-onchain-read.md) | Holonym / Human ID Hub V3 on OP Mainnet | No action-id needed after all; the issuer must be checked or the SBT is forgeable; the circuit's one-year ceiling is the date |
+| [world-id-onchain-read.md](protocols/world-id-onchain-read.md) | World ID on World Chain | `WorldIDAddressBook` is the registry World populates, not AgentBook; `verifiedUntil − 168 days` is the exact verification block; the mapping is never cleared, so held is a comparison; one live binding per human, enforced on chain; the document and Selfie tiers leave no per-holder state anywhere |
+| [linea-poh-onchain-read.md](protocols/linea-poh-onchain-read.md) | Linea PoH V2 via Verax on Linea | There is no per-subject read, so enumerate the whole live population — a 90-day term confines it to 1,024 of 6.37M ids; the portal our research named is the dead test one; Linea's own `poh-api` and `PohVerifier` say yes ten months after expiry |
+| [poh-v1-onchain-read.md](protocols/poh-v1-onchain-read.md) | Proof of Humanity v1 on Ethereum mainnet | `isRegistered` is a comparison and the struct's `registered` flag outlives the term; PoH v2's ForkModule retires registrations v1 keeps honouring, one for 510 days; acceptance emits nothing and can lag the request by 761 days, so only a full-history scan enumerates the registry — 2 registered out of 20,740 lifetime submissions |
+
 ## Landscape — the field, the theory, and the adversary
 
 | File | What it establishes |

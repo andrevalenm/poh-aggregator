@@ -26,16 +26,23 @@ let knownRoots: string[] = []
 try {
   const o = JSON.parse(readFileSync(ontologyPath, 'utf8'))
   knownIds = o.adapters.map((a: { id: string }) => a.id)
-  knownRoots = Object.keys(o.trustRoots)
+  // Retired root names too: an as-of lookup reads revisions where they were still in force,
+  // and without their preimages the interesting part of the history prints as raw hashes.
+  knownRoots = [...Object.keys(o.trustRoots), ...Object.keys(o.retiredTrustRoots ?? {})]
 } catch {
   // Hashes instead of names; degraded but correct.
 }
 
 const client = new Corroborate({
   registryAddress: (process.env.CORROBORATE_REGISTRY as `0x${string}`) ?? DEFAULT_REGISTRY,
-  // The subgraph supplies issuance dates (decay) and trust-graph position. Without it the
-  // server still works but results carry the issuance-date-unknown caveat.
+  // The subgraph supplies trust-graph position, and issuance dates for protocols that keep
+  // none on chain. Without it the server still works — PoH is dated from the contract either
+  // way — but Circles results carry the issuance-date-unknown caveat.
   ...(process.env.CORROBORATE_SUBGRAPH_URL ? { subgraphUrl: process.env.CORROBORATE_SUBGRAPH_URL } : {}),
+  // Only as_of needs this one — it is where the ontology's own history lives.
+  ...(process.env.CORROBORATE_REGISTRY_SUBGRAPH_URL
+    ? { registrySubgraphUrl: process.env.CORROBORATE_REGISTRY_SUBGRAPH_URL }
+    : {}),
   knownIds,
   knownRoots,
 })
@@ -80,6 +87,12 @@ function render(r: PersonhoodResult): string {
 
   lines.push('')
   lines.push(`registry revision ${r.registryRevision ?? 'unknown'}, computed at ${new Date(r.computedAt * 1000).toISOString()}`)
+  if (r.asOf) {
+    lines.push(
+      `AS OF Sepolia block ${r.asOf.block} — the ontology as it stood then (${r.asOf.adapterCount} adapters), not as it stands now.`,
+      'Credentials were read at chain head, so this can understate the subject and never the adversary.',
+    )
+  }
   return lines.join('\n')
 }
 
@@ -90,9 +103,19 @@ server.tool(
     subject: z
       .union([z.string(), z.array(z.string()).min(1)])
       .describe('An address, an ENS name, or several of either belonging to one person.'),
+    as_of: z
+      .string()
+      .optional()
+      .describe(
+        'Score against the ontology as it stood in the past, not as it stands now: a Sepolia registry block number, or an ISO date. Use this to answer "what would this score have been when we made that decision?" — the weights are curated judgments and they change.',
+      ),
   },
-  async ({ subject }) => {
-    const r = await client.resolve(subject)
+  async ({ subject, as_of }) => {
+    // Deliberately not caught: as-of refuses rather than degrading, because answering a
+    // question about the past with today's weights and stamping a block number on it would be
+    // a worse failure than no answer. The error text says which part could not be honoured.
+    const asOf = as_of === undefined ? undefined : /^[0-9]+$/.test(as_of.trim()) ? Number(as_of) : as_of
+    const r = await client.resolve(subject, asOf === undefined ? {} : { asOf })
     return { content: [{ type: 'text', text: render(r) }] }
   },
 )
