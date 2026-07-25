@@ -56,6 +56,23 @@ cd ../agent && npm start                                   # live agent flow
 4. Thresholds: exported `Thresholds.lenient/standard/strict` constants (1.5/2.5/3.5) with
    derivations — still no default inside `isHuman()`.
 
+## Landing v3 — fluid ink + pigment (evening 2026-07-25)
+
+Commit 166f86d, live at http://37.27.67.44:8788. Your three notes:
+
+- **Thumb**: back to the dense continuous rings you preferred (56 of them), keeping only a
+  hint of anatomy — tilt, egg envelope, low-drifting core. No blockiness, no dashes.
+- **Trail is literally a shader now**: a GPU stable-fluids solver (Navier-Stokes — the same
+  family as the famous WebGL fluid demos). The cursor stirs a velocity field and drops bone
+  ink into it; it curls into vortices and dissolves like ink in water. Verified on your GPU
+  in a real browser — screenshots in the session. Falls back to a softened 2D ribbon when
+  WebGL2/float isn't available (that's what headless CI gets).
+- **Pigment everywhere**: fractal-cloud texture washes on every section, oxblood/umber/ochre
+  radials, a slow-breathing blurred pigment cloud in the hero, watercolour edge-washes on
+  the paper bands, hero copy that surfaces line-by-line with de-blur, cascading blur-up
+  reveals, hover physics, ticker edge masks. The stateofsage reference was the floor, not
+  the ceiling.
+
 ## Landing v2 — the overhaul (later 2026-07-25)
 
 Your feedback, all addressed and live at http://37.27.67.44:8788 (commit a34719c):
