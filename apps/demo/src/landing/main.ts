@@ -151,25 +151,25 @@ function mountReveals(): void {
 
 // ------------------------------------------------------------ torn edge
 
-/** The one place the sheet tears: where paper gives way to the night sections. */
+/**
+ * The one place the sheet tears: where paper gives way to night. The tear is a clip-path
+ * on the night section itself, so the generated paper texture runs continuously right up
+ * to the ragged edge — an overlay strip would sit flat on top of it and seam.
+ */
 function mountTornEdges(): void {
   let s = 0x7041
   const rand = () => {
     s = (s * 1103515245 + 12345) & 0x7fffffff
     return s / 0x7fffffff
   }
-  for (const svg of document.querySelectorAll<SVGElement>('svg[data-torn]')) {
-    svg.setAttribute('viewBox', '0 0 100 24')
-    const pts: string[] = ['0,24']
-    for (let x = 0; x <= 100; x += 1.1 + rand() * 1.3) {
-      const y = 6 + rand() * 12 + Math.sin(x * 0.5) * 2
-      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`)
-    }
-    pts.push('100,24')
-    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
-    poly.setAttribute('points', pts.join(' '))
-    svg.append(poly)
+  const install = document.querySelector<HTMLElement>('.install')
+  if (!install) return
+  const pts: string[] = []
+  for (let x = 0; x <= 100; x += 1.1 + rand() * 1.3) {
+    const y = 2 + rand() * 14 + Math.sin(x * 0.5) * 2
+    pts.push(`${Math.min(x, 100).toFixed(1)}% ${y.toFixed(1)}px`)
   }
+  install.style.clipPath = `polygon(${pts.join(', ')}, 100% 0px, 100% 100%, 0% 100%)`
 }
 
 // ----------------------------------------------- smooth scroll + parallax
