@@ -3088,6 +3088,9 @@ second** before it is believed.
 - `cd packages/sdk && npm test` → `# tests 533 # pass 531 # fail 2 # skipped 0` (**+16** over
   iteration 22's 517: 11 unit on `classifyHumanityTerm`/`dateHumanityFromTerm`, 4 on the lapsed
   path, 1 live). The 2 failures are iteration 15's registry-drift pair, unchanged and untouched.
+  Re-run twice more at HEAD: `530 pass / 2 fail / 1 skipped` both times, the skip being iteration
+  22's Coinbase live test whose Base endpoint refuses the `Attested` log filter — it varies run to
+  run, so the honest figure is **530–531 pass with 0–1 skip depending on whether Base answers**.
 - `npm run build` and `tsc --noEmit` clean in `packages/sdk`; `packages/mcp` builds clean.
 - `cd apps/agent && npm start` → DENY / ALLOW **3.6178 over 6 roots** / DENY naming the sibling /
   DENY `a fleet of 27 agents is still one human`. Byte-identical to iterations 20–22, which is the
