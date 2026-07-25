@@ -3,64 +3,217 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Corroborate — proof-of-personhood, aggregated</title>
+    <title>Corroborate — what does it cost to be human?</title>
     <meta
       name="description"
-      content="One API over every proof-of-personhood protocol, scored by what an adversary would actually pay."
+      content="One call over every proof-of-personhood protocol, scored by what an adversary would actually pay. Live on four chains, no server of ours."
+    />
+    <meta property="og:title" content="Corroborate — what does it cost to be human?" />
+    <meta
+      property="og:description"
+      content="Proof of personhood, aggregated. Priced by what an adversary would actually pay."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke='%23E8E0D2' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M16 9a7 7 0 0 1 7 7v3'/%3E%3Cpath d='M16 13a3 3 0 0 1 3 3v6'/%3E%3Cpath d='M16 17v7'/%3E%3Cpath d='M12 15a4 4 0 0 1 0 1v6'/%3E%3Cpath d='M9 16a7 7 0 0 1 3-6'/%3E%3C/g%3E%3C/svg%3E"
     />
   </head>
-  <body>
-    <header class="masthead">
-      <h1>Corroborate</h1>
-      <p class="thesis">
-        Confirm with independent evidence — one API over every proof-of-personhood protocol,
-        scored by what an adversary would actually pay.
-      </p>
-      <p class="registry-line" id="registry-line">Loading ontology from the registry…</p>
+  <body class="landing">
+    <a class="skip" href="#try">Skip to the live demo</a>
+
+    <nav class="nav" aria-label="Main">
+      <a class="wordmark" href="/">corroborate</a>
+      <div class="nav-links">
+        <a href="#try">Live demo</a>
+        <a href="#how">How it works</a>
+        <a href="#install">Install</a>
+        <a href="/app.html">Console</a>
+      </div>
+    </nav>
+
+    <header class="hero" id="hero">
+      <canvas id="print" aria-hidden="true"></canvas>
+      <canvas id="smudge" aria-hidden="true"></canvas>
+      <div class="hero-copy">
+        <p class="eyebrow">Proof of personhood, aggregated</p>
+        <h1>
+          What does it cost<br />
+          <em>to be human?</em>
+        </h1>
+        <p class="hero-answer">
+          On today’s internet: about fifty cents. Corroborate reads every proof-of-personhood
+          protocol a wallet holds and prices each credential at what an adversary would actually
+          pay to fake it — then tells you which ones are the same evidence wearing different
+          names.
+        </p>
+        <div class="hero-ctas">
+          <a class="cta cta-primary" href="#try">Check an address</a>
+          <a class="cta cta-ghost" href="#install">Install the MCP</a>
+        </div>
+        <p class="hero-live" id="registry-line">
+          <span class="pulse" aria-hidden="true"></span>Reading the on-chain registry…
+        </p>
+      </div>
+      <a class="scroll-hint" href="#manifesto" aria-label="Scroll to read more">↓</a>
     </header>
 
-    <main>
-      <section id="compare" class="panel">
-        <h2>Additive scoring pays the farm</h2>
-        <p class="lede">
-          Both columns are computed in your browser, by the same SDK, against the same on-chain
-          ontology. Nothing here is precomputed.
-        </p>
-        <div id="compare-columns" class="columns"></div>
-        <div id="compare-punchline"></div>
-        <div id="compare-footnote"></div>
-      </section>
+    <section class="manifesto" id="manifesto" aria-label="Why">
+      <p class="beat reveal">Forty protocols will swear a wallet is human.</p>
+      <p class="beat reveal">
+        They collapse into six trust roots. One passport, read by three protocols, is one
+        credential — not three.
+      </p>
+      <p class="beat reveal">
+        Every scorer that adds them up pays the sybil farm.
+        <span class="iron">We price what the fraud would cost instead.</span>
+      </p>
+    </section>
 
-      <section id="lookup" class="panel">
-        <h2>Look up a subject</h2>
-        <p class="lede">
-          One or more addresses or ENS names, comma-separated. A subject may be several wallets:
-          real people spread credentials across them. You supply the set and you are responsible
-          for having authenticated it — we never infer that two addresses belong to one person.
+    <section class="daylight" id="try">
+      <div class="band-inner">
+        <header class="band-head reveal">
+          <h2>Ask it about a wallet. Right now.</h2>
+          <p>
+            Everything below runs in your browser against live chains — World Chain, Gnosis,
+            Base, Sepolia. No server of ours, no account, nothing precomputed. A subject can be
+            several wallets, because real people spread credentials across them.
+          </p>
+        </header>
+        <div class="widget reveal" id="widget">
+          <form id="lookup-form">
+            <input
+              id="lookup-input"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Addresses or ENS names, comma-separated"
+              placeholder="0x… or name.eth — comma-separate several wallets"
+            />
+            <button type="submit" id="lookup-submit">Resolve</button>
+          </form>
+          <div class="examples-row" id="examples-row"><span>Try:</span></div>
+          <div id="probe-stream" class="probe-stream" aria-live="polite"></div>
+          <div id="widget-result"></div>
+        </div>
+        <p class="band-foot reveal">
+          Want the full evidence table, the threshold slider and every caveat in the SDK’s own
+          words? <a href="/app.html">Open the console →</a>
         </p>
-        <form id="lookup-form">
-          <input
-            id="lookup-input"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="0xd267…85fb, 0x7D84…18C87"
-            value="0xd267eba602e692216703626a81157214b24c85fb, 0x7D8459e2ca3f62E6d8599E98ebf8c42d88218C87"
-          />
-          <button type="submit" id="lookup-submit">Resolve</button>
-        </form>
-        <div id="lookup-adapters" class="adapter-status"></div>
-        <div id="lookup-result"></div>
-      </section>
-    </main>
+      </div>
+    </section>
+
+    <section class="daylight how" id="how">
+      <div class="band-inner">
+        <header class="band-head reveal">
+          <h2>Three rules, honestly held</h2>
+        </header>
+        <div class="tablets">
+          <article class="tablet reveal">
+            <h3>Saturate, then sum</h3>
+            <p>
+              Within a trust root the strongest credential counts and the rest are the same
+              evidence again — across roots they add. Correlation is a property of the
+              credential <em>class</em>, a public fact about protocols, so we never need to
+              link a person’s credentials to each other. That link is exactly what we refuse
+              to hold.
+            </p>
+          </article>
+          <article class="tablet reveal">
+            <h3>Price at min(forge, rent)</h3>
+            <p>
+              A credential is worth the cheaper of faking one and renting one, because a
+              holder willing to rent theirs out defeats any amount of cryptography. Every
+              weight is a dated, sourced judgment that lives on-chain — every change is an
+              auditable event, and “why did my score move” is a GraphQL query.
+            </p>
+          </article>
+          <article class="tablet reveal">
+            <h3>The caveats are the result</h3>
+            <p>
+              There is no default threshold: <code>isHuman(threshold)</code> throws unless you
+              choose one, because at realistic sybil rates a strong classifier is wrong about
+              most of the people it flags. And no protocol proves a human acts for themselves
+              — so that caveat is permanent, on every result, including perfect ones.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="install" id="install">
+      <div class="band-inner">
+        <header class="band-head reveal">
+          <h2>Put it where you work</h2>
+        </header>
+        <div class="install-grid">
+          <div class="install-col reveal">
+            <h3>The MCP server</h3>
+            <p>
+              Four tools — look up a subject, check a threshold, explain the trust roots,
+              audit any weight’s history. One line, then ask your agent about any address.
+            </p>
+            <div class="picker" id="mcp-picker" role="tablist" aria-label="Choose your client"></div>
+            <div class="command-block" id="mcp-command"></div>
+          </div>
+          <div class="install-col reveal">
+            <h3>The SDK</h3>
+            <p>
+              Typed, client-side, no key. Ontology from the public registry, credentials from
+              public chains, scoring in your process.
+            </p>
+            <div class="command-block">
+              <pre><code id="sdk-install">npm install @corroborate/sdk</code><button class="copy-btn" data-copy="npm install @corroborate/sdk" aria-label="Copy install command">copy</button></pre>
+            </div>
+            <pre class="code-sample"><code><span class="tk">import</span> { Corroborate, Thresholds } <span class="tk">from</span> <span class="ts">'@corroborate/sdk'</span>
+
+<span class="tk">const</span> person = <span class="tk">await new</span> Corroborate().resolve(<span class="ts">'name.eth'</span>)
+person.score            <span class="tc">// log₁₀ of adversary cost</span>
+person.independentRoots <span class="tc">// uncorrelated evidence</span>
+person.isHuman(Thresholds.standard)</code></pre>
+          </div>
+        </div>
+        <div class="protocol-links reveal" id="protocol-links">
+          <span class="protocol-label">Everything public:</span>
+          <a href="https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07" rel="noopener">Registry on Sepolia</a>
+          <a href="https://api.studio.thegraph.com/query/77602/poh/version/latest" rel="noopener">Protocol subgraph</a>
+          <a href="http://37.27.67.44:8100/subgraphs/name/corroborate-registry" rel="noopener">Weight audit trail</a>
+          <a href="/app.html">Live console</a>
+        </div>
+      </div>
+    </section>
 
     <footer class="colophon">
-      <p>
-        Weights are dated human judgements derived from published research, not measurements.
-        Each one carries its source and lives on-chain, so every change is auditable.
-      </p>
+      <div class="band-inner">
+        <div class="colophon-grid">
+          <div class="colophon-brand">
+            <span class="wordmark">corroborate</span>
+            <p>
+              Confirm with independent evidence. The registry stores protocols, never people —
+              scoring runs client-side, and nobody, including us, holds the join key.
+            </p>
+          </div>
+          <div class="colophon-col">
+            <h4>Protocol</h4>
+            <a href="https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07" rel="noopener">Registry contract</a>
+            <a href="https://api.studio.thegraph.com/query/77602/poh/version/latest" rel="noopener">Protocol subgraph</a>
+            <a href="http://37.27.67.44:8100/subgraphs/name/corroborate-registry" rel="noopener">Audit-trail subgraph</a>
+          </div>
+          <div class="colophon-col">
+            <h4>Build</h4>
+            <a href="/app.html">Console</a>
+            <a href="#install">MCP server</a>
+            <a href="#install">SDK</a>
+          </div>
+        </div>
+        <p class="colophon-fine">
+          Weights are dated human judgments derived from published research, not measurements —
+          each carries its source, on-chain. Built at ETHGlobal Lisbon 2026. No cookies, no
+          analytics, no server: this page reads public chains from your browser.
+        </p>
+      </div>
     </footer>
 
-    <script type="module" src="/src/main.ts"></script>
+    <div class="grain" aria-hidden="true"></div>
+    <script type="module" src="/src/landing/main.ts"></script>
   </body>
 </html>

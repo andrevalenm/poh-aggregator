@@ -23,5 +23,14 @@ export default defineConfig({
   },
   // The ontology JSON lives at the repo root and is imported at build time.
   server: { fs: { allow: [repoRoot] } },
-  build: { target: 'es2022' },
+  build: {
+    target: 'es2022',
+    rollupOptions: {
+      input: {
+        // Landing at the root; the full console lives at /app.html.
+        landing: fileURLToPath(new URL('index.html', import.meta.url)),
+        app: fileURLToPath(new URL('app.html', import.meta.url)),
+      },
+    },
+  },
 })

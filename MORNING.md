@@ -56,6 +56,36 @@ cd ../agent && npm start                                   # live agent flow
 4. Thresholds: exported `Thresholds.lenient/standard/strict` constants (1.5/2.5/3.5) with
    derivations — still no default inside `isHuman()`.
 
+## Landing page shipped (afternoon 2026-07-25)
+
+**http://37.27.67.44:8788 is now the landing**; the full console moved to
+**http://37.27.67.44:8788/app.html** (nav → "Console"). Per your brief: bold/natural/earthy,
+anti-robotic. What shipped:
+
+- **Fired-clay identity**: kiln-black ground, bone type, one iron-oxide accent, film grain
+  overlay. Faces: Fraunces (existential display), Bricolage Grotesque (body/UI), Spline Sans
+  Mono (evidence/commands) — all self-hosted, no CDN.
+- **Signature element**: a procedural ink fingerprint (canvas, seeded — the *same* print
+  every visit, deliberately) that draws itself in over ~2.4s and deforms softly under the
+  cursor like wet clay. Cursor leaves a fading bone-dust smudge trail on the hero (your
+  "flower trail" idea, transposed to the fingerprint metaphor — swap if you want flowers).
+  Both are killed under prefers-reduced-motion and on touch devices.
+- **Hero**: "What does it cost *to be human?*" → "On today's internet: about fifty cents."
+  The existential question IS the scoring model (min(forge,rent); Orb's $0.50 resale floor).
+- **Manifesto** (3 beats), **live lookup widget** (streaming per-adapter probes + elapsed
+  time — it answers in under a second warm), **three-rules tablets**, **MCP install picker**
+  (Claude Code / Cursor / Codex / any client, copy-to-clipboard), SDK snippet, proper footer.
+- **E2E**: 4 new landing tests; console tests repointed at /app.html. **10/10 pass against
+  the hosted deployment.**
+- NOT done (deliberate): sound/ambient audio — felt gimmick-prone; say the word and I'll add
+  a muted-by-default toggle. Also note the MCP/SDK install commands reference npm packages
+  that aren't published yet (`@corroborate/mcp`, `@corroborate/sdk`) — they go live the
+  moment you `npm publish` both packages (or I can, post-rename).
+- **Live-data note**: our Circles demo wallet's registration is now ~1 day old on the
+  subgraph, so the ramp prices it at $0 and the three-wallet chip shows 2 *independent*
+  roots + a $0 circles root. That's the anti-farm curve discounting our own demo — the
+  demo script now uses it as a beat instead of hiding it.
+
 ## Since the last update (post-06:00 heartbeats)
 
 - **Demo is hosted: http://37.27.67.44:8788** (ax41, standalone nginx container on :8788 —
