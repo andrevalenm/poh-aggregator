@@ -27,13 +27,13 @@
         <a href="#try">Live demo</a>
         <a href="#how">How it works</a>
         <a href="#install">Install</a>
+        <a href="#hackathon">Hackathon</a>
         <a href="/app.html">Console</a>
       </div>
     </nav>
 
     <header class="hero" id="hero">
       <canvas id="print" aria-hidden="true"></canvas>
-      <canvas id="smudge" aria-hidden="true"></canvas>
       <div class="hero-copy">
         <p class="eyebrow">Proof of personhood, aggregated</p>
         <h1>
@@ -57,6 +57,18 @@
       <a class="scroll-hint" href="#manifesto" aria-label="Scroll to read more">↓</a>
     </header>
 
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker-track" id="ticker-track">
+        <span>one passport ≠ three credentials</span>
+        <span>$0.50 — the going rate for an orb-verified human</span>
+        <span>40 protocols · 6 trust roots</span>
+        <span>saturate within a root · sum across roots</span>
+        <span>rent beats forge</span>
+        <span>nobody holds the join key</span>
+        <span>the caveats are the result</span>
+      </div>
+    </div>
+
     <section class="manifesto" id="manifesto" aria-label="Why">
       <p class="beat reveal">Forty protocols will swear a wallet is human.</p>
       <p class="beat reveal">
@@ -70,6 +82,7 @@
     </section>
 
     <section class="daylight" id="try">
+      <svg class="torn torn-paper" data-torn preserveAspectRatio="none" aria-hidden="true"></svg>
       <div class="band-inner">
         <header class="band-head reveal">
           <h2>Ask it about a wallet. Right now.</h2>
@@ -141,6 +154,7 @@
     </section>
 
     <section class="install" id="install">
+      <svg class="torn torn-kiln" data-torn preserveAspectRatio="none" aria-hidden="true"></svg>
       <div class="band-inner">
         <header class="band-head reveal">
           <h2>Put it where you work</h2>
@@ -182,6 +196,254 @@ person.isHuman(Thresholds.standard)</code></pre>
       </div>
     </section>
 
+    <!--
+      Hackathon section. Plain semantic markup on purpose — structural hooks only
+      (band-inner / band-head / reveal are the page's existing ones), no new styling.
+      Design agent owns the visual treatment. Lisbon cue: the hero calls for azulejo
+      tilework and Atlantic light against the kiln ground; the sponsor list wants to read
+      as three tiles, not three SaaS cards.
+    -->
+    <section class="hackathon" id="hackathon" aria-labelledby="hackathon-title">
+      <div class="band-inner">
+        <header class="band-head reveal">
+          <p class="eyebrow">ETHGlobal Lisbon · 2026</p>
+          <h2 id="hackathon-title">Built in Lisbon, over one weekend</h2>
+          <p>
+            Every line of this was written at ETHGlobal Lisbon 2026 — the contracts, the
+            subgraphs, the SDK, the MCP server, the agent flow. It is a hackathon project and
+            we will not pretend otherwise.
+          </p>
+          <p>
+            But the problem is not a hackathon problem. Proof of personhood is being wired into
+            airdrops, governance and agent permissions right now, and almost every deployed
+            scorer adds credentials together — which means a sybil farm holding one passport
+            read by three protocols outranks a real person holding three unrelated ones. That
+            failure is live, it is in production, and it fails in the attacker's favour. We
+            think it is worth getting right in public, with the weights on-chain and the sources
+            attached, whatever happens to us on Sunday.
+          </p>
+        </header>
+
+        <h3 class="reveal">The three sponsors we are submitting to</h3>
+        <p class="reveal">
+          Three is the limit, and we chose the three whose products are load-bearing here — take
+          any one of them out and this stops working, rather than losing a feature.
+        </p>
+
+        <div class="sponsor-tracks">
+          <article class="sponsor-card reveal" id="track-world">
+            <p class="sponsor-name">World</p>
+            <h4>AgentKit — New Use Cases</h4>
+
+            <p class="sponsor-claim">
+              A counterparty that refuses to trade with an agent unless a real human stands
+              behind it — and refuses the <em>second</em> agent backed by that same human.
+            </p>
+
+            <dl class="sponsor-detail">
+              <dt>Why we qualify</dt>
+              <dd>
+                AgentKit runs on both sides of the flow, not as a decorative import: the agent
+                uses <code>createAgentkitClient</code>, the counterparty is a real AgentKit
+                resource server, and the full handshake executes live — request, HTTP 402, a
+                signed CAIP-122 challenge, retry. Human backing is then read from AgentBook.
+                Three agents, three outcomes: unregistered is denied, human-backed with
+                independent evidence is allowed, and a third is denied
+                <strong>because it is registered to the same human as the second</strong>. A
+                fleet of agents is still one person.
+              </dd>
+
+              <dt>Why World is load-bearing</dt>
+              <dd>
+                AgentBook is the only permissionless read of Orb-verified personhood that
+                exists. <code>lookupHuman</code> is a plain <code>eth_call</code> — no API key,
+                no relying-party registration, no user interaction, nothing that can rate-limit
+                us or be switched off. That is the whole reason World is in our roster: we can
+                read it without World's cooperation, which is the constraint every adapter here
+                has to satisfy.
+              </dd>
+
+              <dt>What we do not claim</dt>
+              <dd>
+                We prove a human exists behind the agent. We do not prove that human controls
+                it — on-chain, puppeteering and voluntary delegation are the same signature. No
+                protocol can do this today, so we ship it as a permanent caveat on every result
+                instead of quietly implying otherwise.
+              </dd>
+            </dl>
+          </article>
+
+          <article class="sponsor-card reveal" id="track-graph">
+            <p class="sponsor-name">The Graph</p>
+            <h4>Best AI Tooling for The Graph</h4>
+            <p class="sponsor-alt">
+              Also a direct fit for <em>Best Use of Composable or Standardized Graph
+              Products</em> — we compose two Graph products across four chains.
+            </p>
+
+            <p class="sponsor-claim">
+              Reusable personhood infrastructure any agent can call: an MCP server, a typed
+              SDK, and subgraphs that answer the questions a contract call cannot.
+            </p>
+
+            <dl class="sponsor-detail">
+              <dt>Why we qualify</dt>
+              <dd>
+                An MCP server with four tools — look up a subject, test a threshold, explain the
+                trust roots, audit any weight's full history — so an agent can reason about
+                personhood conversationally, over live chain data. Underneath it, an
+                open-source SDK anyone can install. Two Graph products in one stack: a protocol
+                subgraph on Subgraph Studio, and a self-hosted <code>graph-node</code> indexing
+                our own registry.
+              </dd>
+
+              <dt>Why an indexer, and not just an RPC</dt>
+              <dd>
+                Three questions an <code>eth_call</code> cannot answer, all of which change the
+                score. <strong>When</strong> was this credential issued — a contract boolean has
+                no timestamp, and for a registry where roughly 95% of lifetime registrations
+                arrived in one four-month airdrop window, age <em>is</em> the signal.
+                <strong>Where</strong> does this account sit in a trust graph — a traversal over
+                a large event history, not a storage slot. And <strong>what did it look like
+                then</strong> — the history that lets us re-score a subject by the rules as they
+                stood at a past block.
+              </dd>
+
+              <dt>Circles: the clearest case for indexing</dt>
+              <dd>
+                Circles registration on its own is close to worthless as evidence of personhood.
+                A sybil costs about two days of freely-minted CRC, and the project's own public
+                indexer carries event namespaces named <code>BotCreated</code> and
+                <code>FarmGrown</code> — the farms are not hypothetical, they are a documented
+                schema. So the boolean "is registered" tells you almost nothing. What carries
+                signal is <em>position in the trust graph</em>: who vouched for this account, how
+                long ago, and how far the edges reach. That is a question about a large volume of
+                historical events and their relationships — exactly and only what an indexer can
+                answer. Circles is where The Graph stops being convenience and becomes the
+                difference between a number that means something and a number that does not.
+              </dd>
+
+              <dt>Accountability, as a query</dt>
+              <dd>
+                Our weights are curated human judgments, so the least a subject is owed is the
+                full history of those judgments. Every registry mutation emits an immutable
+                record with its source URI, block and transaction. "Why did my score change?" is
+                a GraphQL query with a block number in the answer.
+              </dd>
+            </dl>
+          </article>
+
+          <article class="sponsor-card reveal" id="track-ens">
+            <p class="sponsor-name">ENS</p>
+            <h4>Best ENS Integration for AI Agents</h4>
+            <p class="sponsor-alt">
+              Also submitted against <em>Most Creative Use of ENS</em>, if the sponsor reads it
+              that way.
+            </p>
+
+            <p class="sponsor-claim">
+              An ENS name is where an agent declares which human stands behind it — and where a
+              human declares which wallets are theirs.
+            </p>
+
+            <dl class="sponsor-detail">
+              <dt>Why we qualify</dt>
+              <dd>
+                Agent identity and discoverability, resolved rather than configured. A
+                counterparty is handed an agent's ENS name, resolves the records that name the
+                backing human, and checks that human's personhood before agreeing to anything —
+                no registry of ours, no API, no allowlist. The same mechanism serves people: the
+                <code>corroborate.subjects</code> text record lets someone declare their own set
+                of wallets, and the SDK reads it live from any name.
+              </dd>
+
+              <dt>Why ENS is load-bearing</dt>
+              <dd>
+                Real people are plural. Proof of Humanity's own Circles proxy puts a person's PoH
+                registration on one address and their Circles avatar on another, so a
+                single-address lookup systematically undercounts actual humans while
+                undercounting no farms at all. Fixing that needs somewhere a person can say
+                "these wallets are mine" that is user-controlled, on-chain, revocable, readable
+                by anyone, and hosted by nobody. ENS is the only thing that is all five. The
+                alternative is a server of ours holding the mapping — which is precisely the
+                correlation this entire design exists to avoid.
+              </dd>
+
+              <dt>What we do not claim</dt>
+              <dd>
+                The record is self-asserted. A name owner can list any address they like and the
+                listed addresses have not countersigned, so every result built from one carries a
+                caveat saying exactly that. Correlated credentials still saturate <em>across</em>
+                the declared set, so listing more wallets cannot inflate a score.
+              </dd>
+            </dl>
+          </article>
+        </div>
+
+        <div class="hackathon-honesty reveal">
+          <h3>What is finished, and what is not</h3>
+          <p>
+            Working and live: the registry contract, four credential adapters across World Chain,
+            Gnosis, Base and Sepolia, both subgraphs, the SDK, the MCP server, the agent flow,
+            this page, and a test suite that runs against real chains rather than mocks. Honest
+            gaps: the roster covers four protocols where the ontology describes fifteen, the
+            weights are judgments rather than measurements, and no amount of this proves the
+            human behind a credential is acting for themselves.
+          </p>
+          <p>
+            None of that is hidden in a footnote. It is in the API — as caveats you have to
+            receive before you get a verdict, and a <code>isHuman(threshold)</code> that throws
+            unless you choose the threshold yourself.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="hackathon" id="hackathon">
+      <div class="band-inner">
+        <header class="band-head reveal">
+          <p class="eyebrow">ETHGlobal Lisbon 2026</p>
+          <h2>Built on three tracks, all load-bearing</h2>
+          <p>
+            None of these are logo integrations. Remove any one of them and a measurable part
+            of the product stops working.
+          </p>
+        </header>
+        <div class="tracks">
+          <article class="track reveal">
+            <h3>World</h3>
+            <p>
+              Orb verification read permissionlessly from AgentBook on World Chain — no API
+              key on the critical path. Plus the agent flow: a counterparty demands a
+              human-backed agent, and a fleet of agents registered to one human is detected
+              as one human.
+            </p>
+            <a href="/app.html">See a live Orb read →</a>
+          </article>
+          <article class="track reveal">
+            <h3>The Graph</h3>
+            <p>
+              Two subgraphs, both load-bearing. Protocol history feeds real registration ages
+              into the survival ramp — the anti-farm curve. And the registry’s audit trail is
+              itself a subgraph: every weight ever assigned, with its source, queryable.
+              “Why did my score change” is a GraphQL query.
+            </p>
+            <a href="http://37.27.67.44:8100/subgraphs/name/corroborate-registry" rel="noopener">Query the audit trail →</a>
+          </article>
+          <article class="track reveal">
+            <h3>ENS</h3>
+            <p>
+              A name is the honest home of an address set. The
+              <code>corroborate.subjects</code> text record lets a person declare which
+              wallets are theirs — user-controlled, revocable, no server of ours — and
+              resolution expands the set with an asserted-not-countersigned caveat.
+            </p>
+            <a href="#try">Resolve a name above →</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <footer class="colophon">
       <div class="band-inner">
         <div class="colophon-grid">
@@ -206,13 +468,16 @@ person.isHuman(Thresholds.standard)</code></pre>
           </div>
         </div>
         <p class="colophon-fine">
+          <canvas class="stamp" id="stamp" width="46" height="60" aria-hidden="true"></canvas>
           Weights are dated human judgments derived from published research, not measurements —
           each carries its source, on-chain. Built at ETHGlobal Lisbon 2026. No cookies, no
           analytics, no server: this page reads public chains from your browser.
         </p>
       </div>
+      <div class="ghost" aria-hidden="true">corroborate</div>
     </footer>
 
+    <canvas id="smudge" aria-hidden="true"></canvas>
     <div class="grain" aria-hidden="true"></div>
     <script type="module" src="/src/landing/main.ts"></script>
   </body>
