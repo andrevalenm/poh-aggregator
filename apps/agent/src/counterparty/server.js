@@ -107,7 +107,10 @@ export async function startCounterparty({ port = 0 } = {}) {
 
       const validation = await validateAgentkitMessage(payload, resourceUri, {
         maxAge: 5 * 60_000,
-        checkNonce: (nonce) => spentNonces.has(nonce), // true == already used == reject
+        // Returns true when the nonce is ACCEPTABLE. Note this is the opposite polarity to
+        // AgentKitStorage.hasUsedNonce, which returns true when the nonce has been seen.
+        // Getting it backwards rejects every honest request as a replay.
+        checkNonce: (nonce) => !spentNonces.has(nonce),
       })
       if (!validation.valid) {
         identity = { error: `message validation failed: ${validation.error}` }

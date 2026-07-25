@@ -58,8 +58,14 @@ export const hasRpSigningKey = Boolean(process.env.WORLD_SIGNER_PRIVATE_KEY)
 export const rpSigningKey = () => process.env.WORLD_SIGNER_PRIVATE_KEY
 
 export const corroborate = {
-  /** Sepolia registry holding the trust-root ontology and its weights. */
-  registryAddress: process.env.REGISTRY_ADDRESS ?? '0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9',
+  /**
+   * Sepolia registry holding the trust-root ontology and its weights.
+   *
+   * Left undefined so the SDK's own `DEFAULT_REGISTRY` wins. Pinning the address here once
+   * cost an hour when the registry was redeployed underneath us; the package that ships the
+   * ABI should own the address that ABI matches.
+   */
+  registryAddress: process.env.REGISTRY_ADDRESS,
   registryRpcUrl: process.env.SEPOLIA_RPC_URL,
   subgraphUrl: process.env.SUBGRAPH_URL,
 }

@@ -1,5 +1,5 @@
-import { createPublicClient, http, isAddress } from 'viem'
-import { mainnet } from 'viem/chains'
+import { createPublicClient, http, isAddress, type PublicClient } from 'viem'
+import { mainnet, sepolia } from 'viem/chains'
 import { normalize } from 'viem/ens'
 import { loadOntology } from './ontology.ts'
 import ontologyData from './ontology-data.json' with { type: 'json' }
@@ -50,6 +50,8 @@ export interface CorroborateOptions {
   subgraphUrl?: string
   /** For resolving ENS names. Defaults to a public mainnet endpoint. */
   ensRpcUrl?: string
+  /** Chain whose ENS deployment to resolve against. */
+  ensChain?: 'mainnet' | 'sepolia'
   adapters?: AdapterProbe[]
   knownIds?: string[]
   knownRoots?: string[]
@@ -101,17 +103,48 @@ export class Corroborate {
     return this.ontology()
   }
 
-  /** Resolve an ENS name to an address, or pass an address straight through. */
-  async resolveSubject(nameOrAddress: string): Promise<{ address: Address; name?: string }> {
+  #ensClient(): PublicClient {
+    const chain = this.#opts.ensChain === 'sepolia' ? sepolia : mainnet
+    const url =
+      this.#opts.ensRpcUrl ??
+      (this.#opts.ensChain === 'sepolia'
+        ? 'https://ethereum-sepolia-rpc.publicnode.com'
+        : 'https://ethereum-rpc.publicnode.com')
+    return createPublicClient({ chain, transport: http(url) }) as PublicClient
+  }
+
+  /**
+   * Resolve an ENS name to an address — and, when the name carries a
+   * `corroborate.subjects` text record, to the full address set it declares.
+   *
+   * The record is the product idea in one line: ENS is where a person asserts which
+   * wallets are theirs. Real people hold different credentials on different addresses
+   * (PoH's own Circles proxy pairs a PoH address with a separate avatar), and this gives
+   * that address set a user-controlled, on-chain, revocable home — no server of ours
+   * involved. The record is SELF-asserted: the name owner can list any addresses, the
+   * listed addresses have not countersigned, and scoring flags exactly that.
+   */
+  async resolveSubject(nameOrAddress: string): Promise<{ address: Address; name?: string; declaredSubjects?: Address[] }> {
     if (isAddress(nameOrAddress)) return { address: nameOrAddress as Address }
 
-    const client = createPublicClient({
-      chain: mainnet,
-      transport: http(this.#opts.ensRpcUrl ?? 'https://ethereum-rpc.publicnode.com'),
-    })
-    const address = await client.getEnsAddress({ name: normalize(nameOrAddress) })
+    const client = this.#ensClient()
+    const name = normalize(nameOrAddress)
+    const [address, subjectsRecord] = await Promise.all([
+      client.getEnsAddress({ name }),
+      client.getEnsText({ name, key: 'corroborate.subjects' }).catch(() => null),
+    ])
     if (!address) throw new Error(`could not resolve "${nameOrAddress}"`)
-    return { address, name: nameOrAddress }
+
+    const declared = (subjectsRecord ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => isAddress(s)) as Address[]
+
+    return {
+      address,
+      name: nameOrAddress,
+      ...(declared.length ? { declaredSubjects: declared } : {}),
+    }
   }
 
   /**
@@ -146,7 +179,21 @@ export class Corroborate {
       this.ontology(),
     ])
 
-    const addresses = resolved.map((r) => r.address)
+    // A name's corroborate.subjects record expands the set; dedupe again afterwards.
+    const expandedSeen = new Set<string>()
+    const addresses: Address[] = []
+    let subjectsDeclaredByName = false
+    for (const r of resolved) {
+      const batch = [r.address, ...(r.declaredSubjects ?? [])]
+      if (r.declaredSubjects?.length) subjectsDeclaredByName = true
+      for (const a of batch) {
+        const k = a.toLowerCase()
+        if (!expandedSeen.has(k)) {
+          expandedSeen.add(k)
+          addresses.push(a)
+        }
+      }
+    }
     const name = resolved.find((r) => r.name)?.name
     const now = Math.floor(Date.now() / 1000)
 
@@ -195,7 +242,7 @@ export class Corroborate {
       })
     }
 
-    return score({
+    const result = score({
       subjects: addresses,
       ...(name !== undefined ? { name } : {}),
       adapters: ontology.adapters,
@@ -203,6 +250,14 @@ export class Corroborate {
       registryRevision: ontology.revision,
       now,
     })
+    if (subjectsDeclaredByName) {
+      result.caveats.push({
+        code: 'address-set-asserted-by-name-owner',
+        message:
+          'Part of this address set comes from a corroborate.subjects ENS text record. The name owner asserted it; the listed addresses have not countersigned, so ownership of every listed wallet is a claim, not a proof.',
+      })
+    }
+    return result
   }
 }
 

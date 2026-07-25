@@ -12,37 +12,19 @@
  * protocols are built to keep apart.
  */
 
-import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
 import { Corroborate } from '@corroborate/sdk'
-import { corroborate as cfg, REPO_ROOT } from '../config.js'
+import { corroborate as cfg } from '../config.js'
 
-/**
- * The registry stores adapter ids and trust roots as keccak hashes to keep storage cheap, so
- * the SDK needs the plaintext list to reverse them. Without it, `resolve()` silently returns
- * zero evidence for everyone: probes run, hit, and are then dropped because the ontology map
- * is keyed by hash and the probes are keyed by name.
- *
- * `ontology/adapters.json` calls itself the single source of truth shared by the deploy
- * script and the SDK, so we read it from there. See README, "SDK friction" — this should be
- * the SDK's default, not every caller's chore.
- */
-let clientPromise
-async function client() {
-  if (!clientPromise) {
-    clientPromise = (async () => {
-      const raw = await readFile(resolve(REPO_ROOT, 'ontology/adapters.json'), 'utf8')
-      const ontology = JSON.parse(raw)
-      return new Corroborate({
-        registryAddress: cfg.registryAddress,
-        ...(cfg.registryRpcUrl ? { registryRpcUrl: cfg.registryRpcUrl } : {}),
-        ...(cfg.subgraphUrl ? { subgraphUrl: cfg.subgraphUrl } : {}),
-        knownIds: ontology.adapters.map((a) => a.id),
-        knownRoots: Object.keys(ontology.trustRoots),
-      })
-    })()
+let client
+function getClient() {
+  if (!client) {
+    client = new Corroborate({
+      ...(cfg.registryAddress ? { registryAddress: cfg.registryAddress } : {}),
+      ...(cfg.registryRpcUrl ? { registryRpcUrl: cfg.registryRpcUrl } : {}),
+      ...(cfg.subgraphUrl ? { subgraphUrl: cfg.subgraphUrl } : {}),
+    })
   }
-  return clientPromise
+  return client
 }
 
 /**
@@ -50,15 +32,14 @@ async function client() {
  *
  * The address set is the agent's own wallet plus every address the operator declared. The
  * agent wallet belongs in the set for a real reason: AgentBook registration *is* a World ID
- * credential observable on that address, so including it lets the World Orb trust root enter
- * the score through the same path as every other protocol, and saturate against them if it
- * ever overlaps.
+ * credential observable on that address, so the World Orb trust root enters the score through
+ * the same path as every other protocol — and saturates against them if it ever overlaps,
+ * rather than being bolted on as a special case.
  *
  * @param {{agentAddress: string, operatorAddresses: string[]}} subject
  */
 export async function resolveHumanBacking({ agentAddress, operatorAddresses }) {
   const addresses = [agentAddress, ...operatorAddresses]
-  const c = await client()
-  const result = await c.resolve(addresses)
+  const result = await getClient().resolve(addresses)
   return { result, addresses }
 }

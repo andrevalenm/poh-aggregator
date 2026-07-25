@@ -8,7 +8,7 @@
 import { startCounterparty } from './counterparty/server.js'
 import { decide, resetBudget } from './counterparty/decide.js'
 import { counterparty } from './counterparty/policy.js'
-import { Agent } from './agent.js'
+import { Agent, ObservedAgent } from './agent.js'
 import { REGISTERED_AGENTS, OPERATOR_ADDRESS_SET } from './fixtures.js'
 import { banner, renderTrace, colour as C } from './trace.js'
 import { agentPrivateKey, world } from './config.js'
@@ -52,12 +52,16 @@ async function main() {
     console.log(C.dim(`  HTTP ${response.status}`))
     renderTrace({ ...body.trace, agent: { ...body.trace.agent, name: atlas.name, note: atlas.note } })
 
-    console.log(
-      C.dim(
-        '\n  Note the shape of the failure: gate 1 passed. The agent proved it controls its wallet.\n' +
-          '  Controlling a keypair is free. That is exactly why it is not the question.',
-      ),
-    )
+    const identityPassed = body.trace.gates.find((g) => g.n === 1)?.pass === true
+    if (identityPassed) {
+      console.log(
+        C.dim(
+          '\n  Note the shape of the failure: gate 1 passed. The agent proved it controls its wallet,\n' +
+            '  with a real signature the counterparty really verified. Controlling a keypair is free.\n' +
+            '  That is exactly why it is not the question anyone should be asking.',
+        ),
+      )
+    }
 
     // ────────────────────────────────────────────────── 2. human-backed agent
     resetBudget()
@@ -66,11 +70,15 @@ async function main() {
       'Live World Chain state. Signature gate is skipped and labelled, not faked.',
     )
 
-    const beacon = REGISTERED_AGENTS.beacon
-    const trace2 = await decide({
-      agentName: 'beacon',
-      agentAddress: beacon.address,
+    const beacon = new ObservedAgent({
+      name: 'beacon',
+      ...REGISTERED_AGENTS.beacon,
       operatorAddresses: OPERATOR_ADDRESS_SET,
+    })
+    const trace2 = await decide({
+      agentName: beacon.name,
+      agentAddress: beacon.address,
+      operatorAddresses: beacon.operatorAddresses,
       note: beacon.note,
     })
     renderTrace(trace2)
@@ -81,11 +89,15 @@ async function main() {
       'The budget is keyed on the human. A fleet of agents is still one person.',
     )
 
-    const mirror = REGISTERED_AGENTS.mirror
-    const trace3 = await decide({
-      agentName: 'mirror',
-      agentAddress: mirror.address,
+    const mirror = new ObservedAgent({
+      name: 'mirror',
+      ...REGISTERED_AGENTS.mirror,
       operatorAddresses: OPERATOR_ADDRESS_SET,
+    })
+    const trace3 = await decide({
+      agentName: mirror.name,
+      agentAddress: mirror.address,
+      operatorAddresses: mirror.operatorAddresses,
       note: mirror.note,
     })
     renderTrace(trace3)

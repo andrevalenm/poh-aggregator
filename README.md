@@ -25,7 +25,7 @@ roots. Each collapse below is traced to a primary source in [`research/`](resear
    Linea PoH V2             ──┘                    also idOS, Solana Attestation Service
 
    Coinbase Verified Acct   ──┬──────────────────► kyc-vendor:persona
-   Civic Pass (dead)        ──┘                    per Coinbase's own vendor disclosure
+   Civic Pass (discontinued)──┘                    per Coinbase's own vendor disclosure
 
    Anima Proof of Uniqueness ─────────────────────► kyc-vendor:facetec-synaps
 
@@ -68,25 +68,25 @@ From [`packages/sdk/src/scoring.test.ts`](packages/sdk/src/scoring.test.ts), the
 | Corroborate root-cost total | $20.00 | **$31.00** |
 | **Corroborate score** | **3.30** | **3.49** |
 
-Additive scoring ranks the farm first by a factor of ~2. Root-cost aggregation reverses it.
+Additive scoring ranks the farm first by a factor of two. Root-cost aggregation reverses it.
 The test asserts both directions — that the person wins under our model, *and* that a naive
 sum would have inverted the ranking. If saturation ever broke, the second assertion fails.
 
 ```bash
-cd packages/sdk && npm test    # 30 tests
+cd packages/sdk && npm test    # 34 tests
 ```
 
 ---
 
 ## Architecture
 
-Four pieces. Nothing runs on a server of ours; there is no server of ours.
+Five pieces. Nothing runs on a server of ours; there is no server of ours.
 
-### 1. Registry — `PersonhoodRegistry.sol`, Sepolia [`0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9`](https://sepolia.etherscan.io/address/0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9)
+### 1. Registry — `PersonhoodRegistry.sol`, Sepolia [`0x977b028b900cce8ee89c46877e814eff3060aa07`](https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07)
 
-The on-chain ontology: 15 adapters across 10 trust roots, each with an evidence class, a
-forge cost, a rent cost, a decay half-life, a liveness flag, and the `research/` file its
-weight was derived from.
+The on-chain ontology: **15 adapters across 10 trust roots**, each with an evidence class, a
+forge cost, a rent cost, an age curve, a liveness flag, and the `research/` file its weight was
+derived from. Currently at revision 15.
 
 **It stores protocols. It never stores people.** The obvious design — a mapping from address
 to humanity score — is rejected on purpose. A permanent, globally enumerable record asserting
@@ -94,8 +94,9 @@ to humanity score — is rejected on purpose. A permanent, globally enumerable r
 whoever maintains it becomes the one party able to join a user's World ID, passport proof and
 social graph. We do not need that join key, because correlation is a property of the
 credential class. No user is ever linked to anything here, so there is no honeypot to breach
-and nothing to subpoena. Every weight change emits an event, so a subject can ask "why did my
-score move?" and get an answer with a block number.
+and nothing to subpoena. Every weight change emits an event carrying the full record and a
+monotonic revision, so a subject can ask "why did my score move?" and get an answer with a
+block number.
 
 ### 2. Subgraph — [`api.studio.thegraph.com/query/77602/poh/v0.0.1`](https://api.studio.thegraph.com/query/77602/poh/v0.0.1)
 
@@ -103,11 +104,10 @@ Indexes Proof of Humanity v2 and Circles v2 on Gnosis. It supplies the two thing
 contract read cannot: **issuance dates** and **graph position**.
 
 `isHuman(addr)` answers "does this credential exist". It cannot answer "when was it issued" —
-decay needs an event, not a storage slot — and PoH is currently airdrop-inflated, so age is
-most of the signal there. It also cannot answer "how many avatars trust this one", which is
+an age curve needs an event, not a storage slot — and PoH is currently airdrop-inflated, so age
+is most of the signal there. It also cannot answer "how many avatars trust this one", which is
 the only part of a Circles registration that carries weight. Without the subgraph the SDK
-degrades to contract reads: scores stay correct, but every result carries the
-`issuance-date-unknown` caveat instead of decay.
+degrades to contract reads: scores stay correct, but carry the `issuance-date-unknown` caveat.
 
 ### 3. SDK — [`packages/sdk`](packages/sdk)
 
@@ -136,72 +136,75 @@ tool returns a bare boolean, and nothing writes. An agent that gets a number can
 about its own uncertainty, so every response carries the evidence, the trust roots, and what
 was discounted as correlated — the agent asks *why*, not just *whether*.
 
-### 5. Demo + agent apps — [`apps/`](apps)
+### 5. Demo and agent apps — [`apps/`](apps)
 
-**In progress at time of writing.** `apps/demo` is a browser demo that runs the same SDK
-client-side against the live registry; `apps/agent` is a stub. Judge the SDK, the registry,
-the subgraph and the MCP server — those are done and tested.
+[`apps/demo`](apps/demo) is a browser demo: it runs the same SDK **client-side** against the
+live registry, computes the farm-vs-person comparison in your browser rather than serving a
+precomputed picture, and takes a comma-separated address set for lookup.
+
+[`apps/agent`](apps/agent) is a World AgentKit demo: an agent signs a CAIP-122 challenge, a
+fictional counterparty checks that a real human stands behind it via AgentBook plus
+Corroborate, and picks its own threshold. The threshold lives in the counterparty's policy
+file, not in our SDK — that separation is the point of the demo.
+
+Both were built last and are the least polished thing here.
 
 ---
 
 ## Quickstart
-
-### SDK
 
 ```bash
 git clone <this repo> && cd poh-aggregator
 npm install
 ```
 
+### SDK
+
 ```ts
-import { readFileSync } from 'node:fs'
-import { Corroborate } from '@corroborate/sdk'
+import { Corroborate, Thresholds } from '@corroborate/sdk'
 
-// The registry stores ids as keccak hashes to keep storage cheap; supply the
-// preimages to get readable names back. The ontology JSON is the source of truth.
-const ontology = JSON.parse(readFileSync('ontology/adapters.json', 'utf8'))
-
-const corroborate = new Corroborate({
-  knownIds: ontology.adapters.map((a: { id: string }) => a.id),
-  knownRoots: Object.keys(ontology.trustRoots),
-})
+const corroborate = new Corroborate()
 
 // A subject is an address SET. Real people spread credentials across wallets.
-// ENS names work too: resolve('vitalik.eth').
+// ENS names work anywhere an address does: resolve('vitalik.eth').
 const result = await corroborate.resolve([
   '0xd267eba602e692216703626a81157214b24c85fb', // holds Proof of Humanity v2
   '0x317C407725145Fa197701045c3383F58fa14204B', // holds Circles v2
 ])
 
-console.log(result.score)            // 2.7412
-console.log(result.independentRoots) // 2
-console.log(result.totalCostCents)   // 550  ($5.50 to defeat)
+result.score            // 2.4409  — log10 of adversary cost in cents
+result.independentRoots // 2
+result.totalCostCents   // 275     — $2.75 to obtain this evidence fraudulently
 
-for (const r of result.roots) console.log(r.trustRoot, r.contributionCents, r.saturated)
-//  social-vouching:poh   500  false
-//  social-trust:circles   50  false
+result.roots
+//  { trustRoot: 'social-vouching:poh',  contributionCents: 250, saturated: false }
+//  { trustRoot: 'social-trust:circles', contributionCents:  25, saturated: false }
 
-for (const c of result.caveats) console.log(c.code)
+result.caveats.map((c) => c.code)
 //  independent-control-not-attested
 //  multi-address-subject
 //  issuance-date-unknown
 ```
 
-Those are the real values from that call, run against the live registry and live chains.
+Those are the real values from that call against the live registry and live chains. Both
+credentials sit on `Ramp` age curves and neither issuance date was available, so each carries
+the 0.5 unknown-age weight — pass `subgraphUrl` to replace that placeholder with a real
+age-derived weight. See [`docs/scoring.md`](docs/scoring.md#4-apply-the-age-curve).
 
 **`isHuman` throws without a threshold, and that is the feature:**
 
 ```ts
-result.isHuman(2.5)   // true
-result.isHuman()      // TypeError: isHuman requires an explicit numeric threshold
+result.isHuman(2.0)                  // true
+result.isHuman(Thresholds.standard)  // false  (standard = 2.5)
+result.isHuman()                     // TypeError: isHuman requires an explicit numeric threshold
 ```
 
 At a plausible 2% residual sybil rate, a classifier with 90% TPR and 95% specificity has
 **26.9% precision** — it is wrong about roughly three out of four people it flags, excluding
 ~4,900 real people per 100,000. Reaching 95% precision needs ~99.90% specificity, which
 nothing published approaches. So denial is the caller's decision to own, enforced in the type
-system rather than asked for in a doc. Named presets are exported (`Thresholds.lenient` 1.5,
-`.standard` 2.5, `.strict` 3.5) — as constants you must reach for, never as a default.
+system rather than asked for in a doc. `Thresholds.lenient` (1.5), `.standard` (2.5) and
+`.strict` (3.5) are exported as constants you must reach for, never as a default.
 
 ### MCP server
 
@@ -224,26 +227,33 @@ cd packages/mcp && npm run build
 ```
 
 `CORROBORATE_SUBGRAPH_URL` is optional — without it the server still works, results just carry
-the `issuance-date-unknown` caveat. `CORROBORATE_REGISTRY` overrides the registry address.
+the `issuance-date-unknown` caveat. `CORROBORATE_REGISTRY` pins a different registry, so a
+consumer who disagrees with our weights can run their own and ignore ours entirely.
+
+### Demo
+
+```bash
+cd apps/demo && npm run dev     # http://localhost:5173
+```
 
 ### Tests
 
 ```bash
-# 17 contract tests (needs Foundry on PATH)
+# 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 30 SDK unit tests — the scoring model, no network
+# 34 SDK unit tests — the scoring model, no network
 cd packages/sdk && npm test
 
 # 11 live tests — real chains, the deployed registry, no mocks
 cd packages/sdk && node --test --experimental-strip-types src/live.test.ts
 ```
 
-All 58 pass as of writing. The live tests hit real chains on purpose: the failure mode we care
+All 63 pass as of writing. The live tests hit real chains on purpose: the failure mode we care
 about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
 assert the seeded ontology loads, that the ICAO cluster really does have three protocols on
-one root, that discontinued protocols are marked dead, and that rent never exceeds forge for
-any adapter.
+one root, that discontinued protocols are marked dead, that every weight cites a `research/`
+file, and that rent never exceeds forge for any adapter.
 
 ---
 
@@ -256,8 +266,9 @@ space failed loudest not on its math but on having no stated method and no appea
 `rentCostCents` in [`ontology/adapters.json`](ontology/adapters.json) is a human judgement
 derived from `research/`, dated 2026-07-25. This is the honest weak point of the whole design.
 What we do about it: every weight is on-chain, carries its `sourceURI`, and emits an event on
-change — so it is auditable and contestable rather than an opinion in a black box. It is still
-a judgement.
+change — auditable and contestable rather than an opinion in a black box. It is still a
+judgement. If a rent cost is wrong by a factor of *k*, every score containing it is wrong by
+log₁₀ *k*, and nothing else in the model compensates.
 
 **2. Nothing here attests independent control.** A verified, unique, live, fresh human acting
 under someone else's direction passes every check in this system and every check in every
@@ -267,34 +278,46 @@ delegation. Every result carries a permanent, non-suppressible
 ([`research/references/ohlhaver-corpus.md`](research/references/ohlhaver-corpus.md)) accepted
 into the design rather than argued away.
 
-**3. Proof of Humanity is currently airdrop-inflated.** Roughly 1,299 of 1,364 lifetime
+**3. Corroborate does not authenticate the address set.** `resolve()` scores whatever addresses
+it is handed. An integration that lets a user type an arbitrary address into a box has no sybil
+resistance at all, regardless of what the score says. Proving control is the integrator's job
+and duplicating it here would mean holding user state — but this is the most likely way to
+deploy it wrong.
+
+**4. Proof of Humanity is currently airdrop-inflated.** Roughly 1,299 of 1,364 lifetime
 registrations arrived in a four-month window tracking a ~$9.94 PNK claim one-for-one,
-`requiredNumberOfVouches()` is 1, and `HumanityRevoked` has fired exactly once ever. Weight by
-registration age, not by the boolean — which is what the subgraph is for. Its weight should be
-re-measured in October 2026 after the reward pool empties.
+`requiredNumberOfVouches()` is 1, and `HumanityRevoked` has fired exactly once ever. We weight
+by registration age rather than the boolean — a `Ramp` curve, where a week-old registration
+scores 0.88 and a three-year-old one scores 2.64, so the airdrop cohort discounts itself. That
+is a mitigation, not a fix: a patient attacker registers during the surge and waits. Re-measure
+in October 2026 after the pool empties.
 
-**4. The registry curator is a single EOA tonight.**
+**5. The registry curator is a single EOA tonight.**
 `0xE3C03709B2b8439Eb07Aac06CC4Fa9886CE5BF87`, a burner. Honest and fully auditable — every
-change is an event — but not decentralised. `transferCuratorship` exists; a multisig or a
-curation market is the obvious next step and is not built.
+change is an event — but not decentralised. There is no multisig, no timelock, and no appeal
+path. `transferCuratorship` exists and has not been used.
 
-**5. Coverage is 4 of 15 adapters.** The other eleven are priced in the ontology but not yet
+**6. Coverage is 4 of 15 adapters.** The other eleven are priced in the ontology but not yet
 probed. An absent credential is reported as absence of evidence, never as evidence of absence.
 
-**6. World ID has no verified positive vector yet.** The adapter is verified working against
+**7. World ID has no verified positive vector yet.** The adapter is verified working against
 World Chain, but no Orb-verified address turned up in the windows scanned, so every World
 lookup so far has legitimately returned `false`.
 
-**7. The subgraph is still backfilling.** It answers queries and reports no indexing errors,
-but at time of writing it has not reached the Circles start block, so Circles enrichment falls
-back to the vendor indexer.
+**8. The subgraph is still backfilling.** It answers queries and reports no indexing errors,
+but at time of writing has not reached the Circles start block, so Circles enrichment falls
+back to the vendor indexer and most PoH lookups still carry `issuance-date-unknown`.
 
-**8. We cannot offer maximal unlinkability and maximal dedup at once.** An aggregator is a
+**9. We cannot offer maximal unlinkability and maximal dedup at once.** An aggregator is a
 cross-application deduplicator by definition; app-scoped nullifiers make cross-app dedup
-impossible by construction. We chose unlinkability, and saturation is the price we pay for it.
+impossible by construction. We chose unlinkability, and saturation is the price.
 
-Full adversary analysis, including what we defend and what we cannot:
-[`docs/threat-model.md`](docs/threat-model.md).
+**10. The score raises the price; it does not close the door.** An attacker willing to spend
+~$31 per identity on genuinely independent roots scores 3.49 and is indistinguishable from the
+person in our own headline test. That number *is* the product claim, and it is the only one the
+evidence supports.
+
+Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 
 ---
 
@@ -302,9 +325,10 @@ Full adversary analysis, including what we defend and what we cannot:
 
 | What | Where |
 |---|---|
-| `PersonhoodRegistry` | Sepolia (11155111) [`0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9`](https://sepolia.etherscan.io/address/0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9) |
-| Deploy tx | [`0xd4d81610…1327b344`](https://sepolia.etherscan.io/tx/0xd4d81610ad85dcdfd1e7fe547f643122f6d0bbe9c06cd5eafe5999dd1327b344) at block 11343959 |
+| `PersonhoodRegistry` (v2) | Sepolia (11155111) [`0x977b028b900cce8ee89c46877e814eff3060aa07`](https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07) |
+| Deploy tx | [`0xe6b715cd…4677e427`](https://sepolia.etherscan.io/tx/0xe6b715cde4c0d7cb27041ee61f8b4de8d06dfe7bd2e2f306b67e0ca24677e427) at block 11344158 |
 | Curator (EOA, burner) | `0xE3C03709B2b8439Eb07Aac06CC4Fa9886CE5BF87` |
+| `PersonhoodRegistry` (v1) | [`0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9`](https://sepolia.etherscan.io/address/0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9) — superseded by v2 (age curves, plaintext event ids), left deployed, same ontology |
 | Subgraph | `https://api.studio.thegraph.com/query/77602/poh/v0.0.1` |
 | World ID (Orb) read | AgentBook `0xA23aB2712eA7BBa896930544C7d6636a96b944dA` — World Chain |
 | Proof of Humanity v2 | `0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc` — Gnosis |
@@ -320,40 +344,44 @@ that forced the cost model. We read the Orb tier permissionlessly — AgentBook'
 is a plain `eth_call`, no API key, no relying-party id, no user interaction — which is why the
 adapter cannot be rate-limited or revoked out from under an integrator. It is also the
 protocol we price *down*: forging an iris enrolment costs ~$500, but renting one costs $0.50 at
-the observed resale floor, so it scores 1.71. We take the min. See
-[`docs/scoring.md`](docs/scoring.md#the-world-id-wrinkle).
+the observed resale floor, so it scores 1.71 — below Proof of Humanity. We own that result
+rather than fudging it: [`docs/scoring.md`](docs/scoring.md#the-world-id-wrinkle). The AgentKit
+demo in [`apps/agent`](apps/agent) puts the whole thing to work: an agent proves a human stands
+behind it, and the counterparty — not us — picks the line.
 
-**The Graph.** The subgraph is not decoration — it carries the half of the model that contract
-reads cannot reach. Decay needs `claimedAt`, which is an event; the airdrop-inflation
+**The Graph.** The subgraph is not decoration — it carries the half of the model contract reads
+cannot reach. The age curves need `claimedAt`, which is an event; the airdrop-inflation
 correction needs the registration-rate curve, which is a daily rollup; the Circles modifier
 needs `trustedByCount`, which is a graph traversal. `ProtocolDay` exists specifically so an
-integrator can *see* an airdrop happening to a credential they depend on.
+integrator can *see* an airdrop happening to a credential they depend on, rather than reading
+about it in a postmortem.
 
 **ENS.** A subject is an address set, and a set needs a handle. The SDK resolves ENS names
 anywhere an address is accepted (`resolve('vitalik.eth')`, verified against mainnet), so a
 person with a PoH wallet and a separate Circles avatar can be referred to by one name rather
-than by two hex strings the caller must keep in sync. Registering `corroborate.eth` on Sepolia
-and publishing the registry address as a text record is next and is **not done**.
+than two hex strings the caller must keep in sync. Registering `corroborate.eth` on Sepolia and
+publishing the registry address as a text record was in flight at the time of writing — check
+[`deployments/`](deployments) for whether it landed.
 
 ---
 
 ## Docs
 
 - [`docs/scoring.md`](docs/scoring.md) — the scoring model: root-cost aggregation, the
-  sale-versus-rental argument for `min(forge, rent)`, freshness half-lives, and a worked
-  example with real ontology numbers including the case where our own model produces an
-  uncomfortable answer.
+  sale-versus-rental argument for `min(forge, rent)`, the decay-versus-ramp age curves, a
+  worked example over the real ontology, and the case where our own model produces an answer
+  we do not like.
 - [`docs/threat-model.md`](docs/threat-model.md) — what Corroborate defends against, what it
   provably cannot, each tied to the research file it derives from.
 
 ## Research
 
-Every weight in the registry traces to [`research/INDEX.md`](research/INDEX.md) — 23 files,
-~21,000 lines of primary-source research written 2026-07-24 against live sources: contracts
+Every weight in the registry traces to [`research/INDEX.md`](research/INDEX.md) — **23 files,
+~21,000 lines** of primary-source research written 2026-07-24 against live sources: contracts
 queried over RPC, repos read at HEAD, prices fetched the same day. Volatile facts are
-date-stamped; unconfirmed claims are marked `UNVERIFIED:` rather than guessed. If you read
-four files, read the four the index nominates — one of them is the strongest argument that
-this product should not exist, kept at full strength.
+date-stamped; unconfirmed claims are marked `UNVERIFIED:` rather than guessed. If you read four
+files, read the four the index nominates — one of them is the strongest argument that this
+product should not exist, kept at full strength.
 
 ```
 research/
@@ -366,13 +394,14 @@ research/
 ## Repo layout
 
 ```
-contracts/       PersonhoodRegistry.sol + 17 Foundry tests
+contracts/       PersonhoodRegistry.sol + 18 Foundry tests
 ontology/        adapters.json — the trust-root ontology, source of truth for seeding
 packages/sdk/    scoring engine, adapters, subgraph client, ENS resolution
 packages/mcp/    MCP server over the SDK
 subgraph/        The Graph subgraph: PoH v2 + Circles v2 on Gnosis
-apps/            demo (in progress) and agent (stub)
-scripts/         deploy, seed, and the on-chain vector sweep
+apps/demo/       browser demo — same SDK, client-side, live registry
+apps/agent/      World AgentKit demo — human-backing check for an agent
+scripts/         deploy, seed, ENS, and the on-chain vector sweep
 research/        the 23 files every weight derives from
 docs/            scoring model and threat model
 ```
