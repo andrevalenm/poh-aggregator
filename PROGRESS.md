@@ -1996,3 +1996,167 @@ adapter before reaching for an indexer: *is the past still sitting in current st
 **Blocked:** nothing new. Iteration 15's two carried notes stand, both Hugo's call —
 `pnpm-lock.yaml` untracked beside a tracked `package-lock.json`, and `./test.sh` living at
 `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it.
+
+## Iteration 17 — 2026-07-25
+
+**Did:** the oldest open item in this log — iteration 1's next-step 1, carried unchanged through
+fifteen iterations: **widen the Circles subgraph window and add a `registrationObserved` flag to
+both mappings.** Both halves landed, plus the thing that turned out to be underneath them: the
+index now reports *which events it saw* and *how far back it saw them*, and the SDK stops assuming
+either.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: the two red tests reproduce exactly, the chain still reports 32
+adapters at revision 36 against this tree's 30, and `research/protocols/gitcoin-passport.md` and
+`research/protocols/lens-onchain-read.md` still do not exist here. MORNING "Needs you" item 18
+stands, unchanged.
+
+**The window was avoiding a cost that is not there.** The manifest said Circles emits ~7,200 Trust
+events per 60k blocks so full history "would not sync inside a hackathon". Measured today —
+20k-block windows sampled every 1M blocks from the Hub's deployment to head 47,388,288 — the mean
+is **582 events per 20k blocks**, projecting to **~317,000 events** over the Hub's whole life,
+about a quarter of the assumption. And the argument that settles it is not the volume: the PoH data
+source already starts at 35,846,827, so the subgraph was **already syncing every one of those
+blocks** and discarding only the Circles events in them. `startBlock` is now **36,486,014**, the
+block the Hub's code first appears at (`eth_getCode` is `0x` at 36,486,013, 2024-10-13T15:09:10Z);
+its first `RegisterHuman` is 36,501,311.
+
+**What the window was costing, end to end, on real avatars.** Both scored through `resolve()`
+against the old deployment and the new one, in the same minute:
+
+| Subject | old | new | old freshness | new freshness | caveats cleared |
+|---|---|---|---|---|---|
+| `0x3fc5c255…cb6d` | 1.4150 | **1.6711** | 0.5000 (midpoint) | **0.9179** | `issuance-date-unknown`, `index-coverage-partial` |
+| `0xd40133ea…b446` | 0.9438 | **1.6711** | 0.1557 (floor) | **0.9179** | `issuance-date-lower-bound` |
+
+The second is the one worth looking at: it was in the index all along, dated from a trust edge 1.6
+years after its registration, so a twenty-one-month-old avatar was priced at **17%** of the weight
+its survival had earned. Neither error was ever hidden — both caveats fired every time — but a
+caveat is not a score, and "we know this number is wrong" is not the same as a right number.
+
+**Coverage is now the index's claim to make, not a constant in this package.** `completeHistory` is
+what decides whether an index's *silence* is evidence, and it lived in `subgraph.ts` as a table
+describing a manifest in another package. Two files, one hand-maintained agreement, and the drift is
+silent and in the dangerous direction: a windowed index called complete turns "we cannot see it"
+into "it did not exist" and prices a real credential as brand new. New `IndexCoverage` entity —
+each data source records the earliest event it indexed — and the SDK compares that against the
+block the protocol's first credential was created in (`PROTOCOL_FIRST_CREDENTIAL_BLOCK`: PoH's
+first `HumanityClaimed` at **36,029,465**, from the complete 1,409-log claim history; Circles'
+first `RegisterHuman` at **36,501,311**). Live now: `poh` from 35,864,293 (a `VouchRegistered`),
+`circles` from 36,501,311 (a `Trust` — the self-trust edge a registration emits is ordered *before*
+the `RegisterHuman` in the same block). Coverage rides in the same request as the entity and the
+head, because a cached completeness claim outliving the deployment that earned it is the same error
+one layer up. A redeploy with a narrower window now loses the claim by itself, and a unit test
+asserts exactly that.
+
+**The direction of a side-event date is the whole safety question, and the two protocols run
+opposite ways.** The schema could not say whether an entity's date was its issuance or an adjacent
+event's timestamp; PoH's read hard-coded "observed" and Circles inferred it from a null `inviter`.
+Both are now explicit fields (`claimObserved`, `registrationObserved`), and the reconciler treats
+them oppositely:
+
+- **A Circles trust edge cannot precede the registration it points at** — not because Circles says
+  so (it does not: in blocks 40,000,000–40,040,000 there were 21 registrations and **10 of them
+  were preceded by a trust edge naming them**, which is what the invitation flow *is*) but because
+  `handleRegisterHuman` overwrites the date. An avatar still carrying an edge timestamp is one
+  whose registration this index never saw. So the date understates age: kept, flagged a floor.
+- **A PoH vouch is cast on a request that has not resolved**, so it *precedes* the claim and
+  reading it as an issuance date makes the credential look older. PoH scores on a `Ramp` where
+  older is worth more, so this is the one direction that pays an adversary. It is no longer used as
+  a date at all: it becomes `issuedAfter`, a proven lower bound on issuance, which caps ramp weight
+  exactly as an absence bound does. New note `index-date-precedes-issuance`, new `dateFrom` value
+  `index-side-event-bound`, new caveat.
+
+**The honest size of that second fix:** below the half-life the number does not move (the ramp
+evaluated at the bound *is* the ramp evaluated at the date). Above it the cap bites — a three-year
+-old vouch read as an issuance date prices a 365-day ramp at **0.875** for a credential that may
+have been claimed yesterday, against **0.5** as a bound. It also stops `as-of` treating that
+timestamp as an exact date, which it never was, and it stops the caveat blaming our own indexing
+for a disagreement that is a property of vouching.
+
+**Where the direction has not been established, the unsafe reading is assumed.** An
+`issuanceObserved: false` entity with no declared order bounds rather than dates. That is the
+reverse of the old default, which assumed every side-event followed issuance on an argument that
+holds for Circles trust edges and is false for PoH vouches.
+
+**Verified:** on this box, at this commit.
+
+- `cd packages/sdk && npm test` → `# tests 425 # pass 418 # fail 2 # skipped 5` (**+18** over
+  iteration 16's 407: 12 in the new `subgraph.test.ts`, 5 in `reconcile.test.ts`, 1 live). The two
+  failures are iteration 15's registry-drift pair, unchanged and untouched by this commit.
+- `node --test --experimental-strip-types src/live.test.ts` against the new deployment → **16
+  tests, 15 pass, 1 skip** (the index has not reached the PoH vector's claim yet). The three new
+  live tests each assert against the chain rather than against a number in the file: the index's
+  stated lower edge is at or before the Hub's first registration **and** the chain holds no
+  `RegisterHuman` below it (chain-only, no third-party oracle, in the spirit of iteration 6); both
+  avatars the window mis-dated now carry the timestamp of the block their own `RegisterHuman` is
+  in, read from the header at run time; and every entity the index holds only through a vouch has
+  its claim *after* that vouch on chain — **6 later, 2 never claimed, 0 earlier**, checked against
+  the full 1,409-log claim history.
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd apps/demo && npx playwright test` → `13 passed`.
+- `npm run build` and `tsc -p tsconfig.json --noEmit` clean; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` end to end: verdicts unchanged — DENY / ALLOW **3.6152** over 5
+  roots / DENY naming the sibling / DENY `a fleet of 27 agents is still one human`. (3.6153 →
+  3.6152 is hours of decay, not this change.)
+- The 5 skips in the full run are the tests that need the new schema and were taken against
+  `version/latest`, which still serves v0.0.2: the legacy path answers, reports no coverage, and
+  they skip loudly with the reason instead of asserting against a deployment that cannot answer.
+
+**Deployment state, and the one thing left running.** v0.0.3 is deployed to Studio (`77602/poh`)
+and **still syncing** — 40.17M of 47.39M at the time of writing, and the rate through the dense
+Circles region is ~37k blocks/min, so the remainder is on the order of hours. Nothing waits on it:
+**Studio's `/version/latest` tracks the latest *synced* version, not the newest deployed one**
+(verified — `version/latest` still returns v0.0.2's deployment hash `QmeYTnn…` while v0.0.3 answers
+at its own label), so no consumer reads a half-indexed subgraph and the cutover happens by itself.
+Until it does, the hosted demo and the default endpoint keep the old flagged behaviour for those
+two Circles avatars; the numbers in the table above are what they become, measured against both
+deployments rather than predicted. `.env.local`'s `SUBGRAPH_URL` was pinned to `v0.0.2` while I
+deployed and is restored to `version/latest` (byte-identical to how I found it).
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved — this changes
+what the index is allowed to claim about its own dates, not what anything is worth. Registry stays
+as the chain has it (32 adapters / revision 36, written by the other tree; this tree still has 30).
+
+**Committed:** `23c8f31` feat(subgraph): the index reports which events it saw, and how far back it
+saw them
+
+**Write-up:** `research/protocols/protocol-subgraph-coverage.md` — the Hub's deployment bisection,
+the event-volume table, the trust-before-registration measurement, the PoH claim-history counts,
+and what is deliberately still not read. Indexed in `research/INDEX.md` (whose header count was
+stale at "24 files / ~21,300 lines"; it is 36 files / ~24,250 lines). `docs/scoring.md` gained the
+two paragraphs this argument belongs in, README limit 8 rewritten (it described the window as
+current), and the `~2-month window` comment in the Circles adapter is gone.
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15 and 16,
+   still the only red in the suite, still Hugo's call.
+2. **Check the cutover.** When v0.0.3 finishes, `version/latest` should flip to it; the five
+   skipped tests then assert instead of skipping, and the two Circles avatars pick up their real
+   dates everywhere including the hosted demo. If it has *not* flipped, pin `SUBGRAPH_URL` to
+   `v0.0.3` and note that Studio's `latest` needs a manual publish.
+3. **A dated ending for Circles and PoH v2** (iteration 16's #3, unchanged). Circles' `stopped()`
+   has no timestamp we have located, so the window cannot be closed; PoH v2's expiry surface can.
+   Each needs the question that killed Holonym asked of it: is the credential still *attributable*
+   at the moment you restore it?
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read
+   appears. Iteration 7's measurement stands: neither leaves per-holder state on any chain.
+
+**Worth keeping, because it generalises.** Iteration 14's lesson was *when enumeration is the
+problem, ask whether the issuer already solved it on chain*; iteration 16's was *when history is
+the problem, ask what the contract declines to delete*. This one is about our own layer: **an index
+must be able to state what it saw, or its consumer will assume it.** Every assumption removed here
+was load-bearing and silent — a coverage constant in a different package from the manifest it
+described, a hard-coded `issuanceObserved: true`, a null field standing in for a fact nobody
+recorded — and each one failed in the direction that flatters the score. The generalisation for the
+next adapter: if a read's correctness depends on a property of the *source* rather than of the
+subject, the source has to assert that property in the same answer, or it is not being checked.
+
+**Blocked:** nothing new. Iteration 1's two carried notes stand, both Hugo's call —
+`pnpm-lock.yaml` untracked beside a tracked `package-lock.json`, and `./test.sh` living at
+`apps/demo/test.sh` rather than the repo root. One new, minor: the hosted demo bundle is the one
+built at the last deploy and this box's user has no docker access (`docker ps` → permission
+denied), so `scripts/deploy-demo-ax41.sh` cannot be run from here. It does not need to be — the
+bundle reads `version/latest` and every field it queries still exists in the new schema, so it
+picks the new index up at cutover without a rebuild.

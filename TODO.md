@@ -27,6 +27,15 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       archive node needed. Restoring requires an exact issuance date, never a lower bound;
       Holonym is excluded because `getSBT` reverts once expired, so an expired SBT is no longer
       attributable to its issuer. `as-of.ts` rule 2, `heldUntil` in `types.ts`.
+- [x] **The index says what it saw** — shipped (iteration 17): the Circles data source runs
+      from the Hub's deployment block (36486014) instead of a two-month window, so absence is
+      evidence and an avatar is dated from its own `RegisterHuman` — two real avatars moved
+      1.4150 → 1.6711 and 0.9438 → 1.6711. Coverage is now an `IndexCoverage` entity the index
+      writes about itself rather than a constant in the SDK, and `claimObserved` /
+      `registrationObserved` make a side-event date explicit: a Circles trust edge is a floor,
+      a PoH vouch is a *bound* (it precedes the claim, so reading it as a date buys ramp weight
+      — 0.875 vs 0.5 on a three-year-old vouch).
+      `research/protocols/protocol-subgraph-coverage.md`.
 - [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.

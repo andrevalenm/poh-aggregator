@@ -1,11 +1,12 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 16. 18 forge, 407 SDK (403 pass,
-**2 fail**, 1 skipped), 13 Playwright — 438 total. The two failures are not a regression: the
+detail. _Last updated 2026-07-25, after unattended iteration 17. 18 forge, 425 SDK (418 pass,
+**2 fail**, 5 skipped), 13 Playwright — 456 total. The two failures are not a regression: the
 deployed registry gained two adapters from another working copy during iteration 15 and this
 tree's ontology has not caught up. **"Needs you" item 18** has the fix and it is a merge, not a
-bug._
+bug. The 5 skips are the tests that need the new subgraph version, which was still syncing when
+the run was taken; they assert normally against it and skip loudly against the old one._
 
 ---
 
@@ -30,12 +31,10 @@ Two things for you, neither urgent:
   anti-airdrop ramp prices it at 0.022. If a demo beat depended on 2.4409, it needs re-shooting;
   the honest version of that beat is better anyway ("our own credential is discounted by our own
   curve").
-- **The Circles half of the subgraph is a two-month window**, and that now shows up in results
-  as caveats rather than as wrong dates. The oldest avatars (Hub's first registrations, block
-  36501311) are missing from it entirely, and some avatars it does have are dated from a trust
-  edge instead of their registration — up to 1.6 years late. Widening the window and re-syncing
-  is next up in `PROGRESS.md`; it needs no decision from you unless you would rather I not spend
-  the sync time before the deadline.
+- **The Circles half of the subgraph was a two-month window.** ~~Widening it is next up.~~
+  **Done in iteration 17** — the data source now starts at the Hub's deployment block and both
+  affected avatars are dated from their own `RegisterHuman`. See that section below for the two
+  scores it moved.
 
 **Iteration 2 doubled the landscape: the registry now prices 30 protocols over 18 trust roots,
 up from 15 over 10.** That is the "1inch for personhood" claim, and it was the weakest part of
@@ -476,6 +475,38 @@ No weight moved. SDK suite **407 tests**: 403 pass, **the same 2 failures as ite
 Coinbase recipient out of Base's own `Revoked` logs, a lapsed World address out of
 `AccountVerified`, both ends of each window read off the chain, restored at the midpoint of its
 real life and absent one second after it ended.
+
+**Iteration 17 closed the oldest item on the list — the index now reports which events it saw, and
+how far back it saw them.** Two dating approximations had been carried as flagged caveats since
+iteration 1, both artefacts of what the index was allowed to assume about *itself*. One resync
+fixed both.
+
+- **Circles runs from the Hub's deployment (block 36486014) instead of a two-month window.** The
+  window existed on the assumption that full history would not sync in time; measured, that was
+  wrong by ~4x — the Hub's whole life is ~317,000 events, and the PoH data source already forced a
+  sync of those same blocks, so we were scanning them and throwing the events away. Two real
+  avatars, scored through `resolve()` before and after: `0x3fc5c255…` **1.4150 → 1.6711**
+  (freshness 0.5000 midpoint → 0.9179 computed) and `0xd40133ea…` **0.9438 → 1.6711** (0.1557 →
+  0.9179). The second had been in the index all along, dated from a trust edge 1.6 years late, so
+  it was priced at 17% of the weight its survival had earned.
+- **Coverage is now the index's claim to make.** Each data source records the earliest event it
+  indexed; the SDK compares that against the block the protocol's first credential was created in.
+  It used to be a constant in the SDK describing a manifest in another package — which drifts
+  silently and in the dangerous direction, because a windowed index called complete turns "we
+  cannot see it" into "it did not exist". A narrowed redeploy now loses the claim by itself.
+- **A vouch is not a claim date, and that error runs the adversary's way.** The index's oldest PoH
+  entity is dated from a `VouchRegistered` 165,172 blocks before the protocol's first actual
+  claim, because a vouch is cast on a request that has not resolved yet. Read as an issuance date
+  that makes the credential look *older*, and PoH scores on a ramp where older is worth more. It
+  is now a bound that caps weight rather than a date: a three-year-old vouch is worth 0.5 instead
+  of 0.875. Verified against the chain over every such entity — 6 claimed later, 2 never claimed,
+  0 earlier.
+
+No weight, root, curve or cost moved, so no registry write. New write-up:
+`research/protocols/protocol-subgraph-coverage.md`. **One thing worth knowing operationally:**
+Studio's `/version/latest` tracks the latest *synced* version, not the newest deployed one — so
+deploying a resync does not repoint consumers at a half-indexed subgraph, and the flip happens by
+itself when it catches up.
 
 ---
 
