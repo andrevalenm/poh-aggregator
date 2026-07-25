@@ -84,6 +84,12 @@ export type ProvenanceNote =
    * holder acquired it rather than from when it was created.
    */
   | 'credential-transferred-since-issuance'
+  /**
+   * The protocol publishes an expiry and no issuance date, and caps a credential's term. The
+   * date is `expiry - that cap`: the earliest issuance the credential can have, so on a decay
+   * curve the credential is at most this old and its weight here is a floor.
+   */
+  | 'date-from-expiry-and-max-term'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {

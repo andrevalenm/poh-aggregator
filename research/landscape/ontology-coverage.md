@@ -218,8 +218,20 @@ the read is):
    so what gets dated is this address's custody rather than the fid. Write-up, addresses,
    endpoint table: `protocols/farcaster-onchain-read.md`. Farcaster Pro — the one signal with a
    real price — is **not** readable: `TierRegistry` keeps no per-fid state and its logs need a key.
-3. **Holonym / Human ID** — state on Optimism plus a public unauthenticated REST endpoint. Requires
-   us to publish a stable action-id first, which is a design decision, not a lookup.
+3. ~~**Holonym / Human ID**~~ — **DONE 2026-07-25**, and the condition on it turned out to be
+   false. The action-id is only mandatory on the *vendor's REST endpoint*; `Hub.getSBT(address,
+   circuitId)` is keyed on holder and circuit and returns the action-id inside the proof, so we
+   report the namespace the credential was minted for instead of choosing one. Two ontology
+   entries implemented off one contract, `0x2AA822e2…4DfB` on OP Mainnet. Three findings that
+   shaped the adapter: the Hub's own source warns that an SBT is forgeable unless
+   `publicValues[4]` is checked against Holonym's issuer key, because anyone can run an issuer;
+   the Hub burns the nullifier it is *handed* rather than the one the circuit derived, so
+   uniqueness has to be confirmed with a third call; and `V3.circom` constrains
+   `expiry - iat < 31,536,001`, which makes *expiry minus one year* a proven lower bound on
+   issuance and therefore an honest date on a decay curve — the protocol deliberately fuzzes the
+   expiry to hide when the holder was verified, so a bound is the only sound reading. Write-up:
+   `protocols/holonym-human-id-onchain-read.md`. The legacy v2 store is **not** read and the file
+   says why. 238,706 SBTs minted, measured by bisecting `ownerOf`.
 4. **Linea Proof of Humanity V2** — Verax attestations on Linea, portal `0xe8a3…3922`, attester
    `0xc5db…1c0d`. Passive per-subject read, and it retires nothing we depend on.
 5. **World document / Selfie tiers** — already partly reachable through AgentBook; the mission's P1

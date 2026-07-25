@@ -24,10 +24,13 @@ roots. Each collapse below is traced to a primary source in [`research/`](resear
    Galxe Passport v3        ──┬──────────────────► kyc-vendor:sumsub
    Linea PoH V2             ──┘                    also idOS, Solana Attestation Service
 
-   Coinbase Verified Acct   ──┬──────────────────► kyc-vendor:persona
-   Civic Pass (discontinued)──┘                    per Coinbase's own vendor disclosure
+   Coinbase Verified Acct   ──────────────────────► kyc-vendor:persona
+                                                    per Coinbase's own vendor disclosure
 
-   Anima Proof of Uniqueness ─────────────────────► kyc-vendor:facetec-synaps
+   Anima Proof of Uniqueness──┐
+   Civic Pass (discontinued)  ├──────────────────► kyc-vendor:facetec
+   Holonym (biometrics)     ──┘                    Synaps-hosted, Civic-direct or Holonym's
+                                                   own server — one technique defeats all
 
    World ID (Orb)           ──────────────────────► iris-registry:world-orb
    Proof of Humanity v2     ──────────────────────► social-vouching:poh
@@ -141,13 +144,14 @@ authenticates the set; we never infer that two addresses belong to one person, b
 inference is the linkage we exist to avoid. Saturation spans the set, so splitting credentials
 across wallets cannot inflate a score — there is a test for exactly that.
 
-Six adapters are implemented, all readable **without vendor cooperation** — no API key on the
+Eight adapters are implemented, all readable **without vendor cooperation** — no API key on the
 critical path, nothing that can rate-limit or revoke us: World ID Orb (AgentBook `lookupHuman`
 on World Chain), Proof of Humanity v2 (Gnosis), Circles v2 (Gnosis + trust graph), Coinbase
 Verified Account (EAS on Base, revocation checked explicitly — 720,503 issued against 406,022
 revoked, so presence alone is wrong more than half the time), Human Passport
-(`GitcoinResolver.getCachedScore` across all seven Decoder deployments), and Farcaster
-(`IdRegistry` on OP Mainnet).
+(`GitcoinResolver.getCachedScore` across all seven Decoder deployments), Farcaster
+(`IdRegistry` on OP Mainnet), and Holonym / Human ID's two credentials — the government-ID check
+and the FaceTec biometric — from Hub V3 on OP Mainnet.
 
 Farcaster is where the age curve does the work. A fid costs an adversary $0.44 and $0.20 a year,
 and two thirds of the registry was minted inside a nine-month subsidy window — so the boolean is
@@ -170,6 +174,20 @@ is rooted at wallet history and priced at the farmed-wallet market (a dollar), i
 mapped back to the adapters that own them, and the result says so out loud:
 `aggregate-restates-other-credentials`. The whole thesis, on one address:
 [`research/protocols/human-passport-onchain-read.md`](research/protocols/human-passport-onchain-read.md).
+
+Holonym closes that loop, because it is the protocol behind both of those stamps. The same
+address now reads directly against Holonym's Hub on Optimism and both credentials are there —
+so the collapse is one credential seen from two directions rather than a stamp name we trusted.
+Reading it properly took three things the vendor's own API skips or hides. The Hub's source
+warns that an SBT is **forgeable unless you check the issuer in its public values**, since
+anyone can run an issuer key; the Hub burns the nullifier it is *handed* rather than the one the
+circuit derived, so uniqueness needs its own read; and there is no issuance date anywhere,
+deliberately — the circuit tells users to pick a random expiry to hide when they were verified.
+What survives that is a proof: `V3.circom` constrains `expiry - iat < 31,536,001`, so *expiry
+minus one year* is the earliest a credential can have been issued, which on a decay curve is the
+oldest it can be and therefore a weight floor rather than a guess. It also means a Holonym
+credential hard-expires within a year of the check behind it.
+[`research/protocols/holonym-human-id-onchain-read.md`](research/protocols/holonym-human-id-onchain-read.md).
 
 ### 4. MCP server — [`packages/mcp`](packages/mcp)
 
@@ -296,19 +314,21 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 96 SDK tests: 67 unit (scoring model, index reconciliation, input, ontology) + 29 live
+# 113 SDK tests: 77 unit (scoring model, index reconciliation, input, ontology, SBT
+# interpretation) + 36 live
 cd packages/sdk && npm test
 
 # the live ones alone — real chains, the deployed registry, no mocks
 cd packages/sdk && node --test --experimental-strip-types src/live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/human-passport.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/farcaster.live.test.ts
+cd packages/sdk && node --test --experimental-strip-types src/adapters/holonym.live.test.ts
 
 # 10 browser E2E against the built demo, real chains
 cd apps/demo && npx playwright test
 ```
 
-All 124 pass as of 2026-07-25. The live tests hit real chains on purpose: the failure mode we
+All 141 pass as of 2026-07-25. The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
 assert the seeded ontology loads, that the ICAO cluster really does have three protocols on
 one root, that discontinued protocols are marked dead, that every weight cites a `research/`

@@ -357,6 +357,14 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     })
   }
 
+  const fromExpiry = withNote('date-from-expiry-and-max-term').filter((e) => e.held)
+  if (fromExpiry.length) {
+    out.push({
+      code: 'issuance-date-derived-from-expiry',
+      message: `${ids(fromExpiry)} publishes an expiry and no issuance date — deliberately, so that the expiry does not reveal when the holder was verified. The date used is the expiry minus the longest term the protocol's circuit permits, which is the earliest the credential can have been issued and therefore the oldest it can be. On a decay curve the weight here is a floor rather than an estimate.`,
+    })
+  }
+
   const stale = withNote('freshness-check-unavailable')
   if (stale.length) {
     out.push({

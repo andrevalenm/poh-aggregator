@@ -44,6 +44,18 @@ model, and overlap with other protocols.
 | [eas-and-disco.md](protocols/eas-and-disco.md) | Ethereum Attestation Service, Disco.xyz | substrate, not a credential | EAS **as an output rail**; Disco is dead and its domain is now hostile |
 | [privado-id-and-verax.md](protocols/privado-id-and-verax.md) | Privado ID (iden3), Verax | credential plumbing | Verax as a narrow input; Privado neither |
 
+### Added after the sweep — how a protocol is actually read
+
+Written by the unattended build iterations while implementing a probe, so they cover the
+mechanism rather than the landscape: which call, at which address, what the numbers mean, and
+what the read cannot see. Each names the deep dive above that it builds on.
+
+| File | Covers | Adds |
+|---|---|---|
+| [human-passport-onchain-read.md](protocols/human-passport-onchain-read.md) | Human Passport across seven Decoder deployments | Read the resolver, not `getScore`; 90-day hard expiry; the stamp→trust-root map |
+| [farcaster-onchain-read.md](protocols/farcaster-onchain-read.md) | Farcaster `IdRegistry` on OP Mainnet | Dating a registry with no timestamps from `idCounter`; the 193,791-fid import; fids change hands |
+| [holonym-human-id-onchain-read.md](protocols/holonym-human-id-onchain-read.md) | Holonym / Human ID Hub V3 on OP Mainnet | No action-id needed after all; the issuer must be checked or the SBT is forgeable; the circuit's one-year ceiling is the date |
+
 ## Landscape — the field, the theory, and the adversary
 
 | File | What it establishes |
