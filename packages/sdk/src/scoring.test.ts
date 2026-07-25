@@ -179,6 +179,31 @@ describe('cost model', () => {
     assert.equal(effectiveCost(beforeHardening, 1), effectiveCost(afterHardening, 1))
   })
 
+  test('two discontinued credentials on one root are NOT reported as saturated', () => {
+    // Regression: both contribute zero, so nothing of value was collapsed. Claiming they
+    // were "counted once" is false — the discontinued caveat is what explains them.
+    const persona = 'kyc-vendor:persona'
+    const a = adapter({ id: 'civic-pass', trustRoot: persona, live: false })
+    const b = adapter({ id: 'idena-x', trustRoot: persona, live: false })
+    const r = run([a, b], [ev(a, { live: false, effectiveCostCents: 0 }), ev(b, { live: false, effectiveCostCents: 0 })])
+
+    assert.equal(r.totalCostCents, 0)
+    assert.ok(!r.roots.some((x) => x.saturated), 'a zero-value root is not saturation')
+    assert.ok(!r.caveats.some((c) => c.code === 'correlated-evidence-saturated'))
+    assert.ok(r.caveats.some((c) => c.code === 'discontinued-protocol'))
+  })
+
+  test('one live + one dead credential on a root is not saturation either', () => {
+    // Only the live one has value; the dead one wasn't "counted once" against it.
+    const persona = 'kyc-vendor:persona'
+    const live = adapter({ id: 'coinbase', trustRoot: persona, forgeCostCents: 120_000, rentCostCents: 3_000 })
+    const dead = adapter({ id: 'civic-pass', trustRoot: persona, live: false })
+    const r = run([live, dead], [ev(live), ev(dead, { live: false, effectiveCostCents: 0 })])
+
+    assert.equal(r.totalCostCents, 3_000)
+    assert.ok(!r.roots.some((x) => x.saturated))
+  })
+
   test('discontinued protocols score zero but stay visible', () => {
     const dead = adapter({ id: 'civic-pass', trustRoot: 'kyc-vendor:persona', live: false })
     const r = run([dead], [ev(dead, { live: false, effectiveCostCents: effectiveCost(dead, 1) })])
