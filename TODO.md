@@ -4,11 +4,11 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
 
 ## In flight now
 
-- [ ] **Score stamp ceremony** — the score numeral arrives like a pressed seal (squash-
-      spring settle + iron blot bloom under it), completing the ink-press physics. *(Claude)*
-- [ ] **Research margin notes** — the long-form's empty right column at ≥1280px becomes a
-      Tufte margin: the Ohlhaver quotes and case citations pulled out as sidenotes/pull-
-      quotes. *(Claude)*
+- [x] **Score stamp ceremony** — shipped: count-up completes, the numeral presses in
+      (squash-spring settle + iron blot soaking away beneath). Reduced-motion exempt.
+- [x] **Research margin notes** — shipped: at ≥1280px the long-form reserves a Tufte
+      margin and the Ohlhaver pull-quotes float into it at natural flow height — iron
+      rules, mono citations, CSS-only, author's markup untouched.
 - [ ] **9-probe SDK consolidation** — the ax41 build agent's tree (30-adapter ontology,
       9 live probes, reconcile.ts) is being merged into this machine. Once it lands: the
       landing's dynamic counts pick it up automatically; re-run E2E + redeploy. *(agent,

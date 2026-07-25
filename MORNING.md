@@ -341,6 +341,13 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Stamp + margin (Hugo's picks 4 & 5)**: the score now arrives like a pressed seal, and
+the research long-form's dead right column is a Tufte margin carrying the Ohlhaver
+quotes as sidenotes. Meanwhile the ax41 consolidation landed in-tree — the probe table
+runs the full adapter set and every count on the page updated itself via the dynamic
+LIVE_ADAPTER_IDS derivation. TODO.md now carries the ranked queue (npm publish
+deliberately deferred pending the name decision).
+
 **QA-agent pass (deployed site, real clipboard verified by paste-back)**: 24 items PASS,
 2 real bugs found and fixed same-hour — (1) Lenis anchor overshoot: every in-page anchor
 clicked from a Lenis-scrolled position landed at target+currentScroll, never converging;
