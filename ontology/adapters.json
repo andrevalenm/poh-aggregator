@@ -62,7 +62,7 @@
       "live": true,
       "sourceURI": "research/protocols/world-id.md",
       "implemented": true,
-      "notes": "Forging requires defeating iris dedup at an Orb — expensive. Renting does not: an open resale market was documented at $0.50-$15 per verified account (ZachXBT, 2026-04-28). require_user_presence raises the rent floor but does not remove it.",
+      "notes": "Forging requires defeating iris dedup at an Orb — expensive. Renting does not: an open resale market was documented at $0.50-$15 per verified account (ZachXBT, 2026-04-28). require_user_presence raises the rent floor but does not remove it. Read from WorldIDAddressBook (0x57b930D5…E0330D) and AgentBook on World Chain, both group 1 = Orb. The address book's binding carries a fixed 168-day term, so it hard-expires long before this 1,095-day half-life completes, and the contract refuses a second live binding against the same World ID nullifier — at most one live verified address per human, enforced on chain. The date is the last renewal, not the Orb enrolment, which World keeps off chain; see research/protocols/world-id-onchain-read.md.",
       "ageCurve": "Decay"
     },
     {
@@ -76,7 +76,7 @@
       "live": true,
       "sourceURI": "research/protocols/world-id.md",
       "implemented": false,
-      "notes": "Reads the same passport chip as ZKPassport, Self and Rarimo. NOT independent evidence from any of them.",
+      "notes": "Reads the same passport chip as ZKPassport, Self and Rarimo. NOT independent evidence from any of them. There is no permissionless read: a World ID 4.0 credential leaves no per-holder state anywhere on chain — WorldIDVerifier is a view function taking a proof (2 transactions in the proxy's life) and CredentialSchemaIssuerRegistry is keyed by issuer schema id, storing issuer pubkeys and not holders. Both address-keyed World Chain registries (WorldIDAddressBook, AgentBook) consume v3 group-1 proofs, which is the Orb tier only. Reading this tier needs World's Developer Portal with a registered rp_id, which is a vendor on the critical path. Measured 2026-07-25; see research/protocols/world-id-onchain-read.md.",
       "ageCurve": "Decay"
     },
     {
@@ -90,7 +90,7 @@
       "live": true,
       "sourceURI": "research/landscape/kyc-liveness-vendors.md",
       "implemented": false,
-      "notes": "Liveness only — proves a human was present, never that they are unique or that they hold only one credential. Injection attacks against face liveness rose sharply through 2025, so this decays fast.",
+      "notes": "Liveness only — proves a human was present, never that they are unique or that they hold only one credential. Injection attacks against face liveness rose sharply through 2025, so this decays fast. There is no permissionless read, for the same reason as world-id-document: schema 11 is a v4 credential verified by a stateless view call, and World's own docs scope its Sybil signal per relying party, so even the vendor API answers a question about one RP's user base rather than about the chain. Measured 2026-07-25; see research/protocols/world-id-onchain-read.md.",
       "ageCurve": "Decay"
     },
     {

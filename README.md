@@ -145,8 +145,8 @@ inference is the linkage we exist to avoid. Saturation spans the set, so splitti
 across wallets cannot inflate a score — there is a test for exactly that.
 
 Nine adapters are implemented, all readable **without vendor cooperation** — no API key on the
-critical path, nothing that can rate-limit or revoke us: World ID Orb (AgentBook `lookupHuman`
-on World Chain), Proof of Humanity v2 (Gnosis), Circles v2 (Gnosis + trust graph), Coinbase
+critical path, nothing that can rate-limit or revoke us: World ID Orb (`WorldIDAddressBook` and
+AgentBook on World Chain), Proof of Humanity v2 (Gnosis), Circles v2 (Gnosis + trust graph), Coinbase
 Verified Account (EAS on Base, revocation checked explicitly — 720,503 issued against 406,022
 revoked, so presence alone is wrong more than half the time), Human Passport
 (`GitcoinResolver.getCachedScore` across all seven Decoder deployments), Farcaster
@@ -207,6 +207,24 @@ work) nor the `attester` field (simulating `attest` from a stranger and from Sum
 the identical `ECDSAInvalidSignature` revert, so the gate is a signature and the attester is just a
 relayer) but the portal's registered **owner**, in a registry only Consensys can add to.
 [`research/protocols/linea-poh-onchain-read.md`](research/protocols/linea-poh-onchain-read.md).
+
+World is the one where the *date* was the defect. `AgentBook.lookupHuman` — the read this project
+shipped first — returns a nullifier and no date, and an undated credential on a decay curve is
+scored at full weight forever, so every World credential we found was priced as if issued this
+morning. World Chain has a second contract that fixes both halves of that: `WorldIDAddressBook`
+writes `addressVerifiedUntil[account] = block.timestamp + 168 days` after a Semaphore proof of an
+Orb credential clears, which makes `verifiedUntil − 168 days` the **exact** second the verification
+was mined — checked against block headers on 24 samples spanning fifteen months — and makes `held`
+a comparison rather than a presence check, because the mapping is never cleared and more than half
+of a sampled 2025-04 cohort is lapsed. A binding renewed 162 days ago is now worth 45.13 cents
+instead of 50.00. The contract also refuses a second live binding per World ID nullifier, so **one
+live verified address per human is enforced on chain** rather than assumed — and that an entry means
+a real proof is demonstrable on demand: simulating `verify` reverts `NonExistentRoot()` with an
+invented merkle root and `ProofInvalid()` with the group's real one, identically for a stranger, for
+World's own relayer and for the contract's owner. The document and Selfie tiers, by contrast, leave
+no per-holder state anywhere, and the write-up says so with the measurements rather than leaving a
+gap in the queue.
+[`research/protocols/world-id-onchain-read.md`](research/protocols/world-id-onchain-read.md).
 
 ### 4. MCP server — [`packages/mcp`](packages/mcp)
 
@@ -333,8 +351,8 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 150 SDK tests: 96 unit (scoring model, index reconciliation, input, ontology, SBT
-# interpretation, Verax attestation selection) + 54 live
+# 172 SDK tests: 108 unit (scoring model, index reconciliation, input, ontology, SBT
+# interpretation, Verax attestation selection, World address-book interpretation) + 64 live
 cd packages/sdk && npm test
 
 # the live ones alone — real chains, the deployed registry, no mocks
@@ -343,6 +361,7 @@ cd packages/sdk && node --test --experimental-strip-types src/adapters/human-pas
 cd packages/sdk && node --test --experimental-strip-types src/adapters/farcaster.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/holonym.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/linea-poh.live.test.ts
+cd packages/sdk && node --test --experimental-strip-types src/adapters/world.live.test.ts
 
 # 10 browser E2E against the built demo, real chains
 cd apps/demo && npx playwright test
@@ -404,14 +423,17 @@ in October 2026 after the pool empties.
 change is an event — but not decentralised. There is no multisig, no timelock, and no appeal
 path. `transferCuratorship` exists and has not been used.
 
-**6. Coverage is 6 of 30 adapters.** The other twenty-four are priced in the ontology but not yet
+**6. Coverage is 9 of 30 adapters.** The other twenty-one are priced in the ontology but not yet
 probed. An absent credential is reported as absence of evidence, never as evidence of absence.
-Four of them are permissionlessly readable today and are queued in
+One of them — Proof of Humanity v1 — is permissionlessly readable today and is queued in
 `research/landscape/ontology-coverage.md` §6; the rest are gated, off-chain or dead, and say so.
 
-**7. World ID has no verified positive vector yet.** The adapter is verified working against
-World Chain, but no Orb-verified address turned up in the windows scanned, so every World
-lookup so far has legitimately returned `false`.
+**7. World's document and Selfie tiers cannot be read at all.** Not by us and not by anyone
+without World's cooperation: a World ID 4.0 credential leaves no per-holder state on any chain,
+and the only v4 registry is keyed by issuer rather than by holder. Both tiers stay in the ontology
+priced, rooted and `implemented: false`, with the measurements behind that in
+[`research/protocols/world-id-onchain-read.md`](research/protocols/world-id-onchain-read.md) §5.
+What *is* readable — the Orb tier — is now read from the registry World actually populates.
 
 **8. The subgraph covers only a two-month window of Circles.** It is synced and reports no
 indexing errors, but its Circles data source starts at block 46300000 while the Hub's first
@@ -444,7 +466,7 @@ Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 | Curator (EOA, burner) | `0xE3C03709B2b8439Eb07Aac06CC4Fa9886CE5BF87` |
 | `PersonhoodRegistry` (v1) | [`0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9`](https://sepolia.etherscan.io/address/0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9) — superseded by v2 (age curves, plaintext event ids), left deployed, same ontology |
 | Subgraph | `https://api.studio.thegraph.com/query/77602/poh/version/latest` |
-| World ID (Orb) read | AgentBook `0xA23aB2712eA7BBa896930544C7d6636a96b944dA` — World Chain |
+| World ID (Orb) read | `WorldIDAddressBook` `0x57b930D551e677CC36e2fA036Ae2fe8FdaE0330D` and AgentBook `0xA23aB2712eA7BBa896930544C7d6636a96b944dA` — World Chain |
 | Proof of Humanity v2 | `0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc` — Gnosis |
 | Circles v2 Hub | `0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8` — Gnosis |
 | Coinbase Verified Account | EAS schema `0xf8b05c79…70f0de9` — Base |
@@ -454,9 +476,10 @@ Canonical values live in [`deployments/sepolia.json`](deployments/sepolia.json).
 ### Tracks
 
 **World.** World ID is the highest-weight uniqueness credential in the ontology and the one
-that forced the cost model. We read the Orb tier permissionlessly — AgentBook's `lookupHuman`
-is a plain `eth_call`, no API key, no relying-party id, no user interaction — which is why the
-adapter cannot be rate-limited or revoked out from under an integrator. It is also the
+that forced the cost model. We read the Orb tier permissionlessly from two World Chain contracts —
+`WorldIDAddressBook.addressVerifiedUntil` and AgentBook's `lookupHuman`, both plain `eth_call`s,
+no API key, no relying-party id, no user interaction — which is why the adapter cannot be
+rate-limited or revoked out from under an integrator. It is also the
 protocol we price *down*: forging an iris enrolment costs ~$500, but renting one costs $0.50 at
 the observed resale floor, so it scores 1.71 — below Proof of Humanity. We own that result
 rather than fudging it: [`docs/scoring.md`](docs/scoring.md#the-world-id-wrinkle). The AgentKit

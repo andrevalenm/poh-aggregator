@@ -365,6 +365,14 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     })
   }
 
+  const reattested = withNote('date-from-latest-reattestation').filter((e) => e.held)
+  if (reattested.length) {
+    out.push({
+      code: 'issuance-date-is-latest-renewal',
+      message: `${ids(reattested)} is a renewable on-chain attestation with a fixed term, and the date used is the last renewal — the enrolment behind it is older and the protocol does not publish it. So this measures how recently the address re-proved the credential, not how long ago the human was verified.`,
+    })
+  }
+
   const stale = withNote('freshness-check-unavailable')
   if (stale.length) {
     out.push({

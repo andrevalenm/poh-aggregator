@@ -90,6 +90,12 @@ export type ProvenanceNote =
    * curve the credential is at most this old and its weight here is a floor.
    */
   | 'date-from-expiry-and-max-term'
+  /**
+   * The credential is a renewable on-chain attestation, and the date is the most recent renewal
+   * rather than the underlying enrolment — which the protocol keeps off chain. The subject was
+   * enrolled before this date, so on a decay curve the weight here is a ceiling.
+   */
+  | 'date-from-latest-reattestation'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {
