@@ -56,6 +56,23 @@ cd ../agent && npm start                                   # live agent flow
 4. Thresholds: exported `Thresholds.lenient/standard/strict` constants (1.5/2.5/3.5) with
    derivations — still no default inside `isHuman()`.
 
+## Award-run (24h, started 2026-07-25 ~11:00) — v4.1+
+
+Goal set per Hugo: the site should be able to win a prestigious design competition — one
+cohesive physical language, zero stacked gimmicks. Running continuously (cron 4868bed3 is
+only a dead-man switch every 25 min; deadline 2026-07-26 11:45, then it self-deletes).
+
+- **v4.1 (c5b8cd5)**: the ink-press system — every control is soft-bodied (squish +
+  springy jelly release, the jelly-ui idea in our material), blooms an irregular ink blot
+  from the press point, and inverts to its negative while pressed; pressing bare paper
+  leaves a thumb-blot that soaks in (bone on night sections). Console brought inline: the
+  ledger unfolds threshold slider, full evidence and all caveats in place. Contours
+  pronounced. Whole page a step larger.
+- **Parallel agents**: OG/social card generated from the real hero (public/og.png,
+  quantized 1.2MB→632KB) + ink-on-paper favicon in both pages; console (/app.html)
+  restyled to full paper-identity parity (paper canvas, ledger rules, ink tokens).
+- 1920px+ art direction (composition grows into the sheet), mobile pulse alignment.
+
 ## Landing v4 — "Human terrain" complete redesign (night 2026-07-25)
 
 Commit 5fafe41, live at http://37.27.67.44:8788. Research-driven, per your ask:
