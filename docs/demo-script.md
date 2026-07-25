@@ -33,14 +33,15 @@ the RPC waits are the only variable, and the lookup chips make them predictable.
   `independent-control-not-attested`.
 
 **1:35 — The Graph, load-bearing.** (30s)
-- Chip: "A 2024 PoH survivor". Point at the PoH row: freshness ~73%.
-> "This weight is computed from the credential's real age, indexed by our subgraph —
-> registration during last week's airdrop weighs almost nothing, two years of survival
-> weighs a lot. Without The Graph this weight degrades to a flagged
-> midpoint. The subgraph moves it toward the truth in whichever direction the real age
-> points — a freshly-renewed registration weighs less, a long-survived one more. And it's two subgraphs: protocol history on Studio, and
-> the registry's audit trail self-hosted — every weight we've ever assigned, with its
-> source and block. 'Why did my score change' is a GraphQL query."
+- Chip: "A Proof of Humanity member". Point at the PoH row's freshness figure.
+> "That weight is computed from the credential's real registration age, indexed by our
+> subgraph. Proof of Humanity is airdrop-inflated right now, so age is the signal: a
+> registration minted during the reward window weighs almost nothing; one that has
+> survived challenge windows weighs more. Without The Graph this collapses to a flagged
+> midpoint — the subgraph moves it toward the truth in whichever direction the real age
+> points. And it's two subgraphs: protocol history on Studio, and the registry's audit
+> trail self-hosted — every weight we've ever assigned, with its source and block. 'Why
+> did my score change' is a GraphQL query."
 - Flash the audit-trail query result (terminal or browser at
   `37.27.67.44:8100/subgraphs/name/corroborate-registry`).
 
