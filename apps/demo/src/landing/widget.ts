@@ -96,11 +96,24 @@ function thresholdBlock(result: PersonhoodResult): HTMLElement {
       : `Below your ${v.toFixed(2)} cutoff — refused by your rule, applied to our evidence.`
   }
   slider.addEventListener('input', onMove)
+  // Scale marks at the SDK's exported Thresholds — the instrument matches the API.
+  const tick = (v: number, label: string) =>
+    h('span', { class: 'th-tick', style: `left: ${(v / 4) * 100}%` }, h('i'), label)
   return h(
     'div',
     { class: 'th-block' },
     h('span', { class: 'w-score-label' }, 'Your threshold'),
-    h('div', { class: 'th-row' }, slider, readout),
+    h(
+      'div',
+      { class: 'th-row' },
+      h(
+        'div',
+        { class: 'th-track' },
+        slider,
+        h('div', { class: 'th-ticks', 'aria-hidden': 'true' }, tick(1.5, 'lenient'), tick(2.5, 'standard'), tick(3.5, 'strict')),
+      ),
+      readout,
+    ),
     verdict,
   )
 }
