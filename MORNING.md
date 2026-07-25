@@ -95,7 +95,10 @@ https://api.studio.thegraph.com/deploy/`.
    in the b33e5d6 commit message). Register `corroborate.eth` on **mainnet** in the ENS app
    (~$5/yr), set text record `corroborate.subjects` to your wallet list. The SDK feature is
    done and tested; the demo lights up the moment the record exists.
-3. **World tracks need your phone.** Selfie Check + Identity Check beta submissions want
+3. **World tracks need your phone.** The written half is DONE —
+   `docs/world-beta-feedback.md` has all developer feedback from the night's real
+   integration work plus the data-minimization statement the Identity Check track asks
+   for. Only the on-device checklist at the bottom needs you (~20 min): Selfie Check + Identity Check beta submissions want
    *user testing docs*. `apps/agent`: `npm run worldid` prints a live World ID 4.0 QR —
    scan with World App (staging build works, no Orb needed for Selfie Check). 20 minutes.
 4. **Registry curator + deployer is the burner EOA** — fine for judging, say it out loud in
