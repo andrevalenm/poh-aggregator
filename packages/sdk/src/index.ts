@@ -5,6 +5,15 @@ import { loadOntology } from './ontology.ts'
 import ontologyData from './ontology-data.json' with { type: 'json' }
 import { defaultAdapters } from './adapters/index.ts'
 import { score, freshnessOf, effectiveCost } from './scoring.ts'
+import {
+  applyAsOfToEvidence,
+  headRevisionOf,
+  loadOntologyAsOf,
+  registryClient,
+  resolveAsOfPoint,
+  type AsOf,
+  type AsOfScoring,
+} from './as-of.ts'
 import type { Address, AdapterProbe, Evidence, PersonhoodResult } from './types.ts'
 
 export * from './types.ts'
@@ -13,6 +22,8 @@ export { loadOntology, adapterKey, rootKey, REGISTRY_ABI } from './ontology.ts'
 export * from './adapters/index.ts'
 export * from './subgraph.ts'
 export * from './enroll.ts'
+export * from './reconcile.ts'
+export * from './as-of.ts'
 
 /**
  * Named thresholds for `isHuman(threshold)`, exported as documented constants rather than
@@ -49,6 +60,12 @@ export interface CorroborateOptions {
    * results carry the issuance-date-unknown caveat.
    */
   subgraphUrl?: string
+  /**
+   * GraphQL endpoint of the registry audit-trail subgraph. Required only for `asOf` scoring:
+   * reconstructing the ontology at a past block is the one read here that an archive node
+   * cannot serve without already knowing every adapter id. See `as-of.ts`.
+   */
+  registrySubgraphUrl?: string
   /** For resolving ENS names. Defaults to a public mainnet endpoint. */
   ensRpcUrl?: string
   /** Chain whose ENS deployment to resolve against. */
@@ -56,6 +73,15 @@ export interface CorroborateOptions {
   adapters?: AdapterProbe[]
   knownIds?: string[]
   knownRoots?: string[]
+}
+
+export interface ResolveOptions {
+  /**
+   * Score against the ontology as it stood at a past registry block. A number is a Sepolia
+   * block; a `Date` or ISO string is an instant, resolved to the block in force at it.
+   * Requires `registrySubgraphUrl`, and throws rather than degrading — see `as-of.ts`.
+   */
+  asOf?: AsOf
 }
 
 /**
@@ -93,10 +119,55 @@ export class Corroborate {
         registryAddress: this.#opts.registryAddress,
         ...(this.#opts.registryRpcUrl ? { rpcUrl: this.#opts.registryRpcUrl } : {}),
         knownIds: this.#opts.knownIds ?? ontologyData.adapters.map((a) => a.id),
-        knownRoots: this.#opts.knownRoots ?? Object.keys(ontologyData.trustRoots),
+        knownRoots: this.#knownRoots(),
       })
     }
     return this.#ontology
+  }
+
+  /**
+   * Root names we can reverse a registry hash into — current *and* retired.
+   *
+   * Retired names matter because `asOf` reads revisions where they were still in force: the
+   * placeholder `unknown` root and the narrower `kyc-vendor:facetec-synaps` both lived in the
+   * registry until revision 34. Without their preimages a historical score would print raw
+   * hashes for exactly the roots whose correction is the interesting part of the history.
+   * They are harmless at head, where nothing carries them.
+   */
+  #knownRoots(): string[] {
+    return (
+      this.#opts.knownRoots ?? [
+        ...Object.keys(ontologyData.trustRoots),
+        ...Object.keys(ontologyData.retiredTrustRoots ?? {}),
+      ]
+    )
+  }
+
+  /**
+   * The ontology as the registry held it at a past block, from the audit-trail subgraph.
+   *
+   * Deliberately throws when no registry subgraph is configured. Falling back to the current
+   * ontology would answer a question about the past with the present and stamp a block number
+   * on it, which is worse than not answering.
+   */
+  async #ontologyAsOf(asOf: AsOf) {
+    const url = this.#opts.registrySubgraphUrl
+    if (!url) {
+      throw new Error(
+        'asOf scoring requires registrySubgraphUrl. The ontology at a past block is reconstructed from the registry audit-trail subgraph; scoring the past against today’s weights would be a different answer wearing a block number.',
+      )
+    }
+    const client = registryClient(this.#opts.registryRpcUrl)
+    const point = await resolveAsOfPoint(client, asOf)
+    // Read at head, no archive needed. It is what turns the audit trail's completeness from an
+    // assumption into a check — see rule 3 in `as-of.ts`.
+    const headRevision = await headRevisionOf(client, this.#opts.registryAddress)
+    return loadOntologyAsOf({
+      registrySubgraphUrl: url,
+      point,
+      knownRoots: this.#knownRoots(),
+      headRevision,
+    })
   }
 
   async refresh() {
@@ -177,8 +248,15 @@ export class Corroborate {
    *
    * Probes run concurrently and independently: one protocol being down degrades the result
    * rather than failing it, and a failed probe is reported as an error, never as a negative.
+   *
+   * `opts.asOf` scores against the ontology as it stood at a past registry block instead of
+   * against today's — the audit trail applied rather than merely printed. It changes what the
+   * result may claim, so read the header of `as-of.ts` before using it.
    */
-  async resolve(subject: string | readonly string[]): Promise<PersonhoodResult> {
+  async resolve(
+    subject: string | readonly string[],
+    opts: ResolveOptions = {},
+  ): Promise<PersonhoodResult> {
     const raw = typeof subject === 'string' ? [subject] : [...subject]
     // Dedupe case-insensitively: the same wallet pasted twice must not probe twice.
     const seen = new Set<string>()
@@ -190,9 +268,13 @@ export class Corroborate {
     })
     if (inputs.length === 0) throw new Error('resolve requires at least one address or name')
 
+    // Resolved before anything else runs: an as-of request that cannot be honoured must fail
+    // before we spend ten probes producing a result we would have to relabel.
+    const historical = opts.asOf !== undefined ? await this.#ontologyAsOf(opts.asOf) : undefined
+
     const [resolved, ontology] = await Promise.all([
       Promise.all(inputs.map((s) => this.resolveSubject(s))),
-      this.ontology(),
+      historical ? historical.ontology : this.ontology(),
     ])
 
     // A name's corroborate.subjects record expands the set; dedupe again afterwards.
@@ -211,7 +293,9 @@ export class Corroborate {
       }
     }
     const name = resolved.find((r) => r.name)?.name
-    const now = Math.floor(Date.now() / 1000)
+    // Age curves are evaluated at the as-of instant, not at the wall clock: a credential 100
+    // days old then is 100 days old in the answer, whatever it is now.
+    const now = historical ? historical.context.timestamp : Math.floor(Date.now() / 1000)
 
     const probes = addresses.flatMap((address) =>
       this.#adapters.map(async (probe) => ({ address, probe, result: await probe.probe(address) })),
@@ -219,9 +303,16 @@ export class Corroborate {
     const results = await Promise.all(probes)
 
     const evidence: Evidence[] = []
+    const notYetInRegistry = new Set<string>()
     for (const { address, probe, result } of results) {
       const adapter = ontology.adapters.get(probe.adapterId)
-      if (!adapter) continue // not in the registry, so nothing to weigh it by
+      if (!adapter) {
+        // Not in the registry, so nothing to weigh it by. At head that is a configuration
+        // mistake; as of a past revision it is ordinary history — the adapter had not been
+        // researched yet — and the result says so rather than dropping it in silence.
+        if (historical) notYetInRegistry.add(probe.adapterId)
+        continue
+      }
 
       const base = {
         adapterId: adapter.id,
@@ -242,29 +333,46 @@ export class Corroborate {
           held: false,
           freshness: 0,
           effectiveCostCents: 0,
+          ...(result.provenance ? { provenance: result.provenance } : {}),
           detail: { error: result.error, unavailable: true },
         })
         continue
       }
 
-      const freshness = freshnessOf(adapter, result.issuedAt, now)
+      const freshness = freshnessOf(adapter, result.issuedAt, now, result.issuedAfter)
       evidence.push({
         ...base,
         held: result.held,
         ...(result.issuedAt !== undefined ? { issuedAt: result.issuedAt } : {}),
+        ...(result.issuedAfter !== undefined ? { issuedAfter: result.issuedAfter } : {}),
+        ...(result.provenance ? { provenance: result.provenance } : {}),
         freshness,
         effectiveCostCents: result.held ? effectiveCost(adapter, freshness) : 0,
         ...(result.detail ? { detail: result.detail } : {}),
       })
     }
 
+    let scored = evidence
+    let asOf: AsOfScoring | undefined
+    if (historical) {
+      const applied = applyAsOfToEvidence(evidence, historical.context.timestamp)
+      scored = applied.evidence
+      asOf = {
+        ...historical.context,
+        adaptersNotYetInRegistry: [...notYetInRegistry].sort(),
+        issuedAfterAsOf: [...new Set(applied.issuedAfterAsOf)].sort(),
+        existenceUnverified: [...new Set(applied.existenceUnverified)].sort(),
+      }
+    }
+
     const result = score({
       subjects: addresses,
       ...(name !== undefined ? { name } : {}),
       adapters: ontology.adapters,
-      evidence,
+      evidence: scored,
       registryRevision: ontology.revision,
       now,
+      ...(asOf ? { asOf } : {}),
     })
     if (subjectsDeclaredByName) {
       result.caveats.push({
@@ -280,7 +388,10 @@ export class Corroborate {
 /** Convenience for one-off lookups. */
 export async function resolvePersonhood(
   nameOrAddress: string,
-  opts?: CorroborateOptions,
+  opts?: CorroborateOptions & ResolveOptions,
 ): Promise<PersonhoodResult> {
-  return new Corroborate(opts).resolve(nameOrAddress)
+  return new Corroborate(opts).resolve(
+    nameOrAddress,
+    opts?.asOf !== undefined ? { asOf: opts.asOf } : {},
+  )
 }

@@ -241,6 +241,21 @@ describe('age curves', () => {
     assert.equal(freshnessOf(ramp, undefined, now), 0.5)
   })
 
+  test('ramp: a proven upper bound on age caps the weight instead of taking the midpoint', () => {
+    // The credential was absent from a complete index an hour ago, so it is at most an hour
+    // old — the ramp value for an hour, not the 0.5 given to a genuinely unknown age.
+    const capped = freshnessOf(ramp, undefined, now, now - 3600)
+    assert.ok(capped < 0.0002, `expected ~0.00008, got ${capped}`)
+    assert.ok(capped < freshnessOf(ramp, undefined, now), 'strictly tighter than unknown')
+  })
+
+  test('ramp: a loose bound never beats the unknown-age midpoint', () => {
+    // A three-year-stale index permits a three-year-old credential, which the curve would put
+    // at 0.87 — but the bound is an upper limit on age, not a measurement, so it only ever
+    // caps. Otherwise slowing our index down would be a way to buy weight.
+    assert.equal(freshnessOf(ramp, undefined, now, now - 1095 * 86_400), 0.5)
+  })
+
   test('the airdrop scenario: fresh claim vs survived claim, same protocol', () => {
     const fresh = ev(ramp, { issuedAt: now - 7 * 86_400, freshness: freshnessOf(ramp, now - 7 * 86_400, now) })
     fresh.effectiveCostCents = effectiveCost(ramp, fresh.freshness)
@@ -283,6 +298,13 @@ describe('freshness', () => {
     const permanent = adapter({ id: 'p', trustRoot: 'r', decayHalfLifeDays: 0 })
     assert.equal(freshnessOf(permanent, 0, 1_700_000_000), 1)
   })
+
+  test('an age bound cannot penalise a decay curve', () => {
+    // On Decay the same bound says the credential is *young*, which means less decay, not
+    // more — so it cannot tighten the unknown-age answer and must be ignored.
+    const now = 1_700_000_000
+    assert.equal(freshnessOf(decaying, undefined, now, now - 400 * 86_400), 1)
+  })
 })
 
 describe('caveats', () => {
@@ -307,6 +329,58 @@ describe('caveats', () => {
     const r = run([a], [ev(a)])
     assert.ok(r.caveats.some((c) => c.code === 'unresolved-trust-root'))
   })
+
+  /**
+   * Two ways a chain-derived date can be honest and still not be the issuance date. Both are
+   * Farcaster's, and both matter on a Ramp: one understates age and one would overstate it.
+   */
+  test('a credential imported from a predecessor registry says its date is a floor', () => {
+    const a = adapter({ id: 'farcaster-account', trustRoot: 'social-account:farcaster' })
+    const r = run(
+      [a],
+      [
+        ev(a, {
+          provenance: { heldFrom: 'chain', dateFrom: 'chain', notes: ['date-from-registry-import'] },
+        }),
+      ],
+    )
+    const c = r.caveats.find((x) => x.code === 'credential-imported-from-predecessor-registry')
+    assert.ok(c, 'the import must be disclosed')
+    assert.ok(c.message.includes('farcaster-account'))
+    assert.ok(c.message.includes('floor'), 'and must say which direction the error runs in')
+  })
+
+  test('a credential that changed hands is disclosed as dated from the purchase', () => {
+    const a = adapter({ id: 'farcaster-account', trustRoot: 'social-account:farcaster' })
+    const r = run(
+      [a],
+      [
+        ev(a, {
+          provenance: {
+            heldFrom: 'chain',
+            dateFrom: 'chain',
+            notes: ['credential-transferred-since-issuance'],
+          },
+        }),
+      ],
+    )
+    assert.ok(r.caveats.some((x) => x.code === 'credential-changed-hands'))
+    // An unheld credential is not evidence of anything, so it raises no caveat either.
+    const absent = run(
+      [a],
+      [
+        ev(a, {
+          held: false,
+          provenance: {
+            heldFrom: 'chain',
+            dateFrom: 'chain',
+            notes: ['credential-transferred-since-issuance'],
+          },
+        }),
+      ],
+    )
+    assert.ok(!absent.caveats.some((x) => x.code === 'credential-changed-hands'))
+  })
 })
 
 describe('isHuman', () => {
@@ -329,5 +403,71 @@ describe('isHuman', () => {
     const r = run([a], [ev(a, { held: false })])
     assert.equal(r.totalCostCents, 0)
     assert.equal(r.independentRoots, 0)
+  })
+})
+
+describe('aggregates that restate other credentials', () => {
+  /**
+   * Human Passport is an aggregate: its score is built from stamps, and several of those
+   * stamps are credentials with their own entry and their own root here. The arithmetic is
+   * kept safe by pricing the aggregate at what it can claim alone, so these tests pin both
+   * halves — that the restatement is disclosed, and that disclosing it changes no number.
+   */
+  const passport = adapter({
+    id: 'human-passport',
+    trustRoot: 'behavioral:wallet-history',
+    evidenceClass: 'Behavioral',
+    forgeCostCents: 2_000,
+    rentCostCents: 100,
+  })
+  const holonym = adapter({
+    id: 'holonym-gov-id',
+    trustRoot: 'kyc-vendor:unattributed',
+    forgeCostCents: 120_000,
+    rentCostCents: 3_000,
+  })
+
+  test('the restated credentials are named, with the roots they belong to', () => {
+    const r = run(
+      [passport, holonym],
+      [ev(passport, { detail: { score: 28.847, restatesAdapters: ['holonym-gov-id'] } })],
+    )
+    const c = r.caveats.find((x) => x.code === 'aggregate-restates-other-credentials')
+    assert.ok(c, 'an aggregate carrying other roots must say so')
+    assert.match(c.message, /holonym-gov-id \(kyc-vendor:unattributed\)/)
+    assert.match(c.message, /behavioral:wallet-history/)
+  })
+
+  test('a restated identity credential earns identity money only from its own probe', () => {
+    // The passport is worth its own rent ($1) whether or not a $30 KYC stamp is inside it.
+    // If restatement ever started adding cost, this is the test that would notice.
+    const bare = run([passport, holonym], [ev(passport)])
+    const loaded = run(
+      [passport, holonym],
+      [ev(passport, { detail: { restatesAdapters: ['holonym-gov-id'] } })],
+    )
+    assert.equal(loaded.totalCostCents, bare.totalCostCents)
+    assert.equal(loaded.totalCostCents, 100)
+    assert.equal(loaded.independentRoots, 1)
+  })
+
+  test('probing the restated credential directly is what adds its root', () => {
+    const r = run(
+      [passport, holonym],
+      [ev(passport, { detail: { restatesAdapters: ['holonym-gov-id'] } }), ev(holonym)],
+    )
+    assert.equal(r.independentRoots, 2)
+    assert.equal(r.totalCostCents, 3_100)
+    // Two roots, not one saturated root: the passport is genuinely different evidence from
+    // the gov-id check, it is just cheap.
+    assert.ok(!r.roots.some((x) => x.saturated))
+  })
+
+  test('an unheld aggregate discloses nothing', () => {
+    const r = run(
+      [passport, holonym],
+      [ev(passport, { held: false, detail: { restatesAdapters: ['holonym-gov-id'] } })],
+    )
+    assert.ok(!r.caveats.some((x) => x.code === 'aggregate-restates-other-credentials'))
   })
 })

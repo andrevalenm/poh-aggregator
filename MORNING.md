@@ -1,7 +1,283 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, ~07:30. All suites green (58 tests + 1 new live enrichment test); agent flow re-verified against the final SDK; demo hosted with example chips._
+detail. _Last updated 2026-07-25, after unattended iteration 9. All four suites green: 18 forge, 228 SDK
+(226 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 10 Playwright — 256 total._
+
+---
+
+## Unattended run on ax41 — read `PROGRESS.md` for the full log
+
+**Iteration 1 fixed a live scoring bug: subgraph lag was silently changing scores.** The probes
+asked the contract *whether* a credential was held and the subgraph *when* it was issued, as if
+the two answers described the same moment. While the index was behind, a real credential came
+back held-with-no-date, and no date on a survival ramp means the 0.5 midpoint — about 23× what a
+week-old registration earns. So making our index lag was worth buying. Now every index read
+returns the block the index reached, absence at a known block *bounds* the age instead of
+erasing it, and Proof of Humanity is dated straight from the contract
+(`expirationTime − humanityLifespan()`), so no indexer can move a PoH score at all. All four
+suites green: 18 forge, 66 SDK (28 scoring + 18 new reconciliation + 5 input + 15 live), 10
+browser E2E. 94 total.
+
+Two things for you, neither urgent:
+
+- **The README's headline example changed and I updated it to today's real numbers.** That
+  address pair now scores **1.5683**, not 2.4409. Nothing regressed — the old figure predates
+  real dates being computed, and our own PoH vector was re-claimed 11.7 days ago, so the
+  anti-airdrop ramp prices it at 0.022. If a demo beat depended on 2.4409, it needs re-shooting;
+  the honest version of that beat is better anyway ("our own credential is discounted by our own
+  curve").
+- **The Circles half of the subgraph is a two-month window**, and that now shows up in results
+  as caveats rather than as wrong dates. The oldest avatars (Hub's first registrations, block
+  36501311) are missing from it entirely, and some avatars it does have are dated from a trust
+  edge instead of their registration — up to 1.6 years late. Widening the window and re-syncing
+  is next up in `PROGRESS.md`; it needs no decision from you unless you would rather I not spend
+  the sync time before the deadline.
+
+**Iteration 2 doubled the landscape: the registry now prices 30 protocols over 18 trust roots,
+up from 15 over 10.** That is the "1inch for personhood" claim, and it was the weakest part of
+the product. Every new adapter carries an evidence class, a trust root, a forge and rent cost
+traced to a cited anchor, and an age curve;
+`research/landscape/ontology-coverage.md` is the audit trail — including a table of the
+protocols we deliberately refuse to score (EAS, Verax, AttestationStation and Disco are
+substrate, not credentials; Silk wraps Holonym, which we already price under its own roots).
+Registry reseeded on Sepolia, **revision 34**, verified by reading all 30 back through the SDK.
+
+Three defects in the existing ontology fell out of doing it, all now covered by tests:
+
+- **Civic Pass sat on Persona's root.** Its vendor is FaceTec, integrated directly.
+- **BrightID sat on Proof of Humanity's root**, which would have saturated two vouching graphs
+  that share no members and no vendor — they are independent evidence and now score that way.
+- **Humanity Protocol sat on `unknown`**, which is not a root: it scores as *full independence*,
+  the direction that pays an adversary. Resolved to `kyc-vendor:unattributed` and marked not-live
+  (their mainnet has been offline since the June key compromise; the oracle has processed 28
+  verifications in its entire life).
+
+Nobody's score changed — all three adapters are discontinued and contribute zero, which is
+exactly why the errors survived. `packages/sdk/src/ontology.test.ts` now asserts every root is
+declared and used, every source file exists, no adapter sits on `unknown`, and the shipped copy
+of the ontology matches the source of truth.
+
+**Iteration 3 read Human Passport on chain, and found the best demo beat we have.** It is the
+largest score in the landscape and the only aggregate readable without vendor cooperation, so it was
+next on the queue. Reading it properly says something about the whole product: a live subject's
+Passport score of **22.027 is a Holonym government-ID check plus a Holonym FaceTec biometric and
+nothing else** — two credentials we already price, re-scored by somebody else's weights. That is the
+"~40 protocols collapse into a handful of trust roots" claim, demonstrated on one address instead of
+asserted on a slide. Nothing double-counts: the passport is rooted at wallet history and priced at a
+dollar, and the result now says out loud which roots it is restating
+(`aggregate-restates-other-credentials`, naming them from the deployed registry).
+
+Details worth knowing:
+
+- **Seven chains, not one.** A passport is minted per chain and the mints disagree — one subject
+  holds 50.015 on Optimism and Linea, 25.099 on Scroll from a year earlier, and nothing on the other
+  four. A single-chain read would have been wrong for most subjects who have one.
+- **A passport hard-expires at 90 days** (`maxScoreAge` on every deployment), which the ontology did
+  not record. Our derived expiry is checked against the Decoder's own revert payload to the second,
+  in a live test, on whatever address it is pointed at.
+- **We never import their number.** Passport's 20-point pass mark is an on-chain constant; we report
+  what it concluded and score nothing by it. Adopting the number would be adopting their weighting.
+- **No registry write and no weight moved**, so the registry stays at 30 adapters, revision 34.
+- Suites: 18 forge, **86 SDK** (was 76), 10 Playwright. 114 total.
+
+`research/protocols/human-passport-onchain-read.md` is the write-up.
+
+**Iteration 4 added Farcaster — and had to invent a way to date a registry that stores no dates.**
+Sixth adapter, next off the same queue. A Farcaster id costs an adversary **$0.44 plus $0.20 a
+year** (both read off `IdGateway.price()` and `StorageRegistry.usdUnitPrice()` today), and two
+thirds of the 3.34 M ids in existence were minted inside a nine-month subsidy window that ended in
+April. So the boolean is worth nothing and the *age* is the whole signal — which is a problem,
+because `IdRegistry` has no timestamps and no keyless OP endpoint will serve its `Register` logs
+over more than ~1,000 blocks at a time.
+
+It turns out not to need them. `idCounter()` only increases, and `register()` increments it in the
+same transaction that writes custody, so **the first block where `idCounter() >= fid` is the block
+that fid was created in** — a monotone predicate over archive state, searched in 15–30 `eth_call`s
+with no indexer anywhere. The live test confirms every date against the path the probe never uses:
+the registry's own `Register` log must be in that exact block, and in none of the thousand before
+it.
+
+Two findings from doing it, both of which change scores:
+
+- **193,791 fids are older than their date.** The counter sat at zero for two days after
+  deployment and then jumped to 193,791 in a single block — one `SetIdCounter(0, 193791)` from an
+  admin, with the custody rows already written before it. Everything at or below that fid was
+  imported from the predecessor registry, so it dates to 2023-11-08 and is genuinely older. Kept
+  (a too-late date understates age, which is a floor and never an inflation) and flagged.
+- **Fids are transferable, so we date custody, not the fid.** Fid 1 changed hands on 2026-01-30.
+  Crediting it with the registry's own age would sell survival weight at OTC prices, so the probe
+  finds when *this* address acquired the fid and dates from there. Measured end to end: a fid
+  still held by its importer contributes **12.19 cents and one independent root**; fid 1
+  contributes **3.07 cents and none**. Same protocol, four times the weight for the one that was
+  not for sale.
+
+Also worth knowing: **Farcaster Pro is not readable and is therefore not scored.** It is the only
+Farcaster signal with a real price ($120/yr, verified from `TierRegistry.tierInfo(1)`), but the
+contract keeps no per-fid subscription state — a bytecode scan finds no fid-keyed getter at all —
+and its `PurchasedTier` logs need a Base archive key. It stays out of the ontology rather than
+entering it as a number we cannot check. No weight moved, so the registry stays at **30 adapters,
+revision 34**. Write-up: `research/protocols/farcaster-onchain-read.md`.
+
+**Iteration 5 read Holonym — and closed the loop iteration 3 opened.** Seventh and eighth
+adapters, both off one contract (Hub V3 on Optimism): the government-ID check and the FaceTec
+biometric. The queue said this one was blocked on us publishing a stable action-id. It was not:
+that is only true of Holonym's REST endpoint, and the Hub's `getSBT(address, circuitId)` returns
+the action-id *inside* the proof, so we report whichever namespace the credential was minted for
+instead of choosing one. Reading the contract instead of the vendor also drops an off-chain
+blocklist we cannot see, and a gov-id endpoint that quietly falls back to the passport circuit —
+which would have merged an ICAO root into a KYC root and let one document score twice.
+
+The demo beat: iteration 3 read `0xA6b7471f…67b1`'s Human Passport score of 22.027 and found it
+was **a Holonym gov-id check plus a Holonym biometric and nothing else**. Today that address reads
+directly against Holonym's own contract and both credentials are there — minted three minutes
+apart, under Holonym's issuer keys, nullifiers burned. Same collapse, now observed from both
+directions instead of inferred from a stamp name. The address scores **3.6088 across three
+independent roots**, up from 2.0025, and nothing double-counts: the passport still contributes its
+wallet-history dollar and still names the two adapters it restates.
+
+Three things worth knowing:
+
+- **Presence alone was forgeable, and Holonym's own contract says so.** `Hub.sol` warns that a
+  proof under the right circuit id proves nothing unless you check the public values, because
+  anyone can run an issuer key. The probe pins the issuer, and separately confirms that the
+  nullifier the circuit derived is the one the Hub actually burned — the contract burns the
+  nullifier it is *handed*, which nothing forces to match.
+- **The date is a ZK constraint.** There is no issuance timestamp on chain and the expiry is
+  chosen by the holder — the circuit tells them to randomise it for anonymity. But it also
+  constrains `expiry − iat < 31,536,001`, so *expiry minus one year* is a proven lower bound on
+  issuance: the oldest the credential can be, hence the least weight it can support. Measured
+  against thirteen real mints, that bound sits 4–29 days before the mint for eleven of them and
+  187 and 257 days for two. All of the slack costs the subject weight and none of it can gain
+  them any, and a held credential can never decay below 2^(−365/half-life).
+- **238,706 credentials minted**, measured by bisecting the ERC-721 `ownerOf` (the Hub has no
+  enumeration and a private counter). That is the hard population number our research file asked
+  for, without the event index it proposed.
+
+No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/holonym-human-id-onchain-read.md`.
+
+**Iteration 6 added the ninth adapter — Linea Proof of Humanity V2 — by proving the queue's premise
+wrong.** The queue called it a "passive per-subject read". There is no per-subject read at all: Verax
+stores an attestation's subject as raw bytes, keys attestations by a sequential id, and the Sumsub
+portal registers no indexer module, which is exactly why Linea ships a signature-based path instead.
+It does not need one, because the credential **expires in 90 days** and `attestedDate` is monotone in
+attestation id — so every unexpired attestation in the whole registry sits in a **1,024-id window out
+of 6,366,748**, read whole through Multicall3 in six batched calls in under five seconds. What the
+probe holds is therefore the *complete live population*, and a `false` means "we read every live
+credential and you are not in it" rather than "we failed to find yours".
+
+- **500 live attestations over 499 addresses**, against **50,475 ever issued**. Cumulative counts are
+  not population, and here the factor is 101. January 2026 alone was 24,723 — half the protocol's
+  lifetime issuance — and July 2026 is 11. It had a campaign, not a user base, and with a 90-day term
+  the campaign has fully expired.
+- **The authority worth pinning is none of the obvious three.** Not the portal address (our own
+  research named the dead test portal, which would have matched nobody while looking like it worked);
+  not `ownerName` (a string its owner chose); not `attester` (simulating `attest` from a stranger and
+  from Sumsub's own key gives the identical `ECDSAInvalidSignature` revert, so the gate is a signature
+  and the attester is just a relayer). It is the portal's registered **owner**, in an allowlist only
+  Consensys can add to, re-read at runtime.
+- **Linea's own read is ten months stale — see "Needs you" item 11**, which is now a pitch beat.
+
+No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/linea-poh-onchain-read.md`.
+
+**Iteration 7 went after World's document and Selfie tiers, found they cannot be read by anyone,
+and found that the tier we *do* read was being read from the wrong contract.** Both halves matter,
+and the second one was a live scoring defect.
+
+- **World ID Orb was scored as if verified this morning, always.** We read it through
+  `AgentBook.lookupHuman`, which returns a nullifier and **no date** — and an undated credential on
+  a decay curve gets full weight forever. AgentBook is also a registry of *agents*: 1,068
+  transactions in its entire life.
+- **World Chain has a registry World actually populates, and it carries a date.**
+  `WorldIDAddressBook` writes `addressVerifiedUntil[account] = block.timestamp + 168 days` once a
+  Semaphore proof of an Orb credential clears, so `verifiedUntil - 168 days` is the **exact second**
+  the verification was mined — checked against block headers on 24 samples spanning fifteen months,
+  every one to the second. Coverage is ~28,000 verifications a day at head, three to four orders of
+  magnitude past AgentBook. A binding renewed 162 days ago now contributes 45.13 cents; before this
+  it contributed 50.00, as did one renewed this morning.
+- **`held` had to become a comparison, not a presence check.** The mapping is never cleared, so a
+  lapsed verification is a big number sitting in it forever: seven of twelve accounts sampled from
+  April 2025 are in exactly that state. An `!= 0` read counts every one of them as a verified human.
+- **One live verified address per human, enforced on chain.** The contract reverts
+  `VerificationAlreadyActive()` when a nullifier already maps to a different unexpired address. That
+  is the primitive the fleet-policy work needs, and it is a property rather than an inference.
+- **The document (9303) and Selfie (11) tiers leave no per-holder state anywhere**, so no probe is
+  possible for anyone without World's cooperation — the v4 verifier is a `view` function taking a
+  proof (2 transactions in its proxy's life) and the only v4 registry is keyed by *issuer* schema id.
+  Both entries stay priced and rooted with `implemented: false` and a "no permissionless read" note,
+  and a test asserts they keep saying it. See "Needs you" item 13 for the one product consequence.
+
+No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/world-id-onchain-read.md`.
+
+**Iteration 8 added the tenth adapter — Proof of Humanity v1 — and with it the
+permissionlessly-readable queue is empty.** Every remaining entry in the ontology is documented as
+API-gated, off-chain or dead, so no further probe is possible without putting a vendor on the
+critical path. The read itself is one call; the two things around it are the story.
+
+- **The registry keeps a boolean that says "registered" for years after it stops being true.**
+  `isRegistered` is `registered && now - submissionTime <= submissionDuration`, and
+  `submission.registered` — the field `getSubmissionInfo` hands you, so the natural thing to read —
+  is never cleared on expiry. 33 of 215 sampled submitters have it set with the credential dead.
+  Proven against history rather than asserted: the contract answers **true eleven seconds before**
+  one submission's term ran out and **false one second after**, with zero logs from the registry in
+  between. Nobody did anything; the credential died of arithmetic.
+- **PoH v2 retires v1 registrations that v1 goes on honouring.** v2 cannot write to the frozen
+  contract, so it keeps an overlay (`ForkModule.removed`). Nine are set, and one of them was still
+  being honoured by v1 for **510 days** after v2 retired it. `held` reads both. We deliberately do
+  *not* use the module's own `isRegistered`, which adds v2's migration-eligibility condition and is
+  false for the entire live population — an adapter built on it would have answered "no" for
+  everybody while looking like it worked.
+- **The number worth knowing: 2 registered addresses out of 20,740 lifetime submissions**, both
+  expiring in late 2026. PoH v2 mainnet has 55 humanities and the v1→v2 migration moved **nine**
+  registrations. Twenty thousand submissions did not become a v2 population; they lapsed. `live:
+  true` on this adapter means the contract works, not that the protocol has users, and the ontology
+  note now says exactly that. See "Needs you" item 15.
+- **A shortcut that would have got that number wrong.** `executeRequest` writes the date and emits
+  nothing, and anyone can call it at any time: one of the two survivors made a single request in
+  2022-09 that was not accepted until 2024-10 — **761 days**. A window-bounded scan misses it and
+  reports a smaller population while looking exhaustive. My first draft did exactly that; the
+  window is gone and the gap is now its own live test.
+
+No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/poh-v1-onchain-read.md`.
+
+**Iteration 9 made the audit trail executable: `resolve(addr, { asOf: block })` scores against
+the ontology as the registry actually held it at a past block.** Until now the trail could be
+*printed* and never *applied*, which meant every weight correction silently rewrote history for
+anyone holding an old score. Revision 34 alone moved three trust roots, retired a placeholder
+root and added fifteen adapters — so "why did my score change?" had an answer with a block
+number, but no way to check it.
+
+- **Worked, on a real subject** holding PoH v2, two Holonym credentials and a Human Passport:
+  **3.61 / $40.73 / 4 roots** today, **1.07 / $0.11 / 1 root** as of Sepolia block 11,345,000.
+  Nothing about the subject moved — Holonym and Human Passport had not been researched yet, and
+  the caveat says the drop is *a change in what we knew, not in the subject*. This is a good
+  demo beat and it is live, not staged: `await corroborate.resolve(subject, { asOf: 11_345_000 })`.
+- **It is the strongest Graph claim in the repo**, because it is the one read an archive node
+  cannot serve: reconstructing an entity *set* at block N means already knowing every adapter
+  id. Graph Node keeps each entity version with its block range, so it is one query.
+- **It refuses rather than degrades.** Without the registry subgraph configured it throws.
+  Answering a question about the past with today's weights and stamping a block number on it
+  would be worse than not answering — and this is the only place in the SDK that does not fall
+  back, on purpose.
+- **It says what it cannot see.** Credentials are still read at chain head; a credential dated
+  after the as-of instant is excluded, but one held then and revoked since is invisible. That
+  error runs one way only — it understates the subject, never the adversary — and every as-of
+  result carries a caveat saying so.
+- **Fixed a real bug in the audit-trail subgraph, found by building on it.**
+  `AdapterLivenessSet` carries only the hashed adapter key, and the mapping looked the adapter up
+  by that hash while entities are keyed on the plaintext id — so it matched nothing and **every
+  liveness flip was dropped silently**. It had never fired on the deployed registry, which is why
+  nobody noticed; it is also the mutation a score feels hardest, since `live: false` zeroes a
+  credential outright. Redeployed to ax41 as **v0.0.3** with an `AdapterKey` reverse index and a
+  `LivenessChange` entity that records the reason the curator gave. Same URL, no action needed —
+  but if you re-deploy the Studio mirror, take the new version.
+
+MCP's `lookup_personhood` now takes `as_of`. No weight moved, so the registry stays at **30
+adapters, revision 34**.
 
 ---
 
@@ -10,8 +286,8 @@ detail. _Last updated 2026-07-25, ~07:30. All suites green (58 tests + 1 new liv
 | Piece | State | Proof |
 |---|---|---|
 | `PersonhoodRegistry` v2 | Sepolia `0x977b028b900cce8ee89c46877e814eff3060aa07` | 18 forge tests; age curves + plaintext event ids with on-chain integrity check |
-| Ontology | 15 adapters, 10 trust roots, per-adapter age curves | `ontology/adapters.json`, every entry cites `research/` |
-| SDK | builds, publishes clean types | 23 unit + 11 live tests |
+| Ontology | 30 adapters, 18 trust roots, per-adapter age curves | `ontology/adapters.json`, every entry cites `research/` |
+| SDK | builds, publishes clean types | 142 unit + 86 live tests; 10 adapters with live probes |
 | Subgraph | Studio, syncing, serving | `api.studio.thegraph.com/query/77602/poh/version/latest` — feeds claimedAt into the ramp weights |
 | MCP server | verified over stdio | 3 tools; agents get evidence and caveats, never bare booleans |
 | Demo app | Vite SPA, live against real chains | **6/6 Playwright E2E in a real browser** |
@@ -332,6 +608,89 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
 6. **Demo videos.** Full shot-by-shot script with voiceover lines is written:
    `docs/demo-script.md` — 3 minutes, five beats, all live, with per-track cut notes.
    Rehearse once, record, done.
+7. **A pricing judgement I would not make on my own.** Every KYC-rooted adapter is priced at a
+   **$1,200 forge cost**, while our own research says a KYC-passing synthetic face costs
+   **under $20** (WEF, Jan 2026). Nothing turns on it today — scoring takes `min(forge, rent)`
+   and the $30 rental figure binds — but the forge column is wrong by roughly 60× and would
+   start mattering the moment a KYC credential's rental cost rose. I left it alone and wrote it
+   down rather than silently rewriting eleven weights. `research/landscape/ontology-coverage.md`
+   §4 has the full derivation table for every cost in the file if you want to check the rest.
+8. **Binance BABT went from "research debt" to "a hole inside a score we read".** It is a stamp
+   inside Human Passport, weighted there like a government ID, and we now read Human Passport — so a
+   live subject's passport can be one third BABT (`0x46760723…Df74` is exactly that) with that third
+   unattributable to any trust root. It is an ERC-721-shaped read on BNB Chain, so the *probe* is
+   easy; what it needs before it can be scored is a vendor attribution, which is a judgement call on
+   thin public information. I left it unmapped rather than invent a root, because an invented root
+   scores as full independence, which is the direction that pays an adversary.
+
+9. **A second forge figure that says something untrue, same shape as (7).** `farcaster-account`
+   carries `forgeCostCents: 12000` — the Farcaster Pro subscription price — on an adapter that
+   reads plain account ownership and does not read Pro at all. Forging a fid costs the $0.44 +
+   $0.20/yr I measured on chain today. Nothing turns on it (`min(forge, rent)` takes the 20 cents),
+   but it is a published weight, so I left it rather than silently rewriting it. One-line change to
+   `ontology/adapters.json` plus a reseed if you want it corrected.
+
+10. **Two stale counts in `apps/demo/index.html` that I am not allowed to touch** (the design
+   agent owns that file, and the harness enforces it). Line ~87 says a passport is "read by
+   three protocols" — it is now four, since Rarimo joined the ICAO root. Line ~573 says "the
+   ontology describes fifteen" — it describes thirty. Both are one-word fixes. The live counts
+   in the hero are read from the chain at runtime and are already correct. The deployed demo
+   bundle predates this change, which is harmless (adapter and root counts come from the
+   registry; only the implemented probes — nine of them now — are ever named in results), but
+   the next `scripts/deploy-demo-ax41.sh` run picks it up.
+
+11. **A pitch beat you now own, and it is a good one — but check it before you say it on stage.**
+   Linea Proof of Humanity's own documented integration path is **ten months stale**, and ours is not.
+   `poh-api.linea.build/poh/v2/{addr}` returned `true` for **45 of 45** addresses whose Verax
+   attestations had all expired (earliest 2025-09-29), the signer API signs for them, and Linea's own
+   `PohVerifier.verify(sig, addr)` returns `true` **on chain** for one of them. Meanwhile the
+   attestation says expired. **50,475 attestations ever issued against 500 live** — the two answers
+   describe populations 101× apart. This is the strongest concrete instance of the product thesis we
+   have: reading the credential rather than the vendor is not merely purer, here it is *more correct*.
+   Two caveats before it goes in the script. (a) It is a live claim about somebody else's production
+   service and they could fix it any day; the live test is written so that a fix turns into a clear
+   failure message telling us to update the claim, but re-run
+   `node --test --experimental-strip-types src/adapters/linea-poh.live.test.ts` on the morning of the
+   pitch. (b) Phrase it as *"answers 'was ever verified' rather than 'is verified'"*, which is what we
+   measured — not as a vulnerability, because nothing here is exploitable beyond the staleness itself.
+   Full derivation, addresses and revert payloads: `research/protocols/linea-poh-onchain-read.md` §4.
+
+12. **A research file of ours had the wrong portal address, and I corrected it in place.** No decision
+   needed, but you should know the class of error exists: `research/protocols/privado-id-and-verax.md`
+   named `0xe8a3a57e…b73922` as the Sumsub PoH portal. It is real and registered — it is the
+   *deployment test*, with four attestations from July 2025, all expired. Production is
+   `0x501e742C…7D5B46` with 50,471. An adapter built on the researched constant would have answered
+   "not verified" for the entire population while appearing to work perfectly. That file now carries a
+   `CORRECTED` block at the head of the section, and the adapter pins the portal *owner* rather than
+   any portal address, because Sumsub demonstrably runs three of them.
+
+13. **The World pitch line "we read all three tiers" is not true and cannot be made true.** Only
+   the Orb tier is readable without World's cooperation; the NFC-document and Selfie Check tiers
+   leave **no per-holder state on any chain**, so nobody can read them passively — not us, not a
+   competitor. The honest and better line is *"we read the tier that can be read, from the registry
+   World itself populates, and we say out loud that the other two cannot be"*. If a slide or the
+   demo script claims otherwise it needs a word changed; I checked `docs/demo-script.md` and it does
+   not, but I cannot see your deck. Evidence, with contract addresses and the measurement behind
+   each claim: `research/protocols/world-id-onchain-read.md` §5.
+
+14. **World ID Orb can now score slightly lower than yesterday, on purpose.** It was previously
+   undated and therefore scored at full freshness forever; it is now dated from the address book and
+   decays. A wallet verified this morning is unchanged at 50.00 cents; one verified 162 days ago is
+   45.13. The demo vectors do not move — the E2E Orb wallet is an AgentBook registration with no
+   address-book entry, so it still reports `issuance-date-unknown` — but if anyone compares a World
+   number against a screenshot from yesterday, that is the reason.
+
+15. **A pitch number that goes stale on a date, and nothing will fail when it does.** Proof of
+   Humanity v1's live population is **2 addresses out of 20,740 lifetime submissions** — a good
+   beat, and the strongest single illustration of "cumulative counts are not populations" we have
+   after Linea's 101×. Both of those registrations expire in 2026 (**2026-09-07** and
+   **2026-11-16**), after which the honest number is zero unless somebody registers afresh. The
+   live suite is written to keep passing either way (it asserts agreement with the contract, not a
+   count), so **nothing will tell you** — the figures in `README.md`, the `poh-v1` ontology note and
+   `research/protocols/poh-v1-onchain-read.md` will simply become wrong. If the repo is still in
+   use in December, re-run
+   `node --test --experimental-strip-types src/adapters/poh-v1.live.test.ts`, which prints the
+   current count as a diagnostic, and update the three places.
 
 ## Honest state of weak points
 
