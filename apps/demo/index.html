@@ -87,12 +87,13 @@
       <div class="wash wash-sage" data-parallax="0.18" aria-hidden="true"></div>
       <p class="beat reveal">Forty protocols will swear a wallet is human.</p>
       <p class="beat reveal">
-        They collapse into eighteen trust roots. One passport, read by four protocols, is one
-        credential — not four.
+        Integrating one is a week. Integrating all of them is a quarter — and they still
+        disagree, because most of them are quietly reading the same passport.
       </p>
       <p class="beat reveal">
-        Every scorer that adds them up pays the sybil farm.
-        <span class="iron">We price what the fraud would cost instead.</span>
+        So you need a rule for combining them. Every rule that adds credentials up pays the
+        sybil farm, because a farm’s evidence is one document shown forty times.
+        <span class="iron">We count only what is independent, and never who they are.</span>
       </p>
     </section>
 
@@ -175,31 +176,33 @@ person.isHuman(Thresholds.standard)</code></pre>
         </header>
         <div class="tablets">
           <article class="tablet reveal">
+            <h3>Humanity, not identity</h3>
+            <p>
+              KYC tells you <em>who</em> someone is. We tell you <em>that</em> someone is — and
+              stop. No upload, no selfie, no document on your servers to leak. Correlation is a
+              property of the credential <em>class</em>, a public fact about protocols, so we
+              never need to link a person’s credentials to each other. That link is exactly
+              what we refuse to hold.
+            </p>
+          </article>
+          <article class="tablet reveal">
             <h3>Saturate, then sum</h3>
             <p>
               Within a trust root the strongest credential counts and the rest are the same
-              evidence again — across roots they add. Correlation is a property of the
-              credential <em>class</em>, a public fact about protocols, so we never need to
-              link a person’s credentials to each other. That link is exactly what we refuse
-              to hold.
+              evidence again — across roots they add. To compare an iris to a bank check you
+              need one unit, so each credential is priced at the cheaper of faking it and
+              renting it. Every weight is a dated, sourced judgment on-chain, and “why did my
+              score move” is a GraphQL query.
             </p>
           </article>
           <article class="tablet reveal">
-            <h3>Price at min(forge, rent)</h3>
+            <h3>You choose the line</h3>
             <p>
-              A credential is worth the cheaper of faking one and renting one, because a
-              holder willing to rent theirs out defeats any amount of cryptography. Every
-              weight is a dated, sourced judgment that lives on-chain — every change is an
-              auditable event, and “why did my score move” is a GraphQL query.
-            </p>
-          </article>
-          <article class="tablet reveal">
-            <h3>The caveats are the result</h3>
-            <p>
-              There is no default threshold: <code>isHuman(threshold)</code> throws unless you
-              choose one, because at realistic sybil rates a strong classifier is wrong about
-              most of the people it flags. And no protocol proves a human acts for themselves
-              — so that caveat is permanent, on every result, including perfect ones.
+              <code>isHuman(threshold)</code> throws unless you pick one, because at realistic
+              sybil rates a strong classifier is wrong about most of the people it flags —
+              anyone shipping a default is hiding that from you. A dating app and an airdrop
+              need different lines. And no protocol proves a human acts for themselves, so that
+              caveat rides on every result, including perfect ones.
             </p>
           </article>
         </div>
@@ -348,7 +351,7 @@ person.isHuman(Thresholds.standard)</code></pre>
               graph decides whose money you will accept.
             </p>
             <p>
-              Which makes the registration bit close to worthless as evidence, and the arithmetic
+              Which puts the weight on the graph rather than the registration, and the arithmetic
               is in <a href="https://github.com/aboutcircles/circles-contracts-v2/blob/beta/src/hub/Hub.sol" rel="noopener">Hub.sol</a>:
               an invite burns 96 CRC from the inviter and mints a 48 CRC welcome bonus to the
               invitee. At 24 CRC/day of issuance that is a net <strong>two days of freely-minted
@@ -935,12 +938,12 @@ person.isHuman(Thresholds.standard)</code></pre>
 
               <dt>Circles: the clearest case for indexing</dt>
               <dd>
-                Circles registration on its own is close to worthless as evidence of humanity.
-                A sybil costs about two days of freely-minted CRC, and the project's own public
-                indexer carries event namespaces named <code>BotCreated</code> and
-                <code>FarmGrown</code> — the farms are not hypothetical, they are a documented
-                schema. So the boolean "is registered" tells you almost nothing. What carries
-                signal is <em>position in the trust graph</em>: who vouched for this account, how
+                In Circles, the signal is the graph, not the registration. A new node costs about
+                two days of freely-minted CRC, and the project's own public indexer carries event
+                namespaces named <code>BotCreated</code> and <code>FarmGrown</code> — the farms
+                are not hypothetical, they are a documented schema the team indexes deliberately.
+                So the boolean "is registered" is the least informative thing you can read. What
+                carries signal is <em>position in the trust graph</em>: who vouched for this account, how
                 long ago, and how far the edges reach. That is a question about a large volume of
                 historical events and their relationships — exactly and only what an indexer can
                 answer. Circles is where The Graph stops being convenience and becomes the
