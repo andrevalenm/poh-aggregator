@@ -257,11 +257,23 @@ export async function pohIndexRead(
  * reached it yet. Either way the edge cannot precede the registration, so the date understates
  * age and is usable as a floor. (An avatar *can* be trusted before it registers, which is how
  * invitations work; that is exactly why the overwrite matters.)
+ *
+ * **`ended` is hard-false here, and that is the whole of Circles' revocation story.** The Hub
+ * writes `mintTimes[a].lastMintTime` at registration and never writes it back to zero — there is
+ * no `delete` on `avatars`, `_claimIssuance` only ever raises it, and `_updateMintV1Status`
+ * takes a `_max` — so `isHuman`, which is `lastMintTime > 0`, is monotonic and a Circles
+ * credential cannot be revoked. This used to read `ended: Boolean(row.stopped)`, which was the
+ * only place in the SDK where an index could retire a credential the chain still honours, and it
+ * produced a subject who was held at head and not-held whenever the Gnosis RPC failed: the same
+ * torn read `reconcile.ts` exists to kill, in the one field the reconciler cannot second-guess.
+ * `stop()` ends personal-Circles *minting* and leaves the human registered, so it comes back
+ * beside the credential instead — see `adapters/circles.ts`, which reads it from Hub storage
+ * because the contract's `stopped()` getter answers about the caller rather than the argument.
  */
 export async function circlesIndexRead(
   subgraphUrl: string,
   address: string,
-): Promise<(IndexView & { trustedByCount?: number }) | undefined> {
+): Promise<(IndexView & { trustedByCount?: number; stopped?: boolean }) | undefined> {
   const id = address.toLowerCase()
   const read = await indexRead(subgraphUrl, {
     protocol: 'circles',
@@ -271,16 +283,18 @@ export async function circlesIndexRead(
       issuedAt: Number(row.registeredAt),
       issuanceObserved: legacy ? row.inviter != null : Boolean(row.registrationObserved),
       sideEventOrder: 'after-issuance',
-      ended: Boolean(row.stopped),
+      ended: false,
     }),
   })
   if (!read) return undefined
-  // Graph position is not part of the credential's identity, so it rides alongside the
-  // reconciled view rather than inside it — same request, no second round trip.
+  // Graph position and the stop flag are not part of the credential's identity, so they ride
+  // alongside the reconciled view rather than inside it — same request, no second round trip.
   const trustedByCount = read.row?.trustedByCount
+  const stopped = read.row?.stopped
   return {
     ...read.view,
     ...(typeof trustedByCount === 'number' ? { trustedByCount } : {}),
+    ...(typeof stopped === 'boolean' ? { stopped } : {}),
   }
 }
 

@@ -8,6 +8,7 @@ import {
   type IndexView,
   type Reconciled,
 } from '../reconcile.ts'
+import { readCirclesStopped, type CirclesMintTime } from './circles.ts'
 import { humanPassportAdapter } from './human-passport.ts'
 import { farcasterAdapter } from './farcaster.ts'
 import { holonymAdapters } from './holonym.ts'
@@ -16,6 +17,7 @@ import { pohV1Adapter } from './poh-v1.ts'
 import { worldIdOrbAdapter, WORLD_AGENT_BOOK, WORLD_ID_ADDRESS_BOOK, WORLD_RPC } from './world.ts'
 import { coinbaseVerificationAdapter, COINBASE_RPC } from './coinbase.ts'
 
+export * from './circles.ts'
 export * from './coinbase.ts'
 export * from './human-passport.ts'
 export * from './farcaster.ts'
@@ -507,6 +509,13 @@ const CIRCLES_ABI = [
  * CRC, and the public indexer carries event namespaces named `BotCreated` and `FarmGrown`.
  * What carries signal is position in the trust graph, so we fetch incoming trust edges and
  * expose them as detail for the graph-derived modifier.
+ *
+ * `held` is `isHuman`, and `isHuman` is monotonic — nothing in the Hub ever clears
+ * `lastMintTime` and there is no `delete` on `avatars` — so **Circles has no revocation**. The
+ * one transition an avatar has is `stop()`, which ends personal-Circles minting and leaves the
+ * registration standing. It is read from Hub storage here (see `circles.ts`: the contract's own
+ * `stopped()` getter answers about the caller rather than the address you pass, so it returns
+ * false for everyone) and reported as detail and a caveat, never as an ending.
  */
 export function circlesAdapter(
   rpcUrl: string = RPC.gnosis,
@@ -515,7 +524,9 @@ export function circlesAdapter(
 ): AdapterProbe {
   const c = client(gnosis, rpcUrl)
 
-  const readChain = async (subject: Address): Promise<ChainView & { error?: string }> => {
+  const readChain = async (
+    subject: Address,
+  ): Promise<ChainView & { error?: string; mintTime?: CirclesMintTime }> => {
     try {
       const [head, held] = await Promise.all([
         c.getBlockNumber(),
@@ -526,7 +537,10 @@ export function circlesAdapter(
           args: [subject],
         }),
       ])
-      return { held, block: Number(head) }
+      // Same batch, so the storage word and the `isHuman` it is validated against describe the
+      // same world. `undefined` means the decode failed its own check and we say nothing.
+      const mintTime = await readCirclesStopped(c, subject, held)
+      return { held, block: Number(head), ...(mintTime ? { mintTime } : {}) }
     } catch (e) {
       return { held: false, unavailable: true, error: e instanceof Error ? e.message : String(e) }
     }
@@ -545,7 +559,7 @@ export function circlesAdapter(
           subgraphUrl ? circlesIndexRead(subgraphUrl, subject) : undefined,
           readChain(subject),
         ])
-        const { error: chainError, ...chainView } = chain
+        const { error: chainError, mintTime, ...chainView } = chain
         const r = await reconcileWithIndex({
           c,
           chain: chainView,
@@ -556,6 +570,24 @@ export function circlesAdapter(
           return { held: false, provenance: r.provenance, error: chainError ?? r.error }
         }
         if (!r.held) return { held: false, provenance: r.provenance }
+
+        // `stop()` is irreversible and does not deregister, so it is reported next to the
+        // credential rather than instead of it. The chain read is authoritative; the index's
+        // flag is the same protocol event seen later, so a difference is index lag and is shown
+        // rather than resolved. Reporting `stop` as an ending is what this replaces — it made
+        // the same subject held at head and not-held on the fallback path.
+        const stoppedDetail: Record<string, unknown> = {}
+        if (mintTime) {
+          stoppedDetail.stopped = mintTime.stopped
+          if (mintTime.stopped) r.provenance.notes.push('credential-minting-stopped')
+          if (index?.stopped !== undefined && index.stopped !== mintTime.stopped) {
+            stoppedDetail.stoppedIndexed = index.stopped
+          }
+        } else if (index?.stopped !== undefined) {
+          stoppedDetail.stopped = index.stopped
+          if (index.stopped) r.provenance.notes.push('credential-minting-stopped')
+        }
+
         if (index?.entity) {
           return {
             held: true,
@@ -563,6 +595,7 @@ export function circlesAdapter(
             provenance: r.provenance,
             detail: {
               ...(index.trustedByCount !== undefined ? { trustedBy: index.trustedByCount } : {}),
+              ...stoppedDetail,
               source: 'subgraph',
             },
           }
@@ -603,7 +636,10 @@ export function circlesAdapter(
           ...(r.issuedAt !== undefined ? { issuedAt: r.issuedAt } : {}),
           ...(r.issuedAfter !== undefined ? { issuedAfter: r.issuedAfter } : {}),
           provenance: r.provenance,
-          detail: trustedBy === undefined ? {} : { trustedBy },
+          detail: {
+            ...(trustedBy === undefined ? {} : { trustedBy }),
+            ...stoppedDetail,
+          },
         }
       }),
   }

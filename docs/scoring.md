@@ -381,9 +381,17 @@ one term further back — 30 days, three extra batched calls — turns 494 live 
 with a closed dated window. How far back that reach is *exhaustive* is derived from the scan's own
 floor rather than from the constant that chose it, so a narrower scan loses the claim by itself.
 
-A protocol that erases the ending instead — Circles' undated `stopped()`, PoH
-v2's `delete humanity.owner` on revocation, PoH v1's ForkModule boolean — produces no window, and
-those credentials stay invisible rather than being restored from an ending nobody can date.
+A protocol that erases the ending instead — PoH v2's `delete humanity.owner` on revocation, PoH
+v1's ForkModule boolean — produces no window, and those credentials stay invisible rather than
+being restored from an ending nobody can date. **Circles is not in that list, because Circles has
+no ending at all.** The Hub writes `mintTimes[a].lastMintTime` when an avatar registers and never
+writes it back to zero; there is no `delete` on `avatars`; so `isHuman`, which is
+`lastMintTime > 0`, is monotonic and a Circles credential cannot be revoked. Its one transition is
+`stop()`, which ends personal-Circles *minting* by writing `type(uint96).max` to that same field —
+a value which is emphatically greater than zero, so the Hub goes on calling a stopped avatar a
+human. It is reported as a caveat and scored as held. Reading it as a revocation, which the SDK
+did until iteration 20, made the same subject held at chain head and not-held whenever the Gnosis
+RPC failed.
 Restoring also requires an *exact* issuance date: `issuedAfter` is a lower bound and shows only
 that a credential could have existed at an instant, so those go to `asOf.ceasedStartUndated` and
 are left out. The residual therefore still runs one way — it understates the subject, never the

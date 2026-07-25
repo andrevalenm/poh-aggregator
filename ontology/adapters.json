@@ -122,7 +122,7 @@
       "live": true,
       "sourceURI": "research/protocols/circles.md",
       "implemented": true,
-      "notes": "A sybil costs roughly two days of freely-minted CRC — a cost denominated in the asset the issuer mints is barely a cost. The public indexer carries events named BotCreated and FarmGrown. Valuable only as a graph-position modifier, never as a standalone proof; genuinely independent of every document and biometric root. ageCurve=Ramp for the same reason: the BotCreated cohort is fresh by definition.",
+      "notes": "A sybil costs roughly two days of freely-minted CRC — a cost denominated in the asset the issuer mints is barely a cost. The public indexer carries events named BotCreated and FarmGrown. Valuable only as a graph-position modifier, never as a standalone proof; genuinely independent of every document and biometric root. ageCurve=Ramp for the same reason: the BotCreated cohort is fresh by definition. Circles has no revocation: the Hub never clears mintTimes[a].lastMintTime and never deletes an avatar, so isHuman (lastMintTime > 0) is monotonic. Its one transition is stop(), which writes type(uint96).max to that same field — greater than zero, so a stopped avatar is still a registered human — and is reported as a caveat rather than an ending. It is read from Hub storage at slot 21, validated against isHuman on every call, because the contract's own stopped(address) getter checks the address you pass and then answers about msg.sender, so an eth_call with no from reports false for every address that has ever stopped.",
       "ageCurve": "Ramp"
     },
     {

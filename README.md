@@ -598,6 +598,20 @@ impossible by construction. We chose unlinkability, and saturation is the price.
 person in our own headline test. That number *is* the product claim, and it is the only one the
 evidence supports.
 
+**11. A stopped Circles avatar still scores, and we read that from storage because the Hub's own
+getter cannot answer it.** `stop()` is irreversible and ends personal-Circles minting; it does not
+deregister, because it writes `type(uint96).max` to `mintTimes[a].lastMintTime` and `isHuman` is
+that same field `> 0`. So the credential is held, and the most we can say is that the address may
+be one its human has walked away from — a `credential-minting-stopped` caveat, not a revocation.
+The reason it is read from slot 21 rather than from the contract is that
+`stopped(address _human)` validates `_human` and then reads `mintTimes[msg.sender]`: an `eth_call`
+with no `from` runs as the zero address and reports **false for every avatar that has ever
+stopped**, and reports *true* for one that never did if the caller happens to have. The Hub is not
+behind a proxy, so that cannot be fixed in place. Our residual is the mirror image: a hard-coded
+slot in someone else's contract. It is checked against `isHuman` on every call, so a moved layout
+costs us the flag and can never invent one — measured over 40 avatars sampled from the Hub's logs
+each live run. [`research/protocols/circles-stop-and-the-broken-getter.md`](research/protocols/circles-stop-and-the-broken-getter.md).
+
 Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 
 ---

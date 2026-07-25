@@ -133,6 +133,15 @@ export type ProvenanceNote =
    * evidence is excluded for want of a date should be told which credential and why.
    */
   | 'lapsed-credential-start-undated'
+  /**
+   * The holder has irreversibly given up the *economic* half of the credential while keeping the
+   * registration — a Circles avatar that called `stop()`. It is emphatically not an ending: the
+   * protocol's own personhood predicate still returns true, so the credential is held and
+   * scored, and this says the address is one a human has probably walked away from. It exists
+   * because the alternative was to read it as a revocation, which made the same subject held at
+   * head and not-held whenever the chain read failed.
+   */
+  | 'credential-minting-stopped'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {

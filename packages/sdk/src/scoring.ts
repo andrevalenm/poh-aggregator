@@ -456,6 +456,14 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     })
   }
 
+  const mintingStopped = withNote('credential-minting-stopped').filter((e) => e.held)
+  if (mintingStopped.length) {
+    out.push({
+      code: 'credential-minting-stopped',
+      message: `The holder has irreversibly stopped minting on ${ids(mintingStopped)}, usually because they moved to a new address. It is not a revocation and is not scored as one: the protocol's own personhood predicate still returns true for this address, since the sentinel that marks a stopped avatar is written to the very slot that predicate reads as "greater than zero". So the credential is held and counted, and this is the caveat that says the address behind it may be abandoned. Read from contract storage — the protocol's own getter for this validates the address you pass and then answers about the caller, so it reports false for every address ever asked about.`,
+    })
+  }
+
   const stale = withNote('freshness-check-unavailable')
   if (stale.length) {
     out.push({
