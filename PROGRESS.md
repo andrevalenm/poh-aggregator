@@ -1597,3 +1597,119 @@ the empty-array lie it tells for unfiltered ones.
 `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it
 (and its internal `cd` assumes the root, so it only works from there), and `pnpm-lock.yaml` is still
 untracked beside a tracked `package-lock.json`.
+
+## Iteration 14 — 2026-07-25
+
+**Did:** iteration 12's own next-step 1 — **the `easscan.org` GraphQL dependency is gone**, and it
+did not need a subgraph. `coinbaseVerificationAdapter` POSTed to `base.easscan.org` on every
+scoring request, which made it the one adapter in the repo contradicting the principle written at
+the top of `adapters/index.ts`. That is not a coherence complaint: a hosted endpoint we do not run
+is the only part of a score an adversary can reach without touching a chain, and degrading it
+silently costs every Coinbase-verified subject a trust root. Our own research file had already
+written "do not put EASSCAN in a synchronous user-facing path" in July, and then we did.
+
+- **Why the obvious fix fails, measured.** A recipient-filtered `eth_getLogs` over Base's full
+  49.1M-block history: 1M blocks in 197 ms, 5M in **14.0 s**, 20M **times out at 120 s** — on
+  `base.gateway.tenderly.co`, the only keyless Base endpoint that serves archive logs at all.
+  publicnode refuses every archive range (*"Archive requests require a personal token"*), drpc
+  caps a free range at 10,000 blocks, and llamarpc/blockpi/1rpc/meowrpc return non-JSON, rate
+  limits or plan limits. A scoring request cannot pay 14 s, and scanning only the recent window
+  reports `held: false` for everyone verified earlier. Iteration 12's read that this leaves
+  "Studio or nothing" was right about subgraphs and wrong about the problem.
+- **Coinbase maintains an on-chain index, so neither is needed.** Two `eth_call`s:
+  `AttestationIndexer.getAttestationUid(subject, schema)` at
+  `0x2c7eE1E5f416dfF40054c27A62f7B357C4E8619C`, then `EAS.getAttestation(uid)` at the predeploy
+  `0x4200…0021`. Address taken from `coinbase/verifications` and then verified live rather than
+  trusted: 209 bytes of code, a uid for known recipients, zero for `0x…dEaD`.
+- **The indexer is a pointer; EAS is the truth.** It is a proxy Coinbase can upgrade, so schema,
+  recipient, date and revocation all come from the predeploy, and a record failing to match the
+  uid, schema or subject asked for is an **error, not a negative**. EAS returns a *zeroed struct*
+  rather than reverting for a uid it does not know, so that fault arrives looking like an ordinary
+  record — it is caught by comparing the record's own uid to the one asked for.
+- **Revocation is the whole reason for the second call.** The index keeps pointing at an
+  attestation after it is revoked, and the sampled windows hold **5,143 revocations against 18,655
+  issuances**. A non-zero uid is not a credential.
+- **A real finding from the live suite, not from reading.** The first draft asserted the indexed
+  uid equals the uid in the historical `Attested` log. The chain refuted it: the index holds one
+  uid per `(recipient, schema)` and Coinbase re-attests, so old logs are superseded. The test now
+  asserts the superseding record is the same subject, same schema, and `time >= logged.time` — an
+  index pointing *backwards* is the fault worth catching, and equality never was.
+- **The index is written at attestation time, not backfilled.** Read at the attestation's own
+  block it returns the uid; one block earlier it does not. That is what would make an archive read
+  of this credential historically honest, which is the precondition for `as-of` on Base.
+- **The schema id is load-bearing on its own.** `SchemaRegistry.getSchema(0xf8b05c79…)` →
+  `bool verifiedAccount`, `revocable: true`, resolver `0xD867CbEd…F32f` (non-zero, has code) —
+  the mechanism behind "only Coinbase-permitted attesters may use this schema" — and 18,655
+  attestations across six windows spanning the chain carry **exactly one attester**. So the probe
+  filters on schema and does not pin an attester it would have to chase through a rotation.
+- **Reads are at head, not pinned, and the module says why.** Keyless Base endpoints keep ~128
+  blocks of state (`head-200` is already an archive request), so pinning against a load-balanced
+  node one block behind fails outright. An EAS attestation is immutable once written; the only
+  field that can move between the two calls is `revocationTime`, and reading it later reads it
+  fresher. The single torn read available resolves to `held: false` for one block — safe direction.
+- **The one honest limit, written down rather than glossed:** an attestation Coinbase issued but
+  never indexed reads as absent. None was found in any sampled window, and the direction is safe —
+  a missing credential lowers a score and can never inflate one.
+- **Also fixed `apps/demo/test.sh`**, unrunnable since iteration 1. It `cd`s to its own directory
+  and then to `packages/sdk`, which only exists from the repo root, so every iteration has been
+  running the four suites by hand. Anchored to the root; the command `MISSION.md` names now works.
+
+**Verified:** all suites, on this box, at this commit.
+
+- `cd packages/sdk && npm test` → `# tests 351 # pass 351 # fail 0 # skipped 0` (was 330 at
+  iteration 12: **+12 unit** in `coinbase.test.ts`, **+9 live** in `coinbase.live.test.ts`).
+- `node --test --experimental-strip-types src/adapters/coinbase.live.test.ts` → **9/9,
+  `skipped 0`**, against real Base. Nothing about a holder is hard-coded: subjects come out of
+  `Attested` logs at run time, in windows at ~9.1M (Jan 2024), ~29.1M (Apr 2025), ~39.1M, ~46.1M
+  and ~49.1M. Every one indexed; every EAS record's `time` equal to its block header's timestamp;
+  a revoked holder read as not held with the revocation dated; a dead endpoint setting `error`
+  rather than "not a human"; and a source check that no `easscan.org` host remains in the read path.
+- `./apps/demo/test.sh` → **all suites green**: forge 18 passed, sdk unit 35, sdk live 15,
+  Playwright 13 passed.
+- `npm run build` and `tsc -p tsconfig.json --noEmit` clean; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` end to end: verdicts unchanged — DENY / ALLOW 3.6153 over 5 roots /
+  DENY naming the sibling / DENY `a fleet of 27 agents is still one human`. The demo subject holds
+  no Coinbase attestation, so an unchanged score is the correct outcome, not an absence of effect.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved — this changes
+where a credential is read, not what it is worth — so a reseed would bump `revision` to record
+nothing. Registry stays at **30 adapters, revision 34**.
+
+**Committed:** `f8fb52b` feat(sdk): Coinbase reads from Base, not from easscan — the last vendor is
+off the critical path
+
+**Write-up:** `research/protocols/eas-and-disco.md`, new section "Resolution, 2026-07-25", with the
+endpoint table, the coverage sample, and the residual limit. The ontology's `sourceURI` for
+`coinbase-verification` already points there.
+
+**Housekeeping:** `packages/sdk/eas-probe.mjs` — a scratch feasibility script the harness committed
+as `04ff534` at the start of this iteration, from an iteration 13 that left no PROGRESS block — is
+deleted. Its measurement is preserved as the endpoint table in the research doc.
+
+**Next, in the order I would do it:**
+
+1. **A signature gate for the ENS path.** `agent-presenter-not-authenticated` fires on every batch
+   because resolving a name does not establish that the presenter controls the wallet the name
+   points at. The World flow already does this with CAIP-122 and the three agent wallets' keys are
+   in `.env.local` for exactly that. Unchanged from iteration 12's list; now the top item.
+2. **`as-of` for Base.** This iteration established the precondition — Coinbase's index answers
+   historically and is not backfilled — so `resolve(addr, { asOf: block })` could cover this
+   credential too. Note the constraint: only tenderly serves archive `eth_call` on Base among the
+   keyless endpoints, and it rate-limits, so this is a demo path and not a hot path.
+3. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
+   the cheapest way to turn two flagged approximations into real dates. Iteration 1's next-step 1,
+   unchanged through thirteen iterations, and now the oldest thing on the list.
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read
+   appears. Iteration 7's measurement stands: neither leaves per-holder state on any chain.
+
+**Worth keeping, because it generalises.** The pattern that solved this is not specific to
+Coinbase: when enumeration is the problem, check whether the *issuer* already solved it on chain
+before reaching for an indexer. Coinbase writes `(recipient, schema) => uid` because their own
+integrators need it, and that write is public. The same question is worth asking of every
+API-gated protocol still sitting at `live: false` in the ontology.
+
+**Blocked:** nothing. Iteration 1's second note stands and is Hugo's call: `pnpm-lock.yaml` is
+still untracked beside a tracked `package-lock.json`. Its first note — `./test.sh` at the wrong
+path — is now half-resolved: the script works, but it lives at `apps/demo/test.sh` rather than the
+repo root where `MISSION.md` says to run it. Moving it is a one-line `git mv` somebody should
+approve rather than an agent doing it unasked.
