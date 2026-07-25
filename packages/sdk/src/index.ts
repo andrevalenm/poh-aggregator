@@ -24,6 +24,8 @@ export * from './subgraph.ts'
 export * from './enroll.ts'
 export * from './reconcile.ts'
 export * from './as-of.ts'
+export * from './fleet.ts'
+export * from './agentbook.ts'
 
 /**
  * Named thresholds for `isHuman(threshold)`, exported as documented constants rather than

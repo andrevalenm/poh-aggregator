@@ -19,7 +19,7 @@
  * failures as errors. See README, "SDK friction".
  */
 
-import { createPublicClient, http, toHex } from 'viem'
+import { createPublicClient, http } from 'viem'
 import { worldchain } from 'viem/chains'
 import { createAgentBookVerifier } from '@worldcoin/agentkit'
 import { world } from '../config.js'
@@ -70,7 +70,11 @@ export async function lookupHumanBacking(agentAddress) {
       args: [agentAddress],
     })
     if (humanId === 0n) return { status: 'unbacked', source }
-    return { status: 'backed', humanId: toHex(humanId), source }
+    // Decimal, not hex. The identifier is a uint256 nullifier hash and both encodings are
+    // faithful, but it is also a *map key* — the fleet index builds its groups from the
+    // `AgentRegistered` log, where it is decimal, and a hex key silently matched nothing.
+    // Encoding a shared key two ways is the same class of bug as two units of measure.
+    return { status: 'backed', humanId: humanId.toString(), source }
   } catch (e) {
     // Deliberately not 'unbacked'. A failure to ask is not a negative answer.
     return { status: 'unknown', error: e instanceof Error ? e.message : String(e), source }

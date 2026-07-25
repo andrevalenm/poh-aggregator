@@ -6,12 +6,23 @@
  */
 
 import { startCounterparty } from './counterparty/server.js'
-import { decide, resetBudget } from './counterparty/decide.js'
-import { counterparty } from './counterparty/policy.js'
+import { decide, resetSession } from './counterparty/decide.js'
+import { counterparty, fleetPolicy } from './counterparty/policy.js'
 import { Agent, ObservedAgent } from './agent.js'
 import { REGISTERED_AGENTS, OPERATOR_ADDRESS_SET } from './fixtures.js'
 import { banner, renderTrace, colour as C } from './trace.js'
 import { agentPrivateKey, world } from './config.js'
+import { scanAgentBook } from '@corroborate/sdk'
+
+/** The human running the most agents, found by scanning rather than by being told. */
+function largestFleet(index) {
+  let best = ['', []]
+  for (const r of index.registrations) {
+    const fleet = index.fleetOf(r.humanId)
+    if (fleet.length > best[1].length) best = [r.humanId, fleet]
+  }
+  return best
+}
 
 async function main() {
   console.log('')
@@ -64,10 +75,33 @@ async function main() {
     }
 
     // ────────────────────────────────────────────────── 2. human-backed agent
-    resetBudget()
+    resetSession()
     banner(
       'RUN 2 — an agent a real human registered',
       'Live World Chain state. Signature gate is skipped and labelled, not faked.',
+    )
+
+    // `mirror` first because it is this human's *earlier* registration, and the policy gives
+    // the slot to the earliest — a rule the chain decides, not the demo. Presenting `beacon`
+    // first would have it admitted and `mirror` refused, which is the outcome an operator can
+    // manufacture by racing a fresh wallet to the front of the queue.
+    const mirror = new ObservedAgent({
+      name: 'mirror',
+      ...REGISTERED_AGENTS.mirror,
+      operatorAddresses: OPERATOR_ADDRESS_SET,
+    })
+    const trace2 = await decide({
+      agentName: mirror.name,
+      agentAddress: mirror.address,
+      operatorAddresses: mirror.operatorAddresses,
+      note: mirror.note,
+    })
+    renderTrace(trace2)
+
+    // ──────────────────────────────────────── 3. two agents, one human
+    banner(
+      'RUN 3 — a second agent, registered by the same human',
+      'The cap is keyed on the human. A fleet of agents is still one person.',
     )
 
     const beacon = new ObservedAgent({
@@ -75,30 +109,11 @@ async function main() {
       ...REGISTERED_AGENTS.beacon,
       operatorAddresses: OPERATOR_ADDRESS_SET,
     })
-    const trace2 = await decide({
+    const trace3 = await decide({
       agentName: beacon.name,
       agentAddress: beacon.address,
       operatorAddresses: beacon.operatorAddresses,
       note: beacon.note,
-    })
-    renderTrace(trace2)
-
-    // ──────────────────────────────────────── 3. two agents, one human
-    banner(
-      'RUN 3 — a second agent, registered by the same human',
-      'The budget is keyed on the human. A fleet of agents is still one person.',
-    )
-
-    const mirror = new ObservedAgent({
-      name: 'mirror',
-      ...REGISTERED_AGENTS.mirror,
-      operatorAddresses: OPERATOR_ADDRESS_SET,
-    })
-    const trace3 = await decide({
-      agentName: mirror.name,
-      agentAddress: mirror.address,
-      operatorAddresses: mirror.operatorAddresses,
-      note: mirror.note,
     })
     renderTrace(trace3)
 
@@ -106,8 +121,44 @@ async function main() {
       trace2.gates.find((g) => g.n === 2)?.detail?.humanId === trace3.gates.find((g) => g.n === 2)?.detail?.humanId
     console.log(
       C.dim(
-        `\n  beacon and mirror are different wallets that AgentBook maps to ${sameHuman ? 'the same' : 'different'} humanId.\n` +
-          '  Counting agents would have counted two. Counting humans counts one.',
+        `\n  mirror and beacon are different wallets that AgentBook maps to ${sameHuman ? 'the same' : 'different'} humanId.\n` +
+          '  Counting agents would have counted two. Counting humans counts one, and the second\n' +
+          '  request cost one lookup rather than ten probes — evidence is keyed on the person.',
+      ),
+    )
+
+    // ───────────────────────────────── 4. the largest fleet on World Chain
+    banner(
+      'RUN 4 — the biggest fleet in the registry, found rather than declared',
+      'Nothing below is hard-coded. AgentBook’s whole registration history is scanned and the largest fleet wins.',
+    )
+
+    const index = await scanAgentBook()
+    const [humanId, fleet] = largestFleet(index)
+    console.log(
+      C.dim(
+        `  AgentBook holds ${index.stats.agents} agents over ${index.stats.humans} humans ` +
+          `(${index.stats.collapseRatio}× over-count) at World Chain block ${index.head}.\n` +
+          `  ${index.stats.humansWithMoreThanOneAgent} humans run more than one agent. The largest runs ${fleet.length}, ` +
+          `all registered between blocks ${fleet[0].block} and ${fleet[fleet.length - 1].block}.`,
+      ),
+    )
+
+    // Ask on behalf of a member that is *not* the earliest, which is what an operator does when
+    // the first wallet has already spent its slot.
+    const applicant = fleet[fleet.length - 1]
+    const trace4 = await decide({
+      agentName: `fleet-member-${fleet.length}`,
+      agentAddress: applicant.agent,
+      operatorAddresses: OPERATOR_ADDRESS_SET,
+      note: `one of ${fleet.length} agents registered by human ${humanId.slice(0, 12)}…, registered at block ${applicant.block}`,
+    })
+    renderTrace(trace4)
+    console.log(
+      C.dim(
+        `\n  Meridian never met the other ${fleet.length - 1} agents. It refused this one because the registry\n` +
+          '  says they exist and that the slot is already taken. That is the difference between\n' +
+          '  detecting a fleet after it has been served and pricing it before.',
       ),
     )
 
@@ -121,6 +172,9 @@ async function main() {
       declared address set, priced by what it would cost an
       adversary to fake                                       (Corroborate, 3 trust roots)
     · Two agents can be one human, and were                   (run 3)
+    · A counterparty can bound a fleet *before* serving it,
+      because the registry names every agent a human
+      registered — and can say what a second slot costs       (run 4, policy engine)
 
   ${C.red('Not established')}
     · That the human controls the agent right now.
