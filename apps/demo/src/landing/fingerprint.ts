@@ -171,7 +171,8 @@ export function mountFingerprint(
     h = canvas.clientHeight
     canvas.width = Math.round(w * dpr)
     canvas.height = Math.round(h * dpr)
-    const narrow = w < 760
+    // Below 1100 the copy overlaps the print, so it becomes a static watermark there.
+    const narrow = w < 1100
     cx = narrow ? w * 0.5 : w * 0.73
     cy = h * 0.49
     // Vertical extent stays inside the hero — no bleeding into the next fold.

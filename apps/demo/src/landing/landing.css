@@ -355,15 +355,18 @@ a {
 }
 
 /* A soft pool of clean paper behind the copy, so the print's rings never sit under the
- * paragraph text. */
-.hero-copy::before {
-  content: '';
-  position: absolute;
-  inset: -3rem -5rem -3rem -6rem;
-  z-index: -1;
-  background: radial-gradient(closest-side, rgb(237 231 218 / 0.9) 55%, transparent 100%);
-  filter: blur(14px);
-  pointer-events: none;
+ * paragraph text. Only where print and copy share the row — below 1100px the print is a
+ * faint watermark and the pool would erase it entirely. */
+@media (min-width: 1100px) {
+  .hero-copy::before {
+    content: '';
+    position: absolute;
+    inset: -3rem -5rem -3rem -6rem;
+    z-index: -1;
+    background: radial-gradient(closest-side, rgb(237 231 218 / 0.9) 55%, transparent 100%);
+    filter: blur(14px);
+    pointer-events: none;
+  }
 }
 
 /* Entrance: everything except the h1 (which rises line-by-line via split masks). */
