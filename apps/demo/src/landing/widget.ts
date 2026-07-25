@@ -6,9 +6,9 @@
  * elapsed time, because "it answered in three seconds from public chains" is the point a
  * first visitor can feel.
  */
-import type { PersonhoodResult } from '@corroborate/sdk'
+import type { Evidence, PersonhoodResult } from '@corroborate/sdk'
 import { makeClient, type ProbeEvent } from '../client.ts'
-import { clear, fmtCents, fmtScore, h, shortAddr } from '../ui.ts'
+import { clear, fmtCents, fmtScore, freshnessLabel, h, shortAddr } from '../ui.ts'
 
 const EXAMPLES: { label: string; value: string }[] = [
   {
@@ -61,6 +61,89 @@ function scoreNumeral(score: number): HTMLElement {
   return el
 }
 
+/**
+ * The console, brought into the sheet: the threshold is the consumer's decision (no
+ * verdict until the slider moves — isHuman() throws without an explicit cutoff, and the
+ * UI honours the same rule), and the full evidence and caveats unfold in place.
+ */
+function thresholdBlock(result: PersonhoodResult): HTMLElement {
+  const readout = h('span', { class: 'th-readout' }, 'not set')
+  const verdict = h(
+    'p',
+    { class: 'th-verdict is-unset' },
+    'No verdict yet — and none until you choose a cutoff. The decision, and its consequences for the person on the other side, belong to whoever is doing the admitting.',
+  )
+  const slider = h('input', {
+    type: 'range',
+    min: '0',
+    max: '4',
+    step: '0.05',
+    value: '0',
+    class: 'th-slider is-unset',
+    'aria-label': 'Your threshold',
+  }) as HTMLInputElement
+  const onMove = () => {
+    const v = Number(slider.value)
+    slider.classList.remove('is-unset')
+    readout.textContent = v.toFixed(2)
+    const pass = result.isHuman(v)
+    verdict.className = `th-verdict ${pass ? 'is-pass' : 'is-fail'}`
+    verdict.textContent = pass
+      ? `Above your ${v.toFixed(2)} cutoff — admitted by your rule, applied to our evidence.`
+      : `Below your ${v.toFixed(2)} cutoff — refused by your rule, applied to our evidence.`
+  }
+  slider.addEventListener('input', onMove)
+  return h(
+    'div',
+    { class: 'th-block' },
+    h('span', { class: 'w-score-label' }, 'Your threshold'),
+    h('div', { class: 'th-row' }, slider, readout),
+    verdict,
+  )
+}
+
+function evidenceRow(e: Evidence): HTMLElement {
+  const unavailable = e.detail?.['unavailable'] === true
+  return h(
+    'div',
+    { class: `evd-row${e.held ? ' is-held' : ''}` },
+    h(
+      'div',
+      { class: 'evd-head' },
+      h('span', { class: 'evd-name' }, e.adapterName),
+      h('span', { class: 'evd-verdict' }, unavailable ? 'unreachable' : e.held ? 'held' : 'not found'),
+      h('span', { class: 'evd-cost' }, e.held ? fmtCents(e.effectiveCostCents) : '—'),
+    ),
+    h(
+      'p',
+      { class: 'evd-meta' },
+      `${e.trustRoot} · ${freshnessLabel(e.freshness, e.issuedAt)} · on ${shortAddr(e.observedOn)} · forge ${fmtCents(e.forgeCostCents)} / rent ${fmtCents(e.rentCostCents)} — priced at the cheaper`,
+    ),
+  )
+}
+
+function evidenceDetails(result: PersonhoodResult): HTMLElement {
+  return h(
+    'details',
+    { class: 'ledger-details' },
+    h('summary', {}, `Full evidence — ${result.evidence.length} adapter reads`),
+    h('div', { class: 'evd-rows' }, ...result.evidence.map(evidenceRow)),
+  )
+}
+
+function caveatsDetails(result: PersonhoodResult): HTMLElement {
+  return h(
+    'details',
+    { class: 'ledger-details' },
+    h('summary', {}, `Caveats, in the SDK's own words — ${result.caveats.length}`),
+    h(
+      'ul',
+      { class: 'cv-list' },
+      ...result.caveats.map((c) => h('li', {}, h('code', {}, c.code), h('span', {}, c.message))),
+    ),
+  )
+}
+
 function resultView(result: PersonhoodResult, elapsedMs: number): HTMLElement {
   const held = result.evidence.filter((e) => e.held).length
   const seconds = (elapsedMs / 1000).toFixed(1)
@@ -97,11 +180,14 @@ function resultView(result: PersonhoodResult, elapsedMs: number): HTMLElement {
         ),
       ),
     ),
+    thresholdBlock(result),
+    evidenceDetails(result),
+    caveatsDetails(result),
     h(
       'p',
       { class: 'w-meta' },
-      `${result.caveats.length} caveats travel with this result — they are the result, not small print. `,
-      h('a', { href: '/app.html' }, 'Read them all in the console →'),
+      'The caveats are the result, not small print. Prefer a separate workbench? ',
+      h('a', { href: '/app.html' }, 'Open the console →'),
     ),
   )
 }
