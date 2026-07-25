@@ -13,12 +13,26 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       Base's EAS predeploy through Coinbase's own on-chain attestation index, so
       `base.easscan.org` is gone. Every adapter is now a chain read or a self-hosted index.
       Two `eth_call`s, no key. `research/protocols/eas-and-disco.md` §"Resolution, 2026-07-25".
+- [x] **ENS presenter authentication** — shipped (iteration 15): a name is public, so
+      resolving one said nothing about who was presenting it. `verifyEnsPresentation()` is an
+      ERC-4361 challenge bound to the name (`ens:<name>` in Resources) checked against the
+      `addr` record read in the same pass; `requirePresenterAuthentication` enforces it.
+      `npm run ens` gains two runs: the agents themselves (2 of 3, unchanged — proof is free
+      for an honest agent) and the same three names from a wallet made a second earlier
+      (0 of 3). `research/protocols/ens-agent-identity.md` §5.1.
 - [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.
 
 ## Blocked on Hugo (each unlocks a chunk)
 
+- [ ] **Reconcile the ontology with the deployed registry** — the only red in the suite.
+      Another working copy added `human-passport-eas` and `lens-account` to the shared Sepolia
+      registry at block 11,349,413 (2026-07-25 18:29 UTC), taking it to 32 adapters / revision
+      36; this tree's `ontology/adapters.json` has 30, and two `as-of.live.test.ts` tests fail
+      on the difference. Their `sourceURI`s name two research files that do not exist here, so
+      an agent cannot write the entries without inventing citations. Bring the other tree over
+      or re-seed from this one. MORNING "Needs you" item 18.
 - [ ] **Name decision** — thumb / print / corroborate. Gates: npm scope, mainnet ENS,
       public repo name, og/meta copy. Rename is a find-replace; do it BEFORE publish/push.
 - [x] **Repo push (private)** — https://github.com/Hugo0/poh-aggregator (private),

@@ -1,8 +1,10 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 14. All four suites green: 18 forge, 351 SDK
-(351 pass, 0 fail, 0 skipped), 13 Playwright — 382 total._
+detail. _Last updated 2026-07-25, after unattended iteration 15. 18 forge, 389 SDK (386 pass,
+**2 fail**, 1 skipped), 13 Playwright — 420 total. The two failures are not a regression: the
+deployed registry gained two adapters from another working copy mid-iteration and this tree's
+ontology has not caught up. **"Needs you" item 18** has the fix and it is a merge, not a bug._
 
 ---
 
@@ -410,6 +412,38 @@ research file said "do not put EASSCAN in a synchronous user-facing path", and t
 
 No weight moved; the registry stays at **30 adapters, revision 34**. SDK suite **351 pass, 0 fail,
 0 skipped** (was 330). Write-up: `research/protocols/eas-and-disco.md`, §"Resolution, 2026-07-25".
+
+**Iteration 15 closed the last open hole in the ENS track: we now know who is presenting the
+name.** Everything the ENS flow reads is public, so until this existed, anyone could type
+`alpha.corroborate.eth` into a counterparty's form and be scored on the credentials of the human
+behind it — riding a stranger's evidence with no key and no trace, while the counterparty's own
+log named a party that was never there. Every individual answer stays true, which is what makes
+it worse than not knowing. `agent-presenter-not-authenticated` had reported it honestly on every
+batch since iteration 11.
+
+`npm run ens` now ends on the beat: **run 5**, each agent answers an ERC-4361 challenge with the
+wallet its name designates — 2 of 3 admitted, *the same result as without the gate*, because
+proof costs an honest agent nothing. **Run 6**, the same three names presented by a wallet
+generated one second earlier — identical records, identical human, identical score — **0 of 3**.
+
+- **The wallet signs, not the name's owner.** Both keys exist. The wallet proves the presenter is
+  the party the name currently designates; the owner would prove only control of the *name*, so
+  an operator pointing a name at a wallet it does not hold could present as that wallet — which
+  is the impersonation the gate exists to stop. Whether the signer also owns the node is
+  *reported*, because it says whether the key in front of you can rewrite the records you just
+  read.
+- **The name is inside the signed message.** A signature carrying any other name is refused, so
+  one collected for `alpha` cannot be presented for `beta`. Both suites prove it with the same
+  nonce on both challenges, so the refusal can only be the name binding.
+- **An impostor cannot inflate a stranger's fleet.** The gate runs before agents are grouped by
+  human, not merely before the slots are handed out — otherwise presenting somebody's name would
+  let the cap refuse *them* for agents they never ran.
+- **An EOA never touches the network.** Local recovery first; only a smart account's ERC-1271
+  check needs a chain read, and a failed read is `indeterminate`, never an accusation.
+
+No weight moved. SDK suite **389 tests**: 386 pass, **2 fail**, 1 skip — and the two failures are
+not this work. See "Needs you" item 18: the shared Sepolia registry gained two adapters from
+another tree while this iteration ran. Write-up: `research/protocols/ens-agent-identity.md` §5.1.
 
 ---
 
@@ -887,6 +921,29 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    the path: a repo-wide sweep sitting inside the demo app. `git mv apps/demo/test.sh ./` plus
    changing `"$(dirname "$0")/../.."` to `"$(dirname "$0")"` finishes it, and an agent moving a
    file the mission names by path unasked seemed worse than leaving you the one-liner.
+
+18. **Two trees are writing to one registry, and this one is now behind. Two tests are red.**
+   At Sepolia block **11,349,413**, `2026-07-25 18:29:48 UTC` — while unattended iteration 15 was
+   running — two adapters were added to the deployed registry from somewhere that is not this
+   box: **`human-passport-eas`** ("Human Passport score (EAS attestation)", rooted at
+   `behavioral:wallet-history`, tx `0x14302f54…e46f`, revision 35) and **`lens-account`** ("Lens
+   account (Lens Chain)", root `0x35eda994…4a46`, tx `0xe5b5ebdd…bab9`, revision 36). The registry
+   is now **32 adapters at revision 36**; `ontology/adapters.json` in this working copy still has
+   **30**.
+
+   Consequence: two tests in `packages/sdk/src/as-of.live.test.ts` fail — the one that requires the
+   audit-trail indexer's reconstruction to equal the chain's, and the one that pins the current
+   revision at 34. Nothing else in the suite is affected and no score is wrong; the SDK falls back
+   to the raw adapter hash for an id it does not know, which is the designed behaviour.
+
+   I did not fix it. Both records are readable from the registry, so the numbers could have been
+   copied — but they cite `research/protocols/gitcoin-passport.md` and
+   `research/protocols/lens-onchain-read.md`, **neither of which exists in this tree**, and
+   `lens-account` sits on a trust root this tree has no plaintext name for. Writing an entry whose
+   `sourceURI` points at a file nobody here has read is what `MISSION.md` rule 5 forbids and what
+   `ontology.test.ts` asserts against on purpose. **What you need to do:** bring the other tree's
+   `ontology/adapters.json` and its two research files over (or re-seed the registry from this
+   one), then re-run `cd packages/sdk && npm test`. Everything else in the sweep is green.
 
 ## Honest state of weak points
 
