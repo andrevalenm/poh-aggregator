@@ -1287,6 +1287,8 @@ halves are now live, and the number is twenty-seven rather than ten.
 engine reads the ontology and never edits it — so a reseed would bump `revision` to record
 nothing. Registry stays at **30 adapters, revision 34**.
 
+**Committed:** `15d1e4b` feat(sdk): fleet policy — the cap is per human, and the registry says who
+
 **Next, in the order I would do it:**
 
 1. **AgentBook registrations now have a date, and `world-id-orb` still does not use it.**
