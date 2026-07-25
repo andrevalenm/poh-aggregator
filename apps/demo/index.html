@@ -19,6 +19,7 @@
     />
   </head>
   <body class="landing">
+    <canvas id="paper" class="paper" aria-hidden="true"></canvas>
     <a class="skip" href="#try">Skip to the live demo</a>
 
     <nav class="nav" aria-label="Main">
@@ -33,12 +34,15 @@
     </nav>
 
     <header class="hero" id="hero">
-      <canvas id="print" aria-hidden="true"></canvas>
+      <canvas class="contour-layer" data-contours="1" data-parallax="0.14" aria-hidden="true"></canvas>
+      <div class="wash wash-sage" data-parallax="0.2" aria-hidden="true"></div>
+      <div class="wash wash-ochre" data-parallax="0.26" aria-hidden="true"></div>
+      <canvas id="print" data-parallax="0.07" aria-hidden="true"></canvas>
       <div class="hero-copy">
         <p class="eyebrow">Proof of personhood, aggregated</p>
         <h1>
-          What does it cost<br />
-          <em>to be human?</em>
+          <span class="sl-mask"><span class="sl-line">What does it cost</span></span><br />
+          <span class="sl-mask"><span class="sl-line"><em>to be human?</em></span></span>
         </h1>
         <p class="hero-answer">
           On today’s internet: about fifty cents. Corroborate reads every proof-of-personhood
@@ -70,6 +74,8 @@
     </div>
 
     <section class="manifesto" id="manifesto" aria-label="Why">
+      <canvas class="contour-layer" data-contours="2" data-parallax="0.1" aria-hidden="true"></canvas>
+      <div class="wash wash-sage" data-parallax="0.18" aria-hidden="true"></div>
       <p class="beat reveal">Forty protocols will swear a wallet is human.</p>
       <p class="beat reveal">
         They collapse into six trust roots. One passport, read by three protocols, is one
@@ -82,7 +88,6 @@
     </section>
 
     <section class="daylight" id="try">
-      <svg class="torn torn-paper" data-torn preserveAspectRatio="none" aria-hidden="true"></svg>
       <div class="band-inner">
         <header class="band-head reveal">
           <h2>Ask it about a wallet. Right now.</h2>
@@ -605,7 +610,6 @@ person.isHuman(Thresholds.standard)</code></pre>
       <div class="ghost" aria-hidden="true">corroborate</div>
     </footer>
 
-    <canvas id="smudge" aria-hidden="true"></canvas>
     <div class="grain" aria-hidden="true"></div>
     <script type="module" src="/src/landing/main.ts"></script>
   </body>

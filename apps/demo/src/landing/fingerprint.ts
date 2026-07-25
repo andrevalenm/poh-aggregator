@@ -141,9 +141,16 @@ export function stampPrint(canvas: HTMLCanvasElement, color: string, alpha = 1):
   ctx.globalAlpha = 1
 }
 
-export function mountFingerprint(canvas: HTMLCanvasElement): void {
+export function mountFingerprint(
+  canvas: HTMLCanvasElement,
+  opts?: { rgb?: string; wideAlpha?: number; narrowAlpha?: number },
+): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
+  // Ink colour as an "r g b" triple; bone for dark grounds, ink for paper.
+  const rgb = opts?.rgb ?? '232 224 210'
+  const wideAlpha = opts?.wideAlpha ?? 0.85
+  const narrowAlpha = opts?.narrowAlpha ?? 0.3
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -166,7 +173,7 @@ export function mountFingerprint(canvas: HTMLCanvasElement): void {
     cy = h * 0.49
     // Vertical extent stays inside the hero — no bleeding into the next fold.
     scale = narrow ? Math.min(w, h) * 0.46 : Math.min(w * 0.33, h * 0.41)
-    baseAlpha = narrow ? 0.3 : 0.85
+    baseAlpha = narrow ? narrowAlpha : wideAlpha
   }
 
   const start = performance.now()
@@ -191,7 +198,7 @@ export function mountFingerprint(canvas: HTMLCanvasElement): void {
       const f = Math.min(Math.max((p - ridge.delay) / ridge.speed, 0), 1)
       if (f === 0) continue
       ctx.lineWidth = ridge.width
-      ctx.strokeStyle = `rgb(232 224 210 / ${(ridge.alpha * baseAlpha).toFixed(3)})`
+      ctx.strokeStyle = `rgb(${rgb} / ${(ridge.alpha * baseAlpha).toFixed(3)})`
       ctx.beginPath()
       let penDown = false
       const visible = Math.floor(ridge.pts.length * f)

@@ -1,11 +1,15 @@
 /*
- * Corroborate landing — fired clay, not SaaS.
+ * Corroborate landing v4 — "Human terrain": an ink print on field paper.
  *
- * The product is deterministic and machine-facing, so the page is deliberately the
- * opposite: kiln-black ground, bone type, one iron-oxide accent, an ink fingerprint that
- * draws itself, film grain over everything. Three faces, three voices: Fraunces carries
- * the existential register, Bricolage Grotesque does the talking, Spline Sans Mono holds
- * the evidence.
+ * The whole page is one sheet of flecked cotton paper (generated at runtime — see
+ * paper.ts), and everything on it is ink: the thumbprint pressed as a seal, letterpress
+ * type, hairline ledger rules, and a topographic contour field — because a fingerprint IS
+ * a contour map of a person, and terrain is the same drawing of land. Night ink exists
+ * only where the code lives (install) and in the soil of the footer. No boxes on paper;
+ * print composition — rules, columns, stamps, margins.
+ *
+ * Faces: Fraunces (editorial display), Bricolage Grotesque (talking), Spline Sans Mono
+ * (the ledger). All self-hosted.
  */
 
 @import '@fontsource-variable/fraunces/full.css';
@@ -15,30 +19,33 @@
 @import '@fontsource/spline-sans-mono/500.css';
 
 :root {
-  --kiln: #1a1512;
-  --kiln-2: #211b17;
+  --paper-solid: #ede7da;
+  --ink: #2a231b;
+  --ink-soft: #6e6152;
+  --ink-faint: #94886f;
+  --hairline: rgb(42 35 27 / 0.28);
+  --hairline-strong: rgb(42 35 27 / 0.55);
+  --sage: #77816e;
+  --sage-deep: #57604f;
+  --iron: #a6431f;
+  --iron-deep: #833317;
+  --ochre: #c9a25e;
+  --night: #211b15;
+  --night-2: #272019;
   --bone: #e8e0d2;
   --bone-dim: #c9bfae;
   --umber: #4a3a2e;
   --smoke: #8a7e6f;
-  --iron: #b1401f;
-  --iron-deep: #8e3013;
-  --oxblood: #58200f;
-  --ochre: #c88a3e;
-  --paper: #ddd3c1;
-  --paper-2: #d3c8b4;
-  --ink-on-paper: #241d17;
 
   --display: 'Fraunces Variable', 'Georgia', serif;
   --body: 'Bricolage Grotesque Variable', 'Helvetica Neue', sans-serif;
   --mono: 'Spline Sans Mono', ui-monospace, 'SFMono-Regular', monospace;
 
   --measure: 62ch;
-  --band-pad: clamp(4rem, 10vw, 8.5rem);
-  --gutter: clamp(1.25rem, 4vw, 3.5rem);
+  --band-pad: clamp(4.5rem, 11vw, 9.5rem);
+  --gutter: clamp(1.25rem, 4.5vw, 4rem);
 
-  /* Low-frequency fractal clouds, alpha-only — the pigment texture every section washes
-   * with. Same technique as the grain, an octave lower. */
+  /* Fine grain, an octave above the paper's own flecks. */
   --clouds: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0045 0.0065' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 0.95 0 0 0 0 0.85 0.7 0 0 0 0'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23c)'/%3E%3C/svg%3E");
 }
 
@@ -47,13 +54,23 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  /* Lenis owns scrolling; native smooth would fight it. */
+  scroll-behavior: auto;
+}
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
 }
 
 body.landing {
   margin: 0;
-  background: var(--kiln);
-  color: var(--bone);
+  background: var(--paper-solid);
+  color: var(--ink);
   font-family: var(--body);
   font-size: 1.0625rem;
   line-height: 1.6;
@@ -91,8 +108,19 @@ a {
   top: 1rem;
 }
 
-/* ------------------------------------------------------------------ grain */
+/* ------------------------------------------------------------ ground layers */
 
+/* The sheet itself — fixed, under everything. */
+.paper {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -10;
+  pointer-events: none;
+}
+
+/* Fine grain over everything, unifying both worlds. */
 .grain {
   position: fixed;
   inset: -50%;
@@ -100,9 +128,68 @@ a {
   height: 200%;
   pointer-events: none;
   z-index: 50;
-  opacity: 0.55;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.3;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+}
+
+/* Topographic fields, drawn once, parallax-shifted. */
+.contour-layer {
+  position: absolute;
+  inset: -12% 0;
+  width: 100%;
+  height: 124%;
+  opacity: 0.14;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Soft pigment washes soaked into the sheet. */
+.wash {
+  position: absolute;
+  width: 46rem;
+  height: 34rem;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.wash-sage {
+  background: radial-gradient(closest-side, rgb(119 129 110 / 0.34), transparent 72%);
+  top: -6rem;
+  right: -8rem;
+}
+
+.wash-ochre {
+  background: radial-gradient(closest-side, rgb(201 162 94 / 0.3), transparent 72%);
+  bottom: -8rem;
+  left: -10rem;
+}
+
+/* ---------------------------------------------------------------- cursor */
+
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid rgb(42 35 27 / 0.55);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 210;
+  opacity: 0;
+  transition: opacity 0.35s, border-color 0.35s, background 0.35s;
+}
+
+.cursor-ring.is-on {
+  opacity: 1;
+}
+
+.cursor-ring.is-active {
+  border-color: rgb(166 67 31 / 0.8);
+  background: rgb(166 67 31 / 0.07);
 }
 
 /* -------------------------------------------------------------------- nav */
@@ -116,39 +203,56 @@ a {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 1.4rem var(--gutter);
+  padding: 1.5rem var(--gutter);
 }
 
 .wordmark {
   font-family: var(--display);
   font-variation-settings: 'opsz' 40, 'SOFT' 60, 'WONK' 1;
-  font-weight: 620;
+  font-weight: 640;
   font-size: 1.35rem;
   letter-spacing: 0.01em;
-  color: var(--bone);
+  color: var(--ink);
   text-decoration: none;
 }
 
 .nav-links {
   display: flex;
-  gap: clamp(0.9rem, 2.5vw, 2rem);
+  gap: clamp(0.9rem, 2.5vw, 2.1rem);
 }
 
 .nav-links a {
-  font-size: 0.85rem;
-  font-weight: 500;
-  letter-spacing: 0.09em;
+  position: relative;
+  font-size: 0.82rem;
+  font-weight: 550;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   text-decoration: none;
-  color: var(--bone-dim);
-  padding-bottom: 2px;
-  border-bottom: 1px solid transparent;
-  transition: color 0.25s, border-color 0.25s;
+  color: var(--ink-soft);
+  padding-bottom: 3px;
+  transition: color 0.25s;
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 1px;
+  background: var(--iron);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .nav-links a:hover {
-  color: var(--bone);
-  border-color: var(--iron);
+  color: var(--ink);
+}
+
+.nav-links a:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
 }
 
 /* ------------------------------------------------------------------- hero */
@@ -161,164 +265,133 @@ a {
   padding: clamp(5rem, 12vh, 8rem) var(--gutter) 4rem;
   isolation: isolate;
   overflow: hidden;
-  /* Fired pigment, not flat dark: umber heat behind the print, oxblood low, ochre high. */
-  background:
-    radial-gradient(90rem 60rem at 76% 44%, rgb(84 52 32 / 0.6) 0%, transparent 62%),
-    radial-gradient(60rem 44rem at 8% 92%, rgb(88 32 15 / 0.38) 0%, transparent 58%),
-    radial-gradient(46rem 30rem at 24% 6%, rgb(120 84 40 / 0.16) 0%, transparent 55%);
-}
-
-/* A slow pigment cloud drifting through the hero — blurred, barely there, alive. */
-.hero::before {
-  content: '';
-  position: absolute;
-  inset: -20%;
-  z-index: -2;
-  background:
-    radial-gradient(34rem 26rem at 30% 35%, rgb(136 66 34 / 0.2) 0%, transparent 70%),
-    radial-gradient(28rem 30rem at 72% 68%, rgb(96 70 38 / 0.22) 0%, transparent 70%);
-  filter: blur(60px);
-  animation: pigment-drift 46s ease-in-out infinite alternate;
-  pointer-events: none;
-}
-
-@keyframes pigment-drift {
-  from {
-    transform: translate3d(-3%, -2%, 0) scale(1);
-  }
-  to {
-    transform: translate3d(4%, 3%, 0) scale(1.12);
-  }
-}
-
-/* Cloud wash over the kiln — smoke in the glaze. */
-.hero::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image: var(--clouds);
-  opacity: 0.05;
-  mix-blend-mode: screen;
-  pointer-events: none;
 }
 
 #print {
   position: absolute;
-  inset: 0;
+  inset: -6% 0;
   width: 100%;
-  height: 100%;
+  height: 112%;
   z-index: -1;
+  will-change: transform;
 }
 
-/* The ink ribbon rides above content, under the grain; exclusion makes one bone colour
- * read pale on the kiln sections and pressed-dark on the paper ones. */
-#smudge {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 45;
-  pointer-events: none;
-  mix-blend-mode: exclusion;
+.hero .contour-layer {
+  z-index: -2;
+}
+
+.hero .wash {
+  z-index: -3;
 }
 
 .hero-copy {
   position: relative;
   z-index: 1;
-  max-width: 46rem;
+  max-width: 48rem;
 }
 
-/* Entrance: the copy surfaces like ink settling — rise, sharpen, in sequence. */
-.hero-copy > * {
-  animation: surface 1s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+/* Entrance: everything except the h1 (which rises line-by-line via split masks). */
+.hero-copy > :not(h1) {
+  animation: surface 1.1s cubic-bezier(0.19, 0.8, 0.22, 1) backwards;
 }
 
 .hero-copy > .eyebrow {
-  animation-delay: 0.05s;
-}
-
-.hero-copy > h1 {
-  animation-delay: 0.16s;
+  animation-delay: 0.1s;
 }
 
 .hero-copy > .hero-answer {
-  animation-delay: 0.34s;
+  animation-delay: 0.55s;
 }
 
 .hero-copy > .hero-ctas {
-  animation-delay: 0.5s;
+  animation-delay: 0.72s;
 }
 
 .hero-copy > .hero-live {
-  animation-delay: 0.66s;
+  animation-delay: 0.9s;
 }
 
 @keyframes surface {
   from {
     opacity: 0;
-    transform: translateY(26px);
-    filter: blur(10px);
+    transform: translateY(22px);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: none;
   }
 }
 
 .eyebrow {
-  font-size: 0.85rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--smoke);
-  margin: 0 0 1.6rem;
+  color: var(--sage-deep);
+  margin: 0 0 1.7rem;
 }
 
 .hero h1 {
   font-family: var(--display);
-  font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;
-  font-weight: 480;
-  font-size: clamp(2.9rem, 8.5vw, 6.4rem);
-  line-height: 0.98;
-  letter-spacing: -0.015em;
-  margin: 0 0 1.8rem;
+  font-variation-settings: 'opsz' 144, 'SOFT' 34, 'WONK' 0;
+  font-weight: 460;
+  font-size: clamp(3rem, 9vw, 7rem);
+  line-height: 0.99;
+  letter-spacing: -0.018em;
+  margin: 0 0 2rem;
+  color: var(--ink);
   text-wrap: balance;
 }
 
 .hero h1 em {
   font-style: italic;
-  font-variation-settings: 'opsz' 144, 'SOFT' 75, 'WONK' 1;
-  font-weight: 400;
-  color: var(--bone);
+  font-variation-settings: 'opsz' 144, 'SOFT' 80, 'WONK' 1;
+  font-weight: 420;
+}
+
+/* Split-line masks (built by splitlines.ts). */
+.sl-mask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+
+.sl-line {
+  display: inline-block;
+  transform: translateY(118%);
+  transition: transform 1.15s cubic-bezier(0.19, 0.8, 0.22, 1);
+}
+
+.sl-in .sl-line {
+  transform: none;
 }
 
 .hero-answer {
-  max-width: 54ch;
-  font-size: clamp(1rem, 1.6vw, 1.2rem);
-  line-height: 1.55;
-  color: var(--bone-dim);
+  max-width: 52ch;
+  font-size: clamp(1.02rem, 1.6vw, 1.2rem);
+  line-height: 1.6;
+  color: var(--ink-soft);
   margin: 0 0 2.4rem;
 }
 
 .hero-ctas {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.9rem;
-  margin-bottom: 2.2rem;
+  align-items: center;
+  gap: 1.4rem;
+  margin-bottom: 2.4rem;
 }
 
 .cta {
   font-family: var(--body);
-  font-weight: 600;
+  font-weight: 620;
   font-size: 0.95rem;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-decoration: none;
-  padding: 0.85rem 1.7rem;
-  border-radius: 999px;
-  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.25s, color 0.25s,
-    border-color 0.25s, box-shadow 0.3s;
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.3s, color 0.3s,
+    border-color 0.3s, box-shadow 0.3s;
 }
 
 .cta:active {
@@ -326,24 +399,39 @@ a {
 }
 
 .cta-primary {
-  background: linear-gradient(170deg, #c14a24 0%, var(--iron) 55%, var(--iron-deep) 100%);
+  background: var(--iron);
   color: var(--bone);
-  box-shadow: 0 1px 0 rgb(255 220 190 / 0.25) inset, 0 8px 24px -14px rgb(177 64 31 / 0.8);
+  padding: 0.9rem 1.9rem;
+  border-radius: 999px;
+  box-shadow: 0 10px 26px -16px rgb(131 51 23 / 0.8);
 }
 
 .cta-primary:hover {
+  background: var(--ink);
   transform: translateY(-2px);
-  box-shadow: 0 1px 0 rgb(255 220 190 / 0.3) inset, 0 16px 34px -14px rgb(193 74 36 / 0.9);
+  box-shadow: 0 16px 30px -16px rgb(42 35 27 / 0.6);
 }
 
+/* The second action is a line of ink, not a second pill. */
 .cta-ghost {
-  border: 1px solid var(--umber);
-  color: var(--bone);
+  position: relative;
+  color: var(--ink);
+  padding-bottom: 4px;
 }
 
-.cta-ghost:hover {
-  transform: translateY(-2px);
-  border-color: var(--bone-dim);
+.cta-ghost::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 1.5px;
+  background: var(--hairline-strong);
+  transition: background 0.3s;
+}
+
+.cta-ghost:hover::after {
+  background: var(--iron);
 }
 
 .hero-live {
@@ -352,7 +440,7 @@ a {
   gap: 0.55rem;
   font-family: var(--mono);
   font-size: 0.78rem;
-  color: var(--smoke);
+  color: var(--ink-soft);
   margin: 0;
 }
 
@@ -360,7 +448,7 @@ a {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--iron);
+  background: var(--sage);
   flex-shrink: 0;
   animation: pulse 2.4s ease-in-out infinite;
 }
@@ -369,11 +457,11 @@ a {
   0%,
   100% {
     opacity: 1;
-    box-shadow: 0 0 0 0 rgb(177 64 31 / 0.5);
+    box-shadow: 0 0 0 0 rgb(119 129 110 / 0.5);
   }
   50% {
     opacity: 0.6;
-    box-shadow: 0 0 0 6px rgb(177 64 31 / 0);
+    box-shadow: 0 0 0 6px rgb(119 129 110 / 0);
   }
 }
 
@@ -382,7 +470,7 @@ a {
   bottom: 1.6rem;
   left: 50%;
   transform: translateX(-50%);
-  color: var(--smoke);
+  color: var(--ink-faint);
   text-decoration: none;
   font-size: 1.2rem;
   animation: drift 3s ease-in-out infinite;
@@ -400,36 +488,37 @@ a {
 
 /* ----------------------------------------------------------------- ticker */
 
+/* A letterpress specimen strip: hairlines, italic serif, fleuron separators. */
 .ticker {
   overflow: hidden;
-  border-top: 1px solid var(--umber);
-  border-bottom: 1px solid var(--umber);
-  padding: 0.72rem 0;
-  background: var(--kiln-2);
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  padding: 0.85rem 0;
   mask-image: linear-gradient(90deg, transparent 0%, black 7%, black 93%, transparent 100%);
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 7%, black 93%, transparent 100%);
 }
 
 .ticker-track {
   display: flex;
-  gap: 3.5rem;
+  gap: 3.2rem;
   width: max-content;
-  animation: ticker 46s linear infinite;
+  animation: ticker 60s linear infinite;
 }
 
 .ticker-track span {
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--smoke);
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 40, 'SOFT' 70, 'WONK' 1;
+  font-style: italic;
+  font-size: 0.98rem;
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 
 .ticker-track span::after {
-  content: '◌';
-  color: var(--iron);
-  margin-left: 3.5rem;
+  content: '❧';
+  font-style: normal;
+  color: var(--sage);
+  margin-left: 3.2rem;
 }
 
 @keyframes ticker {
@@ -438,184 +527,137 @@ a {
   }
 }
 
-/* ------------------------------------------------------------- torn edges */
-
-/* Section joins are torn, not cut — an SVG edge generated from the same seed as the
- * print. The divider belongs to the section below and bleeds up over the one above. */
-.torn {
-  position: absolute;
-  top: -23px;
-  left: 0;
-  width: 100%;
-  height: 24px;
-  display: block;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.torn-paper {
-  fill: var(--paper);
-}
-
-.torn-kiln {
-  fill: var(--kiln-2);
-}
-
 /* -------------------------------------------------------------- manifesto */
 
 .manifesto {
   position: relative;
-  padding: var(--band-pad) var(--gutter) calc(var(--band-pad) + 1.5rem);
-  max-width: 62rem;
-  margin: 0 auto;
-  display: grid;
-  gap: clamp(2.4rem, 6vw, 4.5rem);
+  padding: var(--band-pad) var(--gutter);
+  overflow: hidden;
 }
 
-/* The manifesto floats in kiln-space; give it embers, not blackness. */
-.manifesto::before {
-  content: '';
-  position: absolute;
-  inset: -10% -40vw;
-  z-index: -1;
-  background:
-    radial-gradient(50rem 30rem at 82% 20%, rgb(88 32 15 / 0.28) 0%, transparent 60%),
-    radial-gradient(44rem 30rem at 10% 78%, rgb(84 52 32 / 0.32) 0%, transparent 60%);
-  pointer-events: none;
+.manifesto .wash-sage {
+  top: 20%;
+  left: -14rem;
+  right: auto;
 }
 
-.beat {
+.manifesto .beat {
+  position: relative;
+  z-index: 1;
   font-family: var(--display);
   font-variation-settings: 'opsz' 100, 'SOFT' 40, 'WONK' 0;
-  font-weight: 420;
-  font-size: clamp(1.7rem, 4.2vw, 3.1rem);
-  line-height: 1.18;
-  margin: 0;
-  max-width: 26ch;
+  font-weight: 440;
+  font-size: clamp(1.8rem, 4.6vw, 3.4rem);
+  line-height: 1.16;
+  margin: 0 auto;
+  max-width: 62rem;
   text-wrap: balance;
 }
 
-.beat:nth-child(2) {
-  margin-left: auto;
+.manifesto .beat + .beat {
+  margin-top: clamp(2.6rem, 6vw, 4.8rem);
+}
+
+.manifesto .beat:nth-of-type(2) {
   text-align: right;
 }
 
-.iron {
+.manifesto .beat:first-of-type,
+.manifesto .beat:nth-of-type(2),
+.manifesto .beat:nth-of-type(3) {
+  max-width: 62rem;
+}
+
+.manifesto .beat {
+  display: block;
+}
+
+.beat .iron {
   color: var(--iron);
   font-style: italic;
   font-variation-settings: 'opsz' 100, 'SOFT' 70, 'WONK' 1;
 }
 
-/* --------------------------------------------------------- daylight bands */
+/* --------------------------------------------------------- paper sections */
 
 .daylight {
   position: relative;
-  /* Watercolour paper: light from the upper left, ochre and rose-clay washes bleeding in
-   * from the edges, darker sediment settling toward the bottom. */
-  background:
-    radial-gradient(70rem 40rem at 18% 0%, rgb(255 250 238 / 0.55) 0%, transparent 55%),
-    radial-gradient(56rem 34rem at 88% 8%, rgb(200 138 62 / 0.16) 0%, transparent 55%),
-    radial-gradient(48rem 38rem at 4% 82%, rgb(166 96 70 / 0.13) 0%, transparent 55%),
-    linear-gradient(180deg, #e3d9c6 0%, var(--paper) 34%, #cfc2a9 100%);
-  color: var(--ink-on-paper);
   padding: var(--band-pad) var(--gutter);
 }
 
-/* Pigment stains soaked into the paper. */
-.daylight::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: var(--clouds);
-  opacity: 0.12;
-  mix-blend-mode: multiply;
-  pointer-events: none;
-}
-
-.daylight > .band-inner {
+.band-inner {
   position: relative;
   z-index: 1;
-}
-
-.daylight + .daylight {
-  background:
-    radial-gradient(60rem 36rem at 78% 100%, rgb(200 138 62 / 0.14) 0%, transparent 55%),
-    linear-gradient(180deg, #cfc2a9 0%, var(--paper-2) 40%, #cbbda3 100%);
-}
-
-.daylight + .daylight {
-  padding-top: 0;
-}
-
-.band-inner {
   max-width: 68rem;
   margin: 0 auto;
 }
 
 .band-head h2 {
   font-family: var(--display);
-  font-variation-settings: 'opsz' 100, 'SOFT' 30, 'WONK' 0;
-  font-weight: 540;
-  font-size: clamp(1.9rem, 4.5vw, 3rem);
-  line-height: 1.08;
-  margin: 0 0 1rem;
-  letter-spacing: -0.01em;
+  font-variation-settings: 'opsz' 110, 'SOFT' 34, 'WONK' 0;
+  font-weight: 500;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 1.05;
+  margin: 0 0 1.1rem;
+  letter-spacing: -0.014em;
+  text-wrap: balance;
 }
 
 .band-head p {
   max-width: var(--measure);
   margin: 0;
-  color: #4d4238;
+  color: var(--ink-soft);
 }
 
 .band-foot {
-  margin: 2.2rem 0 0;
-  color: #4d4238;
+  margin: 2.4rem 0 0;
+  color: var(--ink-soft);
 }
 
 .band-foot a {
   color: var(--iron-deep);
-  font-weight: 600;
+  font-weight: 620;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 
-/* ----------------------------------------------------------------- widget */
+/* ------------------------------------------------------------ field ledger */
 
+/* The widget is a ledger ruled onto the sheet — no card, no box. */
 .widget {
-  margin-top: 2.6rem;
-  background: linear-gradient(165deg, #ded4c1 0%, var(--paper-2) 70%);
-  border: 1px solid #b0a28a;
-  border-radius: 4px;
-  padding: clamp(1.2rem, 3vw, 2.2rem);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.45) inset, 0 24px 60px -26px rgb(36 29 23 / 0.55);
+  margin-top: 2.8rem;
+  border-top: 3px double var(--hairline-strong);
+  border-bottom: 3px double var(--hairline-strong);
+  padding: clamp(1.4rem, 3vw, 2.2rem) 0;
 }
 
 #lookup-form {
   display: flex;
-  gap: 0.7rem;
+  gap: 1.2rem;
   flex-wrap: wrap;
+  align-items: flex-end;
 }
 
 #lookup-input {
-  flex: 1 1 22rem;
+  flex: 1 1 24rem;
   font-family: var(--mono);
-  font-size: 0.92rem;
-  color: var(--ink-on-paper);
-  background: var(--paper);
-  border: 1px solid #a99c84;
-  border-radius: 3px;
-  padding: 0.8rem 1rem;
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--hairline-strong);
+  border-radius: 0;
+  padding: 0.6rem 0.1rem;
+  transition: border-color 0.3s;
 }
 
 #lookup-input::placeholder {
-  color: #94886f;
+  color: var(--ink-faint);
 }
 
 #lookup-input:focus-visible {
-  outline: 2px solid var(--iron);
-  outline-offset: 0;
-  border-color: var(--iron);
+  outline: none;
+  border-bottom-color: var(--iron);
 }
 
 #lookup-submit {
@@ -624,21 +666,23 @@ a {
   font-size: 0.95rem;
   letter-spacing: 0.03em;
   color: var(--bone);
-  background: var(--ink-on-paper);
+  background: var(--iron);
   border: none;
-  border-radius: 3px;
-  padding: 0.8rem 1.8rem;
+  border-radius: 999px;
+  padding: 0.75rem 1.8rem;
   cursor: pointer;
-  transition: background 0.25s;
+  transition: background 0.3s, transform 0.3s;
 }
 
 #lookup-submit:hover {
-  background: var(--iron-deep);
+  background: var(--ink);
+  transform: translateY(-1px);
 }
 
 #lookup-submit:disabled {
-  background: #94886f;
+  background: var(--ink-faint);
   cursor: wait;
+  transform: none;
 }
 
 .examples-row {
@@ -646,37 +690,38 @@ a {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem;
-  margin-top: 0.9rem;
+  margin-top: 1.1rem;
   font-size: 0.85rem;
-  color: #6b5f50;
+  color: var(--ink-soft);
 }
 
 .example-chip {
   font-family: var(--body);
   font-size: 0.82rem;
-  font-weight: 550;
-  color: var(--ink-on-paper);
+  font-weight: 570;
+  color: var(--ink);
   background: transparent;
-  border: 1px solid #a99c84;
+  border: 1px solid var(--hairline);
   border-radius: 999px;
-  padding: 0.32rem 0.85rem;
+  padding: 0.34rem 0.9rem;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.25s, background 0.25s, transform 0.25s;
 }
 
 .example-chip:hover {
   border-color: var(--iron);
-  background: rgb(177 64 31 / 0.08);
+  background: rgb(166 67 31 / 0.06);
+  transform: translateY(-1px);
 }
 
 .probe-stream {
-  margin-top: 1.4rem;
+  margin-top: 1.5rem;
   font-family: var(--mono);
   font-size: 0.8rem;
 }
 
 .probe-lede {
-  color: #6b5f50;
+  color: var(--ink-soft);
   margin: 0 0 0.6rem;
 }
 
@@ -684,17 +729,17 @@ a {
   display: flex;
   gap: 0.9rem;
   align-items: baseline;
-  padding: 0.28rem 0;
-  border-bottom: 1px dashed #b9ac95;
+  padding: 0.3rem 0;
+  border-bottom: 1px dashed var(--hairline);
 }
 
 .probe-row .p-id {
-  flex: 0 0 11.5em;
+  flex: 0 0 12.5em;
   font-weight: 500;
 }
 
 .probe-row .p-addr {
-  color: #6b5f50;
+  color: var(--ink-soft);
 }
 
 .probe-row .p-state {
@@ -708,7 +753,7 @@ a {
 
 .probe-row.is-absent .p-state,
 .probe-row.is-running .p-state {
-  color: #6b5f50;
+  color: var(--ink-soft);
 }
 
 .probe-row.is-unavailable .p-state {
@@ -718,53 +763,54 @@ a {
 .probe-row .p-ms {
   flex: 0 0 4.5em;
   text-align: right;
-  color: #94886f;
+  color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 
-/* widget result */
+/* ledger result */
 
 .w-result {
   margin-top: 1.8rem;
-  border-top: 2px solid var(--ink-on-paper);
-  padding-top: 1.4rem;
+  border-top: 1.5px solid var(--hairline-strong);
+  padding-top: 1.5rem;
 }
 
 .w-score-row {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 1.2rem 2.6rem;
+  gap: 1.2rem 2.8rem;
 }
 
 .w-score {
   font-family: var(--display);
   font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;
-  font-weight: 500;
-  font-size: clamp(3.4rem, 8vw, 5.6rem);
+  font-weight: 480;
+  font-size: clamp(3.6rem, 8vw, 6rem);
   line-height: 1;
   letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 .w-score-label {
   display: block;
   font-family: var(--body);
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #6b5f50;
-  margin-bottom: 0.3rem;
+  color: var(--sage-deep);
+  margin-bottom: 0.35rem;
 }
 
 .w-fact {
-  font-size: 0.95rem;
-  max-width: 24rem;
-  color: #4d4238;
+  font-size: 0.96rem;
+  max-width: 26rem;
+  color: var(--ink-soft);
 }
 
 .w-fact b {
-  color: var(--ink-on-paper);
+  color: var(--ink);
 }
 
 .w-roots {
@@ -777,14 +823,14 @@ a {
 .w-root {
   font-family: var(--mono);
   font-size: 0.76rem;
-  border: 1px solid #a99c84;
+  border: 1px solid var(--hairline);
   border-radius: 999px;
-  padding: 0.3rem 0.8rem;
-  color: var(--ink-on-paper);
+  padding: 0.32rem 0.85rem;
+  color: var(--ink);
 }
 
 .w-root.is-zero {
-  color: #94886f;
+  color: var(--ink-faint);
   border-style: dashed;
 }
 
@@ -793,14 +839,14 @@ a {
 }
 
 .w-meta {
-  margin-top: 1.2rem;
+  margin-top: 1.3rem;
   font-size: 0.88rem;
-  color: #6b5f50;
+  color: var(--ink-soft);
 }
 
 .w-meta a {
   color: var(--iron-deep);
-  font-weight: 600;
+  font-weight: 620;
 }
 
 .w-error {
@@ -809,65 +855,56 @@ a {
   color: var(--iron-deep);
 }
 
-/* ---------------------------------------------------------------- tablets */
+/* ------------------------------------------------------------------ rules */
 
 .how {
-  padding-top: var(--band-pad);
+  padding-top: 0;
 }
 
 .tablets {
-  margin-top: 2.6rem;
+  margin-top: 2.8rem;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-  gap: 1.4rem;
+  gap: clamp(1.6rem, 4vw, 3.2rem);
 }
 
 .tablet {
-  background: linear-gradient(160deg, #e4dbc9 0%, var(--paper) 100%);
-  border: 1px solid #b9ac95;
-  border-radius: 4px;
-  padding: 1.8rem 1.6rem;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.45) inset, 0 10px 30px -22px rgb(36 29 23 / 0.5);
-  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.4s;
-}
-
-.tablet:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.45) inset, 0 26px 44px -24px rgb(36 29 23 / 0.55);
+  border-top: 2px solid var(--ink);
+  padding-top: 1.3rem;
 }
 
 .tablet h3 {
   font-family: var(--display);
-  font-variation-settings: 'opsz' 60, 'SOFT' 50, 'WONK' 1;
+  font-variation-settings: 'opsz' 60, 'SOFT' 55, 'WONK' 1;
   font-weight: 560;
-  font-size: 1.35rem;
+  font-size: 1.45rem;
   margin: 0 0 0.8rem;
 }
 
 .tablet p {
   font-size: 0.95rem;
-  line-height: 1.6;
+  line-height: 1.65;
   margin: 0;
-  color: #4d4238;
+  color: var(--ink-soft);
 }
 
 .tablet code {
   font-family: var(--mono);
   font-size: 0.85em;
-  background: rgb(36 29 23 / 0.08);
+  background: rgb(42 35 27 / 0.07);
   padding: 0.1em 0.35em;
   border-radius: 3px;
 }
 
-/* ---------------------------------------------------------------- install */
+/* --------------------------------------------------------------- night ink */
 
 .install {
   position: relative;
   padding: var(--band-pad) var(--gutter);
   background:
-    radial-gradient(80rem 50rem at 50% 0%, rgb(84 52 32 / 0.42) 0%, transparent 60%),
-    radial-gradient(50rem 40rem at 90% 90%, rgb(88 32 15 / 0.28) 0%, transparent 55%),
-    var(--kiln-2);
+    radial-gradient(80rem 50rem at 50% 0%, rgb(74 58 42 / 0.5) 0%, transparent 60%),
+    var(--night);
+  color: var(--bone);
 }
 
 .install::after {
@@ -889,8 +926,30 @@ a {
   color: var(--bone);
 }
 
+.install .band-head p {
+  color: var(--bone-dim);
+}
+
+/* Torn sheet edge above the night — the one place the paper actually tears. */
+.torn {
+  position: absolute;
+  top: -23px;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  display: block;
+  pointer-events: none;
+  z-index: 2;
+  transform: scaleY(-1);
+}
+
+.torn-kiln {
+  fill: var(--paper-solid);
+  top: -1px;
+}
+
 .install-grid {
-  margin-top: 2.6rem;
+  margin-top: 2.8rem;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
   gap: clamp(1.6rem, 4vw, 3.4rem);
@@ -900,8 +959,9 @@ a {
   font-family: var(--display);
   font-variation-settings: 'opsz' 60, 'SOFT' 40, 'WONK' 0;
   font-weight: 540;
-  font-size: 1.45rem;
+  font-size: 1.5rem;
   margin: 0 0 0.7rem;
+  color: var(--bone);
 }
 
 .install-col > p {
@@ -921,7 +981,7 @@ a {
 .picker button {
   font-family: var(--body);
   font-size: 0.85rem;
-  font-weight: 550;
+  font-weight: 570;
   color: var(--bone-dim);
   background: transparent;
   border: 1px solid var(--umber);
@@ -945,7 +1005,7 @@ a {
 .command-block pre {
   position: relative;
   margin: 0;
-  background: var(--kiln);
+  background: rgb(0 0 0 / 0.28);
   border: 1px solid var(--umber);
   border-radius: 4px;
   padding: 0.9rem 5.2rem 0.9rem 1.1rem;
@@ -981,7 +1041,7 @@ a {
   position: absolute;
   top: 0.65rem;
   right: 0.65rem;
-  background: var(--kiln);
+  background: var(--night);
 }
 
 .command-note {
@@ -1012,13 +1072,13 @@ a {
 }
 
 .copy-btn.copied {
-  color: var(--iron);
-  border-color: var(--iron);
+  color: var(--ochre);
+  border-color: var(--ochre);
 }
 
 .code-sample {
   margin: 1rem 0 0;
-  background: var(--kiln);
+  background: rgb(0 0 0 / 0.28);
   border: 1px solid var(--umber);
   border-radius: 4px;
   padding: 1.1rem 1.2rem;
@@ -1035,7 +1095,7 @@ a {
 }
 
 .code-sample .tk {
-  color: var(--iron);
+  color: var(--ochre);
 }
 
 .code-sample .ts {
@@ -1079,19 +1139,17 @@ a {
 
 /* -------------------------------------------------------------- hackathon */
 
-/* Lisbon, in the palette's own accent: azulejo glaze. The sponsor cards are ceramic
- * tiles — cool cobalt wash, glaze highlight, corner diamonds — under a wash of Atlantic
- * light. The only cool notes on the page, spent on the section that is about Lisbon. */
-
+/* Lisbon, told truthfully: azulejo is cobalt on cream tile. The sponsor cards are glazed
+ * cream tiles set into the night wall, with cobalt ornament. */
 .hackathon {
-  --azul: #8fa9c9;
-  --azul-deep: #5a6e8c;
+  --azul: #33517a;
+  --azul-soft: #5a739c;
   position: relative;
   padding: var(--band-pad) var(--gutter);
   background:
-    radial-gradient(80rem 44rem at 50% -8%, rgb(120 145 180 / 0.11) 0%, transparent 62%),
-    radial-gradient(52rem 36rem at 10% 100%, rgb(84 52 32 / 0.3) 0%, transparent 55%),
-    var(--kiln);
+    radial-gradient(70rem 44rem at 50% -8%, rgb(51 81 122 / 0.16) 0%, transparent 60%),
+    var(--night-2);
+  color: var(--bone);
   border-top: 1px solid rgb(74 58 46 / 0.5);
 }
 
@@ -1125,10 +1183,9 @@ a {
 
 .hackathon .eyebrow {
   margin-bottom: 0.9rem;
-  color: var(--azul);
+  color: var(--azul-soft);
 }
 
-.hackathon > .band-inner > h3,
 .hackathon .band-inner > h3 {
   font-family: var(--display);
   font-variation-settings: 'opsz' 60, 'SOFT' 40, 'WONK' 0;
@@ -1154,40 +1211,39 @@ a {
 
 .sponsor-card {
   position: relative;
-  border: 1px solid rgb(110 130 160 / 0.32);
   border-radius: 3px;
   padding: 1.9rem 1.7rem;
-  background: linear-gradient(168deg, rgb(40 50 66 / 0.5) 0%, rgb(28 32 42 / 0.12) 55%, rgb(26 21 18 / 0) 100%);
-  box-shadow: 0 1px 0 rgb(200 220 255 / 0.1) inset;
-  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), border-color 0.4s, box-shadow 0.4s;
+  background: linear-gradient(168deg, #efe9db 0%, #e6dfcd 100%);
+  color: var(--ink);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.5) inset, 0 20px 44px -26px rgb(0 0 0 / 0.75);
+  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.4s;
 }
 
 .sponsor-card:hover {
   transform: translateY(-5px);
-  border-color: rgb(143 169 201 / 0.55);
-  box-shadow: 0 1px 0 rgb(200 220 255 / 0.14) inset, 0 26px 48px -28px rgb(20 30 50 / 0.9);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.55) inset, 0 30px 54px -28px rgb(0 0 0 / 0.85);
 }
 
-/* Azulejo corner diamonds. */
+/* Azulejo corner diamonds, cobalt on the tile. */
 .sponsor-card::before,
 .sponsor-card::after {
   content: '';
   position: absolute;
   width: 7px;
   height: 7px;
-  background: var(--azul-deep);
+  background: var(--azul);
   transform: rotate(45deg);
-  opacity: 0.7;
+  opacity: 0.65;
 }
 
 .sponsor-card::before {
-  top: 10px;
-  left: 10px;
+  top: 11px;
+  left: 11px;
 }
 
 .sponsor-card::after {
-  bottom: 10px;
-  right: 10px;
+  bottom: 11px;
+  right: 11px;
 }
 
 .sponsor-name {
@@ -1203,36 +1259,36 @@ a {
 .sponsor-card h4 {
   font-family: var(--display);
   font-variation-settings: 'opsz' 60, 'SOFT' 50, 'WONK' 1;
-  font-weight: 560;
+  font-weight: 570;
   font-size: 1.35rem;
   line-height: 1.15;
-  color: var(--bone);
+  color: var(--ink);
   margin: 0 0 0.6rem;
   text-wrap: balance;
 }
 
 .sponsor-alt {
   font-size: 0.8rem;
-  color: var(--smoke);
+  color: var(--ink-faint);
   margin: -0.2rem 0 0.6rem;
 }
 
 .sponsor-claim {
   font-size: 1rem;
   line-height: 1.55;
-  color: var(--bone);
+  color: var(--ink);
   margin: 0 0 1.2rem;
 }
 
 .sponsor-detail {
   margin: 0;
-  border-top: 1px solid rgb(110 130 160 / 0.22);
+  border-top: 1px solid rgb(51 81 122 / 0.25);
   padding-top: 1.1rem;
 }
 
 .sponsor-detail dt {
   font-size: 0.72rem;
-  font-weight: 650;
+  font-weight: 680;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--azul);
@@ -1242,7 +1298,7 @@ a {
 .sponsor-detail dd {
   font-size: 0.9rem;
   line-height: 1.62;
-  color: var(--bone-dim);
+  color: var(--ink-soft);
   margin: 0 0 1.15rem;
 }
 
@@ -1253,13 +1309,13 @@ a {
 .sponsor-card code {
   font-family: var(--mono);
   font-size: 0.85em;
-  background: rgb(143 169 201 / 0.12);
+  background: rgb(51 81 122 / 0.1);
   padding: 0.1em 0.35em;
   border-radius: 3px;
 }
 
 .sponsor-card strong {
-  color: var(--bone);
+  color: var(--ink);
 }
 
 .hackathon-honesty {
@@ -1305,40 +1361,19 @@ a {
   position: relative;
   padding: 4rem var(--gutter) 3rem;
   border-top: 1px solid var(--umber);
-  background: var(--kiln);
+  background: var(--night);
+  color: var(--bone);
   overflow: hidden;
-}
-
-/* The ghost wordmark: poster-scale, outlined, half-buried below the fold line. */
-.ghost {
-  font-family: var(--display);
-  font-variation-settings: 'opsz' 144, 'SOFT' 60, 'WONK' 1;
-  font-style: italic;
-  font-weight: 500;
-  font-size: clamp(5rem, 17vw, 15rem);
-  line-height: 0.8;
-  letter-spacing: -0.02em;
-  color: transparent;
-  -webkit-text-stroke: 1px rgb(232 224 210 / 0.09);
-  user-select: none;
-  pointer-events: none;
-  text-align: center;
-  margin: 2.5rem 0 -0.36em;
-  white-space: nowrap;
-}
-
-.stamp {
-  float: left;
-  width: 46px;
-  height: 60px;
-  margin: 0.2rem 1rem 0.3rem 0;
-  opacity: 0.9;
 }
 
 .colophon-grid {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
   gap: 2.4rem;
+}
+
+.colophon .wordmark {
+  color: var(--bone);
 }
 
 .colophon-brand p {
@@ -1384,22 +1419,42 @@ a {
   max-width: 72ch;
 }
 
+.ghost {
+  font-family: var(--display);
+  font-variation-settings: 'opsz' 144, 'SOFT' 60, 'WONK' 1;
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(5rem, 17vw, 15rem);
+  line-height: 0.8;
+  letter-spacing: -0.02em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(232 224 210 / 0.09);
+  user-select: none;
+  pointer-events: none;
+  text-align: center;
+  margin: 2.5rem 0 -0.36em;
+  white-space: nowrap;
+}
+
+.stamp {
+  float: left;
+  width: 46px;
+  height: 60px;
+  margin: 0.2rem 1rem 0.3rem 0;
+  opacity: 0.9;
+}
+
 /* ---------------------------------------------------------------- reveals */
 
 .reveal {
   opacity: 0;
-  transform: translateY(30px);
-  filter: blur(9px);
-  transition:
-    opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
-    transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
-    filter 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform: translateY(28px);
+  transition: opacity 1s cubic-bezier(0.19, 0.8, 0.22, 1), transform 1s cubic-bezier(0.19, 0.8, 0.22, 1);
 }
 
 .reveal.in {
   opacity: 1;
   transform: none;
-  filter: none;
 }
 
 /* ------------------------------------------------------------- responsive */
@@ -1409,8 +1464,7 @@ a {
     display: none;
   }
 
-  .beat:nth-child(2) {
-    margin-left: 0;
+  .manifesto .beat:nth-of-type(2) {
     text-align: left;
   }
 
@@ -1422,15 +1476,16 @@ a {
   .scroll-hint {
     display: none;
   }
+
+  .wash {
+    width: 28rem;
+    height: 24rem;
+  }
 }
 
 /* ---------------------------------------------------------- reduced motion */
 
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
   .reveal {
     opacity: 1;
     transform: none;
@@ -1440,19 +1495,23 @@ a {
   .pulse,
   .scroll-hint,
   .ticker-track,
-  .hero::before,
-  .hero-copy > * {
+  .hero-copy > :not(h1) {
     animation: none;
+  }
+
+  .sl-line {
+    transform: none;
+    transition: none;
   }
 
   .tablet:hover,
   .sponsor-card:hover,
   .cta-primary:hover,
-  .cta-ghost:hover {
+  .example-chip:hover {
     transform: none;
   }
 
-  #smudge {
+  .cursor-ring {
     display: none;
   }
 }
