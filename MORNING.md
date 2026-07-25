@@ -1,14 +1,18 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 19. 18 forge, 475 SDK (470 pass,
-**2 fail**, 3 skipped), 13 Playwright — 506 total. The two failures are not a regression: the
-deployed registry gained two adapters from another working copy during iteration 15 and this
-tree's ontology has not caught up. **"Needs you" item 18** has the fix and it is a merge, not a
-bug. The 3 skips are the tests that need the new subgraph version, which was still syncing when
-the run was taken; they assert normally against it and skip loudly against the old one. **New:
-"Needs you" item 19** — something runs git in this repo as root and it has started blocking
-commits; there is a workaround in the tree and a one-line fix for you._
+detail. _Last updated 2026-07-25, after unattended iteration 20. 18 forge, 493 SDK, 13
+Playwright — 524 total. **2 fail**, and they are not a regression: the deployed registry gained
+two adapters from another working copy during iteration 15 and this tree's ontology has not
+caught up. **"Needs you" item 18** has the fix and it is a merge, not a bug. **The subgraph
+v0.0.3 sync finished during iteration 20** — the three skips iterations 17–19 carried are gone,
+and the full sweep is green against it (`./apps/demo/test.sh` → forge 18, sdk unit 35, sdk live
+19/19 with no skips, Playwright 13). Four further reds in `npm test` at the end of the run are a
+Studio `429 Too many requests` on the free-tier quota, which I burned on a 252-avatar census;
+the identical tests are 19/19 against the other version of the same subgraph, so they are quota
+and not code. **"Needs you" item 19** stands — something runs git in this repo as root; both
+`git add` and `git commit` happened to work this iteration, which means the lottery is still
+running rather than that it is fixed._
 
 ---
 
@@ -603,6 +607,50 @@ do: `version/latest` tracks the latest *synced* version, so it flips by itself a
 reads a half-indexed index. One trap if you go looking: a labelled version answers at
 `api.studio.thegraph.com/query/77602/poh/**v0.0.3**`, not under `/version/v0.0.3` — that path
 returns `Not found`, which reads exactly like a deleted deployment.
+
+**Iteration 20 went looking for Circles' ending and found we had invented one.** The queued item
+was "date the `stop()`", which needed a subgraph mapping change plus a two-and-a-half-hour resync.
+It needed neither, because there is nothing to date: the Circles Hub writes
+`mintTimes[a].lastMintTime` when an avatar registers and **never writes it back to zero**, and
+`isHuman(a)` is that same field `> 0`. So a Circles registration cannot be revoked at all. Its one
+transition is `stop()`, which writes `type(uint96).max` to that field — irreversible, and
+emphatically greater than zero, so the Hub goes on calling a stopped avatar a human.
+
+We were reading `stop` as a revocation, and that was a live defect. The index's `stopped` flag was
+mapped onto `ended`, which is the one field the reconciler cannot second-guess: on the branch where
+the contract read *fails*, it is the answer. So one subject was **held at chain head and not held
+whenever the Gnosis RPC hiccupped** — two answers about one person, chosen by our own uptime, in
+exactly the place iteration 1's fix was supposed to have removed that. It survived twenty
+iterations because it needs a stopped avatar *and* a failed chain read, and there are **two stopped
+avatars in the world** (a topic-filtered log scan over the Hub's entire life, against ~317,000
+register and trust events).
+
+- **The Hub cannot tell you which avatars stopped, and this is the part worth reading.**
+  `stopped(address _human)` validates `_human` and then reads `mintTimes[msg.sender]`. It answers
+  about the **caller**. An ordinary `eth_call` sends no `from`, so it returns `false` for every
+  address anyone has ever asked about — including both that really stopped — and it returns *true*
+  for a perfectly ordinary avatar if the address doing the asking happens to have stopped.
+  Measured all three ways at head. The Hub is not behind a proxy, so it cannot be fixed in place.
+  **Our index was right and the contract's getter is wrong**, which matters because the obvious
+  sanity check — cross-reference the index against the contract — would have disproved two real
+  stops and confirmed any number that never happened.
+- **So it is read from storage, slot 21, and the slot audits itself.** `isHuman` is a public getter
+  over the exact word being decoded, so `(lastMintTime > 0) === isHuman(a)` is a check the chain
+  performs on every call. 252 of 252 sampled avatars agree, including 4 that never registered. A
+  moved layout costs us the flag and can never invent one.
+- **Now a caveat, not an ending.** `credential-minting-stopped` says the credential is held and
+  counted and that the address may be one its human has walked away from — which is what stopping
+  usually means, since you do it before moving to a new address.
+
+No weight, root, curve or cost moved, so no registry write; nothing at head changes either, because
+`isHuman` already decided it. What changes is that the degraded path now agrees with the head path.
+Write-up: `research/protocols/circles-stop-and-the-broken-getter.md`. `docs/scoring.md` corrected —
+it listed "Circles' undated `stopped()`" among the protocols that erase an ending, and Circles has
+no ending to erase. README gains honest-limit 11.
+
+**The v0.0.3 cutover landed during this iteration** — fully synced to chain head (47,389,943), no
+indexing errors. The three tests that had been skipping since iteration 17 now run and pass, so the
+live suite is **19/19 with no skips**.
 
 ---
 

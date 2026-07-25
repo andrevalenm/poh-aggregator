@@ -2526,3 +2526,177 @@ will silently block roughly one commit in a hundred-and-something until the owne
 Iteration 1's two carried notes stand, both Hugo's call — `pnpm-lock.yaml` untracked beside a
 tracked `package-lock.json`, and `MISSION.md` pointing at a `./test.sh` that lives at
 `apps/demo/test.sh`.
+
+## Iteration 20 — 2026-07-25
+
+**Did:** iteration 19's next-step 2 — **the Circles ending**. The item was "date the stop, which
+needs a mapping change plus a resync". Asking the question closed it a different way and turned up
+a live defect in our own scoring instead: **Circles has no ending, and we were reading one.** No
+subgraph change, no resync.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: `as-of.live.test.ts` is 10 pass / 2 fail, the same two, and
+nothing else. MORNING "Needs you" item 18 stands, unchanged for a sixth iteration.
+
+**`isHuman` is monotonic, so a Circles registration cannot be revoked.** The Hub writes
+`mintTimes[a].lastMintTime` at registration and never writes it back to zero: `_claimIssuance` only
+ever raises it, `_updateMintV1Status` takes `_max(lastMintTime, block.timestamp)` with a comment
+saying it does so precisely to protect the stop sentinel, and there is no `delete` on `avatars`.
+`isHuman(a)` is `mintTimes[a].lastMintTime > 0`. The one transition an avatar has after
+registration is `stop()`, which writes `type(uint96).max` — irreversible, and greater than zero, so
+**the Hub goes on calling a stopped avatar a human**.
+
+**The defect that made it worth an iteration.** `circlesIndexRead` mapped the index's `stopped`
+flag onto `IndexedCredential.ended`, and `ended` is the one field `reconcile.ts` cannot
+second-guess — on the branch where the contract read *fails*, it is the answer
+(`if (index.entity.ended) return { held: false }`). So one subject was:
+
+| Gnosis RPC | `held` |
+|---|---|
+| up | `true` (`isHuman` decides) |
+| down | `false` |
+
+Two answers about one subject, chosen by our own uptime. That is the torn read `reconcile.ts` was
+written to remove, reappearing in the field the reconciler treats as authoritative, and it is a
+**false negative** — the direction the mission's adapter checklist singles out ("a network failure
+returning `held: false` would silently mean 'not a human'"). It survived because it needs a stopped
+avatar *and* a failed chain read, and there are two stopped avatars in the world.
+
+Fixed as `ended: false` with the monotonicity argument in place. The stop is now reported beside
+the credential rather than instead of it: `detail.stopped`, `detail.stoppedIndexed` when the index
+differs (index lag — shown, not resolved), and a `credential-minting-stopped` note and caveat
+saying the credential is held and counted and that the address may be one its human has walked
+away from. Stopping is, in practice, what you do before moving to a new address.
+
+**And the Hub cannot be asked which avatars stopped.** `mintTimes` is `internal`, so
+`stopped(address)` is the only intended read, and it is broken:
+
+```solidity
+function stopped(address _human) external view returns (bool) {
+    if (!isHuman(_human)) { revert CirclesErrorOneAddressArg(_human, 0x03); }
+    MintTime storage mintTime = mintTimes[msg.sender];   // <-- msg.sender, not _human
+    return (mintTime.lastMintTime == INDEFINITE_FUTURE);
+}
+```
+
+Measured three ways at head, and the third row is the one that admits no innocent reading:
+
+| call | `from` | result | true answer |
+|---|---|---|---|
+| `stopped(0xeb94…)` | *(none — `0x0`)* | `false` | **true** |
+| `stopped(0xeb94…)` | `0xeb94…` | `true` | true |
+| **`stopped(<a live avatar>)`** | **`0xeb94…`** | **`true`** | **false** |
+
+An ordinary `eth_call` sends no `from` and runs as the zero address, whose `lastMintTime` is 0, so
+**`stopped()` returns false for every address anyone has ever asked about** — including both that
+really stopped. Archive reads confirm it was false even *in the block the `Stopped` event was
+emitted in* (control: `isHuman` is false at 43,155,514 and true at 43,155,515, so the endpoint is
+genuinely archive). The Hub is not behind a proxy — EIP-1967 implementation slot is `0x00…00`,
+bytecode verifies directly as `Hub` — so it cannot be fixed in place. **Our index was right and the
+contract's getter is wrong**, which is worth saying out loud: the obvious "cross-check the index
+against the contract" would have disproved two real stops and confirmed any number that never
+happened.
+
+**So the probe reads storage, and the slot checks itself.** `mintTimes` is at **slot 21**, found by
+scanning indices against a known-stopped avatar, a live one and an address the Hub has never seen —
+one index gives the sentinel, a plausible timestamp and zero. What makes a hard-coded slot in
+someone else's contract safe here is stronger than iteration 18's owner check: **`isHuman` is a
+public getter over the exact word being decoded**, so `(lastMintTime > 0) === isHuman(a)` is a check
+the chain performs on every call, in the same batch as the `held` read. Census: **252/252 sampled
+avatars agree**, including **4 that never registered** (trust-graph entries), so the identity is
+exercised in both directions. Disagreement returns `undefined` — a moved layout costs the flag and
+can never invent one.
+
+**The population is two, ever.** Topic-filtered `eth_getLogs` for `Stopped(address)` over the Hub's
+whole life (36,486,014 → head 47,389,543, 200,000-block pages): `0xeb94174e…` at block 40,615,924
+(2025-06-16T15:11:25Z) and `0x4bfc7498…` at 45,241,483 (2026-03-20T05:27:05Z), against ~317,000
+register/trust events. Both are `isHuman` at head, with 126 and 5 incoming trust edges. Hard-coded
+as fixtures for the same reason iteration 8's `RETIRED_BY_V2` is — two in the population is not
+something a run-time sample finds — but everything *about* them is re-derived each run.
+
+**Verified:** on this box, at this commit.
+
+- `CORROBORATE_SUBGRAPH_URL=…/poh/v0.0.3 ./apps/demo/test.sh` → **all suites green**: forge **18
+  passed**; sdk scoring **35 pass**; sdk live **19 pass, 0 skip, 0 fail**; Playwright **13 passed**.
+  Exit 0. The three skips iterations 17–19 carried are gone: **v0.0.3 finished syncing during this
+  iteration** (47,389,943, `hasIndexingErrors: false`, at head).
+- `circles.test.ts` → **9/9**, no network. `circles.live.test.ts` → **9/9, 0 skipped** against
+  v0.0.3; 8 pass / 1 skip against `version/latest`.
+- `cd packages/sdk && npm test` → `# tests 493` (**+18** over iteration 19's 475: 9 unit, 9 live).
+  **2** failures are iteration 15's registry-drift pair, unchanged. A further **4** in
+  `live.test.ts` are a Studio `429 Too many requests` on the `version/latest` endpoint and are
+  **19/19 green against v0.0.3**, so they are quota and not code — I exhausted the free-tier quota
+  running the 252-avatar census, and it had not reset by the end of the iteration.
+- `npm run build` and `tsc --noEmit` clean in `packages/sdk`; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` → DENY / ALLOW **3.6178 over 6 roots** / DENY naming the sibling /
+  DENY `a fleet of 27 agents is still one human`. Iteration 19 recorded **3.6152 over 5**. **That
+  difference is not this change** — I stashed the whole working tree and re-ran, and the old code
+  gives 3.6178 over 6 as well. Circles is the sixth root and something outside this commit brought
+  it back; worth a look, but it is not ours.
+- **The acceptance test the mission asks for** ("a live test that hits the real chain and asserts
+  the mechanism, not a magic number") is *"the Hub cannot answer the question its getter takes an
+  argument for"*: the same `stopped()` call issued three ways, with the answers required to be
+  false, true, and **true about an avatar that never stopped**. Then the storage read held against
+  `isHuman` over 40 avatars sampled at run time **from the Hub's own logs, not from our index** —
+  deliberately, since the census is what licenses the hard-coded slot and it must not be able to go
+  quiet because a hosted GraphQL endpoint rate-limited us. Then the transition dated from archive
+  storage: the word at `block − 1` is an ordinary mint timestamp and at `block` it is the sentinel.
+  Then set containment against the index, guarded on the index's *own* coverage record rather than
+  its head, because a windowed deployment has a head past both stops and has seen neither.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved — nothing at
+head changes, because `isHuman` already decided it. What changes is that the degraded path now
+agrees with the head path. `circles-v2`'s `notes` gained the facts (an off-chain field;
+`setAdapter` does not carry it). Registry stays as the chain has it (32 adapters / revision 36,
+written by the other tree; this tree still has 30).
+
+**Committed:** `e96fe5c` fix(sdk): a stopped Circles avatar is not a revoked one, and the Hub
+cannot tell you which is which
+
+**Write-up:** `research/protocols/circles-stop-and-the-broken-getter.md` — the source quoted, the
+three-way measurement, the archive controls, the slot derivation and census, the two-event
+population, the bug with its truth table, and what is deliberately not done. Indexed in
+`research/INDEX.md` (header recount: 39 files / ~25,050 lines). `docs/scoring.md` corrected: it
+listed "Circles' undated `stopped()`" among the protocols that erase an ending, and Circles has no
+ending to erase. README gains honest-limit 11.
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15–19, still
+   the only *real* red in the suite, still Hugo's call.
+2. **Pin Passport's attester** — iteration 19's next-step 3, untouched and still the cheapest
+   remaining correctness item. `passport-and-linea-lapsed-credentials.md` §6 question 1: the
+   probe's authority model rests on only EAS being able to write to the resolver, and the EAS
+   record already read for the window hands us the attester (`0x84382998…dB1a`) for free.
+3. **Ask whether any other adapter's index flag can retire a credential the chain still honours.**
+   That is the shape of this iteration's bug stated generally, and Circles was found by accident
+   rather than by looking. `pohIndexRead` maps `ended: Boolean(row.revoked)`, which *is* a real
+   revocation, so PoH is fine — but the audit is one grep and has never been done deliberately.
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read
+   appears. Iteration 7's measurement stands.
+
+**Worth keeping, because it generalises.** Iteration 18's lesson was *a getter that hides a value
+is not a chain that has lost it*; iteration 19's was *when a read is bounded, write down the
+predicate the bound enforces*. This one is the third face of the same die: **a getter can answer
+truthfully about the wrong subject.** `stopped(_human)` validates its argument and then reads
+`msg.sender` — it never errors, never returns nonsense, and is wrong about almost every address you
+could pass it. The rule for the next adapter: when a getter takes an argument, check that the
+answer actually *moves* with it. One call with a second `from` would have caught this in ten
+seconds, and nothing short of that would have caught it at all.
+
+The other one is about our own design. **The safest storage read is one the contract publishes a
+predicate over.** Iteration 18 made a `private` slot safe by requiring the record to name the
+subject; here `isHuman` *is* `lastMintTime > 0`, so the chain audits our arithmetic on every single
+call and a moved layout produces silence by construction. When you must reach past a getter, look
+first for a getter that reads the same word — that is a free, permanent, self-updating test.
+
+And the smaller one: **an index flag named after an event is not a fact about a credential.**
+`stopped` faithfully recorded a `Stopped` event; the error was one layer up, in deciding that
+`Stopped` meant *ended*. The mapping was right and the meaning was wrong, which is why no amount of
+testing the subgraph would have found it.
+
+**Blocked:** nothing new. Carried: iteration 15's ontology/registry drift (Hugo), iteration 19's
+root-owned `.git` objects (`git add` and `git commit` both worked this iteration — the object
+hashes did not land in `f5`/`fe` — so the lottery is still running and the fix is still needed),
+and iteration 1's two notes, `pnpm-lock.yaml` untracked beside a tracked `package-lock.json` and
+`MISSION.md` pointing at a `./test.sh` that lives at `apps/demo/test.sh`.

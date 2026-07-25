@@ -36,6 +36,16 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       a PoH vouch is a *bound* (it precedes the claim, so reading it as a date buys ramp weight
       — 0.875 vs 0.5 on a three-year-old vouch).
       `research/protocols/protocol-subgraph-coverage.md`.
+- [x] **Circles' ending, which turned out not to exist** — shipped (iteration 20): the queued
+      item was "date the `stop()`, which needs a mapping change plus a resync". It needs
+      neither. `isHuman` is `mintTimes[a].lastMintTime > 0` and nothing ever clears that field,
+      so **Circles has no revocation**; `stop()` writes `type(uint96).max` to it, which is
+      greater than zero, so a stopped avatar is still a registered human. We had been mapping
+      `stopped` onto `ended`, the one field the reconciler cannot second-guess, so the same
+      subject was held at head and **not held whenever the Gnosis RPC failed**. Now a caveat,
+      not an ending — read from Hub storage slot 21, because `stopped(address)` validates the
+      address you pass and then answers about `msg.sender` and so reports `false` for every
+      avatar that has ever stopped. `research/protocols/circles-stop-and-the-broken-getter.md`.
 - [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.
