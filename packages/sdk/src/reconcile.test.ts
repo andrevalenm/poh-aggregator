@@ -17,9 +17,23 @@ const NOW = 1_800_000_000
 const HOUR = 3600
 const DAY = 86_400
 
-/** A synced index: 10 minutes behind head, which is where ours actually sits. */
+/**
+ * A synced index: 10 minutes behind head, which is where ours actually sits.
+ *
+ * `observesEveryEnding: true` is the Circles-shaped index — one whose credential class has no
+ * ending it could miss. It is the default here because most of these tests are about dates and
+ * absence, where it does not participate; the PoH-shaped index that cannot see an ending gets
+ * its own tests below, and it is the one our own deployment actually is.
+ */
 function syncedIndex(over: Partial<IndexView> = {}): IndexView {
-  return { block: 47_000_000, blockTimestamp: NOW - 600, entity: null, completeHistory: true, ...over }
+  return {
+    block: 47_000_000,
+    blockTimestamp: NOW - 600,
+    entity: null,
+    completeHistory: true,
+    observesEveryEnding: true,
+    ...over,
+  }
 }
 
 const chain = (over: Partial<ChainView> = {}): ChainView => ({ held: true, block: 47_000_100, ...over })
@@ -284,6 +298,87 @@ describe('reconciling an index against a chain head', () => {
     assert.equal(r.heldUntil, undefined)
   })
 
+  test('an index blind to endings may not carry a credential through a failed chain read', () => {
+    // The PoH shape, and a live one: 33 humanities have left Gnosis by cross-chain discharge,
+    // 25 of them since 2026-05, and our mapping handles no such event. The index holds them
+    // with `ended: false` and expiries running into 2027, so on the old code a failed Gnosis
+    // read counted a credential the subject transferred away weeks ago — at full weight, with
+    // a real claim date. It is now excluded as unreadable.
+    const r = reconcileIndexAndChain({
+      chain: { held: false, unavailable: true },
+      index: syncedIndex({
+        observesEveryEnding: false,
+        entity: { issuedAt: NOW - 700 * DAY, issuanceObserved: true, ended: false },
+      }),
+    })
+    assert.equal(r.held, false)
+    assert.ok(r.error, 'unreadable, not absent: a failed read is never a claim about a person')
+    assert.equal(r.issuedAt, undefined, 'nothing to date — the credential is not counted at all')
+    assert.ok(r.provenance.notes.includes('index-cannot-see-endings'))
+    assert.ok(r.provenance.notes.includes('freshness-check-unavailable'))
+  })
+
+  test('the same rule applies to an ending the index *did* see, because it can be stale too', () => {
+    // Symmetry is the point. An index that misses endings misses re-creations as well — a
+    // revoked humanity can be granted again from another chain without our mapping hearing —
+    // so its `ended` flag is no more checkable than its silence. Excluded either way, and the
+    // note says which question could not be answered rather than implying an answer.
+    const r = reconcileIndexAndChain({
+      chain: { held: false, unavailable: true },
+      index: syncedIndex({
+        observesEveryEnding: false,
+        entity: { issuedAt: NOW - 700 * DAY, issuanceObserved: true, ended: true },
+      }),
+    })
+    assert.equal(r.held, false)
+    assert.ok(r.error)
+    assert.ok(r.provenance.notes.includes('index-cannot-see-endings'))
+  })
+
+  test('an index that observes every ending still answers alone, which is the whole point', () => {
+    // Circles: `isHuman` is `lastMintTime > 0` and nothing ever writes it back down, so there
+    // is no ending to miss and the index's word survives a failed chain read. The rule has to
+    // discriminate, or it is just a switch that turns the index off.
+    const r = reconcileIndexAndChain({
+      chain: { held: false, unavailable: true },
+      index: syncedIndex({
+        observesEveryEnding: true,
+        entity: { issuedAt: NOW - 700 * DAY, issuanceObserved: true, ended: false },
+      }),
+    })
+    assert.equal(r.held, true)
+    assert.equal(r.error, undefined)
+    assert.equal(r.issuedAt, NOW - 700 * DAY)
+    assert.ok(!r.provenance.notes.includes('index-cannot-see-endings'))
+  })
+
+  test('a blind index is untouched while the chain answers', () => {
+    // The flag is about who may speak when nothing can check them. At head the chain decides
+    // `held` and the index is a date and a cross-check, exactly as before — a protocol whose
+    // endings we cannot index must not lose its ordinary scoring path.
+    const held = reconcileIndexAndChain({
+      chain: chain({ issuedAt: NOW - 400 * DAY }),
+      index: syncedIndex({
+        observesEveryEnding: false,
+        entity: { issuedAt: NOW - 400 * DAY, issuanceObserved: true, ended: false },
+      }),
+    })
+    assert.equal(held.held, true)
+    assert.equal(held.issuedAt, NOW - 400 * DAY)
+    assert.deepEqual(held.provenance.notes, [])
+
+    const gone = reconcileIndexAndChain({
+      chain: chain({ held: false }),
+      index: syncedIndex({
+        observesEveryEnding: false,
+        entity: { issuedAt: NOW - 400 * DAY, issuanceObserved: true, ended: false },
+      }),
+    })
+    assert.equal(gone.held, false)
+    assert.ok(gone.provenance.notes.includes('credential-ceased-since-index'))
+    assert.ok(!gone.provenance.notes.includes('index-cannot-see-endings'))
+  })
+
   test('both sources failing is an error, never a negative', () => {
     const noIndex = reconcileIndexAndChain({ chain: { held: false, unavailable: true } })
     assert.equal(noIndex.held, false)
@@ -458,5 +553,42 @@ describe('subgraph lag can no longer move a score in silence', () => {
       !result.caveats.some((c) => c.code === 'issuance-date-unknown'),
       'the age is bounded, not unknown — claiming otherwise would be false',
     )
+  })
+})
+
+describe('the scoring consequence of an index that cannot see an ending', () => {
+  test('a departed credential is worth nothing and the caveat says why', () => {
+    // Same subject, same index answer, one difference: whether the chain could be reached.
+    // Before this rule the two disagreed by the whole weight of the credential, and which one
+    // a subject got was decided by our own RPC.
+    const departed = reconcileIndexAndChain({
+      chain: { held: false, unavailable: true },
+      index: syncedIndex({
+        observesEveryEnding: false,
+        entity: { issuedAt: NOW - 700 * DAY, issuanceObserved: true, ended: false },
+      }),
+    })
+    const readable = reconcileIndexAndChain({
+      chain: chain({ held: false }),
+      index: syncedIndex({
+        observesEveryEnding: false,
+        entity: { issuedAt: NOW - 700 * DAY, issuanceObserved: true, ended: false },
+      }),
+    })
+
+    const blind = scoreOf(evidenceFor(departed))
+    const seeing = scoreOf(evidenceFor(readable))
+    assert.equal(blind.totalCostCents, 0)
+    assert.equal(seeing.totalCostCents, 0, 'the chain says gone, and now so does the failed read')
+    assert.equal(blind.evidence[0]!.held, false)
+    assert.ok(blind.caveats.some((c) => c.code === 'index-cannot-see-endings'))
+  })
+
+  test('the old behaviour, priced: this is what the rule stops paying out', () => {
+    // The credential the index still lists is 700 days old on a 365-day ramp, so reading it as
+    // held hands the subject 0.75 of a root's full weight for a humanity that left the chain.
+    const asHeld = freshnessOf(pohLike, NOW - 700 * DAY, NOW)
+    assert.ok(Math.abs(asHeld - (1 - 2 ** (-700 / 365))) < 1e-9)
+    assert.ok(effectiveCost(pohLike, asHeld) > 0, 'it was real weight, not a rounding error')
   })
 })

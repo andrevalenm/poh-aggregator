@@ -153,6 +153,24 @@ from the protocol's own deployment block). Coverage rides along in the same requ
 and the head, because a cached "complete history" outliving the deployment that earned it is the
 same class of error the entity exists to remove.
 
+**An index may answer alone only where it can see every way the credential ends.** Complete
+history says how far *back* an index reaches; it says nothing about which transitions the mapping
+handles, and those are different questions with the same failure mode. Our PoH v2 index handles
+`HumanityRevoked` and nothing else, while a humanity also ends by expiring — which emits no event,
+so no mapping could hear it — and by leaving the chain through a cross-chain discharge, which
+emits one we do not handle (33 all-time, 25 since 2026-05). Measured at Gnosis block 47,390,676:
+**217 of the 1,576 humanities our index holds are not held on chain and carry no ending in the
+index**, 13.8% of the population. At head that costs nothing, because the chain decides `held`.
+On a *failed* chain read the reconciler used to fall back to the index and return those
+credentials held, dated, and at full ramp weight — the same subject scored differently depending
+on our own uptime. So `IndexView` now carries `observesEveryEnding` beside `completeHistory`, and
+an index without it is not allowed to decide `held` when nothing can check it: the credential is
+excluded as **unreadable**, with `index-cannot-see-endings`, rather than counted or denied. It is
+declared per mapping rather than asked of the endpoint, because an index cannot report the events
+it does not handle. Circles goes the other way and keeps its fallback — `isHuman` is monotonic, so
+there is no ending to miss. The rule applies to `ended: true` as well: an index that misses
+endings misses the re-grants that undo them, so its ending is no more checkable than its silence.
+
 **A side-event is not an issuance, and which way it errs decides how it may be used.** An index
 often holds a credential only because something adjacent to it was indexed, and that event's
 timestamp is not the issuance date. The direction is what matters, and it is protocol-specific. A

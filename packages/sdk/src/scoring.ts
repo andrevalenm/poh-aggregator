@@ -474,6 +474,17 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     })
   }
 
+  // Deliberately not filtered on `held`: this evidence is never held. The whole point is that
+  // the credential was excluded as unreadable rather than counted, and a subject who loses a
+  // trust root to our own RPC failing is owed the reason.
+  const blind = withNote('index-cannot-see-endings')
+  if (blind.length) {
+    out.push({
+      code: 'index-cannot-see-endings',
+      message: `The contract read failed for ${ids(blind)} and the index at block ${blocks(blind)} does not observe every way this credential can end — a term running out emits no event at all, and a humanity that leaves the chain emits one this index does not handle. So the index can say the credential existed and cannot say it still does. Excluded as unreadable rather than counted, which is the same rule that stops a failed probe reading as "not a human", applied in the other direction.`,
+    })
+  }
+
   const stale = withNote('freshness-check-unavailable')
   if (stale.length) {
     out.push({

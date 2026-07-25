@@ -507,7 +507,7 @@ cd packages/sdk && node --test --experimental-strip-types src/ens-presentation.l
 cd apps/demo && npx playwright test
 ```
 
-537 of them exist as of 2026-07-25 (18 forge + 506 SDK + 13 browser) and 535 pass. Two SDK tests
+548 of them exist as of 2026-07-26 (18 forge + 517 SDK + 13 browser) and 546 pass. Two SDK tests
 are red and named: the deployed registry gained two adapters from another working copy and this
 tree's ontology has not caught up (`MORNING.md`, "Needs you" item 18). Nothing skips against a
 pinned subgraph version; against Studio's `version/latest` the free-tier quota can throttle the
@@ -632,6 +632,23 @@ likes about anybody. The same holds for every hosted credential in the ontology:
 key, Linea's portal owner, World's Orb. This is what a trust root *is*, which is why the weight
 tracks the root's cost rather than the strength of any signature check — and why a passport is
 priced at a dollar. [`research/protocols/passport-attester-pin.md`](research/protocols/passport-attester-pin.md).
+
+**13. Our PoH index cannot see two of the three ways a humanity ends, so it is no longer allowed
+to answer alone.** The mapping handles `HumanityRevoked` — faithful, and empty: the registry has
+had exactly one revocation, it was re-claimed afterwards, and 0 of 1,576 indexed humanities carry
+the flag today. What it cannot handle is an expiry, which emits no event for anyone to index, and
+a cross-chain transfer out, which emits one we do not handle — 33 all-time and **25 since
+2026-05**. So **217 of those 1,576 humanities (13.8%) are not held on chain and carry no ending in
+the index**. At head that costs nothing: the chain decides. When the Gnosis read *failed*, the
+reconciler fell back to the index and returned them held, dated and at a full trust root — the
+same subject scored differently depending on our own uptime, which is the torn read this
+architecture exists to remove. An index now declares whether it observes every ending
+(`observesEveryEnding`), and one that does not is excluded as **unreadable** rather than counted
+or denied, with `index-cannot-see-endings`. Circles keeps its fallback for the opposite reason:
+its credential is monotonic, so there is no ending to miss. The residual is that PoH's degraded
+path is now silence — a subject whose credential is real loses it from the score whenever Gnosis
+is unreachable, which is the direction we would rather be wrong in.
+[`research/protocols/poh-endings-the-index-cannot-see.md`](research/protocols/poh-endings-the-index-cannot-see.md).
 
 Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 

@@ -144,6 +144,12 @@ interface IndexSource {
   entity: string
   /** Entity selection against a deployment predating the observed-issuance and coverage fields. */
   legacyEntity: string
+  /**
+   * See `IndexView.observesEveryEnding`. A property of *this mapping*, so it is declared here
+   * beside the query rather than derived from anything the endpoint says: an index cannot
+   * report the events it does not handle, and asking it would be asking the wrong witness.
+   */
+  observesEveryEnding: boolean
   map: (row: Record<string, unknown>, legacy: boolean) => IndexView['entity']
 }
 
@@ -198,6 +204,7 @@ async function indexRead(
       completeHistory: legacy
         ? LEGACY_SUBGRAPH_COVERAGE[src.protocol].completeHistory
         : (coverage?.completeHistory ?? false),
+      observesEveryEnding: src.observesEveryEnding,
     },
     row: data.entity,
     legacy,
@@ -223,6 +230,25 @@ async function indexRead(
  * `claimObserved` the old assumption is kept (every entity treated as claim-dated), because
  * that is what such a deployment can actually support — and PoH is dated from the contract
  * anyway, so there the index is a cross-check whose disagreements are reported.
+ *
+ * **`observesEveryEnding` is false, and `revoked` is why it has to be said out loud.** The flag
+ * itself is faithful: the deployed implementation (`0x85b88E38…3F52`, verified source) emits
+ * `HumanityRevoked` at the two sites that do `delete humanity.owner` — `executeRequest` and
+ * `rule` — so the event *is* the ending, and the mapping records it. The problem is the endings
+ * it never hears about. A humanity also ends by:
+ *
+ * - **expiring.** `isHuman` is `owner != 0 && block.timestamp < expirationTime`, and a term
+ *   running out emits nothing. There is no event to handle.
+ * - **leaving the chain.** `ccDischargeHumanity` clears the owner and emits
+ *   `HumanityDischargedDirectly`, which this mapping does not handle: **33 all-time on Gnosis,
+ *   25 of them since 2026-05** (topic-filtered `eth_getLogs` over the proxy's whole life,
+ *   2026-07-26). Eight sampled that day are `isHuman: false` with `owner` cleared on chain and
+ *   present in our index with `revoked: false` and expiries running into 2027.
+ *
+ * The credential is decided by the chain at head, so none of that moves a score while the RPC
+ * answers. It decided one when the RPC did *not*, which is what `observesEveryEnding` now
+ * prevents — see `reconcile.ts`. Indexing the two cross-chain events would make this true for
+ * the second case and never for the first; only an expiry-aware entity could do that.
  */
 export async function pohIndexRead(
   subgraphUrl: string,
@@ -232,6 +258,7 @@ export async function pohIndexRead(
     protocol: 'poh',
     entity: `pohHuman(id: "${address.toLowerCase()}") { claimedAt revoked claimObserved }`,
     legacyEntity: `pohHuman(id: "${address.toLowerCase()}") { claimedAt revoked }`,
+    observesEveryEnding: false,
     map: (row, legacy) => ({
       issuedAt: Number(row.claimedAt),
       issuanceObserved: legacy ? true : Boolean(row.claimObserved),
@@ -269,6 +296,13 @@ export async function pohIndexRead(
  * `stop()` ends personal-Circles *minting* and leaves the human registered, so it comes back
  * beside the credential instead — see `adapters/circles.ts`, which reads it from Hub storage
  * because the contract's `stopped()` getter answers about the caller rather than the argument.
+ *
+ * The same argument is what makes `observesEveryEnding` **true** here, and it is true
+ * vacuously: there are no endings to observe, so this index cannot miss one. That is the
+ * opposite verdict from PoH's for the same reason each protocol's `ended` is what it is, and
+ * it is worth stating rather than inheriting a default — an index earns the right to answer
+ * alone by being able to see every way the credential can stop being held, and monotonicity is
+ * the strongest form of that: nothing can stop it.
  */
 export async function circlesIndexRead(
   subgraphUrl: string,
@@ -279,6 +313,7 @@ export async function circlesIndexRead(
     protocol: 'circles',
     entity: `circlesAvatar(id: "${id}") { registeredAt trustedByCount stopped inviter registrationObserved }`,
     legacyEntity: `circlesAvatar(id: "${id}") { registeredAt trustedByCount stopped inviter }`,
+    observesEveryEnding: true,
     map: (row, legacy) => ({
       issuedAt: Number(row.registeredAt),
       issuanceObserved: legacy ? row.inviter != null : Boolean(row.registrationObserved),

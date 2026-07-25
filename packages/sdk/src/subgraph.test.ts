@@ -221,3 +221,47 @@ describe('what the index saw decides how its date is used', () => {
     assert.equal(view?.trustedByCount, 7)
   })
 })
+
+describe('which endings an index can see decides whether it may answer alone', () => {
+  test('the PoH index declares that it cannot see every ending, on every schema', async () => {
+    // Not a property of the endpoint, so a legacy deployment must not be able to soften it: the
+    // mapping handles `HumanityRevoked` and nothing else, and a humanity also ends by expiring
+    // (no event at all) and by leaving the chain (`HumanityDischargedDirectly`, 33 all-time).
+    respond = modern({ human: { claimedAt: '1729000000', revoked: false, claimObserved: true } })
+    assert.equal((await pohIndexRead(url, ADDR))?.observesEveryEnding, false)
+
+    respond = legacy({ claimedAt: '1729000000', revoked: false })
+    assert.equal((await pohIndexRead(url, ADDR))?.observesEveryEnding, false)
+  })
+
+  test('the Circles index declares that it can, because there is no ending to miss', async () => {
+    respond = modern({
+      coverage: { firstEventBlock: PROTOCOL_FIRST_CREDENTIAL_BLOCK.circles },
+      avatar: { registeredAt: '1729000000', trustedByCount: 3, stopped: false, registrationObserved: true, inviter: '0x00' },
+    })
+    assert.equal((await circlesIndexRead(url, ADDR))?.observesEveryEnding, true)
+
+    respond = legacy({ registeredAt: '1729000000', trustedByCount: 1, stopped: false, inviter: null })
+    assert.equal((await circlesIndexRead(url, ADDR))?.observesEveryEnding, true)
+  })
+
+  test('a PoH entity cannot survive a failed chain read, and a Circles one can', async () => {
+    // End to end through the reader, because the flag is only worth anything where it lands.
+    respond = modern({ human: { claimedAt: '1729000000', revoked: false, claimObserved: true } })
+    const human = await pohIndexRead(url, ADDR)
+    const poh = reconcileIndexAndChain({ chain: { held: false, unavailable: true }, index: human! })
+    assert.equal(poh.held, false)
+    assert.ok(poh.error, 'a humanity may have expired or left the chain since, unseen')
+    assert.ok(poh.provenance.notes.includes('index-cannot-see-endings'))
+
+    respond = modern({
+      coverage: { firstEventBlock: PROTOCOL_FIRST_CREDENTIAL_BLOCK.circles },
+      avatar: { registeredAt: '1729000000', trustedByCount: 3, stopped: false, registrationObserved: true, inviter: '0x00' },
+    })
+    const avatar = await circlesIndexRead(url, ADDR)
+    const circles = reconcileIndexAndChain({ chain: { held: false, unavailable: true }, index: avatar! })
+    assert.equal(circles.held, true, 'registration is monotone: nothing can have ended it')
+    assert.equal(circles.error, undefined)
+    assert.equal(circles.issuedAt, 1_729_000_000)
+  })
+})

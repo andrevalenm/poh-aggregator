@@ -636,4 +636,151 @@ describe('index and chain, reconciled against live data', () => {
     }
     if (checked === 0) t.skip('no owner-cleared humanity in the sampled cohort')
   })
+
+  // ------------------------------------- the endings our index cannot see, and what they cost
+  //
+  // Our PoH mapping handles `HumanityRevoked` and nothing else. A humanity also ends by
+  // expiring — no event at all — and by leaving the chain through `ccDischargeHumanity`. So
+  // "the index has it and has not seen it end" is a statement about our event handlers, and
+  // `reconcile.ts` no longer lets it decide `held` when the chain cannot be read. These two
+  // tests hold that against the registry rather than against the argument for it.
+
+  /** keccak256("HumanityDischargedDirectly(bytes20)") — the humanity id is the indexed topic. */
+  const DISCHARGED_TOPIC = '0xae36bccbd3f2d52f68869193680a9f87de51c66f345ff113017bf284437fa901'
+  /** keccak256("HumanityRevoked(bytes20,uint256)"). Not indexed, so the id is in `data`. */
+  const HUMANITY_REVOKED_TOPIC =
+    '0x1765930ce5b4d87513bdba895a4be9f23166d2a2e58528486aa13a1e9777c370'
+  /**
+   * The block the registry's only revocation is in, 2025-07-25T14:15:20Z.
+   *
+   * Pinned for the same reason iteration 20 pinned the two Circles `Stopped` avatars: one event
+   * in a protocol's entire history is not something a run-time sample finds, and sweeping
+   * 11.5M blocks of logs on every test run is not a read anyone should pay for. Everything
+   * *about* it is re-derived each run — the log, both sides of the state transition, and the
+   * humanity id — so if the pin is ever wrong the test says so instead of passing quietly.
+   */
+  const ONLY_REVOCATION_BLOCK = 41_268_459
+
+  test('the index flag that *is* an ending is faithful to the chain, to the block', async (t) => {
+    // The other half of the audit. `revoked` maps `HumanityRevoked`, and the deployed
+    // implementation emits that only where it does `delete humanity.owner` — so the flag is a
+    // real ending and is not the problem. Proved by moving one block: the humanity is owned
+    // with a revocation pending at `block - 1` and unowned at `block`, in the block the log
+    // sits in. Two subsystems of the node, and the mapping only ever consulted the log.
+    let logs: { topics: string[]; data: string; blockNumber: string }[]
+    try {
+      logs = await gnosisRpc('eth_getLogs', [
+        {
+          address: POH_V2,
+          topics: [HUMANITY_REVOKED_TOPIC],
+          fromBlock: hexBlock(ONLY_REVOCATION_BLOCK),
+          toBlock: hexBlock(ONLY_REVOCATION_BLOCK),
+        },
+      ])
+    } catch (e) {
+      t.skip(`Gnosis refused the log query: ${e instanceof Error ? e.message : String(e)}`)
+      return
+    }
+    assert.equal(logs.length, 1, 'the pinned block holds the revocation it is pinned for')
+    const humanityId = `0x${logs[0]!.data.slice(2, 42)}`
+
+    const { createPublicClient, http, parseAbi } = await import('viem')
+    const { gnosis } = await import('viem/chains')
+    const client = createPublicClient({ chain: gnosis, transport: http('https://rpc.gnosischain.com') })
+    const abi = parseAbi(POH_V2_READ_ABI)
+    const at = (blockNumber: bigint) =>
+      client.readContract({
+        address: POH_V2,
+        abi,
+        functionName: 'getHumanityInfo',
+        args: [humanityId as `0x${string}`],
+        blockNumber,
+      })
+
+    const before = await at(BigInt(ONLY_REVOCATION_BLOCK - 1))
+    const after = await at(BigInt(ONLY_REVOCATION_BLOCK))
+    assert.equal(before[1], true, 'a revocation was pending in the block before')
+    assert.notEqual(
+      before[4].toLowerCase(),
+      '0x0000000000000000000000000000000000000000',
+      'and the humanity was owned',
+    )
+    assert.equal(
+      after[4].toLowerCase(),
+      '0x0000000000000000000000000000000000000000',
+      'the event and `delete humanity.owner` are the same instant',
+    )
+    assert.equal(after[1], false)
+  })
+
+  test('a humanity that left the chain is held in our index and gone from the registry', async (t) => {
+    // The ending nothing tells us about. A cross-chain discharge clears the owner while the
+    // expiry runs on for another year or more, so the subject is *not* lapsed and *not* revoked
+    // — the two states the index can represent — and the index goes on listing them as held.
+    const head = Number(await gnosisRpc('eth_blockNumber', []))
+    let logs: { topics: string[]; blockNumber: string }[] = []
+    try {
+      // Recent history only: the point is that this path is *current*, not that it ever fired.
+      for (let from = head - 1_500_000; from < head; from += 500_000) {
+        logs.push(
+          ...(await gnosisRpc('eth_getLogs', [
+            {
+              address: POH_V2,
+              topics: [DISCHARGED_TOPIC],
+              fromBlock: hexBlock(from),
+              toBlock: hexBlock(Math.min(from + 499_999, head)),
+            },
+          ])),
+        )
+      }
+    } catch (e) {
+      t.skip(`Gnosis refused the log query: ${e instanceof Error ? e.message : String(e)}`)
+      return
+    }
+    if (!logs.length) {
+      t.skip('no cross-chain discharge in the last 1.5M blocks')
+      return
+    }
+
+    const { subgraphReady, pohIndexRead } = await import('./subgraph.ts')
+    if (!(await subgraphReady(SUBGRAPH))) {
+      t.skip('subgraph not answering')
+      return
+    }
+    const poh = await pohV2Client()
+    const now = Math.floor(Date.now() / 1000)
+    const { reconcileIndexAndChain } = await import('./reconcile.ts')
+
+    let checked = 0
+    for (const log of logs.reverse()) {
+      const humanityId = `0x${log.topics[1]!.slice(2, 42)}`
+      const info = await poh.humanityInfo(humanityId)
+      // The discriminator that makes this test about the *unindexed event* and not about
+      // expiry: the credential is gone while the term it was written with is still running.
+      if (info.owner !== '0x0000000000000000000000000000000000000000') continue
+      if (info.expirationTime <= now) continue
+
+      const view = await pohIndexRead(SUBGRAPH, humanityId)
+      if (!view?.entity) continue
+
+      assert.equal(view.entity.ended, false, `${humanityId}: the index cannot see this ending`)
+      assert.equal(view.observesEveryEnding, false, 'and it says so rather than being trusted')
+
+      const probe = await pohAdapter().probe(humanityId as Address)
+      assert.equal(probe.held, false, 'the chain, read at head, is not fooled')
+
+      // The whole point, in one call: with the chain unreadable this used to come back held,
+      // dated, and worth a full trust root.
+      const blind = reconcileIndexAndChain({
+        chain: { held: false, unavailable: true },
+        index: view,
+      })
+      assert.equal(blind.held, false)
+      assert.ok(blind.error, 'excluded as unreadable rather than counted on the index alone')
+      assert.ok(blind.provenance.notes.includes('index-cannot-see-endings'))
+      checked++
+      break
+    }
+    if (checked === 0) t.skip('no discharged humanity in the sampled cohort is in the index')
+  })
 })

@@ -22,6 +22,10 @@
  *
  *   - the chain decides whether a credential is held *now* (a revocation must not be
  *     invisible for as long as the index lags)
+ *   - when the chain cannot be read at all, the index answers alone only for a credential
+ *     class whose every ending it observes. Otherwise the credential is *unreadable* — not
+ *     absent, not present — because "the index has it and has not seen it end" is then a fact
+ *     about which events the mapping handles rather than about the subject
  *   - the date comes from the most authoritative source available: the contract when the
  *     protocol exposes one, else the index at its named block, else a bound derived from
  *     the index's own absence, else nothing — and which one it was is always reported
@@ -66,6 +70,17 @@ export type ProvenanceNote =
   | 'index-unreachable'
   /** The index answered but cannot see this credential's history (windowed data source). */
   | 'index-outside-coverage'
+  /**
+   * The contract read failed *and* the index does not observe every way this credential class
+   * can end, so the index can say the credential once existed and cannot say it still does.
+   * The credential is excluded as unreadable rather than counted on the index's say-so.
+   *
+   * This is the mirror of `credential-ceased-since-index`. There the chain answered and
+   * overruled a stale index; here nothing can, so the only honest answer is that we could not
+   * read the credential — in *either* direction. An index that has seen a revocation may have
+   * missed the re-grant that undid it just as easily.
+   */
+  | 'index-cannot-see-endings'
   /** Held on chain, absent from an index with complete history: age is bounded, not unknown. */
   | 'credential-not-yet-indexed'
   /** The index has it, the chain does not: revoked, expired or transferred since the index. */
@@ -169,6 +184,26 @@ export interface IndexView {
    * windowed data source, where absence means nothing at all.
    */
   completeHistory: boolean
+  /**
+   * True when the index observes **every transition that can end this credential class**, so
+   * an entity it holds with `ended: false` is a credential that is still held.
+   *
+   * This is a different question from `completeHistory`, which is only about how far *back*
+   * the index reaches. An index can start at the protocol's first block and still be blind to
+   * an ending: a term that runs out emits no event at all, and a mapping that handles some of
+   * a contract's ending events is blind to the rest. Absence of an ending in such an index is
+   * not evidence that nothing ended, so it may not decide `held` when the chain cannot be read.
+   *
+   * It is a claim about the *mapping*, not about the protocol, and the producer of the view has
+   * to justify it — vacuously for a protocol with no endings (Circles, whose personhood
+   * predicate is monotonic), by handling every ending event otherwise. Measured on our own PoH
+   * v2 index, which is why this field exists: the mapping handles `HumanityRevoked` and nothing
+   * else, while a humanity also ends by simply expiring — no event — and by leaving the chain
+   * (`ccDischargeHumanity` → `HumanityDischargedDirectly`, **33 of them, 25 since 2026-05**).
+   * Eight of those subjects were checked on 2026-07-26: chain `isHuman` false and `owner`
+   * cleared, index entity present with `ended: false`, expiries running to 2027.
+   */
+  observesEveryEnding: boolean
 }
 
 export interface IndexedCredential {
@@ -292,6 +327,20 @@ export function reconcileIndexAndChain(input: {
         held: false,
         provenance: { heldFrom: 'index', dateFrom: 'none', ...base, notes },
         error: 'contract read failed and the index has no record to fall back on',
+      }
+    }
+    // The index holds an entity, and nothing can check it. It may only answer for a credential
+    // class whose every ending it sees — otherwise "the index has it and has not seen it end"
+    // is a statement about the index's event handlers, not about the subject. Excluding the
+    // credential as unreadable is the same rule as everywhere else in this codebase applied in
+    // both directions: an unreadable source is never turned into a claim about a person.
+    if (!index.observesEveryEnding) {
+      notes.push('index-cannot-see-endings')
+      return {
+        held: false,
+        provenance: { heldFrom: 'index', dateFrom: 'none', ...base, notes },
+        error:
+          'contract read failed and the index does not observe every way this credential can end',
       }
     }
     if (index.entity.ended) {
