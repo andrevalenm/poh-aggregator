@@ -65,6 +65,14 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Integration sweep** (post parallel work): scrolled the full 1440 composition end-to-end
+— hero → ticker → manifesto → ledger → rules → research instruments → cases → tear →
+night install → azulejo → footer reads as one product. The parallel-built research
+section holds the idiom faithfully; its controls now obey the ink-press rule; every
+live-probe count on the page derives from LIVE_ADAPTER_IDS at runtime so the copy can
+never drift from the code again (the ontology is now 30 adapters / 18 roots / rev 34
+on-chain; this tree still probes 4 until the 9-probe SDK lands).
+
 **Console cohesion**: the console's threshold slider now wears the same hairline-track /
 ink-drop instrument as the landing (the console-mobile jury agent stalled at its watchdog,
 but its section screenshots were reviewed by hand — this was the one gap found; the rest
