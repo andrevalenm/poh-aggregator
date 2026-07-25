@@ -48,7 +48,12 @@ function probeRows(events: Map<string, ProbeEvent>): HTMLElement {
   return wrap
 }
 
-/** The score numeral counts up like a meter settling — unless the visitor asked for calm. */
+/**
+ * The score numeral counts up like a meter settling, then STAMPS — a squash-spring
+ * settle with an iron blot blooming beneath, the seal pressed into the sheet. The most
+ * important number on the page arrives under the same physical law as everything else.
+ * Reduced motion gets the plain number.
+ */
 function scoreNumeral(score: number): HTMLElement {
   const el = h('span', { class: 'w-score' }, fmtScore(score))
   if (matchMedia('(prefers-reduced-motion: reduce)').matches || score <= 0) return el
@@ -59,6 +64,7 @@ function scoreNumeral(score: number): HTMLElement {
     const eased = 1 - (1 - t) ** 3
     el.textContent = fmtScore(score * eased)
     if (t < 1) requestAnimationFrame(tick)
+    else el.classList.add('stamped')
   }
   requestAnimationFrame(tick)
   return el
