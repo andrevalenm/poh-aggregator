@@ -57,7 +57,7 @@ is why Civic and Sismo are in the file at all.
 | **Anon Aadhaar** | `state-registry:aadhaar` | — | — | `protocols/zk-passport-and-eid.md` |
 | Coinbase Verification | `kyc-vendor:persona` | ✔ | ✔ | `protocols/eas-and-disco.md` |
 | Galxe Passport v3 | `kyc-vendor:sumsub` | ✔ | — | `landscape/kyc-liveness-vendors.md` |
-| Linea Proof of Humanity V2 | `kyc-vendor:sumsub` | ✔ | — | `protocols/privado-id-and-verax.md` |
+| Linea Proof of Humanity V2 | `kyc-vendor:sumsub` | ✔ | ✔ | `protocols/privado-id-and-verax.md` (costs); `protocols/linea-poh-onchain-read.md` (the read) |
 | Anima Proof of Uniqueness | `kyc-vendor:facetec` | ✔ | — | `landscape/kyc-liveness-vendors.md` |
 | **Billions (ex-Privado)** | `kyc-vendor:facetec` | ✔ | — | `protocols/billions-…-intuition.md` |
 | **Holonym / Human ID (biometrics)** | `kyc-vendor:facetec` | ✔ | — | `protocols/billions-…-intuition.md` |
@@ -232,8 +232,25 @@ the read is):
    expiry to hide when the holder was verified, so a bound is the only sound reading. Write-up:
    `protocols/holonym-human-id-onchain-read.md`. The legacy v2 store is **not** read and the file
    says why. 238,706 SBTs minted, measured by bisecting `ownerOf`.
-4. **Linea Proof of Humanity V2** — Verax attestations on Linea, portal `0xe8a3…3922`, attester
-   `0xc5db…1c0d`. Passive per-subject read, and it retires nothing we depend on.
+4. ~~**Linea Proof of Humanity V2**~~ — **DONE 2026-07-25**, and there is no per-subject read at all:
+   Verax stores `subject` as `bytes` and the Sumsub portal registers no `IndexerModule`, so nothing
+   is keyed on an address. It does not need to be, because the credential **expires in 90 days** and
+   `attestedDate` is monotone in attestation id — so every unexpired attestation in the whole
+   registry sits in a **1,024-id window out of 6,366,748**, found by a doubling ladder in one
+   batched call and read whole in six more. What the probe holds is therefore the *complete live
+   population*: 500 attestations over 499 addresses, so a negative is exhaustive rather than a
+   failed lookup. Three findings. The portal named in this file's own §6 entry, `0xe8a3…3922`, is
+   the **deployment test** — four attestations, all expired — while production is
+   `0x501e742C…7D5B46`; an adapter pinned to the researched address would have matched nobody while
+   appearing to work, so the anchor is the portal's registered **owner** (`0x887F94C1…2467`,
+   `isIssuer` true), which covers all three Sumsub portals. The `attester` field is *not* the
+   authority: simulating `attest` from a stranger and from Sumsub's own key gives the identical
+   `ECDSAInvalidSignature` revert, so the gate is a signature and `attester` is just the relayer.
+   And **Linea's own reads are ten months stale** — `poh-api.linea.build` returned `true` for 45 of
+   45 addresses whose attestations had all expired, the signer API signs for them, and
+   `PohVerifier.verify` accepts it on chain; 50,475 issued against 500 live means the vendor boolean
+   and the registry describe populations 101× apart. Write-up:
+   `protocols/linea-poh-onchain-read.md`.
 5. **World document / Selfie tiers** — already partly reachable through AgentBook; the mission's P1
    asks for these so World appears in the *score*, not only in the agent gate.
 6. **Proof of Humanity v1** — a second `isRegistered` call on a registry we already talk to. Cheap,

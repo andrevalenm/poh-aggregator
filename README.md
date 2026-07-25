@@ -144,14 +144,15 @@ authenticates the set; we never infer that two addresses belong to one person, b
 inference is the linkage we exist to avoid. Saturation spans the set, so splitting credentials
 across wallets cannot inflate a score — there is a test for exactly that.
 
-Eight adapters are implemented, all readable **without vendor cooperation** — no API key on the
+Nine adapters are implemented, all readable **without vendor cooperation** — no API key on the
 critical path, nothing that can rate-limit or revoke us: World ID Orb (AgentBook `lookupHuman`
 on World Chain), Proof of Humanity v2 (Gnosis), Circles v2 (Gnosis + trust graph), Coinbase
 Verified Account (EAS on Base, revocation checked explicitly — 720,503 issued against 406,022
 revoked, so presence alone is wrong more than half the time), Human Passport
 (`GitcoinResolver.getCachedScore` across all seven Decoder deployments), Farcaster
-(`IdRegistry` on OP Mainnet), and Holonym / Human ID's two credentials — the government-ID check
-and the FaceTec biometric — from Hub V3 on OP Mainnet.
+(`IdRegistry` on OP Mainnet), Holonym / Human ID's two credentials — the government-ID check
+and the FaceTec biometric — from Hub V3 on OP Mainnet, and Linea Proof of Humanity V2 from the
+Verax registry on Linea.
 
 Farcaster is where the age curve does the work. A fid costs an adversary $0.44 and $0.20 a year,
 and two thirds of the registry was minted inside a nine-month subsidy window — so the boolean is
@@ -188,6 +189,24 @@ minus one year* is the earliest a credential can have been issued, which on a de
 oldest it can be and therefore a weight floor rather than a guess. It also means a Holonym
 credential hard-expires within a year of the check behind it.
 [`research/protocols/holonym-human-id-onchain-read.md`](research/protocols/holonym-human-id-onchain-read.md).
+
+Linea PoH V2 is the one where the *absence* of a read turned out not to matter. Verax stores an
+attestation's subject as raw bytes and the Sumsub portal registers no indexer module, so there is
+genuinely no "does address X hold this" call — which is why Linea ships a signature-based path
+instead. It does not need one, because the credential **expires in 90 days** and `attestedDate` is
+monotone in attestation id: every unexpired attestation in the whole registry therefore sits in a
+**1,024-id window out of 6,366,748**, read whole in six batched calls. So the probe holds the
+complete live population — 500 attestations over 499 addresses — and a `false` here means *we read
+every live credential and you are not in it*, which is a stronger claim than a vendor boolean can
+make. It is also a more accurate one: `poh-api.linea.build` returned `true` for 45 of 45 addresses
+whose attestations had all lapsed, the signer API signs for them, and Linea's own `PohVerifier`
+accepts that signature on chain — so the documented integration answers "was ever verified" for a
+population 101× larger than the one that exists. And the authority worth pinning is not the portal
+(our own research had named the dead test one, which would have matched nobody while appearing to
+work) nor the `attester` field (simulating `attest` from a stranger and from Sumsub's own key gives
+the identical `ECDSAInvalidSignature` revert, so the gate is a signature and the attester is just a
+relayer) but the portal's registered **owner**, in a registry only Consensys can add to.
+[`research/protocols/linea-poh-onchain-read.md`](research/protocols/linea-poh-onchain-read.md).
 
 ### 4. MCP server — [`packages/mcp`](packages/mcp)
 
@@ -314,8 +333,8 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 113 SDK tests: 77 unit (scoring model, index reconciliation, input, ontology, SBT
-# interpretation) + 36 live
+# 150 SDK tests: 96 unit (scoring model, index reconciliation, input, ontology, SBT
+# interpretation, Verax attestation selection) + 54 live
 cd packages/sdk && npm test
 
 # the live ones alone — real chains, the deployed registry, no mocks
@@ -323,6 +342,7 @@ cd packages/sdk && node --test --experimental-strip-types src/live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/human-passport.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/farcaster.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/holonym.live.test.ts
+cd packages/sdk && node --test --experimental-strip-types src/adapters/linea-poh.live.test.ts
 
 # 10 browser E2E against the built demo, real chains
 cd apps/demo && npx playwright test

@@ -11,10 +11,12 @@ import {
 import { humanPassportAdapter } from './human-passport.ts'
 import { farcasterAdapter } from './farcaster.ts'
 import { holonymAdapters } from './holonym.ts'
+import { lineaPohAdapter } from './linea-poh.ts'
 
 export * from './human-passport.ts'
 export * from './farcaster.ts'
 export * from './holonym.ts'
+export * from './linea-poh.ts'
 
 /**
  * Adapters.
@@ -478,5 +480,6 @@ export function defaultAdapters(opts?: { subgraphUrl?: string }): AdapterProbe[]
     humanPassportAdapter(),
     farcasterAdapter(),
     ...holonymAdapters(),
+    lineaPohAdapter(),
   ]
 }
