@@ -318,6 +318,9 @@ idle(() => {
     mountContours(canvas, 0x7e44a1 + Number(canvas.dataset['contours']) * 0x1f2e3d)
   }
 })
+// The research instruments live four sections below the fold — their whole module
+// (logic + styles) loads at idle instead of competing with first paint.
+idle(() => void import('./research.ts'))
 mountCursor()
 mountInkPress()
 mountWidget()
