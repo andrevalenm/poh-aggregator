@@ -1861,3 +1861,138 @@ can move.
 is still untracked beside a tracked `package-lock.json`. `./test.sh` works but lives at
 `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it; moving it is a
 one-line `git mv` somebody should approve.
+
+## Iteration 16 — 2026-07-25
+
+**Did:** iteration 15's next-step 2 in substance — **as-of scoring can now see a credential the
+subject held then and has since lost.** Not by the route that list proposed (archive `eth_call`
+on Base), which turns out to be unnecessary: the same correctness win is available at head, on
+every chain, with no archive endpoint and no rate limit in the path.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — is **still blocked on
+Hugo** and was re-confirmed blocked before starting: `npm test` reproduces exactly the two
+failures, the deployed registry still reports revision 36 against this tree's 30 adapters, and
+`research/protocols/gitcoin-passport.md` and `research/protocols/lens-onchain-read.md` still do
+not exist here. Nothing has changed since iteration 15 wrote it up; MORNING "Needs you" item 18
+stands.
+
+**The defect.** Rule 2 in `as-of.ts` has said the same thing since the feature landed: credentials
+are read at chain head, one dated after the as-of instant is dropped, and "one held then and
+revoked since cannot be seen". The second half is not a footnote. Iteration 14 measured **5,143
+revocations against 18,655 issuances** in the sampled Coinbase windows, and iteration 7 measured
+that **roughly half a sampled 2025-04 World cohort** has let its 168-day term lapse. So an as-of
+score asked about a block those subjects were verified at reported evidence they did not have — in
+the one place the product claims to be exact. A counterparty auditing *"why did you deny me on
+Tuesday"* got a reconstruction of Tuesday that was quietly not Tuesday.
+
+**Why no archive node is needed.** Both registries already store the *end* of the credential and
+never clear it. EAS keeps `revocationTime` and `expirationTime` on an immutable record;
+`WorldIDAddressBook` keeps the lapsed `addressVerifiedUntil` forever — the same property that made
+"presence is not evidence" a bug in iteration 3 is what makes history readable now. A credential
+with a dated start and a dated end is a *closed window*, and `issuedAt <= t < heldUntil` is a
+proof rather than an estimate. Five decisions in it matter more than the code.
+
+- **`heldUntil` is a probe field, not an inference.** It may only ever be set by a probe that read
+  an ending off a contract, never by one that failed to find a credential. That is the whole
+  safety property: every negative in this SDK — a failed probe, a never-verified address, an
+  ordinary absence — reaches the same branch, and only the ones carrying a real end date can come
+  back. Unit tests assert each of those three stays exactly where it was.
+- **Restoring requires an exact issuance date, never a lower bound.** `issuedAfter` says a
+  credential is younger than some instant; it never says the credential already existed at one.
+  Using it here would turn a bound into a credential. Those cases go to `ceasedStartUndated` and
+  are left out — the residue of rule 2 made visible rather than absorbed into the score in either
+  direction, which is the same reason `existenceUnverified` exists.
+- **The window closes at whichever end came first.** An attestation that expired in March and was
+  revoked in June stopped counting in March. The revocation stays the reported *reason* — it is
+  the more informative negative — but `heldUntil` takes the minimum of the non-zero ends, because
+  handing an as-of score the later one grants the subject three months they did not have.
+- **A restored credential is priced at what it was worth then.** Freshness is already evaluated at
+  the as-of instant by the caller, so the restore recomputes `effectiveCost` from it rather than
+  granting full weight. Otherwise an expired credential would be the most valuable thing a subject
+  could own.
+- **World's lapsed entries get a start date they did not have.** `verifiedUntil -
+  verificationLength()` was run only for live entries; it is the same arithmetic for a dead one
+  under the same plausibility guard. It is set only when nothing else holds the credential up — a
+  lapsed AddressBook entry beside a live AgentBook binding has not ended anything, and a test
+  asserts `heldUntil` stays unset there.
+
+**Holonym is deliberately not wired to this, and the reason generalises.** Its expiry is exact and
+its credentials hard-expire within a year, so it looked like the best candidate in the roster. But
+`getSBT` reverts once an SBT has expired, so the public values — and with them the issuer check
+that makes an SBT evidence of anything at all — are unreadable for exactly the credentials that
+would be restored. A window we cannot attribute would restore a self-signed credential. The rule
+worth carrying: *a dated ending is not enough; the credential must still be attributable at the
+moment you restore it.*
+
+**Verified:** on this box, at this commit.
+
+- `cd packages/sdk && npm test` → `# tests 407 # pass 403 # fail 2` (**+18 tests** over iteration
+  15's 389). The two failures are iteration 15's registry-drift pair, unchanged: `the ontology at
+  the indexed head is the ontology the chain reports` and `the same credential scores differently
+  against the ontology of that morning` (expects 34, gets 36). Neither path touches this commit.
+- `node --test --experimental-strip-types src/adapters/coinbase.live.test.ts` → **9/9,
+  `skipped 0`**, against real Base. The revocation test finds a real revoked recipient in the
+  chain's own `Revoked` logs, asserts `heldUntil` equals the EAS `revocationTime`, restores the
+  credential at the midpoint of its real life, and confirms it is still absent one second after
+  the revocation. Nothing about a holder is hard-coded.
+- `node --test --experimental-strip-types src/adapters/world.live.test.ts` → **15/15, twice,
+  `skipped 0`**, against real World Chain. A sampled lapsed address yields both ends off the chain
+  — the stored number and the contract's own `verificationLength()` — and the same inside/outside
+  pair, with `date-from-lapsed-verification` in the provenance.
+- **A real finding from the live suite, not from reading.** The first draft asserted the derived
+  start equals the timestamp of the `AccountVerified` log it was sampled from. The chain refuted
+  it: the mapping holds only the *latest* verification, so an address that re-verified after that
+  log and then lapsed has a later start (1765162927 against the log's 1745005467). The test now
+  asserts `issuedAt >= minedAt`, which is the property that can actually be violated. This is the
+  same supersession the Coinbase suite met in iteration 14, in a second registry.
+- `./apps/demo/test.sh` → **all suites green**: forge 18 passed, sdk unit 35, sdk live 15,
+  Playwright 13 passed.
+- `npm run build` and `tsc -p tsconfig.json --noEmit` clean; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` end to end: verdicts unchanged — DENY / ALLOW 3.6153 over 5 roots /
+  DENY naming the sibling / DENY `a fleet of 27 agents is still one human`.
+
+**Honest limit on the demo path, stated rather than glossed.** The restore is exercised
+end-to-end at the *evidence* layer against real chain data, not through `resolve(addr, { asOf })`,
+and that is not a shortcut — it is arithmetic. `REGISTRY_GENESIS_BLOCK` is Sepolia 11,344,158,
+deployed today, so every legal as-of instant is inside the registry's few hours of life. A
+credential has to have ended *within those hours* for a full `resolve()` call to restore it, and
+none of the sampled subjects has. The mechanism is asserted where it can be: real revoked
+Coinbase recipients, real lapsed World addresses, both ends read off the chain at run time. As the
+registry accumulates history this becomes the ordinary path with no code change.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved — this changes
+what a past instant can be shown to have contained, not what anything is worth. Registry stays as
+the chain has it (32 adapters / revision 36, written by the other tree; this tree still has 30).
+
+**Committed:** `aaae9dc` feat(sdk): as-of scoring can see a credential the subject has since lost
+
+**Docs:** `README.md`'s as-of section rewritten — it previously ended on "one held then and revoked
+since is invisible", which is no longer true, and stating a limit that has been fixed is as wrong
+as hiding one that has not.
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iteration 15, still the
+   only red in the suite, still Hugo's call. Pull the tree that wrote revisions 35 and 36, or
+   re-seed from this one.
+2. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
+   the cheapest way to turn two flagged approximations into real dates. Iteration 1's next-step 1,
+   unchanged through fifteen iterations, and now by a wide margin the oldest thing on the list.
+3. **A dated ending for Circles and PoH v2.** This iteration built the mechanism and wired the two
+   adapters whose contracts already store an end. PoH v2's `humanityCount`/expiry surface and
+   Circles' `stopped()` are the next two candidates, and each would need the same question asked
+   of it that killed Holonym: is the credential still *attributable* at the moment you restore it?
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read
+   appears. Iteration 7's measurement stands: neither leaves per-holder state on any chain.
+
+**Worth keeping, because it generalises.** Iteration 14's lesson was *when enumeration is the
+problem, check whether the issuer already solved it on chain*. This one is its twin for time:
+**when history is the problem, check what the contract declines to delete.** Both registries here
+answer a historical question at head purely because neither clears its mapping — EAS because
+attestations are immutable, World because `verify()` only ever overwrites. The archive node this
+iteration was queued to need was never needed, and the same question is worth asking of every
+adapter before reaching for an indexer: *is the past still sitting in current state?*
+
+**Blocked:** nothing new. Iteration 15's two carried notes stand, both Hugo's call —
+`pnpm-lock.yaml` untracked beside a tracked `package-lock.json`, and `./test.sh` living at
+`apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it.

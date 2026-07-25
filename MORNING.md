@@ -1,10 +1,11 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 15. 18 forge, 389 SDK (386 pass,
-**2 fail**, 1 skipped), 13 Playwright — 420 total. The two failures are not a regression: the
-deployed registry gained two adapters from another working copy mid-iteration and this tree's
-ontology has not caught up. **"Needs you" item 18** has the fix and it is a merge, not a bug._
+detail. _Last updated 2026-07-25, after unattended iteration 16. 18 forge, 407 SDK (403 pass,
+**2 fail**, 1 skipped), 13 Playwright — 438 total. The two failures are not a regression: the
+deployed registry gained two adapters from another working copy during iteration 15 and this
+tree's ontology has not caught up. **"Needs you" item 18** has the fix and it is a merge, not a
+bug._
 
 ---
 
@@ -444,6 +445,37 @@ generated one second earlier — identical records, identical human, identical s
 No weight moved. SDK suite **389 tests**: 386 pass, **2 fail**, 1 skip — and the two failures are
 not this work. See "Needs you" item 18: the shared Sepolia registry gained two adapters from
 another tree while this iteration ran. Write-up: `research/protocols/ens-agent-identity.md` §5.1.
+
+**Iteration 16 made the historical score tell the truth about credentials people have since
+lost.** `as-of.ts` had always said, in a caveat on every result, that a credential "held then and
+revoked since cannot be seen". That is a bigger hole than it reads as: **5,143 of the 18,655
+Coinbase attestations we sampled are revoked**, and about half a sampled 2025-04 World cohort has
+let its 168-day term lapse. So asking "what did this person score on Tuesday" returned a Tuesday
+they did not have — in the one feature that claims to be exact. A counterparty auditing a denial
+got a reconstruction that was quietly not the thing being audited.
+
+The fix needed no archive node, which is the interesting part. Both registries already keep the
+*end* of a credential and never delete it — EAS stores `revocationTime` and `expirationTime` on an
+immutable record, `WorldIDAddressBook` keeps the lapsed number forever — so a credential with a
+dated start and a dated end is a closed window, and "was this held at instant *t*" becomes a proof
+instead of a guess. Read at head, on any chain, with nothing to rate-limit.
+
+- **Only a real end date can bring a credential back.** `heldUntil` is set by a probe that *read*
+  an ending off a contract, never by one that failed to find something. A failed probe, an address
+  that never verified and an ordinary absence all stay exactly where they were.
+- **A lower bound is not a proof.** Restoring needs an exact issuance date; `issuedAfter` shows a
+  credential *could* have existed at an instant, never that it did. Those cases are named and left
+  out rather than guessed in either direction.
+- **Holonym is deliberately excluded, and the reason is the good one.** Its expiry is exact, but
+  `getSBT` reverts once an SBT expires, so the issuer check that makes it evidence of anything is
+  unreadable for exactly the credentials that would be restored. A dated ending is not enough — the
+  credential must still be *attributable* at the moment you restore it.
+
+No weight moved. SDK suite **407 tests**: 403 pass, **the same 2 failures as iteration 15**, item
+18 unchanged and re-confirmed. Live proof is real subjects found on chain at run time: a revoked
+Coinbase recipient out of Base's own `Revoked` logs, a lapsed World address out of
+`AccountVerified`, both ends of each window read off the chain, restored at the midpoint of its
+real life and absent one second after it ended.
 
 ---
 

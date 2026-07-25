@@ -20,6 +20,13 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       `npm run ens` gains two runs: the agents themselves (2 of 3, unchanged — proof is free
       for an honest agent) and the same three names from a wallet made a second earlier
       (0 of 3). `research/protocols/ens-agent-identity.md` §5.1.
+- [x] **As-of sees credentials since lost** — shipped (iteration 16): the standing caveat "one
+      held then and revoked since cannot be seen" is no longer true. EAS and
+      `WorldIDAddressBook` both keep the *end* of a credential and never clear it, so a dated
+      start plus a dated end is a closed window and `issuedAt <= t < heldUntil` is a proof. No
+      archive node needed. Restoring requires an exact issuance date, never a lower bound;
+      Holonym is excluded because `getSBT` reverts once expired, so an expired SBT is no longer
+      attributable to its issuer. `as-of.ts` rule 2, `heldUntil` in `types.ts`.
 - [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.
