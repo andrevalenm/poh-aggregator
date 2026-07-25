@@ -128,3 +128,43 @@ describe('end to end', () => {
     assert.equal(world.held, false)
   })
 })
+
+describe('subgraph enrichment (live)', () => {
+  /**
+   * The load-bearing claim, as a test: with the subgraph, a vouching-registry credential's
+   * weight is computed from its real on-chain age; without it, the weight falls to the
+   * flagged 0.5 midpoint. Skips (rather than fails) while the subgraph is still syncing —
+   * a fresh deployment should not redden the suite.
+   */
+  const SUBGRAPH = process.env.CORROBORATE_SUBGRAPH_URL ?? 'https://api.studio.thegraph.com/query/77602/poh/version/latest'
+  // Sept-2024 organic PoH registration (claimedAt 1726098850), well before the airdrop window.
+  const ORGANIC = '0x17a91203a9e9c3519c2f76210497ef7f4be2352f' as Address
+
+  test('ramp weight computes from real claimedAt when the subgraph has the range', async (t) => {
+    const { subgraphReady, pohEnrichment } = await import('./subgraph.ts')
+    if (!(await subgraphReady(SUBGRAPH)) || !(await pohEnrichment(SUBGRAPH, ORGANIC))) {
+      t.skip('subgraph not synced past the organic PoH range yet')
+      return
+    }
+
+    const bare = await new Corroborate({ knownIds, knownRoots }).resolve(ORGANIC)
+    const enriched = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(ORGANIC)
+
+    const barePoh = bare.evidence.find((e) => e.adapterId === 'poh-v2')
+    const richPoh = enriched.evidence.find((e) => e.adapterId === 'poh-v2')
+    assert.ok(barePoh?.held && richPoh?.held, 'vector must still be registered')
+
+    assert.equal(barePoh.freshness, 0.5, 'without ages, Ramp holds the flagged midpoint')
+    assert.ok(richPoh.issuedAt, 'subgraph supplies the issuance date')
+    assert.ok(
+      richPoh.freshness > 0.6,
+      `a ~2-year survivor must weigh well above the midpoint, got ${richPoh.freshness}`,
+    )
+    assert.ok(
+      bare.caveats.some((c) => c.code === 'issuance-date-unknown') &&
+        !enriched.caveats.some((c) => c.code === 'issuance-date-unknown'),
+      'the unknown-age caveat clears exactly when the age is known',
+    )
+    assert.ok(enriched.score > bare.score, 'survival earns more than uncertainty')
+  })
+})
