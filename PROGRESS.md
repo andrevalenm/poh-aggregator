@@ -875,3 +875,154 @@ and OpenChain; the revert experiment pins the shim's behaviour either way). Iter
 notes still stand and are Hugo's calls, not blockers: `./test.sh` lives at `apps/demo/test.sh`
 rather than the repo root where `MISSION.md` says to run it, and `pnpm-lock.yaml` is still
 untracked beside a tracked `package-lock.json`.
+
+## Iteration 8 — 2026-07-25
+
+**Did:** §6 item 6 of `ontology-coverage.md` — **Proof of Humanity v1**, read from the original
+registry on Ethereum mainnet. Ten adapters implemented now, up from nine, and **the
+permissionlessly-readable queue is empty**: every remaining ontology entry is documented as gated,
+off-chain or dead.
+
+The queue called this "a second `isRegistered` call on a registry we already talk to". It is. The
+two things around that call are what mattered.
+
+- **The flag outlives the credential.** `isRegistered` is
+  `registered && now - submissionTime <= submissionDuration`, and `submission.registered` — the
+  fourth field `getSubmissionInfo` hands you, i.e. the obvious thing to read — is **never cleared
+  on expiry**. Only a governor removal or a lost revocation clears it. **33 of 215** addresses
+  sampled from the registry's recent request history have it set with the credential long dead.
+  The comparison was checked against history rather than trusted: for one submission the registry
+  answers **true at block 19,046,504** (timestamp 1,705,734,779, eleven seconds before its term ran
+  out) and **false at 19,046,505** (one second after), with **zero logs** from the registry across
+  the boundary. Nothing was written. The credential died of arithmetic, and that is the acceptance
+  test — run against a freshly sampled lapsed submission every time the suite runs.
+- **PoH v2 retires v1 registrations that v1 goes on honouring.** v2 cannot write to the frozen
+  contract, so it keeps an overlay: `ForkModule` (`0x068a27Db…9cCB`, initialised 2024-09-05) with
+  `mapping(address => bool) removed`, set by `tryRemove` on migration into v2 and by `remove` on
+  revocation, a lost revocation request or a bad-vouching penalty. **9 of 20,682 are set**, and
+  bisecting the flag over history shows the windows they opened: `0x6687c671…8dd6` was retired
+  2024-09-06 and its v1 term did not run out until 2026-01-29 — **510 days** in which v1 said
+  registered and the protocol that governs it said otherwise. So `held` is
+  `v1.isRegistered && !forkModule.removed`.
+- **Not `ForkModule.isRegistered`, and this one would have been silent.** The module's own getter
+  adds `submissionTime < forkTime`, which is v2's *migration policy* rather than a statement about
+  the v1 credential. Both registrations alive today were made **after** the fork, so that getter is
+  false for the entire live population: an adapter built on it answers "not registered" for
+  everybody while the contract responds, the ABI matches and nothing errors. Same failure mode as
+  iteration 6's dead Linea portal, arrived at from the opposite direction.
+- **The population is the finding: 2 registered addresses out of 20,740 lifetime submissions**
+  (block 25,610,404). Enumerated from the registry's whole event history — 22,038 `AddSubmission`
+  over 20,677 distinct addresses, 239 `ReapplySubmission` over 227, 20,682 in union — plus one
+  `isRegistered` each. Both survivors expire in late 2026 (2026-09-07 and 2026-11-16). PoH v2
+  mainnet has `getHumanityCount()` = 55 and the v1→v2 migration moved **9** registrations; 20,740
+  lifetime submissions did not become a v2 population, they lapsed. `live: true` here means the
+  contract works, not that the protocol has users, and the ontology note now says exactly that.
+- **A bounded scan would have got that number wrong, and nearly did.** The tempting shortcut is
+  "a live registration was accepted within the term, so scan the term plus slack". `executeRequest`
+  writes `submissionTime` and **emits nothing** — neither does the `processVouches` it delegates to
+  — and anyone may call it at any time after the challenge period. `0xb2db7c3b…67e7`, one of the
+  two survivors with exactly **one** request in its life, emitted `AddSubmission` on **2022-09-25**
+  and was accepted on **2024-10-25**: **761 days**. My first live test used a term+180-day window
+  and reported a population of 1 while looking exhaustive. The window is gone; the gap is now its
+  own live test, because it is the reason the method is what it is.
+- **A second invisible cohort, already harmless.** `submissionCounter` (20,740) exceeds the distinct
+  `AddSubmission` emitters (20,677) by **63**, constant from 2021 onward. `addSubmissionManually`
+  increments the counter and emits no `AddSubmission` — the governor used it on **2021-03-12**
+  (counter 59 → 63 between blocks 12,023,878 and 12,023,879). Those 63 are dated 2021 and expired
+  under either term, and any that renewed would have emitted `ReapplySubmission`, so the figure
+  stands. Same shape as iteration 4's Farcaster import.
+- **A hard term truncates a `Ramp` too.** `docs/scoring.md` records the decay version across four
+  adapters. PoH v1 is the ramp version: a registration is at most 730.5 days old before it stops
+  being one, so on a 365-day ramp its weight can never exceed `1 − 2^(−730.5/365)` = **0.7500**.
+  The live suite asserts it against whoever is registered on the day it runs.
+- **`submissionDuration` has moved** — 31,557,600 s (365.25 d) at the registry's first submission in
+  2021-03, 63,115,200 s (730.5 d) today — so the probe never recomputes the comparison. It calls
+  `isRegistered`, lets the contract apply whatever term is current, and reads the term only to
+  report the expiry.
+- **Failure policy is asymmetric on purpose.** Losing `isRegistered` or `getSubmissionInfo` is an
+  error, because a network failure must never read as "not a human". Losing `submissionDuration`
+  costs the reported expiry and nothing else. Losing the **ForkModule** read while v1 says
+  registered is *also* an error: the alternative is publishing a positive we cannot confirm has not
+  been retired, and an unreadable credential is a truer answer than either.
+- Verified source for both contracts came from **Sourcify**, fetched today, not recalled. Worth
+  noting because the bytecode `PUSH4` scan this repo has leaned on **under-reports**: it missed
+  `challengePeriodDuration()` (`0x0082a36d`), which answers 302,400. `submissionList(uint256)`
+  really is absent, confirmed by `eth_call` reverting rather than by the scan.
+- New write-up `research/protocols/poh-v1-onchain-read.md` (addresses, the ForkModule's two removal
+  paths, the boundary proof, the enumeration and its two invisible cohorts, the mainnet endpoint
+  table). `ontology-coverage.md` §6 item 6 struck through, its roster row flipped to `impl ✔`, its
+  `social-vouching:poh` row annotated, and a line added saying the queue is now empty; `INDEX.md`
+  lists the sixth implementation write-up; README updated (nine adapters → ten, new section, test
+  counts, "coverage is 9 of 30" → 10 of 30 with the queue-empty note). `reconcile.ts`'s comment on
+  `date-from-latest-reattestation` generalised: it is a ceiling under `Decay` and a floor under
+  `Ramp`, and PoH v1 is the first user of the second case.
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd packages/sdk && npm test` → `# tests 195 # pass 193 # fail 0 # skipped 2` (was
+  172/170/0/2: +13 PoH v1 unit, +10 PoH v1 live). The 2 skips are iteration 6's Verax subgraph
+  HTTP 429s, unchanged and untouched by this work.
+- `node --test --experimental-strip-types src/adapters/poh-v1.live.test.ts` → **10/10, `skipped 0`**,
+  32 s.
+- `npm run build` clean; `node_modules/.bin/tsc -p tsconfig.json --noEmit` clean.
+- `cd apps/demo && npx playwright test` → `10 passed`.
+- End to end through `resolvePersonhood()`: `0x8C01046e…2Fa0`, the surviving registration, scores
+  **2.5626** / 364.22 cents / one root, freshness 0.7284, `heldFrom: chain`, `dateFrom: chain`, with
+  `detail` reporting 44.1 days to expiry and `recognisedByPohV2: false`.
+- The acceptance test the mission asks for ("a live test that hits the real chain and asserts the
+  mechanism, not a magic number") is **"the credential dies of arithmetic, and the chain shows the
+  exact second"** — described above. Beside it: the date checked by bisecting historical state for
+  the block `submissionTime` was written in and requiring that block's header to carry exactly that
+  timestamp (state history and block header agreeing, where the probe consults only the current
+  value of the first); the 761-day request-to-acceptance gap; the ForkModule's wiring to both
+  contracts and its term snapshot still equalling v1's; the retired fixture; and a scorer-level
+  check that poh-v1 and poh-v2 evidence collapses to one root with
+  `correlated-evidence-saturated` and buys no extra cost.
+
+**No registry write, on purpose.** Root, evidence class, curve, half-life and both costs are
+unchanged — only `implemented` and `notes`, which are off-chain fields — so a reseed would bump
+`revision` to record nothing, which is what iteration 2's incremental seeding exists to prevent.
+Registry stays at **30 adapters, revision 34**.
+
+**Committed:** `f6b69a9` feat(sdk): read Proof of Humanity v1, where the flag outlives the credential
+
+**Next, in the order I would do it:**
+
+1. **The probe queue is empty, so the next marginal work is P1, not another adapter.** The two
+   candidates, in the order I would take them: **as-of scoring** (`resolve(addr, { asOf: block })`)
+   — the registry audit-trail subgraph on `:8100` already exists, it makes the audit trail
+   executable rather than decorative, and it is the strongest Graph claim available; and **P1's
+   fleet policy**, which iteration 7 handed a chain-enforced primitive (`WorldIDAddressBook` allows
+   at most one live verified address per human, and `nullifierHashes(nullifier) → address` is
+   public).
+2. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still the
+   cheapest way to turn two flagged approximations into real dates (iteration 1's next-step 1,
+   unchanged through seven iterations now, which is itself a signal that nobody thinks it is worth
+   the resync time before the deadline).
+3. **PoH v1 will empty in November.** Both survivors expire (2026-09-07, 2026-11-16) and the live
+   suite is written to keep passing when they do — the population test asserts agreement with the
+   contract rather than a count, and the `submissionCounter` check is a monotone invariant with a
+   diagnostic rather than an equality. But the *numbers in the README, the ontology note and the
+   write-up* will go stale, and nothing fails when they do. If this repo is still alive in
+   December, re-measure them.
+
+**Measured while working, worth keeping:** keyless Ethereum mainnet is a *worse* environment than
+OP or World Chain for this class of probe, and the table in the write-up's §6 is there so nobody
+re-derives it. Only three endpoints serve archive `eth_call` *and* wide `eth_getLogs`
+(`gateway.tenderly.co/public/mainnet`, `mainnet.gateway.tenderly.co`, `rpc.mevblocker.io`);
+`ethereum-rpc.publicnode.com` answers at head and refuses anything historical with "Archive
+requests require a personal token"; `eth-mainnet.public.blastapi.io` caps `eth_getLogs` at **10
+blocks**; `cloudflare-eth.com` refuses outright. And log *volume* is the real cost, not block
+range: an unfiltered 250,000-block query over the registry's 2021–2022 era returns 4,564 logs and
+takes **76 seconds**, which is what made the first version of the live suite take five minutes.
+Filtering by topic at the node took the same suite to 32 seconds.
+
+**Blocked:** nothing. Two open questions written into the write-up's §8 rather than guessed:
+**when `changeDurations` fired** (the term doubled somewhere between 2021-03 and today; it affects
+no answer, because the probe never applies a term itself) and **who the 63 governor-seeded
+submissions are** (recoverable from that day's calldata; it cannot move the population figure,
+but it would make the enumeration exhaustive rather than exhaustive-modulo-an-argument).
+Iteration 1's two notes still stand and are Hugo's calls, not blockers: `./test.sh` lives at
+`apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it, and
+`pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.

@@ -1,8 +1,8 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 7. All four suites green: 18 forge, 172 SDK
-(170 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 10 Playwright — 200 total._
+detail. _Last updated 2026-07-25, after unattended iteration 8. All four suites green: 18 forge, 195 SDK
+(193 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 10 Playwright — 223 total._
 
 ---
 
@@ -211,6 +211,38 @@ and the second one was a live scoring defect.
 
 No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
 `research/protocols/world-id-onchain-read.md`.
+
+**Iteration 8 added the tenth adapter — Proof of Humanity v1 — and with it the
+permissionlessly-readable queue is empty.** Every remaining entry in the ontology is documented as
+API-gated, off-chain or dead, so no further probe is possible without putting a vendor on the
+critical path. The read itself is one call; the two things around it are the story.
+
+- **The registry keeps a boolean that says "registered" for years after it stops being true.**
+  `isRegistered` is `registered && now - submissionTime <= submissionDuration`, and
+  `submission.registered` — the field `getSubmissionInfo` hands you, so the natural thing to read —
+  is never cleared on expiry. 33 of 215 sampled submitters have it set with the credential dead.
+  Proven against history rather than asserted: the contract answers **true eleven seconds before**
+  one submission's term ran out and **false one second after**, with zero logs from the registry in
+  between. Nobody did anything; the credential died of arithmetic.
+- **PoH v2 retires v1 registrations that v1 goes on honouring.** v2 cannot write to the frozen
+  contract, so it keeps an overlay (`ForkModule.removed`). Nine are set, and one of them was still
+  being honoured by v1 for **510 days** after v2 retired it. `held` reads both. We deliberately do
+  *not* use the module's own `isRegistered`, which adds v2's migration-eligibility condition and is
+  false for the entire live population — an adapter built on it would have answered "no" for
+  everybody while looking like it worked.
+- **The number worth knowing: 2 registered addresses out of 20,740 lifetime submissions**, both
+  expiring in late 2026. PoH v2 mainnet has 55 humanities and the v1→v2 migration moved **nine**
+  registrations. Twenty thousand submissions did not become a v2 population; they lapsed. `live:
+  true` on this adapter means the contract works, not that the protocol has users, and the ontology
+  note now says exactly that. See "Needs you" item 15.
+- **A shortcut that would have got that number wrong.** `executeRequest` writes the date and emits
+  nothing, and anyone can call it at any time: one of the two survivors made a single request in
+  2022-09 that was not accepted until 2024-10 — **761 days**. A window-bounded scan misses it and
+  reports a smaller population while looking exhaustive. My first draft did exactly that; the
+  window is gone and the gap is now its own live test.
+
+No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/poh-v1-onchain-read.md`.
 
 ---
 
@@ -505,6 +537,18 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    45.13. The demo vectors do not move — the E2E Orb wallet is an AgentBook registration with no
    address-book entry, so it still reports `issuance-date-unknown` — but if anyone compares a World
    number against a screenshot from yesterday, that is the reason.
+
+15. **A pitch number that goes stale on a date, and nothing will fail when it does.** Proof of
+   Humanity v1's live population is **2 addresses out of 20,740 lifetime submissions** — a good
+   beat, and the strongest single illustration of "cumulative counts are not populations" we have
+   after Linea's 101×. Both of those registrations expire in 2026 (**2026-09-07** and
+   **2026-11-16**), after which the honest number is zero unless somebody registers afresh. The
+   live suite is written to keep passing either way (it asserts agreement with the contract, not a
+   count), so **nothing will tell you** — the figures in `README.md`, the `poh-v1` ontology note and
+   `research/protocols/poh-v1-onchain-read.md` will simply become wrong. If the repo is still in
+   use in December, re-run
+   `node --test --experimental-strip-types src/adapters/poh-v1.live.test.ts`, which prints the
+   current count as a diagnostic, and update the three places.
 
 ## Honest state of weak points
 
