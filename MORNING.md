@@ -1,12 +1,14 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 18. 18 forge, 450 SDK (445 pass,
-**2 fail**, 3 skipped), 13 Playwright — 481 total. The two failures are not a regression: the
+detail. _Last updated 2026-07-25, after unattended iteration 19. 18 forge, 475 SDK (470 pass,
+**2 fail**, 3 skipped), 13 Playwright — 506 total. The two failures are not a regression: the
 deployed registry gained two adapters from another working copy during iteration 15 and this
 tree's ontology has not caught up. **"Needs you" item 18** has the fix and it is a merge, not a
 bug. The 3 skips are the tests that need the new subgraph version, which was still syncing when
-the run was taken; they assert normally against it and skip loudly against the old one._
+the run was taken; they assert normally against it and skip loudly against the old one. **New:
+"Needs you" item 19** — something runs git in this repo as root and it has started blocking
+commits; there is a workaround in the tree and a one-line fix for you._
 
 ---
 
@@ -552,6 +554,49 @@ or cost changed, so no registry write. What changed is what `resolve(addr, { asO
 credential held then and revoked since, which stopped being true in iteration 16. Write-up:
 `research/protocols/poh-lapsed-credentials.md`.
 
+**Iteration 19 finished the roster: every adapter that publishes a dated ending now reads it.**
+Human Passport and Linea PoH were the last two, and the same sentence explains both — neither
+registry deletes the ending. `GitcoinPassportDecoder.getScore` reverts `AttestationExpired` once
+a score ages out, but the Decoder is not where the score lives: `GitcoinResolver.getCachedScore`
+is a plain mapping read and answers forever, so a passport that died **419.9 days ago** still
+gives up both ends of its life at head. And a Verax attestation is immutable, so a lapsed Linea
+credential still carries `attestedDate` beside its expiry or revocation.
+
+The interesting one is Linea, because of a ratio: **50,475 attestations ever issued, about 495
+alive.** Nearly everyone that protocol has verified is lapsed, so a historical score that sees
+only live attestations is blind to 99% of the population it is being asked about. The existing
+scan reads a one-term-wide id range, which is exactly the set that can still be *alive* — an
+attestation that ended at E was written no earlier than E − term, so nothing ended is in it.
+Reaching one term plus thirty days back costs **three extra batched calls** and turns 494 live
+subjects into **1,025 with a closed, dated window**.
+
+- **It works end to end on a real subject, today.** `0x39473b54…fab1` scores **0.0000 now** and
+  **3.1765 as of 2026-07-25T07:04:56Z** — one hour before their attestation expired — and 0.0000
+  an hour after. Nine subjects are in that state right now. Human Passport has the same mechanism
+  and *no* such subject: every lapsed passport window closed before the registry's own genesis
+  yesterday, so its restoration is tested and currently undemonstrable end to end. That is a fact
+  about the registry's age, not the read, and it is said out loud rather than glossed.
+- **A dated ending is necessary and not sufficient**, which is why lapsed Holonym credentials are
+  still excluded: `getSBT` reverts once an SBT expires and takes the issuer check with it. Passport
+  passes that test with a read rather than an argument — the EAS attestation behind the cached
+  score survives un-revoked, still naming the subject as recipient, with the identical timestamp.
+  The live suite checks the window against two contracts the probe never touches.
+- **How far back the enumeration is exhaustive is derived from the scan itself**, not from the
+  constant that chose it, so a narrower scan loses the claim by itself. And a revocation Verax
+  recorded with no date gets no window at all: the expiry is only an upper bound on when the
+  credential really stopped, and restoring against a bound hands somebody days they may not have
+  had.
+- **One of our own live tests had quietly stopped covering anything, for two reasons at once.** It
+  sourced a current Passport minter from Optimism logs; the endpoint iteration 4 moved us to
+  rejects that filter outright, and the search swallowed the error and reported "nobody minted" —
+  while the mint rate had *separately* fallen past the window it searched. Both fixed, and the
+  refusal is printed now, because "the source refused me" and "the thing does not exist" must not
+  arrive as the same answer.
+
+No weight, root, curve or cost moved, so no registry write. Write-up:
+`research/protocols/passport-and-linea-lapsed-credentials.md`. README and `docs/scoring.md` both
+said four registries produce a window; it is six.
+
 **The v0.0.3 subgraph cutover is still pending and still healthy** — 42.29 M of 47.39 M at the end
 of this iteration, no indexing errors, ~65,000 blocks/min, so roughly 75 minutes left. Nothing to
 do: `version/latest` tracks the latest *synced* version, so it flips by itself and no consumer ever
@@ -1058,6 +1103,34 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    `ontology.test.ts` asserts against on purpose. **What you need to do:** bring the other tree's
    `ontology/adapters.json` and its two research files over (or re-seed the registry from this
    one), then re-run `cd packages/sdk && npm test`. Everything else in the sweep is green.
+
+19. **Something runs git in this repo as root, and it silently blocks about one commit in a
+   hundred.** 258 files under `.git` are owned by `root` — including `.git/config`, `ORIG_HEAD`
+   and two pack files — with timestamps running from 17:57 to 21:40 on 2026-07-25. Two of the
+   loose-object directories, `.git/objects/f5` and `.git/objects/fe`, were *created* by that
+   process, so they are owned by root at mode 755. Git writes a loose object into the directory
+   named by the first byte of its SHA-1, so **any object hashing into those two bytes cannot be
+   written by this user** and `git add` dies with `insufficient permission for adding an object to
+   repository database`. It is a 2-in-256 lottery per object, which is why iterations 17 and 18
+   committed without noticing and iteration 19 could not commit at all.
+
+   Neither the directories nor the three objects inside them can be removed without root —
+   deleting an entry needs write permission on its *parent* — so I did not force it, and nothing
+   root owns was touched. The three objects were verified intact (`git cat-file`, md5) and left
+   exactly as they were.
+
+   **Workaround shipped, because the alternative was leaving the work uncommitted:**
+   `scripts/commit-via-fast-import.mjs` commits through `git fast-import`, which writes a **pack**
+   into `.git/objects/pack` (writable) instead of loose objects. `976b0a2` was made that way;
+   `git fsck` (full) is clean before and after, `git status` is empty, and `git show --stat HEAD`
+   renders all 13 files, which requires every blob to be present. It is a workaround for a broken
+   environment, not a replacement for `git commit` — use plain git whenever plain git works.
+
+   **What you need to do:** `sudo chown -R corroborate:corroborate /home/corroborate/poh-aggregator/.git`,
+   and work out what is running git in here as root, because it will keep doing this. My guess is
+   a container or a cron job with the repo bind-mounted; I did not go looking, since hunting for
+   root processes is outside what `MISSION.md` lets me do. The script can then be deleted, or kept
+   as documentation of the failure mode.
 
 ## Honest state of weak points
 

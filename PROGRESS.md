@@ -2324,3 +2324,205 @@ silence rather than a credential.
 **Blocked:** nothing new. Iteration 1's two carried notes stand, both Hugo's call —
 `pnpm-lock.yaml` untracked beside a tracked `package-lock.json`, and `./test.sh` living at
 `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it.
+
+## Iteration 19 — 2026-07-25
+
+**Did:** iteration 18's next-step 3 — **a dated ending for Human Passport and Linea PoH V2.** With
+these two the roster is finished: every adapter that publishes an ending now reads it, and the
+ones that do not are documented as not being able to.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: the same two tests are red in `as-of.live.test.ts` and nothing
+else is. MORNING "Needs you" item 18 stands, unchanged for a fifth iteration. Iteration 18's
+next-step 2 (Circles' undated ending, which needs a mapping change plus a resync) was deliberately
+left for after the v0.0.3 cutover rather than queued behind it, exactly as iteration 18 proposed.
+
+**Human Passport: the resolver keeps what the Decoder stops saying.** `getScore` reverts
+`AttestationExpired` once a score ages out, but the Decoder is not where the score lives —
+`GitcoinResolver.getCachedScore` is a plain mapping read and answers forever. `0xb0812e00…90F2`'s
+passport died **419.9 days ago** and its `{score: 500150, time: 1740958699, expirationTime: 0}` is
+still there at head, so the whole life of the credential is available with no archive node and no
+log query. Third instance of one shape now: PoH v2's `getHumanityInfo` vs `isHuman`, World's
+`addressVerifiedUntil`, and this.
+
+- **The test that mattered was iteration 16's refusal, not the expiry.** A dated ending is
+  necessary and not sufficient — the credential has to still be *attributable* at the instant you
+  restore it, which is why lapsed Holonym SBTs are excluded (`getSBT` reverts and takes the issuer
+  check with it). Passport passes it with a read rather than an argument: `userAttestations` →
+  EAS `getAttestation` returns `time` **1740958699, identical to the resolver's**, `revocationTime`
+  0, and the subject still named as `recipient`. The live suite does that cross-check every run.
+- **Refused:** a zero score (not evidence while it was alive, so its expiry ends nothing), a window
+  that never opened (`expiresAt <= time`), anything not actually expired.
+- **Residual, stated:** the resolver caches one score per address per chain and a re-mint
+  overwrites it, so only the most recent life on each chain is visible. Reading all seven
+  deployments blunts it — this subject has three lapsed windows, Optimism and Linea from 2025-03
+  and Scroll from 2024-07 — and `detail.perChain` shows every one we can see.
+
+**Linea PoH: the same enumeration, one term further back — and here it is most of the protocol.**
+A Verax attestation is immutable, so an expired or revoked one still carries `attestedDate` beside
+its ending. The existing scan reads a one-term-wide id range, which is exactly the set that can
+still be *alive*: a credential that ended at `E` was written no earlier than `E − term`, so nothing
+ended is in it. That is arithmetic, not an oversight, and reaching further back fixes it.
+
+- **The ratio is the argument. 50,475 attestations ever issued, ~495 alive.** Nearly everyone this
+  protocol has verified is lapsed, so an as-of score that sees only live attestations is blind to
+  99% of the population it is being asked about. Thirty days of reach costs three extra batched
+  calls (758 ids → 2,048 through the doubling ladder, 7.3 s against ~4 s) and turns **494 live
+  subjects into 1,025 with a closed, dated window**.
+- **The lookback is a cost decision made with the issuance curve in front of me,** not a round
+  number: measured today, 90 d → 758 ids, 120 d → 1,211, 150 d → 1,943, **180 d → 3,896**, because
+  at 180 days the January 2026 campaign (24,723 attestations in one month, half the protocol's
+  lifetime issuance) comes back into range.
+- **Coverage is derived from the scan, not from the constant that chose it.**
+  `endingsCompleteFrom = attestedDate(lowest id actually read) + longest term actually seen`, so a
+  narrower scan loses the claim by itself — iteration 17's `IndexCoverage` lesson applied to an
+  enumeration. Below that instant an *observed* ending is still a real window; it is only the
+  **absence** of one that stops meaning anything, which is why under-coverage can only fail to
+  restore a credential and never invent one.
+- **Refused:** a revocation Verax recorded with no `revocationDate` — the expiry is then only an
+  *upper* bound on when it really stopped, and restoring against a bound hands the subject every
+  day between. Also a revocation *after* the term ran out (Verax lets a dead attestation be
+  revoked, so the ending is `min(revocationDate, expirationDate)`; the one dated revocation in
+  range has a 16.4-day window, not 90), a foreign portal's attestation, and inverted or future
+  windows.
+
+**End to end, on a subject found at run time.** `0x39473b54ff152461298a93ed6913ee0fa7f2fab1` holds
+one Linea PoH attestation, written 2026-04-26T08:04:57Z, expired **2026-07-25T08:04:56Z**:
+
+| as of | score | roots | `linea-poh` |
+|---|---|---|---|
+| 2026-07-25T07:04:56Z | **3.1765** | 1 | held, 1500.48c, `ceasedAfterAsOf: [linea-poh]` |
+| 2026-07-25T09:04:56Z | **0.0000** | 0 | not held |
+| chain head | **0.0000** | 0 | not held |
+
+Nine subjects are in that state right now — a window that has already closed and whose closing
+instant is *after* the registry's own genesis, which is the only range an as-of question can be
+asked about at all (Sepolia 11,344,158, 2026-07-25T00:21:36Z). **Human Passport has the same
+mechanism and no such subject today:** every lapsed passport window closed long before the registry
+existed, so its restoration is real, unit- and live-tested, and currently undemonstrable end to
+end. That is a fact about the registry's age, not about the read, and it is worth saying out loud
+rather than quietly presenting the Linea number as if it covered both.
+
+**A live test of ours had stopped covering anything, silently, for two reasons at once.**
+`human-passport.live.test.ts` sourced a *current* minter from EAS `Attested` logs on Optimism.
+Iteration 4 moved the Passport probe off `mainnet.optimism.io` to publicnode (correctly — the
+archive quota belongs to Farcaster) and the test followed it; **publicnode rejects that log filter
+outright** with `InvalidParams`, and the search caught the exception and returned `undefined`,
+which the caller read as "nobody minted recently" and skipped in silence. Separately, the mint rate
+had fallen: the most recent score-v2 mint on 2026-07-25 was **54,000 blocks back**, past the 45,000
+the search covered. Fixed by pointing the search at `optimism.drpc.org` (which answers), widening
+to 16 windows, and **printing the refusal** — an endpoint that will not serve the filter and a
+registry with no recent mint produced the same `undefined` and the caller could not tell them
+apart. The positive path now actually runs.
+
+**Verified:** on this box, at this commit.
+
+- `./apps/demo/test.sh` → forge **18 passed**; sdk scoring **35 pass**; sdk live **16 pass, 3 skip,
+  0 fail**; Playwright **13 passed**. Exit 0.
+- `cd packages/sdk && npm test` → `# tests 475 # pass 470 # fail 2 # skipped 3` (**+25** over
+  iteration 18's 450). Per file: `human-passport.test.ts` +9 (new), `linea-poh.test.ts` +10
+  (19 → 29), `linea-poh.live.test.ts` +4 (18 → 22), `human-passport.live.test.ts` +2 (6 → 8). The
+  commit message's per-file breakdown is off by one on two of those lines; the totals in it are
+  right and this is the accurate split.
+- The 2 failures are iteration 15's registry-drift pair in `as-of.live.test.ts` — *the ontology at
+  the indexed head is the ontology the chain reports* and *the same credential scores differently
+  against the ontology of that morning* — unchanged and untouched by this commit. The 3 skips are
+  the tests waiting on subgraph v0.0.3.
+- `node --test src/adapters/linea-poh.live.test.ts` → **22/22, 0 skipped**, three consecutive runs.
+  One earlier run had the probe suite red once and I could not reproduce it in three attempts; it
+  is recorded here rather than dismissed.
+- `node --test src/adapters/human-passport.live.test.ts` → **8/8, 0 skipped.**
+- `npm run build` and `tsc -p tsconfig.json --noEmit` clean in `packages/sdk`; `packages/mcp`
+  builds clean.
+- `cd apps/agent && npm start` → verdicts unchanged: DENY / ALLOW **3.6152** over 5 roots / DENY
+  naming the sibling / DENY `a fleet of 27 agents is still one human`. Nothing at head moved,
+  which is the point: a credential that is not held is priced at zero either way.
+- **The acceptance test the mission asks for** ("a live test that hits the real chain and asserts
+  the mechanism, not a magic number") is two, one per adapter. Passport's is *"a lapsed passport is
+  a closed window, and both of its ends come back from elsewhere"*: the probe reads one struct, and
+  the test holds the window it derives against **two contracts the probe never touches** — EAS's
+  own attestation record, whose `time` must equal the start to the second and whose
+  `revocationTime` must be zero and whose `recipient` must still be the subject, and the Decoder,
+  whose `AttestationExpired` revert payload must equal the end. Linea's is *"a lapsed subject is a
+  closed window, restorable inside it and nowhere else"*: a subject sampled out of the ended
+  population at run time, its window re-read from the registry at head, then pushed through
+  `applyAsOfToEvidence` — restored at the midpoint of a life that really happened, absent one
+  second after it ended and one second before it began. Plus the coverage claim proved from the
+  chain alone (the 600 ids below the scan must each have *finished* before `endingsCompleteFrom`)
+  and cross-checked against the Verax subgraph by **set equality** over lapsed subjects, paged,
+  because the lapsed half of the window is larger than the live half.
+
+**Committed:** `976b0a2` feat(sdk): Human Passport and Linea PoH date the end of a credential, so
+as-of can see it
+
+**The commit needed a new tool, and that is an environment fault worth knowing about.** `git add`
+failed with `insufficient permission for adding an object to repository database`. Cause:
+**another process runs git in this repo as root** — 258 files under `.git` are root-owned,
+including `.git/config`, `ORIG_HEAD` and two pack files, with timestamps from 17:57 to 21:40
+today. Two of the 258 loose-object directories, `f5` and `fe`, were *created* by that process and
+are therefore owned by root and mode 755, so any object whose SHA-1 starts with those bytes cannot
+be written — a 2-in-256 lottery per object, which is why iterations 17 and 18 committed fine and
+this one could not. Neither the directories nor their contents can be removed without root
+(deleting an entry needs write permission on its parent), and I did not try to force it. What is
+writable is `.git/objects/pack`, so `scripts/commit-via-fast-import.mjs` commits through
+`git fast-import`, which packs its objects. `git fsck` (full, not just `--connectivity-only`) is
+**clean before and after**, `git status` is empty, and `git show --stat HEAD` renders all 13 files,
+which requires every blob to be present and readable. The three root-owned objects were verified
+intact and untouched. This is a workaround for a broken environment and not a replacement for
+`git commit`; the script's header says so and MORNING has it as a "Needs you".
+
+**Write-up:** `research/protocols/passport-and-linea-lapsed-credentials.md` — the resolver/Decoder
+asymmetry with the live struct, the EAS attributability cross-check, the window-cost table by
+lookback, the coverage derivation, everything refused and why, the end-to-end table, and the live
+test defect in §4. Indexed in `research/INDEX.md` (header recount: 38 files / ~24,750 lines).
+`docs/scoring.md` and README both said **four** registries produce a window; it is six, and both
+now say which and why the ratio makes Linea the one that matters. README's test-count paragraph
+was two iterations stale and claimed "All 420 pass" while two are red — corrected to name the red
+ones rather than round them away.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved — this changes
+what a past instant can be shown to have contained, not what anything is worth. Both `notes` fields
+gained the new facts (an off-chain field; `setAdapter` does not carry it). Registry stays as the
+chain has it (32 adapters / revision 36, written by the other tree; this tree still has 30).
+
+**The v0.0.3 cutover, checked.** Still syncing, healthily and faster than iteration 18 measured:
+**45,117,475 of ~47,389,400**, `hasIndexingErrors: false`, ~81,000 blocks/min over two samples 34
+minutes apart, so roughly half an hour left. `version/latest` still serves v0.0.2 (`QmeYTnn…`),
+which is the designed behaviour. Nothing waits on it.
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15–18, still
+   the only red in the suite, still Hugo's call.
+2. **Circles is the last undated ending, and v0.0.3 should have landed by now.** The Hub's
+   `stopped()` is a boolean with no timestamp, so state cannot date it, but the mapping already
+   handles the stop event and could record the block it saw. A mapping change plus a resync —
+   and the resync no longer has to queue behind v0.0.3.
+3. **Pin Passport's attester.** §6 question 1 of the new write-up: the probe's authority model
+   rests on only EAS being able to write to the resolver, and the EAS record now read for the
+   window hands us the attester (`0x84382998…dB1a`) for free. Pinning it the way Holonym's issuer
+   and Linea's portal owner are pinned would close the question instead of assuming it. This is
+   the cheapest remaining correctness item in the roster.
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read
+   appears. Iteration 7's measurement stands: neither leaves per-holder state on any chain.
+
+**Worth keeping, because it generalises.** Iteration 18's lesson was *a getter that hides a value
+is not a chain that has lost it*. This iteration is the same question asked of an **enumeration**
+rather than a getter: our Linea scan was not missing lapsed credentials because the chain had
+deleted them, it was missing them because the range we chose was defined by *what could still be
+alive*. The window was answering a different question from the one an as-of score asks, and it
+looked complete because it was complete — for the other question. The rule for the next adapter:
+**when a read is bounded, write down the predicate the bound enforces, because that predicate is
+what the read is actually exhaustive over** — and if a second consumer asks something else, the
+bound has to move rather than the answer being trusted.
+
+The other one is smaller and cost me a real hole: **a live test that sources its own subject can
+stop covering anything without failing.** If the search can come back empty, "the source refused
+me" and "the thing does not exist" must be distinguishable, or the test degrades into a green
+no-op and stays that way for fifteen iterations.
+
+**Blocked:** nothing. One new item for Hugo, in MORNING: the root-owned `.git` objects above, which
+will silently block roughly one commit in a hundred-and-something until the ownership is fixed.
+Iteration 1's two carried notes stand, both Hugo's call — `pnpm-lock.yaml` untracked beside a
+tracked `package-lock.json`, and `MISSION.md` pointing at a `./test.sh` that lives at
+`apps/demo/test.sh`.
