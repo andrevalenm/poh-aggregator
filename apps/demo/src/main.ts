@@ -1,5 +1,6 @@
 import './style.css'
 import { DEFAULT_REGISTRY, makeClient } from './client.ts'
+import { mountPaper } from './landing/paper.ts'
 import { renderComparison } from './compare.ts'
 import { wireLookup } from './lookup.ts'
 import { h, shortAddr } from './ui.ts'
@@ -21,6 +22,9 @@ async function paintRegistryLine(): Promise<void> {
     el.classList.add('is-error')
   }
 }
+
+const paper = document.getElementById('paper')
+if (paper instanceof HTMLCanvasElement) mountPaper(paper)
 
 const columns = document.getElementById('compare-columns')
 if (columns) void renderComparison(columns)

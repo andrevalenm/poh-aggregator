@@ -545,7 +545,7 @@ a {
 
 .hero-live {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.55rem;
   font-family: var(--mono);
   font-size: 0.78rem;
@@ -554,6 +554,7 @@ a {
 }
 
 .pulse {
+  margin-top: 0.34em;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -1745,6 +1746,33 @@ a {
   .wash {
     width: 28rem;
     height: 24rem;
+  }
+}
+
+/* ---------------------------------------------------------- wide art direction */
+
+/* Above 1800px the sheet is enormous — let the composition grow into it instead of
+ * floating in margin. */
+@media (min-width: 1800px) {
+  :root {
+    --gutter: 5.5rem;
+  }
+
+  .band-inner {
+    max-width: 78rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(7rem, 6.8vw, 8.4rem);
+  }
+
+  .hero-copy {
+    max-width: 54rem;
+  }
+
+  .manifesto .beat {
+    font-size: clamp(3.4rem, 3vw, 4.2rem);
+    max-width: 70rem;
   }
 }
 
