@@ -341,6 +341,11 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Density absorbed**: with 10 live probes × 3 wallets the stream ran 30 rows — the
+receipt now settles on completion (credentials found stay line-by-line, empties fold to
+one tally over a strong rule) and the full-evidence ledger sorts held → unreachable →
+absent, cost-descending. The stream's drama survives; the residue doesn't.
+
 **Stamp + margin (Hugo's picks 4 & 5)**: the score now arrives like a pressed seal, and
 the research long-form's dead right column is a Tufte margin carrying the Ohlhaver
 quotes as sidenotes. Meanwhile the ax41 consolidation landed in-tree — the probe table

@@ -9,10 +9,9 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
 - [x] **Research margin notes** — shipped: at ≥1280px the long-form reserves a Tufte
       margin and the Ohlhaver pull-quotes float into it at natural flow height — iron
       rules, mono citations, CSS-only, author's markup untouched.
-- [ ] **9-probe SDK consolidation** — the ax41 build agent's tree (30-adapter ontology,
-      9 live probes, reconcile.ts) is being merged into this machine. Once it lands: the
-      landing's dynamic counts pick it up automatically; re-run E2E + redeploy. *(agent,
-      in progress)*
+- [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
+      the dynamic derivation. Design absorbed the new density: the probe receipt settles
+      on completion (found rows + one tally line) and full evidence sorts held-first.
 
 ## Blocked on Hugo (each unlocks a chunk)
 
