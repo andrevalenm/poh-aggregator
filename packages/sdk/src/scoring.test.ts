@@ -329,6 +329,58 @@ describe('caveats', () => {
     const r = run([a], [ev(a)])
     assert.ok(r.caveats.some((c) => c.code === 'unresolved-trust-root'))
   })
+
+  /**
+   * Two ways a chain-derived date can be honest and still not be the issuance date. Both are
+   * Farcaster's, and both matter on a Ramp: one understates age and one would overstate it.
+   */
+  test('a credential imported from a predecessor registry says its date is a floor', () => {
+    const a = adapter({ id: 'farcaster-account', trustRoot: 'social-account:farcaster' })
+    const r = run(
+      [a],
+      [
+        ev(a, {
+          provenance: { heldFrom: 'chain', dateFrom: 'chain', notes: ['date-from-registry-import'] },
+        }),
+      ],
+    )
+    const c = r.caveats.find((x) => x.code === 'credential-imported-from-predecessor-registry')
+    assert.ok(c, 'the import must be disclosed')
+    assert.ok(c.message.includes('farcaster-account'))
+    assert.ok(c.message.includes('floor'), 'and must say which direction the error runs in')
+  })
+
+  test('a credential that changed hands is disclosed as dated from the purchase', () => {
+    const a = adapter({ id: 'farcaster-account', trustRoot: 'social-account:farcaster' })
+    const r = run(
+      [a],
+      [
+        ev(a, {
+          provenance: {
+            heldFrom: 'chain',
+            dateFrom: 'chain',
+            notes: ['credential-transferred-since-issuance'],
+          },
+        }),
+      ],
+    )
+    assert.ok(r.caveats.some((x) => x.code === 'credential-changed-hands'))
+    // An unheld credential is not evidence of anything, so it raises no caveat either.
+    const absent = run(
+      [a],
+      [
+        ev(a, {
+          held: false,
+          provenance: {
+            heldFrom: 'chain',
+            dateFrom: 'chain',
+            notes: ['credential-transferred-since-issuance'],
+          },
+        }),
+      ],
+    )
+    assert.ok(!absent.caveats.some((x) => x.code === 'credential-changed-hands'))
+  })
 })
 
 describe('isHuman', () => {

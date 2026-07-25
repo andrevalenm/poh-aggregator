@@ -141,12 +141,26 @@ authenticates the set; we never infer that two addresses belong to one person, b
 inference is the linkage we exist to avoid. Saturation spans the set, so splitting credentials
 across wallets cannot inflate a score — there is a test for exactly that.
 
-Five adapters are implemented, all readable **without vendor cooperation** — no API key on the
+Six adapters are implemented, all readable **without vendor cooperation** — no API key on the
 critical path, nothing that can rate-limit or revoke us: World ID Orb (AgentBook `lookupHuman`
 on World Chain), Proof of Humanity v2 (Gnosis), Circles v2 (Gnosis + trust graph), Coinbase
 Verified Account (EAS on Base, revocation checked explicitly — 720,503 issued against 406,022
-revoked, so presence alone is wrong more than half the time), and Human Passport
-(`GitcoinResolver.getCachedScore` across all seven Decoder deployments).
+revoked, so presence alone is wrong more than half the time), Human Passport
+(`GitcoinResolver.getCachedScore` across all seven Decoder deployments), and Farcaster
+(`IdRegistry` on OP Mainnet).
+
+Farcaster is where the age curve does the work. A fid costs an adversary $0.44 and $0.20 a year,
+and two thirds of the registry was minted inside a nine-month subsidy window — so the boolean is
+worth nothing and the *date* is the entire signal. The registry stores no dates. It does not need
+to: `idCounter` is monotone and `register()` increments it in the same transaction that writes
+custody, so the first block where `idCounter() >= fid` is the block that fid was created in, found
+by searching archive state and confirmed against the `Register` log the probe never reads. Two
+things fall out of that search and change the answer — fids ≤ 193,791 were imported wholesale from
+the predecessor registry by an admin `SetIdCounter`, so they are older than their date; and fids
+are transferable, so what gets dated is *this address's custody*, not the fid. A fid still held by
+its importer is worth 12.19 cents and one independent root; fid 1, bought in January 2026, is
+worth 3.07 cents and none.
+[`research/protocols/farcaster-onchain-read.md`](research/protocols/farcaster-onchain-read.md).
 
 Human Passport is the interesting one, because it is itself an aggregator. Its stamps are
 frequently credentials this ontology already prices: one live subject's score of 22.027 is a
@@ -282,18 +296,19 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 86 SDK tests: 65 unit (scoring model, index reconciliation, input, ontology) + 21 live
+# 96 SDK tests: 67 unit (scoring model, index reconciliation, input, ontology) + 29 live
 cd packages/sdk && npm test
 
 # the live ones alone — real chains, the deployed registry, no mocks
 cd packages/sdk && node --test --experimental-strip-types src/live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/human-passport.live.test.ts
+cd packages/sdk && node --test --experimental-strip-types src/adapters/farcaster.live.test.ts
 
 # 10 browser E2E against the built demo, real chains
 cd apps/demo && npx playwright test
 ```
 
-All 114 pass as of 2026-07-25. The live tests hit real chains on purpose: the failure mode we
+All 124 pass as of 2026-07-25. The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
 assert the seeded ontology loads, that the ICAO cluster really does have three protocols on
 one root, that discontinued protocols are marked dead, that every weight cites a `research/`
@@ -302,7 +317,10 @@ index's to within the hour, and that a real credential outside the index's windo
 rather than silently re-dated. The Passport suite asserts the mechanism rather than a score,
 because every score in it expires in ninety days: our derived expiry must equal the one the
 Decoder computes in Solidity and returns in its revert payload, on whatever address it is
-pointed at.
+pointed at. The Farcaster suite does the same for a date rather than a number: the block our
+counter search picks must be the block the registry's own `Register` log for that fid is in, with
+none in the thousand blocks before it — two subsystems of the node agreeing about one fid, where
+the probe only ever consulted the first.
 
 ---
 
@@ -346,9 +364,9 @@ in October 2026 after the pool empties.
 change is an event — but not decentralised. There is no multisig, no timelock, and no appeal
 path. `transferCuratorship` exists and has not been used.
 
-**6. Coverage is 4 of 30 adapters.** The other twenty-six are priced in the ontology but not yet
+**6. Coverage is 6 of 30 adapters.** The other twenty-four are priced in the ontology but not yet
 probed. An absent credential is reported as absence of evidence, never as evidence of absence.
-Six of them are permissionlessly readable today and are queued in
+Four of them are permissionlessly readable today and are queued in
 `research/landscape/ontology-coverage.md` §6; the rest are gated, off-chain or dead, and say so.
 
 **7. World ID has no verified positive vector yet.** The adapter is verified working against

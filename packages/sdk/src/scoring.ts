@@ -341,6 +341,22 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     })
   }
 
+  const imported = withNote('date-from-registry-import').filter((e) => e.held)
+  if (imported.length) {
+    out.push({
+      code: 'credential-imported-from-predecessor-registry',
+      message: `${ids(imported)} was carried into its current registry by a bulk import rather than issued there, so the only date the contract can give is the import. The credential is genuinely older than that, and on a survival ramp the weight here is a floor rather than an estimate.`,
+    })
+  }
+
+  const transferred = withNote('credential-transferred-since-issuance').filter((e) => e.held)
+  if (transferred.length) {
+    out.push({
+      code: 'credential-changed-hands',
+      message: `${ids(transferred)} is transferable and was not issued to the address holding it. It is dated from when this address acquired it, not from when it was created, so an aged credential bought on a secondary market earns the age of the purchase. The acquisition was found by bisecting custody, which cannot rule out an earlier stint the subject no longer held.`,
+    })
+  }
+
   const stale = withNote('freshness-check-unavailable')
   if (stale.length) {
     out.push({

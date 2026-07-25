@@ -439,8 +439,8 @@
       "decayHalfLifeDays": 730,
       "live": true,
       "sourceURI": "research/landscape/social-and-zktls-signals.md",
-      "implemented": false,
-      "notes": "Account ownership, never personhood — but permissionlessly readable in one eth_call (IdRegistry.idOf on OP Mainnet) and priced from published on-chain numbers rather than guesses: StorageRegistry.usdUnitPrice() is $0.20/unit/year and TierRegistry.tierInfo(1) is $120/year for Pro, which is the forge figure. Ramp because the aged-account market pays for age: a 2016 X account costs ten times a 2025 one, and the same logic prices a Farcaster id.",
+      "implemented": true,
+      "notes": "Account ownership, never personhood — but permissionlessly readable on OP Mainnet and priced from published on-chain numbers rather than guesses: StorageRegistry.usdUnitPrice() is $0.20/unit/year and TierRegistry.tierInfo(1) is $120/year for Pro, which is the forge figure. Ramp because the aged-account market pays for age, and because two thirds of the registry was minted inside a nine-month subsidy window that ended in 2026-04: at 20 cents and a 730-day half-life an id has to predate that window to clear the negligible-cost floor at all. The registry stores no timestamps, so the probe dates a fid by searching idCounter over archive state; fids <= 193791 were carried in from the predecessor registry by an admin SetIdCounter at block 111904738 and are dated to that import, which understates their age. Farcaster Pro is NOT scored: TierRegistry holds no per-fid subscription state, so a subject's Pro status is derivable only from PurchasedTier logs and no keyless Base endpoint serves those over full history.",
       "ageCurve": "Ramp"
     },
     {
