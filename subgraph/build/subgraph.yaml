@@ -1,0 +1,62 @@
+specVersion: 1.0.0
+description: >
+  Normalized proof-of-personhood data on Gnosis. Indexes Proof of Humanity v2
+  registrations and vouch edges, and Circles v2 avatars and trust edges, exposing each
+  credential with its issuance time and graph position so a consumer can weight by age and
+  independence rather than by a boolean.
+repository: https://github.com/andrevalenm/poh-aggregator
+schema:
+  file: schema.graphql
+dataSources:
+  - kind: ethereum
+    name: ProofOfHumanity
+    network: gnosis
+    source:
+      address: "0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc"
+      abi: ProofOfHumanity
+      startBlock: 35846827
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ProofOfHumanity/ProofOfHumanity.wasm
+      entities:
+        - PohHuman
+        - PohVouch
+        - ProtocolDay
+      abis:
+        - name: ProofOfHumanity
+          file: ProofOfHumanity/ProofOfHumanity.json
+      eventHandlers:
+        - event: HumanityClaimed(indexed bytes20,uint256)
+          handler: handleHumanityClaimed
+        - event: HumanityRevoked(indexed bytes20,uint256)
+          handler: handleHumanityRevoked
+        - event: VouchRegistered(indexed bytes20,indexed bytes20,uint256)
+          handler: handleVouchRegistered
+  - kind: ethereum
+    name: CirclesHub
+    network: gnosis
+    source:
+      address: "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8"
+      abi: CirclesHub
+      startBlock: 46300000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: CirclesHub/CirclesHub.wasm
+      entities:
+        - CirclesAvatar
+        - CirclesTrust
+        - ProtocolDay
+      abis:
+        - name: CirclesHub
+          file: CirclesHub/CirclesHub.json
+      eventHandlers:
+        - event: RegisterHuman(indexed address,indexed address)
+          handler: handleRegisterHuman
+        - event: Trust(indexed address,indexed address,uint256)
+          handler: handleTrust
+        - event: Stopped(indexed address)
+          handler: handleStopped

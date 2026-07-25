@@ -1,0 +1,79 @@
+"""
+A human registered in Proof of Humanity v2.
+
+Registration time is the point of this entity. The boolean is nearly meaningless on its own —
+roughly 1,299 of PoH's 1,364 lifetime registrations arrived inside a four-month window
+tracking a ~$9.94 PNK airdrop one-for-one — so an aggregator needs the *age* of a credential
+to weight it, and age is an event, not a storage slot.
+"""
+type PohHuman @entity(immutable: false) {
+  "The bytes20 humanity id, hex encoded."
+  id: ID!
+  humanityId: Bytes!
+  claimedAt: BigInt!
+  claimedAtBlock: BigInt!
+  requestId: BigInt!
+  revoked: Boolean!
+  revokedAt: BigInt
+  vouchesReceived: [PohVouch!]! @derivedFrom(field: "vouched")
+  vouchesGiven: [PohVouch!]! @derivedFrom(field: "voucher")
+}
+
+"""
+One vouch edge.
+
+requiredNumberOfVouches() is 1, so a vouch is cheap; what carries signal is the shape of the
+graph, not the count. Indexing edges lets a consumer compute subtree width and time-clustering
+— the statistics that actually discriminate a farm from an organic invite tree, since root
+concentration alone does not (it flags ~94% of PoH, which is a bootstrapped tree by design).
+"""
+type PohVouch @entity(immutable: true) {
+  id: ID!
+  voucher: PohHuman!
+  vouched: PohHuman!
+  timestamp: BigInt!
+  block: BigInt!
+}
+
+"""
+A Circles v2 avatar and its position in the trust graph.
+
+Registration is close to worthless on its own: a sybil costs about two days of freely-minted
+CRC. Position in the graph is the signal, so incoming trust edges are counted here.
+"""
+type CirclesAvatar @entity(immutable: false) {
+  id: ID!
+  address: Bytes!
+  registeredAt: BigInt!
+  registeredAtBlock: BigInt!
+  inviter: Bytes
+  "Distinct avatars currently trusting this one."
+  trustedByCount: Int!
+  trustedBy: [CirclesTrust!]! @derivedFrom(field: "trustee")
+  stopped: Boolean!
+}
+
+"""
+A Circles trust edge. Unilateral and gas-only, so cheap to create — which is why an honest
+Circles graph should NOT be tree-shaped, and why root-concentration analysis is valid here
+even though it produces a ~94% false-positive rate on invite-gated registries like PoH.
+"""
+type CirclesTrust @entity(immutable: false) {
+  id: ID!
+  truster: Bytes!
+  trustee: CirclesAvatar!
+  expiryTime: BigInt!
+  updatedAt: BigInt!
+  active: Boolean!
+}
+
+"Daily rollups. Registration rate over time is how you detect an airdrop-inflated credential."
+type ProtocolDay @entity(immutable: false) {
+  "protocol-YYYYMMDD"
+  id: ID!
+  protocol: String!
+  day: Int!
+  registrations: Int!
+  revocations: Int!
+  trustEdges: Int!
+}

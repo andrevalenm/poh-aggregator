@@ -1,0 +1,65 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes20",
+        "name": "humanityId",
+        "type": "bytes20"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
+    "name": "HumanityClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes20",
+        "name": "humanityId",
+        "type": "bytes20"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
+    "name": "HumanityRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes20",
+        "name": "voucherHumanityId",
+        "type": "bytes20"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes20",
+        "name": "vouchedHumanityId",
+        "type": "bytes20"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
+    "name": "VouchRegistered",
+    "type": "event"
+  }
+]
