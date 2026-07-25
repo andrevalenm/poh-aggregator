@@ -187,8 +187,8 @@
       "decayHalfLifeDays": 90,
       "live": true,
       "sourceURI": "research/protocols/privado-id-and-verax.md",
-      "implemented": false,
-      "notes": "Sumsub-attested via a Verax portal registering no validation modules. A hard 90-day expiry left ~502 live credentials out of 50,475 ever issued — cumulative counts are not population.",
+      "implemented": true,
+      "notes": "Sumsub-attested via a Verax portal registering no validation modules, so nothing validates a write except the portal's own signature check. Read by enumerating the whole live population from the registry: the 90-day term plus attestedDate being monotone in attestation id confines every unexpired attestation to a ~1,000-id window out of 6.37M, so the probe needs no indexer and no vendor. The hard expiry means this 90-day half-life only ever applies over one credential life, and it leaves 500 live credentials out of 50,475 ever issued — cumulative counts are not population. Linea's own poh-api and PohVerifier still answer true ten months after an attestation expires, so the chain is the stricter source.",
       "ageCurve": "Decay"
     },
     {

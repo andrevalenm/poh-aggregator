@@ -285,6 +285,23 @@ here as low-value — see https://github.com/Consensys/linea-attestation-registr
 
 ### Linea Proof of Humanity — the only personhood thing actually running on Verax
 
+> **CORRECTED 2026-07-25 — read `protocols/linea-poh-onchain-read.md` before using anything below.**
+> Two claims in this section are wrong and one is misleading, all established by direct calls while
+> implementing the adapter:
+>
+> 1. **The portal address below is the deployment test, not production.**
+>    `0xe8a3a57e…b73922` has issued **four** attestations, all on 2025-07-02/03, all expired.
+>    Production is **`0x501e742CF30eCE300E3e8CB45a975c15057D5B46`** (50,471). Both are registered to
+>    the same owner, `0x887F94C1283697c607b321860bd95263AC0E2467`, which is the address an adapter
+>    should pin — there are three Sumsub portals.
+> 2. **"There is no efficient on-chain read" is false.** There is no *per-subject* read, but the
+>    90-day term plus `attestedDate` being monotone in attestation id confines the entire live
+>    population to a ~1,000-id window out of 6.37M, so it can be enumerated whole in six batched
+>    calls. 500 live attestations over 499 addresses on 2026-07-25.
+> 3. **The REST endpoint recommended below does not honour the expiry.** It returned `true` for 45 of
+>    45 addresses whose attestations had all lapsed, the signer API signs for them, and
+>    `PohVerifier.verify` accepts that signature on chain. It answers "was ever verified".
+
 - **PoH V2 = a single attestation issued by Sumsub through Verax**, replacing the "now-deprecated
   multi-provider setup". https://docs.linea.build/network/how-to/verify-users-with-proof-of-humanity
 - **`PohVerifier.sol` = `0xBf14cFAFD7B83f6de881ae6dc10796ddD7220831`** on Linea — verified to have
