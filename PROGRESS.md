@@ -739,3 +739,139 @@ a measurement and it is not in the ontology. Iteration 1's two notes still stand
 calls, not blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where
 `MISSION.md` says to run it, and `pnpm-lock.yaml` is still untracked beside a tracked
 `package-lock.json`.
+
+## Iteration 7 — 2026-07-25
+
+**Did:** §6 item 5 of `ontology-coverage.md` — **World's document and Selfie tiers**. The answer is
+that neither can be read, by us or by anyone, and establishing that properly turned up the thing
+that mattered: **the tier we do read was being read from the wrong contract, and the score it
+produced was wrong in the adversary's favour.**
+
+- **The defect.** `AgentBook.lookupHuman` returns a nullifier and **no date**, and `freshnessOf`
+  scores an undated `Decay` credential at freshness **1** — full weight, forever. So every World
+  credential we found was priced as though issued this morning. AgentBook is also a registry of
+  *agents*, not humans: **1,068 transactions in its entire life**.
+- **`WorldIDAddressBook`** (`0x57b930D5…E0330D`, verified source, Blockscout tags it "World Chain:
+  World ID Address Book" for worldcoin.org, deployed 2024-08-27) fixes both halves. `verify()`
+  writes `addressVerifiedUntil[account] = block.timestamp + verificationLength` after the router
+  accepts a group-1 proof, so `verifiedUntil − verificationLength()` is the **exact second the
+  verification was mined** — checked against block headers on **24 samples spanning 2025-04-18 to
+  2026-07-25, every one to the second**. Coverage measured from twelve 100-block windows:
+  ~28,000 verifications/day at head, 60,000–80,000/day through 2025.
+- **`held` is a comparison, never a presence check.** The mapping is never cleared, so a lapsed
+  verification is a large number sitting in it forever — 7 of 12 accounts sampled from 2025-04-18
+  and 8 of 12 from 2026-01-21 are in exactly that state. An `!= 0` read counts all of them.
+- **The date is exact only while the term is the term the entry was written under**, so the full
+  config-event history was scanned (7 chunked `eth_getLogs`, deployment → head): the contract has
+  emitted **exactly two config events in its life** — initialisation (term 14,515,200 = 168 days,
+  groupId 1, 2024-08-27) and one `WorldIdRouterUpdated` on 2026-01-08. The term has never moved.
+  The probe reads it live anyway and refuses any derived date landing before the contract existed
+  or after the block it read, so a future `setVerificationLength` can cost us a date but can never
+  invent one. A live test holds the current term to the initialisation event as a tripwire.
+- **The date is a binding, not an iris.** It is when this address last re-proved a World ID, not
+  when the human enrolled at an Orb (`genesis_issued_at` lives inside the v4 credential and never
+  touches a chain). New provenance note `date-from-latest-reattestation` → caveat
+  `issuance-date-is-latest-renewal`. On a decay curve that is the conservative reading: the
+  enrolment is older, so the weight is a ceiling. **Measured: a binding renewed 162.0 days ago now
+  scores freshness 0.9025 and 45.13 cents against the adapter's 50; one renewed this morning
+  0.99999 and 50.00. Before this change both were 50.00.**
+- **One live verified address per human, enforced on chain.** `verify` reverts
+  `VerificationAlreadyActive()` when the proof's nullifier already maps to a *different* address
+  whose verification has not expired. P1's fleet policy can rely on that rather than infer it.
+- **An entry means a real proof, and the chain will demonstrate it on demand.** Simulating
+  `verify` with an invented merkle root reverts `NonExistentRoot()` (`0xddae3b71`, the root-history
+  check); with the group's current `latestRoot()` it advances to `ProofInvalid()` (`0x7fcdd1f4`,
+  the Groth16 pairing). **Identical from a stranger, from the relayer that submits real
+  verifications, and from the contract's owner** — so the gate is the proof, not the caller. Six
+  calls, asserted every run. Corroborated by the trace of a real verification: AddressBook → shim →
+  WorldIDRouter → RouterImplV1 → group-1 identity manager → Groth16 verifier → bn256 precompiles.
+- **The 2026-01 router swap was checked rather than assumed.** The new router
+  (`0xB012Bc9D…65Caa`) is unverified, so it was read from its bytecode: 1,337 bytes, no EIP-1967
+  slot, and `PUSH32` constants naming the canonical `WorldIDRouter` and the AddressBook itself. It
+  is a shim in front of the canonical router, not a replacement for it, and `groupId` is still 1.
+- **Why the other two tiers are unreadable, with measurements rather than an assertion.** World ID
+  4.0 verification writes no state — `WorldIDVerifier` is a `view` function taking a proof and its
+  proxy has received **2 transactions in its life** — and `CredentialSchemaIssuerRegistry` is keyed
+  by `uint64` issuer schema id with **no address anywhere in its read surface**: it registers who
+  may *issue* schema 9303, not who *holds* one. Both address-keyed World Chain registries report
+  `groupId() == 1`, the Orb. Reading either tier needs the Developer Portal and a registered
+  `rp_id`. Both ontology entries now carry a `no permissionless read` note naming the evidence, and
+  a test asserts they keep carrying it.
+- **Also fixed:** `scripts/deploy.mjs` erased the human-written `note` from
+  `deployments/sepolia.json` on every re-seed — the only place the *reason* for a revision is
+  written down. It is preserved now, and a no-op re-seed leaves the file byte-identical.
+- New write-up `research/protocols/world-id-onchain-read.md` (addresses, the two config events, the
+  revert experiment, the rate table, and §5's evidence that the other tiers cannot be read).
+  `ontology-coverage.md` §6 item 5 resolved *in the opposite direction to the one it assumed* and
+  its three World roster rows re-sourced; `INDEX.md` lists the fifth implementation write-up;
+  README updated (World section, the stale "6 of 30 adapters" line corrected to 9 of 30, test
+  counts, contract table). `docs/scoring.md` now states once what four adapters were each saying
+  separately: **a hard expiry truncates a decay curve**, with the four floors (Passport 0.71,
+  Holonym 0.71, World 0.90, Linea 0.50) — iteration 6's next-step 2, closed.
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd packages/sdk && npm test` → `# tests 172 # pass 170 # fail 0 # skipped 2` (was 150/148/0/2:
+  +12 World unit, +10 World live). The 2 skips are iteration 6's Verax subgraph HTTP 429s, still
+  unresolved and not touched by this change. Per file: 34 scoring, 18 reconcile, 5 input,
+  10 ontology, 10 holonym unit, 19 linea-poh unit, **12 world unit**, 15 live, 6 passport-live,
+  8 farcaster-live, 7 holonym-live, 18 linea-poh-live, **10 world-live**.
+- `node --test --experimental-strip-types src/adapters/world.live.test.ts` → **10/10, `skipped 0`,
+  three consecutive runs**.
+- `npm run build` clean; `node_modules/.bin/tsc -p tsconfig.json --noEmit` clean.
+- `cd apps/demo && npx playwright test` → `10 passed`.
+- `node scripts/deploy.mjs --seed-only` → `30 already identical on-chain`, registry
+  `0x977b028b…aa07` unchanged at **30 adapters, revision 34**, and `deployments/sepolia.json`
+  byte-identical afterwards (which is the `note`-preservation fix proving itself).
+- End to end through `resolvePersonhood()`: a subject sampled from the address book scores
+  **1.7076** / 50.00 cents / one root with `issuance-date-is-latest-renewal`; four subjects
+  sampled from 150–162-day-old cohorts score 45.13–45.46 cents where yesterday they would have
+  scored 50.00.
+- The acceptance test the mission asks for ("a live test that hits the real chain and asserts the
+  mechanism, not a magic number") is **"the date the probe derives is the block the verification
+  was mined in"**: it samples `AccountVerified` logs at head *and* 20M blocks back, requires
+  `verifiedUntil − verificationLength()` to equal the block header's timestamp for each, and then
+  requires the probe — which reads only the mapping — to land on the same second. Three parts of
+  the chain (log index, block header, mapping) where the probe consults one. Beside it: the proof
+  gate experiment above, the initialisation-event tripwire, the lapsed-entry test asserting a
+  nonzero mapping value with `held: false`, and the decay-floor invariant.
+
+**No registry write, on purpose.** Root, evidence class, curve, half-life and both costs are
+unchanged — only `notes`, which is an off-chain field — so a reseed would bump `revision` to record
+nothing, which is what iteration 2's incremental seeding exists to prevent.
+
+**Next, in the order I would do it:**
+
+1. **Proof of Humanity v1** — the last item in §6's passively-readable queue, and a cheap one: a
+   second `isRegistered` call on a registry family we already talk to, which exercises saturation
+   against v2 with real data. After that the queue is empty and every remaining ontology entry is
+   documented as *not* passively readable, so the next marginal probe is worth less than P1's
+   as-of scoring or the ENS agent track.
+2. **P1 fleet policy now has a chain-enforced primitive to build on.** `WorldIDAddressBook` allows
+   at most one live verified address per human, and `nullifierHashes(nullifier) → address` is
+   public. A counterparty policy of "at most N agents per human" can therefore be *checked* against
+   World rather than asserted, which is the difference between a product and an illustration.
+3. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
+   the cheapest way to turn two flagged approximations into real dates (iteration 1's note 1,
+   unchanged through six iterations now).
+
+**Measured while working, worth keeping:** World Chain runs at exactly 2.0 s/block over the
+address book's whole life (30,114,786 blocks in 60,229,662 s), which is what makes 100-block
+`eth_getLogs` windows — the cap on the keyless endpoint — a usable sampler: one window is ~200
+seconds of traffic and holds dozens of verifications. The endpoint serves those windows at any
+height, so historical sampling needs no archive vendor. `worldchain-mainnet.gateway.tenderly.co`
+serves wide log ranges keylessly and was used for the config-history scan; it silently *truncates*
+oversized results rather than erroring (a 500k-block query returned fewer logs than a 10k-block
+one), so anything counted through it must be chunked, and this file records that because the next
+person to count something on World Chain will hit it.
+
+**Blocked:** nothing. Two measurements I could not close honestly and wrote down as open questions
+rather than guessing: **how many distinct humans hold a live World binding** (the contract has
+emitted on the order of 10⁷ `AccountVerified` events and deduping them needs an archive log scan
+no keyless endpoint will serve — the rate table is a sample and says so), and **what selector
+`0xad94e556` is** on the router shim (not in the AddressBook's verified ABI, unknown to both 4byte
+and OpenChain; the revert experiment pins the shim's behaviour either way). Iteration 1's two
+notes still stand and are Hugo's calls, not blockers: `./test.sh` lives at `apps/demo/test.sh`
+rather than the repo root where `MISSION.md` says to run it, and `pnpm-lock.yaml` is still
+untracked beside a tracked `package-lock.json`.
