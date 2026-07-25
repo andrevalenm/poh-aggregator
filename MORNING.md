@@ -65,6 +65,12 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Operational green-board (verified ~16:45)**: registry audit-trail subgraph fully
+synced with the grown ontology (30 adapters indexed, revision 34, current block); Studio
+protocol subgraph healthy, no indexing errors, synced to Gnosis head; hosted demo 200
+with gzip; demo script rewritten for the shipped layout. Every live dependency the video
+and judging depend on is green.
+
 **Keyboard**: the MCP picker now honors the ARIA tabs contract it declared (roving
 tabindex, arrow-key cycling, Home/End) — verified by driving it with the keyboard.
 
