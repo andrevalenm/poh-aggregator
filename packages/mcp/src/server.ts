@@ -18,7 +18,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { readFileSync } from 'node:fs'
-import { Corroborate, DEFAULT_REGISTRY, type PersonhoodResult } from '@corroborate/sdk'
+import { Corroborate, DEFAULT_REGISTRY, weightHistory, type PersonhoodResult } from '@corroborate/sdk'
 
 const ontologyPath = new URL('../../../ontology/adapters.json', import.meta.url)
 let knownIds: string[] = []
@@ -151,6 +151,42 @@ server.tool(
         lines.push(`      source: ${a.sourceURI}`)
       }
       lines.push('')
+    }
+    return { content: [{ type: 'text', text: lines.join('\n') }] }
+  },
+)
+
+server.tool(
+  'explain_weight_history',
+  'The full audit trail for one adapter: every weight the ontology has ever assigned it, each with the source it was derived from and the block it landed in. Weights here are curated judgments, so this history is what makes them accountable — if a score changed, this shows exactly when, why, and on whose evidence.',
+  {
+    adapter_id: z.string().describe('Adapter id, e.g. world-id-orb, poh-v2, circles-v2'),
+  },
+  async ({ adapter_id }) => {
+    const url = process.env.CORROBORATE_REGISTRY_SUBGRAPH_URL
+    if (!url) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'CORROBORATE_REGISTRY_SUBGRAPH_URL is not set. The audit trail lives in the registry subgraph; without it, use explain_trust_roots for current weights (each carries its sourceURI).',
+          },
+        ],
+      }
+    }
+    const history = await weightHistory(url, adapter_id)
+    if (!history) return { content: [{ type: 'text', text: 'Registry subgraph unreachable.' }] }
+    if (!history.length)
+      return { content: [{ type: 'text', text: `No weight history for "${adapter_id}" — check the id via explain_trust_roots.` }] }
+
+    const lines = [`weight history for ${adapter_id} (${history.length} change${history.length === 1 ? '' : 's'}):`, '']
+    for (const w of history) {
+      lines.push(
+        `  rev ${w.revision} · ${new Date(w.timestamp * 1000).toISOString()} · block ${w.block}`,
+        `    forge $${(w.forgeCostCents / 100).toFixed(2)} / rent $${(w.rentCostCents / 100).toFixed(2)} · ${w.live ? 'live' : 'DISCONTINUED'}`,
+        `    source: ${w.sourceURI}`,
+        `    tx: ${w.txHash}`,
+      )
     }
     return { content: [{ type: 'text', text: lines.join('\n') }] }
   },
