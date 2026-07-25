@@ -1,9 +1,11 @@
 import './landing.css'
+import Lenis from 'lenis'
 import { DEFAULT_REGISTRY, makeClient } from '../client.ts'
 import { h, shortAddr } from '../ui.ts'
 import { mountFingerprint, stampPrint } from './fingerprint.ts'
-import { mountFluid } from './fluid.ts'
-import { mountSmudge } from './smudge.ts'
+import { mountPaper } from './paper.ts'
+import { mountContours } from './contours.ts'
+import { mountCursor } from './cursor.ts'
 import { mountWidget } from './widget.ts'
 
 // ------------------------------------------------------------- registry line
@@ -91,11 +93,7 @@ function mountPicker(): void {
 
   for (const c of MCP_CLIENTS) {
     tabs.append(
-      h(
-        'button',
-        { type: 'button', role: 'tab', 'data-id': c.id, onclick: () => paint(c) },
-        c.label,
-      ),
+      h('button', { type: 'button', role: 'tab', 'data-id': c.id, onclick: () => paint(c) }, c.label),
     )
   }
   paint(MCP_CLIENTS[0]!)
@@ -127,10 +125,11 @@ function mountReveals(): void {
     for (const el of els) el.classList.add('in')
     return
   }
-  // Siblings cascade rather than arriving as one block: each element's delay is its
-  // reveal-index within its parent.
+  // Siblings cascade rather than arriving as one block.
   for (const el of els) {
-    const siblings = el.parentElement ? [...el.parentElement.children].filter((c) => c.classList.contains('reveal')) : []
+    const siblings = el.parentElement
+      ? [...el.parentElement.children].filter((c) => c.classList.contains('reveal'))
+      : []
     const idx = Math.max(siblings.indexOf(el), 0)
     el.style.transitionDelay = `${Math.min(idx * 110, 440)}ms`
   }
@@ -148,12 +147,9 @@ function mountReveals(): void {
   for (const el of els) io.observe(el)
 }
 
-// ------------------------------------------------------------ torn edges
+// ------------------------------------------------------------ torn edge
 
-/**
- * Section joins are torn, not cut. Each divider is a seeded jagged polygon — same idea as
- * the print: deterministic, hand-made-looking, no image asset.
- */
+/** The one place the sheet tears: where paper gives way to the night sections. */
 function mountTornEdges(): void {
   let s = 0x7041
   const rand = () => {
@@ -163,8 +159,8 @@ function mountTornEdges(): void {
   for (const svg of document.querySelectorAll<SVGElement>('svg[data-torn]')) {
     svg.setAttribute('viewBox', '0 0 100 24')
     const pts: string[] = ['0,24']
-    for (let x = 0; x <= 100; x += 1.6 + rand() * 1.8) {
-      const y = 4 + rand() * 15 + Math.sin(x * 0.35) * 2.5
+    for (let x = 0; x <= 100; x += 1.1 + rand() * 1.3) {
+      const y = 6 + rand() * 12 + Math.sin(x * 0.5) * 2
       pts.push(`${x.toFixed(1)},${y.toFixed(1)}`)
     }
     pts.push('100,24')
@@ -174,50 +170,91 @@ function mountTornEdges(): void {
   }
 }
 
+// ----------------------------------------------- smooth scroll + parallax
+
+function mountScroll(): void {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  const parallaxEls = [...document.querySelectorAll<HTMLElement>('[data-parallax]')].map((el) => ({
+    el,
+    speed: Number(el.dataset['parallax'] ?? 0.1),
+    baseCenter: 0,
+  }))
+  const measure = () => {
+    for (const p of parallaxEls) {
+      // offsetTop chains ignore transforms, so measurement is feedback-free.
+      let top = 0
+      let node: HTMLElement | null = p.el
+      while (node) {
+        top += node.offsetTop
+        node = node.offsetParent as HTMLElement | null
+      }
+      p.baseCenter = top + p.el.offsetHeight / 2
+    }
+  }
+  measure()
+  addEventListener('resize', measure)
+
+  const applyParallax = () => {
+    const vh = innerHeight
+    const sy = scrollY
+    for (const p of parallaxEls) {
+      const progress = sy + vh / 2 - p.baseCenter
+      p.el.style.transform = `translate3d(0, ${(progress * p.speed).toFixed(1)}px, 0)`
+    }
+  }
+
+  if (reduced) return
+
+  const lenis = new Lenis({ autoRaf: false, lerp: 0.11 })
+  const raf = (time: number) => {
+    lenis.raf(time)
+    applyParallax()
+    requestAnimationFrame(raf)
+  }
+  requestAnimationFrame(raf)
+
+  // Anchor links glide instead of jumping.
+  for (const a of document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')) {
+    a.addEventListener('click', (e) => {
+      const target = document.querySelector(a.getAttribute('href') ?? '')
+      if (!target) return
+      e.preventDefault()
+      lenis.scrollTo(target as HTMLElement, { offset: 0, duration: 1.4 })
+    })
+  }
+}
+
 // -------------------------------------------------------------------- mount
 
-mountFingerprint(document.getElementById('print') as HTMLCanvasElement)
-{
-  // The ink trail is a GPU fluid sim; the 2D ribbon (softened) is the fallback, both for
-  // machines without WebGL2 and for contexts that get dropped after init — a lost context
-  // cannot be revived as 2D on the same element, so the fallback gets a fresh canvas.
-  const smudgeCanvas = document.getElementById('smudge') as HTMLCanvasElement
-  let fellBack = false
-  const fallbackToRibbon = () => {
-    if (fellBack) return
-    fellBack = true
-    const fresh = smudgeCanvas.cloneNode(false) as HTMLCanvasElement
-    smudgeCanvas.replaceWith(fresh)
-    fresh.style.filter = 'blur(6px)'
-    mountSmudge(fresh)
-  }
-  if (!mountFluid(smudgeCanvas, fallbackToRibbon)) fallbackToRibbon()
+mountPaper(document.getElementById('paper') as HTMLCanvasElement)
+for (const canvas of document.querySelectorAll<HTMLCanvasElement>('canvas[data-contours]')) {
+  mountContours(canvas, 0x7e44a1 + Number(canvas.dataset['contours']) * 0x1f2e3d)
 }
+// The print is ink on paper now.
+mountFingerprint(document.getElementById('print') as HTMLCanvasElement, {
+  rgb: '42 35 27',
+  wideAlpha: 0.78,
+  narrowAlpha: 0.16,
+})
+mountCursor()
 mountWidget()
 mountPicker()
 mountReveals()
 mountTornEdges()
+mountScroll()
+
+// The headline rises line-by-line out of its masks once layout settles.
+requestAnimationFrame(() =>
+  requestAnimationFrame(() => document.querySelector('.hero h1')?.classList.add('sl-in')),
+)
 
 // Seamless ticker: the track needs its content twice for the -50% translate loop.
 const tickerTrack = document.getElementById('ticker-track')
 if (tickerTrack) tickerTrack.innerHTML += tickerTrack.innerHTML
 
-// The colophon stamp: the same print, pressed small in iron.
+// The colophon seal: the same print, pressed small in iron.
 const stamp = document.getElementById('stamp') as HTMLCanvasElement | null
-if (stamp) stampPrint(stamp, '#b1401f', 0.95)
-document.querySelectorAll<HTMLButtonElement>('.copy-btn[data-copy]').forEach((btn) => {
-  btn.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(btn.dataset['copy'] ?? '')
-      btn.textContent = 'copied'
-      btn.classList.add('copied')
-      setTimeout(() => {
-        btn.textContent = 'copy'
-        btn.classList.remove('copied')
-      }, 1600)
-    } catch {
-      btn.textContent = 'select it'
-    }
-  })
-})
+if (stamp) stampPrint(stamp, '#a6431f', 0.95)
+
 void paintRegistryLine()
