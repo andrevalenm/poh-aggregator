@@ -1482,3 +1482,118 @@ tracked `package-lock.json`. New and minor: `.env.local` gained three agent wall
 (`AGENT_ALPHA_PRIVATE_KEY`, `AGENT_BETA_PRIVATE_KEY`, `AGENT_UNVERIFIED_PRIVATE_KEY`), generated
 by `scripts/ens-agents-keys.mjs`, holding no funds and needed only to re-run the setup script or
 to build next-step 3.
+
+## Iteration 12 — 2026-07-25
+
+**Did:** the defect iterations 7 and 10 both named and left — **`world-id-orb` held through
+AgentBook had no date**, and an undated credential on a `Decay` curve is scored by `freshnessOf`
+at freshness **1**: full weight, forever, for a registration of any age. It was the last undated
+credential in the roster and the same shape iteration 7 called a live scoring bug. The date was on
+chain the whole time: `AgentRegistered` is emitted in the transaction that writes the mapping, so
+the registration's block is the second the contract accepted a group-1 Orb proof for that address.
+
+- **`registrationOf()` (`agentbook.ts`) — the probe path, not the scan path.** Filtering
+  `eth_getLogs` on the agent topic makes the *result* one log, and tenderly then serves the entire
+  5.8M-block history in a **single call: 423 ms**, against ~4.6 s for the six-call fleet scan. A
+  scoring request cannot pay for a fleet scan; now it does not have to. Fetched only when the
+  mapping says there is a registration to date (~1,164 wallets on World Chain, not every subject),
+  so ordinary subjects pay nothing.
+- **The canary is wide here, and that is the whole design.** `scanAgentBook`'s canary asks one
+  block because its risk is an endpoint that answers `[]` for everything. This path's risk is
+  quieter: an endpoint that serves recent blocks and silently drops the old end of a wide range
+  returns no log for an agent registered in March, "no log" becomes "no date", and no date is
+  **back to freshness 1** — the permissive answer the function exists to remove. So the canary is
+  the *same wide filtered query* for `0xb667e025…83a1`, whose registration has sat at block
+  27,100,652 since 2026-03-15. A local HTTP server answering `{"result":[]}` to everything is
+  refused by it (`unavailable`, never `not-found`), asserted in the live suite rather than argued
+  for in a comment. drpc — the endpoint iteration 10 caught lying — fails this too, loudly (HTTP
+  400 on a wide range).
+- **The date is refused unless it belongs to the binding state holds.** The log's `humanId` must
+  equal the one `lookupHuman` just returned, and the timestamp must fall inside the contract's own
+  lifetime (`AGENT_BOOK_DEPLOYED_AT`, 1,773,441,765, read from the deploy block's header). Nothing
+  has ever re-registered on this contract, so today the first check is defensive — but the mapping
+  is a plain overwrite, and dating a live binding from a superseded event is precisely the torn
+  read `reconcile.ts` exists to prevent.
+- **Both registries can date one address, and the later date wins.** Measured going both ways:
+  `0x4f40c84e…` was AddressBook-verified 2026-04-16 and registered as an agent 2026-05-13
+  (registration fresher); `0xf0ffe69d…` did both within ten minutes. Each date is a moment the
+  chain accepted an Orb proof for that address and neither can be produced without one, so the
+  most recent is the freshest thing known and there is no cheap way for an adversary to move it.
+  Both land in `detail`; new note `date-from-agent-registration` beside the existing
+  `date-from-latest-reattestation`, and both fire when the two dates are the same second.
+- **Four ways the lookup can fail, four flags in `detail`** — endpoint unavailable, log missing a
+  registration state holds, log naming a different human, timestamp out of range. Every one of
+  them is a silent return to full weight, so none of them is swallowed. New caveat
+  `issuance-date-is-registration` states the direction of the error: the enrolment behind the
+  registration is older and World does not publish it, so on `Decay` the weight is a **ceiling**.
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `cd packages/sdk && npm test` → `# tests 330 # pass 330 # fail 0 # skipped 0` (was 314 at
+  iteration 11: **+11 unit** — 10 in `world.test.ts`, 1 in `scoring.test.ts` — **+5 live**, 4 in
+  `world.live.test.ts` and 1 in `agentbook.live.test.ts`).
+- `node --test --experimental-strip-types src/adapters/world.live.test.ts` → **14/14, `skipped 0`**,
+  including a real agent wallet registered **73 days ago moving from freshness 1.0000 to 0.9546**,
+  the probe's date matching the registration block's header to the second on four sampled
+  registrations, and the empty-answer endpoint being refused.
+- `node --test --experimental-strip-types src/agentbook.live.test.ts` → **13/13, `skipped 0`**: the
+  one-agent lookup returns the same block, humanId and txHash as the full scan for a sample of six,
+  and its timestamp is checked against the block header rather than the log field it came from.
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `npm run build` clean; `tsc -p tsconfig.json --noEmit` clean; `packages/mcp` builds clean.
+- `cd apps/demo && npx playwright test` → `13 passed`.
+- `cd apps/agent && npm start` end to end: unchanged verdicts (DENY / ALLOW 3.6153 over 5 roots /
+  DENY naming the sibling / DENY `admitted 1 of 27`), and gate 3 now prints
+  `issuance-date-is-registration` where it printed `issuance-date-unknown`, with `world-id-orb`
+  counted at **49.98c rather than a flat 50c**. That is the honest size of the fix on agents
+  registered days ago; the 73-day figure above is what it is worth on an old one.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved — this reads a
+date the chain already had — so a reseed would bump `revision` to record nothing. Registry stays at
+**30 adapters, revision 34**.
+
+**Committed:** `278d8cd` feat(sdk): the AgentBook registration is a date, and the last undated
+credential is gone
+
+**One incident worth recording, because it will happen again.** About an hour in, `git diff` came
+back empty with every edited file at HEAD content; `git reflog` showed
+`reset: moving to reattributed`. The laptop session had rewritten this repo's history to reattribute
+all commits to `andrevalenm` and reset `main` onto the new lineage, discarding my uncommitted work —
+it left a note at the bottom of `MORNING.md` explaining exactly that, which I found afterwards. No
+data was lost beyond the hour: the changes were regenerated on the new HEAD and are the commit
+above. **Practice for future iterations: commit each piece as soon as its tests are green, not at
+the end of the iteration** — this repo has a second writer and `git status` being clean is not proof
+that nothing happened. `MORNING.md`'s "Needs you" item 1 ("repo has no pushable remote") is now
+stale; the laptop's `b1a9097` says the private repo is live. Nothing has ever been pushed from here.
+
+**Next, in the order I would do it:**
+
+1. **Base EAS subgraph**, replacing the `easscan.org` GraphQL dependency in
+   `coinbaseVerificationAdapter` — the last vendor on the critical path, and the last place the
+   repo contradicts its own stated principle. Constraint measured in iteration 9 and unchanged: the
+   self-hosted graph-node here would need a Base network added to its config, which is a container
+   change this mission forbids, so this is Studio or nothing.
+2. **A signature gate for the ENS path.** `agent-presenter-not-authenticated` fires on every batch
+   because resolving a name does not establish that the presenter controls the wallet the name
+   points at. The World flow already does this with CAIP-122 and the three agent wallets' keys are
+   in `.env.local` for exactly this reason, so it is contained.
+3. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
+   the cheapest way to turn two flagged approximations into real dates (iteration 1's next-step 1,
+   unchanged through eleven iterations).
+4. **World's Selfie and document tiers in the score**, if and only if a permissionless read appears.
+   Iteration 7's measurement still stands: neither leaves per-holder state on any chain, so this
+   stays `live: false` in the ontology with the reason written down.
+
+**Measured while working, worth keeping:** tenderly returns `blockTimestamp` on every log
+(`eth_getLogs` spec addition), so the date costs no extra header read in practice — but the code
+falls back to `eth_getBlockByNumber` when it is absent, and the live suite checks the value against
+the header rather than trusting the field. A topic-filtered query over the full history is served in
+one call where an unfiltered one needs six, so the cost of a date is bounded by result size and not
+by range. Also, of the World Chain endpoints, only tenderly serves this at all: alchemy caps at 100
+blocks, thirdweb at 1,000, and drpc returns HTTP 400 above 10,000 for a filtered query rather than
+the empty-array lie it tells for unfiltered ones.
+
+**Blocked:** nothing. Iteration 1's two notes still stand and are Hugo's calls, not blockers:
+`./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run it
+(and its internal `cd` assumes the root, so it only works from there), and `pnpm-lock.yaml` is still
+untracked beside a tracked `package-lock.json`.

@@ -1,9 +1,8 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 11. All four suites green: 18 forge, 314 SDK
-(314 pass, 0 fail, 0 skipped — the rate-limited third-party indexer answered this time),
-13 Playwright — 345 total._
+detail. _Last updated 2026-07-25, after unattended iteration 12. All four suites green: 18 forge, 330 SDK
+(330 pass, 0 fail, 0 skipped), 13 Playwright — 361 total._
 
 ---
 
@@ -348,6 +347,33 @@ infrastructure, with the parent name as the only input.
 
 No weight moved; the registry stays at **30 adapters, revision 34**. Write-up:
 `research/protocols/ens-agent-identity.md`.
+
+**Iteration 12 closed the last undated credential in the roster.** `AgentBook.lookupHuman`
+answered *held* and nothing else, so a World credential held only through it reached the scorer
+with no date — and no date on a `Decay` curve is **freshness 1, full weight, forever**.
+Iterations 7 and 10 both named it and moved on. The date was on chain the whole time:
+`AgentRegistered` is emitted in the transaction that writes the mapping, so the registration's
+block is the second the contract accepted an Orb proof for that address.
+
+- **It is cheap enough for a probe.** Filtering the log on the agent makes the result one line,
+  so the whole 5.8M-block history is served in a *single* call — 423 ms, against ~4.6 s for the
+  six-call fleet scan — and only for wallets the mapping says are registered.
+- **The guard is the interesting part.** An endpoint that serves recent blocks and quietly drops
+  the old end of a range returns no log for an agent registered in March; "no log" becomes "no
+  date", and no date is back to full weight. So the canary is the *same wide filtered query* for
+  the agent whose registration has sat at block 27,100,652 since 2026-03-15, and an endpoint that
+  cannot find it is not asked anything else. A server answering `{"result":[]}` to everything is
+  refused by that check, asserted in the live suite.
+- **When both World registries date one address, the later date wins** — each is a moment the
+  chain accepted an Orb proof, and neither can be produced without one. Both are reported; the
+  new caveat `issuance-date-is-registration` says which was used and that the weight is a
+  ceiling, because the enrolment behind either is older and World does not publish it.
+- **Size of the fix, honestly:** an agent registered 73 days ago goes from 50.00c to 47.73c
+  (freshness 1.0000 → 0.9546). The demo's own agents, registered days ago, go to 49.98c. It is
+  small on a fresh credential by construction — and unbounded on an old one, which was the point.
+
+No weight moved; the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/world-agentbook-fleets.md` §7.
 
 ---
 
@@ -848,3 +874,20 @@ in the reset — apologies; regenerate them on this HEAD. Your git identity here
 configured as andrevalenm. Commit early, commit often. To sync onward: the laptop pushes
 refs/heads/reattributed here; canonical remote is github.com/Hugo0/poh-aggregator
 (private).
+
+**Acknowledged, iteration 12 (ax41, ~19:30).** Read after the fact — the reset landed
+mid-edit, so the first symptom was `git diff` coming back empty with the files back at
+HEAD and `git reflog` showing `reset: moving to reattributed`. The lost changes were
+regenerated on the new lineage and are committed as `278d8cd`; nothing else of mine was
+in flight. Two notes back:
+
+- **Nothing was pushed from here, then or since.** `MISSION.md` forbids it and I have not
+  run `git push` in any iteration. `origin` on this box still points at
+  `andrevalenm/poh-aggregator`; if you want ax41 pushing to the Hugo0 remote, someone has
+  to add it — I have deliberately not.
+- **"Needs you" item 1 above is now stale** ("Repo has no pushable remote"): the laptop's
+  own commit `b1a9097` says the private repo is live and andrevalenm is invited. Left in
+  place rather than rewritten, because which remote ax41 should point at is your call.
+
+Working practice adjusted: commit as soon as a piece is green rather than at the end of an
+iteration, so a concurrent reset costs minutes instead of an hour.
