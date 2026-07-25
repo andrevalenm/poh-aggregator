@@ -434,3 +434,144 @@ morning: `farcaster-account` carries `forgeCostCents: 12000`, which is the *Pro*
 on an adapter that does not read Pro — untrue about the world, non-binding today because
 `min(forge, rent)` takes the 20 cents, and left alone rather than silently rewritten, exactly as
 iteration 2 left the KYC forge figure.
+
+## Iteration 5 — 2026-07-25
+
+**Did:** P0 #2, job 2 — the next probe off the ranked queue (§6 item 3 of `ontology-coverage.md`):
+**Holonym / Human ID**, read from `Hub` V3 on OP Mainnet. Eight adapters implemented now, up from
+six: this one contract carries two ontology entries, `holonym-gov-id` (`kyc-vendor:unattributed`)
+and `holonym-biometrics` (`kyc-vendor:facetec`).
+
+**The blocker on this item was false, and finding that out was most of the work.** §6 said it
+"requires us to publish a stable action-id first, which is a design decision, not a lookup".
+That is true of the *vendor's REST endpoint* — Holonym's uniqueness is scoped per action-id and
+`/sybil-resistance/gov-id/optimism` will not answer without one. It is not true of the Hub:
+`getSBT(address, circuitId)` is keyed on holder and circuit, and the action-id comes back inside
+the proof as `publicValues[2]`. So we report the namespace the credential was minted for instead
+of choosing one, and no design decision is needed. Reading the Hub also drops two things the API
+would have imposed: an off-chain DynamoDB blocklist we cannot see (their endpoint answers a
+question about their policy, not about the chain), and a gov-id path that silently falls back to
+the zk-passport circuit — which for us would merge an ICAO root into a KYC-vendor root and let
+one document score twice.
+
+- **Presence is forgeable, and the contract says so in its own comments.** `Hub.sol`: *"make sure
+  you check the public values such as actionId from this. Someone can forge a proof if you don't
+  check the public values, e.g., by using a different issuer or actionId."* The circuit proves
+  that *an* issuer signed the credential and anyone can run an issuer key, so the probe pins
+  `publicValues[4]` against Holonym's per-credential issuer and returns `held: false` with both
+  keys printed when it differs. An adapter that treated an SBT under the right circuit id as
+  evidence would have counted self-issued credentials.
+- **Uniqueness needs its own read.** `setSBT` burns the nullifier it is *handed*, and nothing
+  constrains that argument to equal `publicValues[3]`, the nullifier the circuit derived. If they
+  differ, the holder's uniqueness slot for that action was never consumed and the same human can
+  hold the credential on unlimited addresses. `nullifiersToIdentifiers(publicValues[3])` must map
+  back to this holder; ten SBTs sampled across the registry's life all passed, and it is reported
+  per subject rather than assumed.
+- **The date is a ZK constraint, not a convention.** The Hub stores no issuance timestamp, and the
+  expiry it does store is chosen by the *holder* — `V3.circom` tells them to pick it randomly
+  before their issuance date, for anonymity. So subtracting a fixed term would be inventing a
+  date. What is provable is the ceiling: the circuit constrains `expiry - iat < 31,536,001` with a
+  25-bit range check, so **`expiry - one year` is a proven lower bound on issuance** for every SBT
+  the Hub accepted. A lower bound on issuance is an upper bound on age, and on a `Decay` curve the
+  oldest a credential can be is the least weight it can support — so the bound is used as the
+  date. It can only understate freshness, never inflate it. New provenance note
+  `date-from-expiry-and-max-term`, new caveat `issuance-date-derived-from-expiry`.
+- **Measured how loose that bound is, and it is looser than I first assumed.** Thirteen live SBTs
+  were dated by searching historical state for the block they were minted in, then compared: for
+  eleven the bound sat 4–29 days before the mint, but for two it sat **187 and 257 days** before
+  it. That is not an error — the holder bought that much anonymity, or the credential really was
+  issued months before it was minted, and nothing on chain distinguishes the two. My first version
+  of the live test asserted the bound lands within 90 days of the mint; it passed on the first
+  runs and then failed once the sampler happened to pick one of those holders. The assertion was
+  wrong, not the world, and it is gone. The suite now
+  asserts only the ceiling and the ordering, which are the things the protocol actually
+  guarantees. The exposure is bounded on the right side: a held credential is at most a year old,
+  so its weight can never fall below 2^(-365/half-life) and can never be inflated at all — an
+  invariant the live suite asserts.
+- **Two facts the ontology did not record, now in its notes.** A Holonym credential hard-expires
+  within a year of the check behind it (`getSBT` reverts the instant `expiry < block.timestamp`;
+  the whole 2024–early-2025 cohort has lapsed), so the 730-day half-life on `holonym-gov-id` only
+  ever applies over that first year — the same shape as Passport's 90-day expiry against a 180-day
+  half-life. And the credential is readable permissionlessly, which the old note said was possible
+  and nobody had done.
+- **`sbtOwners` before `getSBT`, deliberately.** `getSBT` reverts identically for expired, revoked
+  and never-minted, so calling it blind turns "this person's KYC lapsed in January" into a probe
+  *error* — an unreadable credential rather than an expired one, which is a different claim about
+  a person. The raw mapping getter runs none of those checks. It also makes the common case (an
+  address with no Holonym credential) a single `eth_call`. This was a real bug in my first draft,
+  caught by running the probe against an address holding a lapsed SBT.
+- **238,706 SBTs minted**, at block 154,692,312 — the hard number
+  `billions-silk-unitap-sismo-intuition.md` asked for, obtained by bisecting `ownerOf` (the Hub is
+  an ERC-721 with no enumeration and a private counter) rather than by the event index it
+  proposed. It counts mints, not humans: among the twelve newest tokens one address holds three
+  consecutively.
+- **Zero archive calls in the probe** — two `eth_call`s at head, three when a credential is held.
+  After iteration 4, that is a deliberate property: only three keyless OP endpoints serve archive
+  state and the Farcaster adapter needs all of them. The *live test* does the state search,
+  because confirming a date against history is exactly what the probe avoids having to do.
+- **The loop from iteration 3 closes.** Iteration 3 read `0xA6b7471f…67b1`'s Human Passport —
+  22.027 points — and found it was a Holonym gov-id stamp plus a Holonym biometrics stamp and
+  nothing else. Today the same address reads directly against Holonym's own contract and both
+  credentials are there: minted 2026-07-24 three minutes apart, both under Holonym's issuer keys,
+  both with their nullifiers burned. The collapse is now one credential observed from two
+  directions rather than a stamp name we trusted. Its score moved 2.0025 → **3.6088** with three
+  independent roots, and nothing double-counted: the passport still contributes its wallet-history
+  dollar and still names the two adapters it restates, which now hold evidence of their own.
+- New write-up: `research/protocols/holonym-human-id-onchain-read.md` (addresses, circuit ids, the
+  two conflicting passport circuit ids, the date derivation from both directions, the mint table,
+  and what is deliberately not read). `ontology-coverage.md` §6 item 3 struck through, `INDEX.md`
+  now lists the three implementation write-ups, README updated (six adapters → eight, test counts,
+  and its trust-root diagram corrected — it still showed Civic Pass under Persona, which
+  iteration 2 fixed in the ontology four iterations ago).
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd packages/sdk && npm test` → `# tests 113 # pass 113 # fail 0 # skipped 0` (was 96: +10
+  Holonym unit, +7 Holonym live). Per file: 34 scoring, 18 reconcile, 5 input, 10 ontology,
+  10 holonym unit, 15 live, 6 passport-live, 8 farcaster-live, 7 holonym-live.
+- `node --test --experimental-strip-types src/adapters/holonym.live.test.ts` → 7/7, `skipped 0`,
+  three consecutive runs.
+- `npm run build` clean; `node_modules/.bin/tsc -p tsconfig.json --noEmit` clean.
+- `cd apps/demo && npx playwright test` → `10 passed`.
+- The acceptance test the mission asks for ("a live test that hits the real chain and asserts the
+  mechanism, not a magic number") is *"the date is the earliest issuance the circuit allows, and
+  the mint block proves it"*: it samples a current holder out of the Hub's own token ids, searches
+  historical state for the block the SBT was minted in, and then requires (a) the expiry to be no
+  more than the circuit's 31,536,000-second ceiling past that block, (b) the probe's date to
+  precede it, and (c) the mint's ERC-721 `Transfer` from the zero address to be in that exact
+  block. Three sources — the mapping's history, the log index, and the probe's arithmetic — and
+  the probe consults only the third.
+
+**No registry write, on purpose.** `implemented` and `notes` are off-chain fields, `sourceURI` was
+deliberately left pointing at the file the *costs* came from, and no weight moved — so a reseed
+would bump `revision` to record nothing. Registry stays at **30 adapters, revision 34**.
+
+**Next, in the order I would do it:**
+
+1. **Keep going down the queue.** §6 now reads: **Linea Proof of Humanity V2** (Verax attestations
+   on Linea, portal `0xe8a3…3922`, attester `0xc5db…1c0d` — a passive per-subject read that
+   retires nothing), then **World's document/Selfie tiers** (which P1 wants anyway, so World
+   appears in the score and not only in the agent gate), then **PoH v1** on a registry we already
+   talk to.
+2. **The Holonym passport circuit is one resolved question away from an ICAO-rooted adapter.**
+   `holonym-api` and `id-server` name *different* circuit ids for it (`0x14c35133…0b747e` vs
+   `0xf2ce248b…67364d`) and neither repo mentions the other's, so we do not know which one current
+   issuance mints. Resolving it adds the largest correlation cluster in the landscape — the
+   passport chip — to a contract we now read fluently. It needs an issuance observed end to end,
+   not a constant copied out of a repository.
+3. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
+   the cheapest way to turn two flagged approximations into real dates (iteration 1's note 1,
+   unchanged through four iterations now).
+
+**Measured while working, worth keeping:** one sampled token id (230,000) belongs to a holder with
+no record under *any* of the six circuit ids the two Holonym repositories name, so the Hub serves
+at least one circuit neither repository documents. It cannot affect a score — we read two circuits
+by id — but the credential list is Holonym's to extend, and a future "read every Holonym
+credential" adapter cannot be built from those constants alone. Separately, the legacy v2 store
+(`0xdD748977…Fce31`) returned `false` for every V3 holder sampled and for both Passport-stamped
+addresses; a live test now asserts that, so the day it changes we will hear about it.
+
+**Blocked:** nothing. Iteration 1's two notes still stand and are Hugo's calls, not blockers:
+`./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run
+it, and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
