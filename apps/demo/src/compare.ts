@@ -278,7 +278,7 @@ export async function renderComparison(container: HTMLElement): Promise<void> {
         { class: 'error' },
         h('b', {}, 'Could not reach the registry or the chains. '),
         String(err instanceof Error ? err.message : err),
-        h('p', {}, 'This is an infrastructure failure, not a statement about anyone’s personhood.'),
+        h('p', {}, 'This is an infrastructure failure, not a statement about anyone’s humanity.'),
       ),
     )
     return

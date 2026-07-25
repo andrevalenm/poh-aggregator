@@ -6,12 +6,12 @@
     <title>Print — what does it cost to be human?</title>
     <meta
       name="description"
-      content="One call over every proof-of-personhood protocol, scored by what an adversary would actually pay. Live on four chains, no server of ours."
+      content="One call over every proof-of-humanity protocol, scored by what an adversary would actually pay. Live on four chains, no server of ours."
     />
     <meta property="og:title" content="Print — what does it cost to be human?" />
     <meta
       property="og:description"
-      content="Proof of personhood, aggregated. Priced by what an adversary would actually pay."
+      content="Proof of humanity, aggregated. Priced by what an adversary would actually pay."
     />
     <meta property="og:image" content="/og.jpg" />
     <meta property="og:image:width" content="1200" />
@@ -54,7 +54,7 @@
           <span class="sl-mask"><span class="sl-line"><em>to be human?</em></span></span>
         </h1>
         <p class="hero-answer">
-          On today’s internet: about fifty cents. Print reads every proof-of-personhood
+          On today’s internet: about fifty cents. Print reads every proof-of-humanity
           protocol a wallet holds and prices each credential at what an adversary would actually
           pay to fake it — then tells you which ones are the same evidence wearing different
           names.
@@ -221,7 +221,7 @@ person.isHuman(Thresholds.standard)</code></pre>
           <h2 id="research-title">Everything here is downstream of someone else's fieldwork</h2>
           <p>
             The saturation rule is not a clever idea we had. It is the conclusion of a decade of
-            people watching personhood systems get captured and writing down exactly how. Below
+            people watching proof-of-humanity systems get captured and writing down exactly how. Below
             are the cases that shaped the design, the papers worth your evening, and two
             instruments you can operate yourself — because a claim you can test beats a claim
             you have to accept.
@@ -569,7 +569,7 @@ person.isHuman(Thresholds.standard)</code></pre>
                 </p>
                 <p class="paper-who">Puja Ohlhaver</p>
                 <p class="paper-why">
-                  Her most recent paper, and not a personhood paper at all — which is the point.
+                  Her most recent paper, and not a proof-of-humanity paper at all — which is the point.
                   Contains the strongest argument against what we are building (p.27), plus a neat
                   unification: a plain airdrop and a soulbound token are the two endpoints of one
                   dial. Names our exact attack surface as “account splitting.”
@@ -815,7 +815,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             we will not pretend otherwise.
           </p>
           <p>
-            But the problem is not a hackathon problem. Proof of personhood is being wired into
+            But the problem is not a hackathon problem. Humanity verification is being wired into
             airdrops, governance and agent permissions right now, and almost every deployed
             scorer adds credentials together — which means a sybil farm holding one passport
             read by four protocols outranks a real person holding four unrelated ones. That
@@ -880,7 +880,7 @@ person.isHuman(Thresholds.standard)</code></pre>
 
               <dt>Why World is load-bearing</dt>
               <dd>
-                AgentBook is the only permissionless read of Orb-verified personhood that
+                AgentBook is the only permissionless read of Orb-verified humanity that
                 exists. <code>lookupHuman</code> is a plain <code>eth_call</code> — no API key,
                 no relying-party registration, no user interaction, nothing that can rate-limit
                 us or be switched off. That is the whole reason World is in our roster: we can
@@ -907,7 +907,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             </p>
 
             <p class="sponsor-claim">
-              Reusable personhood infrastructure any agent can call: an MCP server, a typed
+              Reusable proof-of-humanity infrastructure any agent can call: an MCP server, a typed
               SDK, and subgraphs that answer the questions a contract call cannot.
             </p>
 
@@ -916,7 +916,7 @@ person.isHuman(Thresholds.standard)</code></pre>
               <dd>
                 An MCP server with four tools — look up a subject, test a threshold, explain the
                 trust roots, audit any weight's full history — so an agent can reason about
-                personhood conversationally, over live chain data. Underneath it, an
+                whether a human is there, conversationally, over live chain data. Underneath it, an
                 open-source SDK anyone can install. Two Graph products in one stack: a protocol
                 subgraph on Subgraph Studio, and a self-hosted <code>graph-node</code> indexing
                 our own registry.
@@ -936,7 +936,7 @@ person.isHuman(Thresholds.standard)</code></pre>
 
               <dt>Circles: the clearest case for indexing</dt>
               <dd>
-                Circles registration on its own is close to worthless as evidence of personhood.
+                Circles registration on its own is close to worthless as evidence of humanity.
                 A sybil costs about two days of freely-minted CRC, and the project's own public
                 indexer carries event namespaces named <code>BotCreated</code> and
                 <code>FarmGrown</code> — the farms are not hypothetical, they are a documented
@@ -976,7 +976,7 @@ person.isHuman(Thresholds.standard)</code></pre>
               <dd>
                 Agent identity and discoverability, resolved rather than configured. A
                 counterparty is handed an agent's ENS name, resolves the records that name the
-                backing human, and checks that human's personhood before agreeing to anything —
+                backing human, and verifies that human before agreeing to anything —
                 no registry of ours, no API, no allowlist. The same mechanism serves people: the
                 <code>print.subjects</code> text record lets someone declare their own set
                 of wallets, and the SDK reads it live from any name.

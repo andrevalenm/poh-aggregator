@@ -1,6 +1,6 @@
 # Print
 
-> Proof of personhood, aggregated. One SDK over every proof-of-personhood protocol,
+> Proof of humanity, aggregated. One SDK over every proof-of-humanity protocol,
 > scored by what an adversary would actually pay to fake it. Scores are computed
 > client-side against live chains; the on-chain registry stores protocols, never people.
 

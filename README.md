@@ -2,7 +2,7 @@
 
 **Print** *(n.)* — the mark that identifies one person, and the thing a forger has to reproduce.
 
-One SDK over every proof-of-personhood protocol, scored by what an adversary would actually
+One SDK over every proof-of-humanity protocol, scored by what an adversary would actually
 pay. Built at ETHGlobal Lisbon, 2026.
 
 <!-- TODO: live URL -->
@@ -19,7 +19,7 @@ pay. Built at ETHGlobal Lisbon, 2026.
 
 ## The problem, in one diagram
 
-There are roughly forty proof-of-personhood protocols. They collapse into about six trust
+There are roughly forty proof-of-humanity protocols. They collapse into about six trust
 roots. Each collapse below is traced to a primary source in [`research/`](research/INDEX.md).
 
 ```

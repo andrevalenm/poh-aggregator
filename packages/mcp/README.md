@@ -60,7 +60,7 @@ derivations ship in the SDK (`Thresholds.lenient/standard/strict` = 1.5/2.5/3.5)
 subgraph: every weight ever assigned, each with its source and the block it landed in.
 Enable with `PRINT_REGISTRY_SUBGRAPH_URL`.
 
-**`explain_trust_roots`** — the ontology itself: every known personhood protocol, what it
+**`explain_trust_roots`** — the ontology itself: every known proof-of-humanity protocol, what it
 proves, which trust root it reads, what it costs to forge or *rent*, with shared roots
 marked. Use it to understand why two credentials might not be independent evidence.
 
