@@ -1,7 +1,7 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 3. All four suites green: 18 forge, 86 SDK, 10 Playwright — 114 total._
+detail. _Last updated 2026-07-25, after unattended iteration 4. All four suites green: 18 forge, 96 SDK, 10 Playwright — 124 total._
 
 ---
 
@@ -81,6 +81,42 @@ Details worth knowing:
 - Suites: 18 forge, **86 SDK** (was 76), 10 Playwright. 114 total.
 
 `research/protocols/human-passport-onchain-read.md` is the write-up.
+
+**Iteration 4 added Farcaster — and had to invent a way to date a registry that stores no dates.**
+Sixth adapter, next off the same queue. A Farcaster id costs an adversary **$0.44 plus $0.20 a
+year** (both read off `IdGateway.price()` and `StorageRegistry.usdUnitPrice()` today), and two
+thirds of the 3.34 M ids in existence were minted inside a nine-month subsidy window that ended in
+April. So the boolean is worth nothing and the *age* is the whole signal — which is a problem,
+because `IdRegistry` has no timestamps and no keyless OP endpoint will serve its `Register` logs
+over more than ~1,000 blocks at a time.
+
+It turns out not to need them. `idCounter()` only increases, and `register()` increments it in the
+same transaction that writes custody, so **the first block where `idCounter() >= fid` is the block
+that fid was created in** — a monotone predicate over archive state, searched in 15–30 `eth_call`s
+with no indexer anywhere. The live test confirms every date against the path the probe never uses:
+the registry's own `Register` log must be in that exact block, and in none of the thousand before
+it.
+
+Two findings from doing it, both of which change scores:
+
+- **193,791 fids are older than their date.** The counter sat at zero for two days after
+  deployment and then jumped to 193,791 in a single block — one `SetIdCounter(0, 193791)` from an
+  admin, with the custody rows already written before it. Everything at or below that fid was
+  imported from the predecessor registry, so it dates to 2023-11-08 and is genuinely older. Kept
+  (a too-late date understates age, which is a floor and never an inflation) and flagged.
+- **Fids are transferable, so we date custody, not the fid.** Fid 1 changed hands on 2026-01-30.
+  Crediting it with the registry's own age would sell survival weight at OTC prices, so the probe
+  finds when *this* address acquired the fid and dates from there. Measured end to end: a fid
+  still held by its importer contributes **12.19 cents and one independent root**; fid 1
+  contributes **3.07 cents and none**. Same protocol, four times the weight for the one that was
+  not for sale.
+
+Also worth knowing: **Farcaster Pro is not readable and is therefore not scored.** It is the only
+Farcaster signal with a real price ($120/yr, verified from `TierRegistry.tierInfo(1)`), but the
+contract keeps no per-fid subscription state — a bytecode scan finds no fid-keyed getter at all —
+and its `PurchasedTier` logs need a Base archive key. It stays out of the ontology rather than
+entering it as a number we cannot check. No weight moved, so the registry stays at **30 adapters,
+revision 34**. Write-up: `research/protocols/farcaster-onchain-read.md`.
 
 ---
 
@@ -319,13 +355,20 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    thin public information. I left it unmapped rather than invent a root, because an invented root
    scores as full independence, which is the direction that pays an adversary.
 
-9. **Two stale counts in `apps/demo/index.html` that I am not allowed to touch** (the design
+9. **A second forge figure that says something untrue, same shape as (7).** `farcaster-account`
+   carries `forgeCostCents: 12000` — the Farcaster Pro subscription price — on an adapter that
+   reads plain account ownership and does not read Pro at all. Forging a fid costs the $0.44 +
+   $0.20/yr I measured on chain today. Nothing turns on it (`min(forge, rent)` takes the 20 cents),
+   but it is a published weight, so I left it rather than silently rewriting it. One-line change to
+   `ontology/adapters.json` plus a reseed if you want it corrected.
+
+10. **Two stale counts in `apps/demo/index.html` that I am not allowed to touch** (the design
    agent owns that file, and the harness enforces it). Line ~87 says a passport is "read by
    three protocols" — it is now four, since Rarimo joined the ICAO root. Line ~573 says "the
    ontology describes fifteen" — it describes thirty. Both are one-word fixes. The live counts
    in the hero are read from the chain at runtime and are already correct. The deployed demo
    bundle predates this change, which is harmless (adapter and root counts come from the
-   registry; only the four implemented probes are ever named in results), but the next
+   registry; only the six implemented probes are ever named in results), but the next
    `scripts/deploy-demo-ax41.sh` run picks it up.
 
 ## Honest state of weak points
