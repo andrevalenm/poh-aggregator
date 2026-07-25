@@ -982,7 +982,46 @@ html.js .hero-answer {
 
 .th-slider {
   flex: 1 1 18rem;
-  accent-color: var(--iron);
+  appearance: none;
+  -webkit-appearance: none;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.th-slider::-webkit-slider-runnable-track {
+  height: 1.5px;
+  background: var(--hairline-strong);
+}
+
+.th-slider::-moz-range-track {
+  height: 1.5px;
+  background: var(--hairline-strong);
+}
+
+.th-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 17px;
+  height: 17px;
+  margin-top: -7.75px;
+  border-radius: 50%;
+  background: var(--iron);
+  border: 2.5px solid var(--paper-solid);
+  box-shadow: 0 0 0 1.5px var(--iron);
+  transition: transform 0.3s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.th-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--iron);
+  border: 2.5px solid var(--paper-solid);
+  box-shadow: 0 0 0 1.5px var(--iron);
+}
+
+.th-slider:active::-webkit-slider-thumb {
+  transform: scale(1.25);
 }
 
 .th-slider.is-unset {
@@ -1047,6 +1086,16 @@ html.js .hero-answer {
 
 .ledger-details summary:hover {
   color: var(--ink);
+}
+
+.ledger-details summary {
+  display: inline-block;
+  transform-origin: left center;
+  transition: transform 0.55s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.ledger-details summary:active {
+  transform: scale(0.96, 0.92);
 }
 
 .evd-rows {
