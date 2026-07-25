@@ -75,3 +75,58 @@ export async function subgraphReady(subgraphUrl: string): Promise<boolean> {
   )
   return (data?._meta?.block?.number ?? 0) > 0
 }
+
+// ---------------------------------------------------------- registry audit trail
+
+export interface WeightChange {
+  revision: number
+  forgeCostCents: number
+  rentCostCents: number
+  live: boolean
+  sourceURI: string
+  timestamp: number
+  block: number
+  txHash: string
+}
+
+/**
+ * The audit trail for one adapter, from the registry subgraph — every weight the ontology
+ * has ever assigned it, each with the source it was derived from and the block it landed in.
+ *
+ * This is the accountability half of curated weights: the weights are judgments, so the
+ * least a subject is owed is the full history of those judgments and their sources. The
+ * biggest sybil-filtering deployment to date drew its loudest criticism for having no
+ * stated method and no appeal path; this is the opposite design.
+ */
+export async function weightHistory(
+  registrySubgraphUrl: string,
+  adapterId: string,
+): Promise<WeightChange[] | undefined> {
+  const data = await query<{
+    weightChanges: {
+      revision: string
+      forgeCostCents: string
+      rentCostCents: string
+      live: boolean
+      sourceURI: string
+      timestamp: string
+      block: string
+      txHash: string
+    }[]
+  }>(
+    registrySubgraphUrl,
+    `{ weightChanges(where: { adapter: "${adapterId}" }, orderBy: revision, orderDirection: asc) {
+        revision forgeCostCents rentCostCents live sourceURI timestamp block txHash } }`,
+  )
+  if (!data) return undefined
+  return data.weightChanges.map((w) => ({
+    revision: Number(w.revision),
+    forgeCostCents: Number(w.forgeCostCents),
+    rentCostCents: Number(w.rentCostCents),
+    live: w.live,
+    sourceURI: w.sourceURI,
+    timestamp: Number(w.timestamp),
+    block: Number(w.block),
+    txHash: w.txHash,
+  }))
+}

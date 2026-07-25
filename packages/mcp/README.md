@@ -56,6 +56,10 @@ threshold on purpose: at a plausible sybil rate a strong classifier still misjud
 the people it flags, so the decision to deny belongs to the caller. Presets and their
 derivations ship in the SDK (`Thresholds.lenient/standard/strict` = 1.5/2.5/3.5).
 
+**`explain_weight_history`** — the audit trail for one adapter, from the registry
+subgraph: every weight ever assigned, each with its source and the block it landed in.
+Enable with `CORROBORATE_REGISTRY_SUBGRAPH_URL`.
+
 **`explain_trust_roots`** — the ontology itself: every known personhood protocol, what it
 proves, which trust root it reads, what it costs to forge or *rent*, with shared roots
 marked. Use it to understand why two credentials might not be independent evidence.
