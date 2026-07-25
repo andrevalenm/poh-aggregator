@@ -31,9 +31,9 @@ dataSources:
         - name: ProofOfHumanity
           file: ./abis/ProofOfHumanity.json
       eventHandlers:
-        - event: HumanityClaimed(indexed bytes20,uint256)
+        - event: HumanityClaimed(bytes20,uint256)
           handler: handleHumanityClaimed
-        - event: HumanityRevoked(indexed bytes20,uint256)
+        - event: HumanityRevoked(bytes20,uint256)
           handler: handleHumanityRevoked
         - event: VouchRegistered(indexed bytes20,indexed bytes20,uint256)
           handler: handleVouchRegistered

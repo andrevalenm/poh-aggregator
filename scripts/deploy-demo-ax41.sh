@@ -4,7 +4,7 @@
 #   ssh ax41 'docker rm -f corroborate-demo'
 set -euo pipefail
 cd "$(dirname "$0")/../apps/demo"
-VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/77602/poh/v0.0.1 npx vite build
+VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/77602/poh/version/latest npx vite build
 ssh ax41 'mkdir -p ~/corroborate-demo/dist'
 rsync -az --delete dist/ ax41:corroborate-demo/dist/
 ssh ax41 'docker rm -f corroborate-demo 2>/dev/null; docker run -d --name corroborate-demo \

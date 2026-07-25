@@ -19,7 +19,7 @@ Register with your MCP client — for Claude Code:
 
 ```bash
 claude mcp add corroborate \
-  --env CORROBORATE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/77602/poh/v0.0.1 \
+  --env CORROBORATE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/77602/poh/version/latest \
   -- node /path/to/poh-aggregator/packages/mcp/dist/server.js
 ```
 
@@ -32,7 +32,7 @@ Or as JSON config (Claude Desktop / Cursor):
       "command": "node",
       "args": ["/path/to/poh-aggregator/packages/mcp/dist/server.js"],
       "env": {
-        "CORROBORATE_SUBGRAPH_URL": "https://api.studio.thegraph.com/query/77602/poh/v0.0.1"
+        "CORROBORATE_SUBGRAPH_URL": "https://api.studio.thegraph.com/query/77602/poh/version/latest"
       }
     }
   }

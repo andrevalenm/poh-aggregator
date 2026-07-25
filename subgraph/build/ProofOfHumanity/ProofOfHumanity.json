@@ -3,7 +3,7 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
+        "indexed": false,
         "internalType": "bytes20",
         "name": "humanityId",
         "type": "bytes20"
@@ -22,7 +22,7 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
+        "indexed": false,
         "internalType": "bytes20",
         "name": "humanityId",
         "type": "bytes20"
