@@ -1,8 +1,8 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 9. All four suites green: 18 forge, 228 SDK
-(226 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 10 Playwright — 256 total._
+detail. _Last updated 2026-07-25, after unattended iteration 10. All four suites green: 18 forge, 276 SDK
+(274 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 13 Playwright — 307 total._
 
 ---
 
@@ -278,6 +278,45 @@ number, but no way to check it.
 
 MCP's `lookup_personhood` now takes `as_of`. No weight moved, so the registry stays at **30
 adapters, revision 34**.
+
+**Iteration 10 turned fleet detection into a policy engine, and the number is 27.** A
+counterparty now declares its limits as data — `minScore`, `minIndependentRoots`,
+`maxAgentsPerHuman`, what to do with unregistered agents, which of a human's agents keeps the
+slot — and `evaluateFleet()` in the SDK enforces them. The demo's gate 4 *is* that function
+rather than a re-implementation of it, so what a judge sees is what the 30 unit tests exercise.
+
+- **AgentBook's whole registration history is 1,164 registrations in six `eth_getLogs` calls**,
+  about five seconds, and it groups to **830 humans. One human runs 27 agents**, all registered
+  inside 0.7 days; 131 humans run more than one. A venue counting requesters over-counts its
+  counterparties by 1.40× on average and 27× at the tail. `npm run start` in `apps/agent` has a
+  fourth run that finds that fleet by scanning rather than being told, and refuses a member of
+  it: **1 of 27 admitted**.
+- **The cap has a price, computed from the deployed registry.** The cheapest credentials that
+  clear Meridian's policy cost an adversary **$5.50** — a rented Proof of Humanity registration
+  plus a World Orb — so 27 agent slots cost **$148.50** with the cap and $5.50 without it.
+  Priced only against adapters we can actually read, because an adversary cannot clear our score
+  with a credential we never look up.
+- **The question everyone asks about the operator address set now has a measured answer: no.**
+  AgentBook and the World ID Address Book issue nullifiers under *different* external nullifiers
+  (`38265997…265498` vs `377593556…326541`), both over Orb group 1, so the same person is two
+  unlinkable identifiers across them — 0 of 150 AgentBook humanIds resolve in the Address Book.
+  There is no chain path from an agent to the wallets its operator holds credentials on, by
+  anyone. `address-set-not-authenticated` is permanent, and permanent because World's privacy
+  design works. Good pitch line: *"the one link we would most like to make is the one World
+  correctly refuses to let anyone make."*
+- **A free RPC endpoint that lies, found the hard way.** `worldchain.drpc.org` returns HTTP 200
+  and an empty array for `eth_getLogs` ranges that provably hold 39 events. As a fallback it
+  produced a 7-registration index of a 1,165-registration registry and raised nothing — and an
+  empty fleet index makes every human look like they run one agent, which is the answer the
+  whole policy exists to prevent. It is out of the endpoint list and every endpoint now has to
+  see a canary registration before its history is trusted.
+- **The demo's declared operator set gained a third address**, `0xA6b7471f…67b1` — the Holonym +
+  Human Passport subject iterations 3 and 5 read. The original two are both fresh survival-ramp
+  credentials scoring 1.57, below Meridian's line, so every run was refusing on the *score* and
+  no run ever reached the fleet gate. See "Needs you" item 16.
+
+No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
+`research/protocols/world-agentbook-fleets.md`.
 
 ---
 
@@ -691,6 +730,20 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    use in December, re-run
    `node --test --experimental-strip-types src/adapters/poh-v1.live.test.ts`, which prints the
    current count as a diagnostic, and update the three places.
+
+16. **The agent demo now depends on somebody else's credential staying alive, and it will not.**
+   `apps/agent/src/fixtures.js` declares three operator addresses. The first two — our Proof of
+   Humanity and Circles vectors — are both recent registrations on survival ramps and together
+   score **1.57**, below the demo counterparty's 2.5 line, so on their own every run refuses on
+   the score and the fleet gate never runs. The third, `0xA6b7471f…67b1`, carries a Holonym
+   government-ID check, a Holonym FaceTec biometric and the Human Passport that restates both,
+   which takes the set to ~3.61 over five roots. It is live data and it expires: **Human
+   Passport hard-expires at 90 days and a Holonym credential within a year of its check**, both
+   minted 2026-07-24. When they lapse the demo will start refusing at gate 3 again — nothing is
+   broken, it has observed an expiry, and `fixtures.js` says so — but if that happens the day
+   before a pitch it will look like a bug. Either re-point the third address at a live
+   credential-holder on the morning, or accept that runs 2–4 will show the fleet gate as
+   unreached.
 
 ## Honest state of weak points
 

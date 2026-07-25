@@ -286,8 +286,19 @@ precomputed picture, and takes a comma-separated address set for lookup.
 
 [`apps/agent`](apps/agent) is a World AgentKit demo: an agent signs a CAIP-122 challenge, a
 fictional counterparty checks that a real human stands behind it via AgentBook plus
-Corroborate, and picks its own threshold. The threshold lives in the counterparty's policy
-file, not in our SDK — that separation is the point of the demo.
+Corroborate, and picks its own limits. The limits live in the counterparty's policy file, not
+in our SDK — that separation is the point of the demo.
+
+Its fourth gate is a **fleet policy**, `evaluateFleet()` in the SDK. A counterparty declares
+`maxAgentsPerHuman`, `minScore`, `minIndependentRoots`, what to do with agents nobody
+registered, and which of a human's agents keeps the slot; the engine allocates the slots and
+each refusal names the sibling that took one. It runs over the whole fleet rather than the
+requester, because AgentBook's registration log says in advance how many agents a human has —
+a venue that waits to be asked has already served the first N. Live, at the time of writing:
+**1,164 registered agents over 830 humans, and one human runs 27 of them**, all registered
+inside 0.7 days. The engine also prices the policy from the deployed registry: under
+Meridian's line a slot costs an adversary at least **$5.50**, so those 27 slots cost $148.50
+with the cap and $5.50 without it.
 
 Both were built last and are the least polished thing here.
 
@@ -425,9 +436,9 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 228 SDK tests: 142 unit (scoring model, index reconciliation, input, ontology, SBT
+# 276 SDK tests: 178 unit (scoring model, index reconciliation, input, ontology, SBT
 # interpretation, Verax attestation selection, World address-book interpretation, PoH v1
-# submission interpretation, as-of reconstruction) + 86 live
+# submission interpretation, as-of reconstruction, fleet policy) + 98 live
 cd packages/sdk && npm test
 
 # the live ones alone — real chains, the deployed registry, no mocks
@@ -439,12 +450,13 @@ cd packages/sdk && node --test --experimental-strip-types src/adapters/linea-poh
 cd packages/sdk && node --test --experimental-strip-types src/adapters/world.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/adapters/poh-v1.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/as-of.live.test.ts
+cd packages/sdk && node --test --experimental-strip-types src/agentbook.live.test.ts
 
-# 10 browser E2E against the built demo, real chains
+# 13 browser E2E against the built demo, real chains
 cd apps/demo && npx playwright test
 ```
 
-All 256 pass as of 2026-07-25 (18 forge + 228 SDK + 10 browser; two of the SDK live tests skip
+All 307 pass as of 2026-07-25 (18 forge + 276 SDK + 13 browser; two of the SDK live tests skip
 loudly when the third-party Verax indexer they cross-check against returns HTTP 429). The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
 assert the seeded ontology loads, that the ICAO cluster really does have three protocols on

@@ -33,7 +33,7 @@ import type { AsOfScoring } from './as-of.ts'
  */
 
 /** Adapter costs are in cents; below this a credential is treated as free. */
-const NEGLIGIBLE_COST_CENTS = 10
+export const NEGLIGIBLE_COST_CENTS = 10
 
 /** Weight retained by an adapter whose upstream protocol is discontinued. */
 const DEAD_PROTOCOL_MULTIPLIER = 0

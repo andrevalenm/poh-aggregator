@@ -1165,3 +1165,166 @@ root where `MISSION.md` says to run it, and `pnpm-lock.yaml` is still untracked 
 `package-lock.json`. New and minor: `subgraph-registry/package-lock.json` moved because installing
 graph-cli resolved a floating `@types/node` range from 12.20.55 to 26.1.1; kept, since it is the
 tree that built and deployed v0.0.3.
+
+## Iteration 10 — 2026-07-25
+
+**Did:** P1 — **World fleet policy**. The mission asked to turn fleet detection into a real
+policy engine, and named the failure it wanted fixed: *"ten agents behind one human collapsing
+to one allowed reads as a product; three hard-coded agents reads as an illustration."* Both
+halves are now live, and the number is twenty-seven rather than ten.
+
+- **The counterparty declares limits as data; the SDK enforces them.** New
+  `packages/sdk/src/fleet.ts`: `FleetPolicy` (`minScore`, `minIndependentRoots`,
+  `maxAgentsPerHuman`, `unbackedAgents`, `admission`) and `evaluateFleet()`, a pure function
+  over (what the registries said) × (the policy) with no I/O, so every branch is unit testable.
+  `apps/agent/src/counterparty/policy.js` is now that object and nothing else — the demo's gate 4
+  *is* the function the SDK's tests exercise, rather than a re-implementation of it.
+- **Enforcement is an allocation, not a boolean.** A fleet of 27 collapses to N admitted and
+  27−N refused, and each refusal names the sibling holding the slot. Three properties the engine
+  holds to, each with its own test: **a denied agent never spends its human's slot** (the score
+  gates run before the allocation, or an agent that was going to be refused anyway burns a
+  passing sibling's allowance for free); **an unreadable registry is `indeterminate`, never a
+  denial and never an admission**; and **an unbacked agent is a declared choice** — it has no
+  human identifier, so the cap cannot bind it, and `count-as-distinct-human` hands an operator
+  one slot per free keypair, which the caveat says out loud.
+- **Evidence is keyed on the human, not the agent** — the input type makes the other shape
+  inexpressible. Credentials belong to the person, so two agents of one human cannot present two
+  address sets and be scored twice, and a 27-agent fleet costs one lookup instead of 270 probes.
+- **New `packages/sdk/src/agentbook.ts` — AgentBook read as a fleet index.** There is no reverse
+  index (a `PUSH4` scan finds 17 selectors; the reads are `lookupHuman`, `getNextNonce`,
+  `groupId`, `worldIdRouter` and Ownable2Step), same shape as Verax on Linea. It does not need
+  one: the registry is **1,164 registrations** since 2026-03-13 in 1,164 transactions, read whole
+  in **six `eth_getLogs` calls, ~5 s**. `register` is the only writer and it emits; there is no
+  admin write path and no deregistration selector, so the log reconstructs the mapping exactly —
+  asserted against *state* for 60 sampled agents every run, not assumed.
+- **The finding: 1,164 agents over 830 humans, and one human runs 27 of them**, all registered
+  inside 0.7 days. 131 humans run more than one. A venue counting requesters over-counts its
+  counterparties by **1.40× on average and 27× at the tail**. Full histogram and the fleet-shape
+  table (afternoon fleets vs fleets accumulated over months) in the write-up.
+- **`humanId` is the registering proof's nullifier hash, read from the chain rather than from a
+  doc**: in tx `0xc19650a0…a0cfe` `register`'s fourth argument equals the event's second topic.
+  That is what makes the cap enforceable — a counter would make one person several humans.
+- **The identifier cannot be joined to any other World registry, and that is the answer to the
+  obvious question.** `AgentBookInitialized` records external nullifier `38265997…265498`;
+  `WorldIDAddressBookInitialized` records `377593556…326541`. Same router, same Orb group 1, so
+  the same population — but different external nullifiers, so one person is two unlinkable
+  pseudonyms across the two contracts. Measured: **0 of 150** AgentBook humanIds resolve in
+  `WorldIDAddressBook.nullifierHashes`. So there is no chain path from an agent to the wallets
+  its operator holds credentials on: `address-set-not-authenticated` is permanent, and permanent
+  because World's privacy design works rather than because we stopped early. The caveat text now
+  says that.
+- **The cap has a price, computed from the deployed registry.** `priceOfPolicy()` finds the
+  cheapest set of credentials clearing a policy — one per trust root, since a second credential
+  on a held root adds nothing — priced at `min(forge, rent)` and full freshness, and restricted
+  to adapters we can actually *read*, because an adversary cannot clear our score with a
+  credential we never look up. Under Meridian's line (2.5 over 2 roots, plus the Orb root every
+  AgentBook registration implies) a slot costs **550 cents: poh-v2 at $5 rent + world-id-orb at
+  50c**. So 27 slots cost **$148.50** with the cap and **$5.50** without it. A unit test
+  re-derives the minimum by brute force over every subset of candidate roots, so "cheapest" is a
+  claim rather than a label.
+- **Two real defects found by building this, one of them mine.**
+  1. **A silent key-encoding mismatch.** The demo's AgentBook module returned `humanId` as hex
+     (`toHex`) while the index groups on the decimal string the event carries. The evidence map
+     matched nothing and *every* agent came back `indeterminate` — nobody was refused, so nothing
+     looked wrong. Fixed at the source (decimal, with a comment saying why a shared map key may
+     not have two encodings), and `evaluateFleet` now emits `fleet-evidence-keys-unmatched`
+     naming the unmatched identifiers when agents go unjudged while evidence exists for humans
+     not in the batch. Both directions have tests.
+  2. **A public endpoint that lies.** `worldchain.drpc.org` answers `eth_getLogs` with HTTP 200
+     and `[]` for ranges that provably hold 39 registrations — four times out of four, against
+     tenderly's 39 every time. Configured briefly as a fallback, it produced a **7-registration**
+     index of a 1,165-registration registry and raised nothing. That is worse than the silent
+     truncation iteration 7 measured, because it is permissive in the direction that matters: an
+     empty fleet index makes every human look like they run one agent. It is out of the endpoint
+     list, and every endpoint must now clear a **canary** — one call for block 27,100,652, which
+     has held the registry's first registration since March — before its history is used. Caught
+     because the live test re-scans at a second chunk size and demands set equality; it failed
+     intermittently and the intermittency was the fallback engaging.
+- **The demo now has a fourth run, and nothing in it is hard-coded.** `npm start`: run 2 is the
+  human's *earlier* registration and is admitted (the chain decides which, not the demo); run 3
+  is its sibling, refused by name; run 4 scans the whole registry, takes the largest fleet it
+  finds, and refuses a member of it — **1 of 27 admitted** — printing what the fleet would cost
+  an adversary. The demo's declared operator set gained a third address
+  (`0xA6b7471f…67b1`, the Holonym + Human Passport subject iterations 3 and 5 read) because the
+  original two are both fresh survival-ramp credentials scoring 1.57, below Meridian's line — so
+  every run refused on the *score* and no run reached the fleet gate at all. `fixtures.js` says
+  that out loud, including that it is live data and will move when those credentials expire.
+- New write-up `research/protocols/world-agentbook-fleets.md` (selector table, the enumeration,
+  the fleet histogram, the nullifier-namespace measurement, the endpoint table with drpc's
+  behaviour, and what none of it establishes). `research/INDEX.md` lists it as the seventh
+  implementation write-up. README updated (test counts, the fleet gate in the apps section);
+  `apps/agent/README.md`'s gate diagram, run table and file map rewritten for four gates.
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd packages/sdk && npm test` → `# tests 276 # pass 274 # fail 0 # skipped 2` (was
+  228/226/0/2 at iteration 9; the difference is +30 fleet unit, +12 AgentBook live, and the
+  6 `enroll.test.ts` tests that arrived with the laptop's `7b47e9e` routing commit, which this
+  tree is rebased on). The 2 skips are iteration 6's Verax subgraph HTTP 429s, unchanged and
+  untouched. Per file — unit: 34 scoring, 18 reconcile, 5 input, 11 ontology, 6 enroll,
+  10 holonym, 19 linea-poh, 12 world, 13 poh-v1, 20 as-of, **30 fleet**; live: 15 live,
+  6 passport, 8 farcaster, 7 holonym, 18 linea-poh, 10 world, 10 poh-v1, 12 as-of,
+  **12 agentbook**.
+- `node --test --experimental-strip-types src/agentbook.live.test.ts` → **12/12, `skipped 0`,
+  three consecutive runs** after the drpc fix (it was 10/12 on two runs out of five before it).
+- `npm run build` clean; `tsc -p tsconfig.json --noEmit` clean.
+- `cd apps/demo && npx playwright test` → `13 passed` (13 now, not 10 — the landing agent added
+  three; untouched by this work).
+- `cd apps/agent && npm start` end to end: run 1 DENY (unregistered), run 2 **ALLOW** (score
+  3.6153 across 5 roots, slot 1 of 1), run 3 **DENY** naming
+  `0x30b8cc07…fbe5` as the holder of the slot, run 4 **DENY** with `admitted 1 of 27` and the
+  $5.50/$148.50 price line.
+- The acceptance the mission asks for — *"ten agents behind one human collapsing to one allowed
+  reads as a product"* — is run 4 plus two tests. **Live:** the largest fleet in AgentBook is
+  found by scanning, every member is confirmed against state to carry the identical humanId, the
+  policy admits exactly one, and the slot goes to the earliest registration the *chain* names.
+  **Unit:** 27 agents behind one human admit 1 and refuse 26 with each refusal naming the holder;
+  the same fleet under `maxAgentsPerHuman: 3` admits exactly 3, because the cap is a number
+  rather than a boolean.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved — the fleet
+engine reads the ontology and never edits it — so a reseed would bump `revision` to record
+nothing. Registry stays at **30 adapters, revision 34**.
+
+**Next, in the order I would do it:**
+
+1. **AgentBook registrations now have a date, and `world-id-orb` still does not use it.**
+   Iteration 7 fixed the AddressBook half (`verifiedUntil − verificationLength` is the exact
+   verification second) but left the AgentBook half undated, and an undated credential on a
+   `Decay` curve scores at freshness 1 — full weight, forever. The index built this iteration
+   has the block every registration was mined in, so the fix is now cheap: date an
+   AgentBook-sourced World credential from its `AgentRegistered` block. It is visible in run 4's
+   gate 3 today (`issuance-date-unknown` for `world-id-orb` at the full 50c). Small in
+   magnitude — World Orb's half-life is 1,095 days, so a four-month-old registration loses ~7% —
+   but it is the same defect shape iteration 7 called a scoring bug, and it is the last undated
+   credential in the roster.
+2. **Base EAS subgraph**, replacing the `easscan.org` GraphQL dependency in
+   `coinbaseVerificationAdapter` — the last vendor on the critical path, and the last place the
+   repo contradicts its own stated principle.
+3. **P1's ENS agent track** — `corroborate.human` on an agent's name, the counterparty resolving
+   it and checking the backing human's personhood, a second agent under the same tree refused
+   because it is the same human. The refusal half now exists as a policy engine and would only
+   need the ENS name tree; still blocked on Hugo registering a mainnet name (`MORNING.md` item 2).
+4. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still
+   the cheapest way to turn two flagged approximations into real dates (iteration 1's next-step
+   1, unchanged through nine iterations now).
+
+**Measured while working, worth keeping:** 79 of the 1,164 AgentBook agent wallets carry a *live*
+World ID Address Book verification of their own and one a lapsed one — so a small minority of
+"agent" wallets are also somebody's verified human address. No AgentBook human's fleet contains
+two live AddressBook-verified wallets, which is what the AddressBook's one-live-address-per-human
+rule predicts and is worth knowing before anyone tries to cluster fleets that way. And the
+World Chain log-endpoint situation is now a table in the write-up's §6: exactly one keyless
+endpoint serves wide `eth_getLogs` correctly, two refuse loudly (100 and 1,000 blocks), and one
+answers wrongly.
+
+**Blocked:** nothing. Two things left deliberately undone and written down rather than guessed:
+**who the 27-agent operator is** (the wallets were not clustered by funder, because the policy
+does not need it and a guess would be an accusation) and **what `getNextNonce` implies about
+delegated registration** (`register` takes a nonce and the sampled call passed 0; if
+registrations can be relayed, the transaction sender is not the operator — which changes nothing
+we score, since the identifier comes from the proof, but it would change anyone's attempt to
+cluster fleets by funder). Iteration 1's two notes still stand and are Hugo's calls, not
+blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md`
+says to run it, and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
