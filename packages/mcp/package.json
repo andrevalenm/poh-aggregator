@@ -1,0 +1,17 @@
+{
+  "name": "@corroborate/mcp",
+  "version": "0.1.0",
+  "description": "MCP server exposing proof-of-personhood lookup across protocols, scored by independent trust root.",
+  "type": "module",
+  "bin": { "corroborate-mcp": "./dist/server.js" },
+  "main": "./dist/server.js",
+  "files": ["dist"],
+  "scripts": { "build": "tsc -p tsconfig.json", "start": "node dist/server.js" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@corroborate/sdk": "file:../sdk",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": { "typescript": "^5.6.0", "@types/node": "^22.0.0" },
+  "license": "MIT"
+}
