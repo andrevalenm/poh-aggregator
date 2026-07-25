@@ -102,11 +102,16 @@ export function score(input: ScoreInput): PersonhoodResult {
   const roots: RootContribution[] = []
   for (const [trustRoot, group] of byRoot) {
     const strongest = group.reduce((a, b) => (b.effectiveCostCents > a.effectiveCostCents ? b : a))
+    // Saturated means value was actually discarded: more than one credential in this root
+    // carried positive cost, so keeping the strongest genuinely dropped a real one. Two
+    // discontinued (zero-cost) credentials sharing a root are NOT saturation — nothing of
+    // value was collapsed, and the discontinued-protocol caveat already explains them.
+    const contributors = group.filter((e) => e.effectiveCostCents > 0).length
     roots.push({
       trustRoot,
       adapterIds: group.map((e) => e.adapterId),
       contributionCents: strongest.effectiveCostCents,
-      saturated: group.length > 1,
+      saturated: contributors > 1,
     })
   }
   roots.sort((a, b) => b.contributionCents - a.contributionCents)
