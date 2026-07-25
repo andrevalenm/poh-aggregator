@@ -17,7 +17,7 @@ const CIRCLES_VECTOR = '0x7D8459e2ca3f62E6d8599E98ebf8c42d88218C87'
 
 test.describe('Corroborate demo', () => {
   test('loads and reports the live registry', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/app.html')
     await expect(page.locator('h1')).toContainText('Corroborate')
     // The registry line is populated from a live Sepolia read — no hard-coded values.
     await expect(page.locator('#registry-line')).toContainText(/revision \d+/, { timeout: 60_000 })
@@ -28,7 +28,7 @@ test.describe('Corroborate demo', () => {
 
   test('comparison panel: farm collapses to one root, person keeps independence', async ({ page }) => {
     test.setTimeout(240_000)
-    await page.goto('/')
+    await page.goto('/app.html')
 
     const columns = page.locator('#compare-columns')
     // Live computation across chains; wait for both verdict lines.
@@ -44,7 +44,7 @@ test.describe('Corroborate demo', () => {
 
   test('lookup: multi-address subject aggregates roots and shows caveats verbatim', async ({ page }) => {
     test.setTimeout(240_000)
-    await page.goto('/')
+    await page.goto('/app.html')
 
     await page.fill('#lookup-input', `${POH_VECTOR}, ${CIRCLES_VECTOR}`)
     await page.click('#lookup-submit')
@@ -61,7 +61,7 @@ test.describe('Corroborate demo', () => {
 
   test('lookup: a live Orb-verified wallet reads as one uniqueness root', async ({ page }) => {
     test.setTimeout(240_000)
-    await page.goto('/')
+    await page.goto('/app.html')
 
     await page.fill('#lookup-input', BEACON)
     await page.click('#lookup-submit')
@@ -72,23 +72,31 @@ test.describe('Corroborate demo', () => {
     await expect(result).toContainText(/World ID \(Orb\)held/, { timeout: 30_000 })
   })
 
-  test('lookup: an address set spanning Orb, PoH and Circles yields three independent roots', async ({ page }) => {
+  test('lookup: an address set spanning Orb, PoH and Circles spans three trust roots', async ({ page }) => {
     test.setTimeout(300_000)
-    await page.goto('/')
+    await page.goto('/app.html')
 
     await page.fill('#lookup-input', `${BEACON}, ${POH_VECTOR}, ${CIRCLES_VECTOR}`)
     await page.click('#lookup-submit')
 
     const result = page.locator('#lookup-result')
     await expect(result).toContainText(/score/i, { timeout: 240_000 })
-    await expect(result).toContainText(/Independent roots3/, { timeout: 30_000 })
+    // Assert the mechanism, not a magic count. All three roots must appear, but how many
+    // clear the negligible-cost bar depends on live ages: with the subgraph wired, the
+    // day-old Circles registration is Ramp-discounted to ~$0 and does NOT count as an
+    // independent root — the anti-farm curve working on our own demo wallet. Without the
+    // subgraph its age is unknown, it sits at the 0.5 midpoint, and it does count.
+    await expect(result).toContainText('iris-registry:world-orb', { timeout: 30_000 })
+    await expect(result).toContainText('social-vouching:poh')
+    await expect(result).toContainText('social-trust:circles')
+    await expect(result).toContainText(/Independent roots[23]/)
     // Aggregating across caller-supplied wallets must be flagged, never silent.
     await expect(result).toContainText('multi-address-subject')
   })
 
   test('threshold is the caller’s decision, not ours', async ({ page }) => {
     test.setTimeout(240_000)
-    await page.goto('/')
+    await page.goto('/app.html')
 
     await page.fill('#lookup-input', POH_VECTOR)
     await page.click('#lookup-submit')

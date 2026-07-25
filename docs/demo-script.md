@@ -21,14 +21,16 @@ the RPC waits are the only variable, and the lookup chips make them predictable.
 > a passport is genuinely expensive — but independence. A consumer requiring two
 > independent roots admits the person and refuses the farm, same API call."
 
-**1:00 — Lookup panel, chip: "Three wallets, three roots".** (35s)
+**1:00 — Lookup panel, chip: "Three wallets, three protocols".** (35s)
 - Click the chip; per-adapter probes stream in.
 > "Real wallets, live chains. An Orb-verified wallet, a Proof of Humanity registration,
 > a Circles account — three different wallets, because real people actually hold
-> credentials on different addresses. Three independent roots. And no verdict: the
-> threshold slider is the consumer's, not ours. At realistic sybil rates a strong
-> classifier is wrong about most of the people it flags — so denial is a decision we
-> refuse to automate."
+> credentials on different addresses. Three trust roots appear — and notice the system
+> is discounting our own demo: the Circles registration is days old, so the survival
+> ramp prices it at zero. A farm's fresh accounts get exactly this treatment. And no
+> verdict: the threshold slider is the consumer's, not ours. At realistic sybil rates a
+> strong classifier is wrong about most of the people it flags — so denial is a decision
+> we refuse to automate."
 - Drag the slider once each way. Point at the caveats block, read the first line of
   `independent-control-not-attested`.
 

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Corroborate — proof-of-personhood, aggregated</title>
+    <meta
+      name="description"
+      content="One API over every proof-of-personhood protocol, scored by what an adversary would actually pay."
+    />
+  </head>
+  <body>
+    <header class="masthead">
+      <h1>Corroborate</h1>
+      <p class="thesis">
+        Confirm with independent evidence — one API over every proof-of-personhood protocol,
+        scored by what an adversary would actually pay.
+      </p>
+      <p class="registry-line" id="registry-line">Loading ontology from the registry…</p>
+    </header>
+
+    <main>
+      <section id="compare" class="panel">
+        <h2>Additive scoring pays the farm</h2>
+        <p class="lede">
+          Both columns are computed in your browser, by the same SDK, against the same on-chain
+          ontology. Nothing here is precomputed.
+        </p>
+        <div id="compare-columns" class="columns"></div>
+        <div id="compare-punchline"></div>
+        <div id="compare-footnote"></div>
+      </section>
+
+      <section id="lookup" class="panel">
+        <h2>Look up a subject</h2>
+        <p class="lede">
+          One or more addresses or ENS names, comma-separated. A subject may be several wallets:
+          real people spread credentials across them. You supply the set and you are responsible
+          for having authenticated it — we never infer that two addresses belong to one person.
+        </p>
+        <form id="lookup-form">
+          <input
+            id="lookup-input"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="0xd267…85fb, 0x7D84…18C87"
+            value="0xd267eba602e692216703626a81157214b24c85fb, 0x7D8459e2ca3f62E6d8599E98ebf8c42d88218C87"
+          />
+          <button type="submit" id="lookup-submit">Resolve</button>
+        </form>
+        <div id="lookup-adapters" class="adapter-status"></div>
+        <div id="lookup-result"></div>
+      </section>
+    </main>
+
+    <footer class="colophon">
+      <p>
+        Weights are dated human judgements derived from published research, not measurements.
+        Each one carries its source and lives on-chain, so every change is auditable.
+      </p>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

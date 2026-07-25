@@ -261,7 +261,7 @@ function resultView(result: PersonhoodResult): HTMLElement {
  */
 const EXAMPLES: { label: string; value: string }[] = [
   {
-    label: 'Three wallets, three roots',
+    label: 'Three wallets, three protocols',
     value:
       '0x58b849f60b0515871fcfa80c7907d097571f2a12, 0xd267eba602e692216703626a81157214b24c85fb, 0x7D8459e2ca3f62E6d8599E98ebf8c42d88218C87',
   },
