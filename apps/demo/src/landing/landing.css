@@ -273,9 +273,12 @@ a {
 .wordmark {
   font-family: var(--display);
   font-variation-settings: 'opsz' 40, 'SOFT' 60, 'WONK' 1;
-  font-weight: 640;
+  font-weight: 620;
   font-size: 1.35rem;
-  letter-spacing: 0.01em;
+  /* Set in caps: a one-syllable name needs the presence, and it reads as a
+     proper noun rather than the verb. Caps need tracking the lowercase did not. */
+  text-transform: uppercase;
+  letter-spacing: 0.085em;
   color: var(--ink);
   text-decoration: none;
 }
@@ -338,6 +341,11 @@ a {
   height: 112%;
   z-index: -1;
   will-change: transform;
+  /* The whorl bleeds 6% above the hero, which is exactly where the nav sits —
+     the ridges ran under the menu links. Fade the top out so the nav lands on
+     clean paper, rather than moving the print and losing the composition. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 3%, #000 13%);
+  mask-image: linear-gradient(to bottom, transparent 0, transparent 3%, #000 13%);
 }
 
 .hero .contour-layer {

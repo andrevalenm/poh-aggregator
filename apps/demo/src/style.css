@@ -166,9 +166,11 @@ code {
 .wordmark {
   font-family: var(--display);
   font-variation-settings: 'opsz' 40, 'SOFT' 60, 'WONK' 1;
-  font-weight: 640;
+  font-weight: 620;
   font-size: 1.35rem;
-  letter-spacing: 0.01em;
+  /* Matches the landing wordmark: set in caps, tracked out. */
+  text-transform: uppercase;
+  letter-spacing: 0.085em;
   color: var(--ink);
   text-decoration: none;
 }
