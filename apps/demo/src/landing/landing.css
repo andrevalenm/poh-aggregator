@@ -104,7 +104,7 @@
   --mono: 'Spline Sans Mono', ui-monospace, 'SFMono-Regular', monospace;
 
   --measure: 62ch;
-  --band-pad: clamp(4.5rem, 11vw, 9.5rem);
+  --band-pad: clamp(5rem, 10vh, 7.5rem);
   --gutter: clamp(1.25rem, 4.5vw, 4rem);
 
   /* Fine grain, an octave above the paper's own flecks. */
@@ -118,6 +118,8 @@
 html {
   /* Lenis owns scrolling; native smooth would fight it. */
   scroll-behavior: auto;
+  /* The native bar is part of the page too. */
+  scrollbar-color: #b0a38c #e7e0d1;
 }
 
 html.lenis,
@@ -1503,7 +1505,7 @@ html.js .sl-in .sl-line {
 }
 
 .protocol-links {
-  margin-top: 3rem;
+  margin-top: 2.4rem;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -1867,8 +1869,8 @@ html.js .sl-in .sl-line {
 
 html.js .reveal {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 1s cubic-bezier(0.19, 0.8, 0.22, 1), transform 1s cubic-bezier(0.19, 0.8, 0.22, 1);
+  transform: translateY(22px);
+  transition: opacity 0.6s cubic-bezier(0.19, 0.8, 0.22, 1), transform 0.6s cubic-bezier(0.19, 0.8, 0.22, 1);
 }
 
 html.js .reveal.in {

@@ -22,7 +22,7 @@ async function paintRegistryLine(): Promise<void> {
     el.textContent = ''
     el.append(
       pulse,
-      `live — ${adapters.size} protocols, ${roots.size} trust roots · registry ${shortAddr(DEFAULT_REGISTRY)} rev ${revision}, read just now`,
+      `live — ${adapters.size} protocols catalogued, ${roots.size} trust roots, 4 probed live · registry ${shortAddr(DEFAULT_REGISTRY)} rev ${revision}, read just now`,
     )
   } catch {
     el.textContent = ''
@@ -133,7 +133,7 @@ function mountReveals(): void {
       ? [...el.parentElement.children].filter((c) => c.classList.contains('reveal'))
       : []
     const idx = Math.max(siblings.indexOf(el), 0)
-    el.style.transitionDelay = `${Math.min(idx * 110, 440)}ms`
+    el.style.transitionDelay = `${Math.min(idx * 90, 360)}ms`
   }
   const io = new IntersectionObserver(
     (entries) => {
@@ -144,7 +144,7 @@ function mountReveals(): void {
         }
       }
     },
-    { threshold: 0.2, rootMargin: '0px 0px -40px 0px' },
+    { threshold: 0.12, rootMargin: '0px 0px -12% 0px' },
   )
   for (const el of els) io.observe(el)
 }
