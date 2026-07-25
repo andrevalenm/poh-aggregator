@@ -87,7 +87,10 @@ function mountPicker(): void {
 
   const paint = (chosen: ClientOption) => {
     for (const b of tabs.querySelectorAll('button')) {
-      b.setAttribute('aria-selected', String(b.dataset['id'] === chosen.id))
+      const selected = b.dataset['id'] === chosen.id
+      b.setAttribute('aria-selected', String(selected))
+      // Roving tabindex: the tablist is one tab stop; arrows move within it.
+      b.tabIndex = selected ? 0 : -1
     }
     commandEl.textContent = ''
     const pre = h(
@@ -106,6 +109,23 @@ function mountPicker(): void {
       h('button', { type: 'button', role: 'tab', 'data-id': c.id, onclick: () => paint(c) }, c.label),
     )
   }
+  // The ARIA tabs contract: Left/Right/Home/End move selection within the tablist.
+  tabs.addEventListener('keydown', (e) => {
+    const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End']
+    if (!keys.includes(e.key)) return
+    e.preventDefault()
+    const current = MCP_CLIENTS.findIndex(
+      (c) => c.id === (document.activeElement as HTMLElement | null)?.dataset?.['id'],
+    )
+    let next = current
+    if (e.key === 'ArrowRight') next = (current + 1) % MCP_CLIENTS.length
+    if (e.key === 'ArrowLeft') next = (current - 1 + MCP_CLIENTS.length) % MCP_CLIENTS.length
+    if (e.key === 'Home') next = 0
+    if (e.key === 'End') next = MCP_CLIENTS.length - 1
+    const chosen = MCP_CLIENTS[next]!
+    paint(chosen)
+    tabs.querySelector<HTMLButtonElement>(`[data-id="${chosen.id}"]`)?.focus()
+  })
   paint(MCP_CLIENTS[0]!)
 }
 
