@@ -1,7 +1,7 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, ~07:30. All suites green (58 tests + 1 new live enrichment test); agent flow re-verified against the final SDK; demo hosted with example chips._
+detail. _Last updated 2026-07-25, after unattended iteration 3. All four suites green: 18 forge, 86 SDK, 10 Playwright — 114 total._
 
 ---
 
@@ -56,6 +56,31 @@ Nobody's score changed — all three adapters are discontinued and contribute ze
 exactly why the errors survived. `packages/sdk/src/ontology.test.ts` now asserts every root is
 declared and used, every source file exists, no adapter sits on `unknown`, and the shipped copy
 of the ontology matches the source of truth.
+
+**Iteration 3 read Human Passport on chain, and found the best demo beat we have.** It is the
+largest score in the landscape and the only aggregate readable without vendor cooperation, so it was
+next on the queue. Reading it properly says something about the whole product: a live subject's
+Passport score of **22.027 is a Holonym government-ID check plus a Holonym FaceTec biometric and
+nothing else** — two credentials we already price, re-scored by somebody else's weights. That is the
+"~40 protocols collapse into a handful of trust roots" claim, demonstrated on one address instead of
+asserted on a slide. Nothing double-counts: the passport is rooted at wallet history and priced at a
+dollar, and the result now says out loud which roots it is restating
+(`aggregate-restates-other-credentials`, naming them from the deployed registry).
+
+Details worth knowing:
+
+- **Seven chains, not one.** A passport is minted per chain and the mints disagree — one subject
+  holds 50.015 on Optimism and Linea, 25.099 on Scroll from a year earlier, and nothing on the other
+  four. A single-chain read would have been wrong for most subjects who have one.
+- **A passport hard-expires at 90 days** (`maxScoreAge` on every deployment), which the ontology did
+  not record. Our derived expiry is checked against the Decoder's own revert payload to the second,
+  in a live test, on whatever address it is pointed at.
+- **We never import their number.** Passport's 20-point pass mark is an on-chain constant; we report
+  what it concluded and score nothing by it. Adopting the number would be adopting their weighting.
+- **No registry write and no weight moved**, so the registry stays at 30 adapters, revision 34.
+- Suites: 18 forge, **86 SDK** (was 76), 10 Playwright. 114 total.
+
+`research/protocols/human-passport-onchain-read.md` is the write-up.
 
 ---
 
@@ -286,7 +311,15 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    start mattering the moment a KYC credential's rental cost rose. I left it alone and wrote it
    down rather than silently rewriting eleven weights. `research/landscape/ontology-coverage.md`
    §4 has the full derivation table for every cost in the file if you want to check the rest.
-8. **Two stale counts in `apps/demo/index.html` that I am not allowed to touch** (the design
+8. **Binance BABT went from "research debt" to "a hole inside a score we read".** It is a stamp
+   inside Human Passport, weighted there like a government ID, and we now read Human Passport — so a
+   live subject's passport can be one third BABT (`0x46760723…Df74` is exactly that) with that third
+   unattributable to any trust root. It is an ERC-721-shaped read on BNB Chain, so the *probe* is
+   easy; what it needs before it can be scored is a vendor attribution, which is a judgement call on
+   thin public information. I left it unmapped rather than invent a root, because an invented root
+   scores as full independence, which is the direction that pays an adversary.
+
+9. **Two stale counts in `apps/demo/index.html` that I am not allowed to touch** (the design
    agent owns that file, and the harness enforces it). Line ~87 says a passport is "read by
    three protocols" — it is now four, since Rarimo joined the ICAO root. Line ~573 says "the
    ontology describes fifteen" — it describes thirty. Both are one-word fixes. The live counts
