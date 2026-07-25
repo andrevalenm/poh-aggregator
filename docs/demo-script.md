@@ -20,12 +20,13 @@ evidence). The script uses both.
 
 **0:18 — The live ledger.** (40s) — scroll to "Ask it about a wallet"
 - Click "Three wallets, three protocols". Probes stream with per-adapter latencies.
-> "Real wallets, live chains, no server of ours — watch the probes answer. An
-> Orb-verified wallet, a Proof of Humanity registration, a Circles account: three
-> different wallets, because real people hold credentials on different addresses. And
-> notice the system discounting our own demo: that Circles registration is days old, so
-> the survival ramp prices it at zero. A farm's fresh accounts get exactly this
-> treatment."
+> "Real wallets, live chains, no server of ours — watch thirty probes answer, ten
+> adapters against three wallets. When it settles: three found, twenty-seven empty —
+> the machine checked everything and says so. Three different wallets, because real
+> people hold credentials on different addresses. And notice the system discounting our
+> own demo: that Circles registration is days old, so the survival ramp prices it at
+> zero. A farm's fresh accounts get exactly this treatment."
+- Let the score STAMP land on camera — the numeral presses in like a seal. It's a beat.
 - Drag the threshold slider across the lenient / standard / strict ticks; read a verdict.
 > "And no verdict until you choose one — the cutoff is the consumer's decision, priced in
 > the open. The API enforces the same rule: isHuman throws without a threshold."
@@ -77,3 +78,6 @@ evidence). The script uses both.
   to the declared wallet set with the asserted-not-countersigned caveat.
 - The hero press interaction and the ink-press on buttons read beautifully on video —
   linger on them for a beat; they are the design language doing the talking.
+- B-roll worth grabbing: the receipt settling from 30 rows to the tally; the terrain
+  drifting if you rest on the hero ~15s; the Ohlhaver margin notes beside the lineage
+  essay (≥1280px); the sponsor marks on the azulejo tiles.
