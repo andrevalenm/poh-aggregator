@@ -1,5 +1,6 @@
 import { createPublicClient, http, parseAbi, type PublicClient } from 'viem'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
+import type { ProbeProvenance } from '../reconcile.ts'
 
 /**
  * Human Passport (ex-Gitcoin Passport), read from the on-chain Decoder.
@@ -54,6 +55,38 @@ import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
  * Per the rule at the top of `adapters/index.ts`, a probe never turns a failure into a
  * negative. A chain that does not answer is dropped; only if *every* chain fails to answer do
  * we return an `error`, because "no passport" and "we could not look" are different claims.
+ *
+ * ## An expired passport is a closed window, not an absence
+ *
+ * The resolver does not delete anything when a score ages out. `getCachedScore` keeps returning
+ * `{score, time, expirationTime}` for a passport that expired a year ago — only the *Decoder*
+ * goes quiet, by reverting `AttestationExpired`. That is the same asymmetry PoH v2 has between
+ * `getHumanityInfo` and `isHuman`: a getter that declines to answer is not a chain that has lost
+ * the answer.
+ *
+ * So a lapsed passport gives up both ends of its life at head, exactly, with no archive node and
+ * no log query: `time` is the issuance second and the derived expiry is the second it stopped
+ * counting. That closes a window an `asOf` score can decide membership of — see `as-of.ts`.
+ *
+ * Iteration 16 refused to do this for Holonym, and the reason is the test this one has to pass:
+ * *is the credential still attributable at the instant you restore it?* For Holonym it is not —
+ * `getSBT` reverts once the SBT expires, so the issuer check that makes the credential evidence
+ * of anything is unreadable for exactly the credentials that would be restored. Here nothing
+ * reverts and nothing is lost: the struct is read by the same call on the same resolver, and the
+ * EAS attestation behind it survives too, un-revoked, with the subject still named as its
+ * recipient (`0xb0812e00…90F2`, whose passport lapsed 2025-06-01, checked 2026-07-25). The
+ * live suite asserts that rather than assuming it.
+ *
+ * Two limits, both stated rather than absorbed:
+ *
+ * - **One window per chain.** The resolver caches *the* score for an address, so a re-mint
+ *   overwrites the previous struct. We can only ever see the most recent life on each chain;
+ *   an earlier one that ended before it is gone. Reading seven chains blunts this — a mint on
+ *   one chain does not touch another's cache — and `detail.perChain` shows every window we can
+ *   see, but a subject who minted twice on one chain has a hole in their history there.
+ * - **A zero score never was a credential.** A passport with no stamps is not wallet-history
+ *   evidence while it is live (`held` is false for it), so its expiry does not close a window
+ *   over anything. Those readings are excluded and counted rather than restored.
  */
 
 /**
@@ -168,13 +201,57 @@ interface CachedScore {
   expirationTime: number
 }
 
-interface ChainReading extends CachedScore {
+export interface ChainReading extends CachedScore {
   chain: PassportChain
   /** Derived, never read: `expirationTime` when set, else `time + maxScoreAge`. */
   expiresAt: number
   expired: boolean
   /** Passport's own published pass mark, reported but never adopted. */
   meetsOwnThreshold: boolean
+}
+
+/**
+ * Close the window on a passport that has lapsed on every chain — or decline to, and say why.
+ *
+ * Pure over what was read, so every branch that can put a credential back into a historical
+ * score is testable without a network. Called only when no chain holds a passport that counts
+ * today; a live passport needs no window, because it has not ended.
+ *
+ * Three things have to be true before a window is returned, and each of them is a way this can
+ * be wrong rather than a formality:
+ *
+ * - **The score was non-zero.** A zero-score passport does not count as held while it is alive
+ *   (see the `valid` filter in the probe), so its expiry ends nothing and restoring it would put
+ *   a credential into the past that would not have counted at the time.
+ * - **It has actually expired.** `expiresAt > now` on a zero-score reading is a live passport
+ *   that carries no evidence, not an ending. `heldUntil` may only ever mean "the chain says this
+ *   ended here".
+ * - **The window is non-empty.** `expiresAt > time` guards against a struct we have not seen —
+ *   an explicit `expirationTime` at or before the issuance — which would describe a credential
+ *   that never counted for a second.
+ *
+ * Where several chains have lapsed windows the latest ending wins: it is the most recent thing
+ * the subject paid to publish, and the one an as-of instant is most likely to fall inside. The
+ * others stay visible in `detail.perChain`.
+ */
+export function closeLapsedPassportWindow(
+  readings: readonly ChainReading[],
+  now: number,
+): { heldUntil?: number; issuedAt?: number; chain?: PassportChain; detail: Record<string, unknown> } {
+  const detail: Record<string, unknown> = {}
+  const lapsed = readings.filter(
+    (r) => r.score > 0 && r.time > 0 && r.expiresAt > r.time && r.expiresAt <= now,
+  )
+  const emptyScore = readings.filter((r) => r.score === 0 && r.expiresAt <= now).length
+  if (emptyScore) detail.lapsedWithZeroScore = emptyScore
+  if (lapsed.length === 0) return { detail }
+
+  const best = lapsed.reduce((a, b) => (b.expiresAt > a.expiresAt ? b : a))
+  detail.lapsedChain = best.chain
+  detail.lapsedScore = best.score / SCORE_DECIMALS
+  detail.lapsedDaysAgo = Math.round(((now - best.expiresAt) / 86_400) * 10) / 10
+  if (lapsed.length > 1) detail.lapsedWindowsOnOtherChains = lapsed.length - 1
+  return { heldUntil: best.expiresAt, issuedAt: best.time, chain: best.chain, detail }
 }
 
 /** Per-chain configuration that never changes between lookups, fetched once per instance. */
@@ -302,8 +379,13 @@ export function humanPassportAdapter(opts: HumanPassportOptions = {}): AdapterPr
         ? { chainsUnreadable: failures.map((f) => f.chain) }
         : {}
 
+      const provenance: ProbeProvenance = { heldFrom: 'chain', dateFrom: 'chain', notes: [] }
       if (readings.length === 0) {
-        return { held: false, detail: { minted: false, chainsRead: chains.length - failures.length, ...unreadable } }
+        return {
+          held: false,
+          provenance: { ...provenance, dateFrom: 'none' },
+          detail: { minted: false, chainsRead: chains.length - failures.length, ...unreadable },
+        }
       }
 
       // Freshest unexpired mint wins: it is the strongest evidence available and the one the
@@ -312,12 +394,23 @@ export function humanPassportAdapter(opts: HumanPassportOptions = {}): AdapterPr
       const valid = readings.filter((r) => !r.expired && r.score > 0)
       if (valid.length === 0) {
         const newest = readings.reduce((a, b) => (b.expiresAt > a.expiresAt ? b : a))
+        // The resolver keeps the struct after the Decoder stops honouring it, so this negative
+        // can carry the whole life of the credential rather than only its absence.
+        const window = closeLapsedPassportWindow(readings, now)
+        if (window.heldUntil !== undefined) provenance.notes.push('date-from-lapsed-verification')
         return {
           held: false,
+          ...(window.issuedAt !== undefined ? { issuedAt: window.issuedAt } : {}),
+          ...(window.heldUntil !== undefined ? { heldUntil: window.heldUntil } : {}),
+          provenance: {
+            ...provenance,
+            ...(window.heldUntil === undefined ? { dateFrom: 'none' as const } : {}),
+          },
           detail: {
             minted: true,
             reason: newest.score === 0 ? 'score-zero' : 'score-expired',
             expiredAt: newest.expiresAt,
+            ...window.detail,
             perChain,
             ...unreadable,
           },
@@ -348,6 +441,7 @@ export function humanPassportAdapter(opts: HumanPassportOptions = {}): AdapterPr
       return {
         held: true,
         issuedAt: best.time,
+        provenance,
         detail: {
           minted: true,
           score: best.score / SCORE_DECIMALS,

@@ -414,12 +414,17 @@ did not exist then and is dropped. And one the chain dates the *end* of — an E
 World verification term that ran out, a Proof of Humanity registration or humanity whose term
 expired — was held for the whole window between its issuance and that end, so if the instant falls
 inside it the credential is **restored and priced at what it was worth then**, and the result says
-so in `ceasedAfterAsOf`. Four registries produce those windows, and each does so for the same
+so in `ceasedAfterAsOf`. Six registries produce those windows, and each does so for the same
 reason: none of them deletes the ending. EAS attestations are immutable, `WorldIDAddressBook`
 keeps a lapsed `addressVerifiedUntil` forever, PoH v1 never clears `submission.registered` when a
-term runs out, and PoH v2 leaves `owner` and `expirationTime` on an expired humanity. That matters more than
-it sounds: 5,143 of the Coinbase attestations in our sampled windows are revoked, and every one of
-them used to make a historical score quietly lower than the subject's real position. Restoring
+term runs out, PoH v2 leaves `owner` and `expirationTime` on an expired humanity, Human Passport's
+resolver keeps a cached score long after the Decoder has started reverting on it, and a lapsed
+Verax attestation still carries both its `attestedDate` and its ending. That matters more than
+it sounds: 5,143 of the Coinbase attestations in our sampled windows are revoked, about half a
+sampled World cohort has let its term lapse, and Linea PoH has issued **50,475 attestations of
+which ~495 are alive** — so for that protocol the lapsed population *is* the population, and
+reading it costs three extra batched calls. Every one of those used to make a historical score
+quietly lower than the subject's real position. Restoring
 requires an *exact* issuance date, never a lower bound — a bound shows a credential could have
 existed at an instant, never that it did — so the cases where only the ending is dated are listed
 in `ceasedStartUndated` and left out. What remains invisible is a credential whose ending the
@@ -492,9 +497,12 @@ cd packages/sdk && node --test --experimental-strip-types src/ens-presentation.l
 cd apps/demo && npx playwright test
 ```
 
-All 420 pass as of 2026-07-25 (18 forge + 389 SDK + 13 browser; two of the SDK live tests skip
-loudly when the third-party Verax indexer they cross-check against returns HTTP 429, and did not
-on this run). The live tests hit real chains on purpose: the failure mode we
+506 of them pass as of 2026-07-25 (18 forge + 475 SDK + 13 browser). Two SDK tests are red and
+named: the deployed registry gained two adapters from another working copy and this tree's
+ontology has not caught up (`MORNING.md`, "Needs you" item 18). Three skip loudly, waiting on a
+subgraph version that is still syncing. Some live tests also skip rather than fail when the
+third-party Verax indexer they cross-check against returns HTTP 429 — an unreachable source says
+nothing about the mechanism under test. The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
 assert the seeded ontology loads, that the ICAO cluster really does have three protocols on
 one root, that discontinued protocols are marked dead, that every weight cites a `research/`

@@ -42,6 +42,17 @@ const DECODER_ABI = parseAbi([
 ])
 const RESOLVER_ABI = parseAbi([
   'function getCachedScore(address user) view returns ((uint32 score, uint64 time, uint64 expirationTime))',
+  'function userAttestations(address user, bytes32 schema) view returns (bytes32)',
+])
+
+/** The EAS predeploy, identical on every OP-stack chain. The attestation itself lives here. */
+const EAS_PREDEPLOY = '0x4200000000000000000000000000000000000021' as Address
+const EAS_ABI = parseAbi([
+  'function getAttestation(bytes32 uid) view returns ((bytes32 uid, bytes32 schema, uint64 time, uint64 expirationTime, uint64 revocationTime, bytes32 refUID, address recipient, address attester, bool revocable, bytes data))',
+])
+const SCHEMA_ABI = parseAbi([
+  'function scoreSchemaUID() view returns (bytes32)',
+  'function scoreV2SchemaUID() view returns (bytes32)',
 ])
 
 /** Custom errors declared by GitcoinPassportDecoder.sol. Selectors confirmed against live reverts. */
@@ -289,16 +300,142 @@ describe('Human Passport (live, seven chains)', () => {
     for (const id of (r.detail?.['restatesAdapters'] as string[] | undefined) ?? []) {
       assert.ok(known.has(id), `restated adapter "${id}" is not in the ontology`)
     }
+    // A credential that is held has not ended. `heldUntil` may only ever mean "the chain says
+    // this stopped here", and a live passport is the case where inventing one would be easiest.
+    assert.equal(r.heldUntil, undefined, 'a current passport must not be handed a closed window')
+  })
+
+  /**
+   * The acceptance test for the lapsed window.
+   *
+   * The probe reads exactly one thing: the resolver's cached struct. This holds the window it
+   * derives from that struct against **two contracts it never touches** — the EAS attestation
+   * behind the score, which dates the start, and the Decoder, which dates the end by reverting.
+   * Three sources, one window, and the probe consulted only the first.
+   *
+   * It also answers the question iteration 16 refused Holonym on: *is the credential still
+   * attributable at the instant you restore it?* Holonym's `getSBT` reverts once an SBT expires,
+   * so the issuer check that makes it evidence is unreadable for exactly the credentials that
+   * would be restored. Here the EAS record survives with the subject still named as its
+   * recipient and its `revocationTime` still zero, which is what the assertions below check.
+   */
+  test('a lapsed passport is a closed window, and both of its ends come back from elsewhere', async (t) => {
+    const c = clientFor('optimism')
+    const dec = PASSPORT_DEPLOYMENTS.optimism.decoder
+
+    const r = await humanPassportAdapter({ chains: ['optimism'] }).probe(MULTI_CHAIN_MINTER)
+    if (r.error) {
+      t.skip(`Optimism unreachable: ${r.error.split('\n')[0]}`)
+      return
+    }
+    if (r.held) {
+      // Nothing is wrong: the subject re-minted, and a live passport has not ended. Skipping
+      // loudly beats asserting against a world that moved.
+      t.skip(`${MULTI_CHAIN_MINTER} holds a current passport again, so it has no lapsed window`)
+      return
+    }
+    if (r.heldUntil === undefined) {
+      t.skip(`${MULTI_CHAIN_MINTER} has no lapsed non-zero passport on Optimism: ${JSON.stringify(r.detail)}`)
+      return
+    }
+
+    const head = Number((await c.getBlock()).timestamp)
+    assert.equal(typeof r.issuedAt, 'number', 'a closed window needs both ends')
+    assert.ok(r.heldUntil > (r.issuedAt as number), 'the window must be non-empty')
+    assert.ok(r.heldUntil <= head, 'a window that has not closed yet is not a window')
+    assert.ok(r.provenance?.notes.includes('date-from-lapsed-verification'))
+    assert.equal(r.detail?.['lapsedChain'], 'optimism')
+
+    // Source two: the attestation the resolver was caching. Passport writes under one of two
+    // schemas and the resolver files the uid under whichever it was, so ask for both.
+    const resolver = await c.readContract({ address: dec, abi: DECODER_ABI, functionName: 'gitcoinResolver' })
+    const schemas = await Promise.all(
+      (['scoreV2SchemaUID', 'scoreSchemaUID'] as const).map((fn) =>
+        c.readContract({ address: dec, abi: SCHEMA_ABI, functionName: fn }).catch(() => null),
+      ),
+    )
+    let matched = 0
+    for (const schema of schemas) {
+      if (!schema || /^0x0+$/.test(schema)) continue
+      const uid = await c.readContract({
+        address: resolver,
+        abi: RESOLVER_ABI,
+        functionName: 'userAttestations',
+        args: [MULTI_CHAIN_MINTER, schema],
+      })
+      if (/^0x0+$/.test(uid)) continue
+      const att = await c.readContract({
+        address: EAS_PREDEPLOY,
+        abi: EAS_ABI,
+        functionName: 'getAttestation',
+        args: [uid],
+      })
+      matched++
+      assert.equal(att.schema, schema, 'the resolver filed this uid under a different schema')
+      assert.equal(
+        att.recipient.toLowerCase(),
+        MULTI_CHAIN_MINTER.toLowerCase(),
+        'the attestation behind a restored credential must still name this subject',
+      )
+      assert.equal(
+        Number(att.revocationTime),
+        0,
+        'a revoked attestation ends earlier than its expiry, so the window would be too long',
+      )
+      assert.equal(
+        Number(att.time),
+        r.issuedAt,
+        'EAS dates the attestation differently from the struct the probe read',
+      )
+    }
+    assert.ok(matched > 0, 'the resolver holds a cached score with no attestation behind it')
+
+    // Source three: the Decoder, which decides expiry in Solidity and tells us by reverting.
+    const decoded = await rawGetScore('optimism', MULTI_CHAIN_MINTER)
+    assert.ok('revert' in decoded, 'we call this passport lapsed and the Decoder returned a score')
+    assert.equal(decoded.revert.slice(0, 10), ATTESTATION_EXPIRED, `unexpected revert ${decoded.revert}`)
+    assert.equal(
+      BigInt(`0x${decoded.revert.slice(10)}`),
+      BigInt(r.heldUntil),
+      'the end of our window is not the instant the Decoder says the score expired',
+    )
+  })
+
+  test('an address that never minted gets no window, because absence is not an ending', async () => {
+    const r = await humanPassportAdapter({ chains: ['optimism'] }).probe(NEVER_MINTED)
+    if (r.error) return // covered by the first test; an outage says nothing about this claim
+    assert.equal(r.held, false)
+    assert.equal(r.heldUntil, undefined)
+    assert.equal(r.issuedAt, undefined)
+    assert.equal(r.provenance?.dateFrom, 'none')
   })
 })
+
+/**
+ * A keyless Optimism endpoint that will serve `eth_getLogs`.
+ *
+ * Deliberately not `PASSPORT_DEPLOYMENTS.optimism.rpc`: publicnode answers every `eth_call` the
+ * probe makes and rejects this filter outright with `InvalidParams` (verified 2026-07-25), so
+ * using it here turned "the endpoint will not serve logs" into "nobody has minted a passport" —
+ * and the positive-path test below then skipped itself in silence. `drpc` answers the same
+ * query and returns real logs. The probe itself still reads publicnode; nothing here is on the
+ * scoring path.
+ */
+const OPTIMISM_LOG_RPC = 'https://optimism.drpc.org'
 
 /**
  * Find an address that minted a passport on Optimism recently, by reading EAS's own `Attested`
  * log for the schema the Decoder names. Permissionless, no vendor endpoint, and it keeps the
  * positive-path test from depending on one address staying unexpired.
+ *
+ * The window is 16 × 9,000 blocks ≈ 1.7 days of Optimism. That is not arbitrary: score-v2 mints
+ * were arriving several times a day when this adapter was written and are now down to a couple
+ * every day or two — the most recent mint on 2026-07-25 was 54,000 blocks back, past the 45,000
+ * this searched before, which is exactly how a thinning population turns a positive-path test
+ * into a no-op.
  */
 async function findCurrentMinter(): Promise<Address | undefined> {
-  const c = clientFor('optimism')
+  const c = createPublicClient({ transport: http(OPTIMISM_LOG_RPC, { timeout: 20_000 }) })
   const EAS = '0x4200000000000000000000000000000000000021' as Address
   const attested = parseAbi([
     'event Attested(address indexed recipient, address indexed attester, bytes32 uid, bytes32 indexed schemaUID)',
@@ -317,7 +454,7 @@ async function findCurrentMinter(): Promise<Address | undefined> {
   const head = await c.getBlockNumber()
   for (const schemaUID of schemas) {
     if (!schemaUID || /^0x0+$/.test(schemaUID)) continue
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 16; i++) {
       const to = head - BigInt(i) * 9_000n
       try {
         const logs = await c.getLogs({
@@ -329,8 +466,12 @@ async function findCurrentMinter(): Promise<Address | undefined> {
         })
         const hit = logs.at(-1)?.args.recipient
         if (hit) return hit as Address
-      } catch {
-        break // this endpoint will not serve log ranges; the caller treats that as "not found"
+      } catch (e) {
+        // Say so. An endpoint refusing the filter and a registry with no recent mint produce
+        // the same `undefined` here, and the caller cannot tell them apart — which is how this
+        // search silently stopped covering anything at all.
+        console.log(`    (${OPTIMISM_LOG_RPC} would not serve the filter: ${(e as Error).message.split('\n')[0]})`)
+        break
       }
     }
   }

@@ -358,11 +358,30 @@ the direction that would otherwise favour an adversary. And a credential the cha
 of was held for the whole window between its issuance and that end, so an instant inside the window
 **restores** it, priced at what it was worth then (`asOf.ceasedAfterAsOf`).
 
-Four registries produce such a window, and all four for one reason: **none of them deletes the
+Six registries produce such a window, and all six for one reason: **none of them deletes the
 ending.** EAS attestations are immutable and keep `revocationTime` and `expirationTime`;
 `WorldIDAddressBook` keeps a lapsed `addressVerifiedUntil` forever; PoH v1 never clears
 `submission.registered` when a term runs out; PoH v2 leaves `owner` and `expirationTime` on an
-expired humanity. A protocol that erases the ending instead — Circles' undated `stopped()`, PoH
+expired humanity; Human Passport's `GitcoinResolver` keeps a cached score after the Decoder has
+started reverting `AttestationExpired` on it; and a Verax attestation is immutable, so a lapsed
+Linea PoH credential still carries its `attestedDate` beside its expiry or revocation.
+
+A dated ending is necessary and not sufficient: the credential must also still be **attributable**
+at the instant you restore it. That is the test Holonym fails — `Hub.getSBT` reverts once an SBT
+expires and takes the issuer check with it, so exactly the credentials that would be restored are
+the ones we could no longer show were Holonym's. Human Passport passes it with a read rather than
+an argument: the EAS attestation behind a lapsed score survives un-revoked, still naming the
+subject as its recipient, and the live suite asserts that every run.
+
+The last one is also the one where it matters most, and the reason is a ratio. Linea PoH has
+issued **50,475 attestations of which about 495 are alive**, so nearly everyone that protocol has
+ever verified is in the lapsed state; without a window, an as-of question about them is answered
+with silence. The live population sits in a one-term-wide id range by construction, and reaching
+one term further back — 30 days, three extra batched calls — turns 494 live subjects into 1,025
+with a closed dated window. How far back that reach is *exhaustive* is derived from the scan's own
+floor rather than from the constant that chose it, so a narrower scan loses the claim by itself.
+
+A protocol that erases the ending instead — Circles' undated `stopped()`, PoH
 v2's `delete humanity.owner` on revocation, PoH v1's ForkModule boolean — produces no window, and
 those credentials stay invisible rather than being restored from an ending nobody can date.
 Restoring also requires an *exact* issuance date: `issuedAfter` is a lower bound and shows only
