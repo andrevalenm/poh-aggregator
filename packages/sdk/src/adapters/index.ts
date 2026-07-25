@@ -9,8 +9,10 @@ import {
   type Reconciled,
 } from '../reconcile.ts'
 import { humanPassportAdapter } from './human-passport.ts'
+import { farcasterAdapter } from './farcaster.ts'
 
 export * from './human-passport.ts'
+export * from './farcaster.ts'
 
 /**
  * Adapters.
@@ -472,5 +474,6 @@ export function defaultAdapters(opts?: { subgraphUrl?: string }): AdapterProbe[]
     circlesAdapter(RPC.gnosis, undefined, opts?.subgraphUrl),
     coinbaseVerificationAdapter(),
     humanPassportAdapter(),
+    farcasterAdapter(),
   ]
 }

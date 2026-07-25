@@ -51,6 +51,11 @@ export interface ProbeProvenance {
 /**
  * Conditions worth surfacing. Each maps to a caveat on the result — the point of the
  * inversion is that a degraded read is loud, not that it never happens.
+ *
+ * Most of these are about reconciling an index against a chain, and are produced here. The
+ * last two are not: they are things a probe can only learn from the protocol it reads, and
+ * they live in the same vocabulary because they answer the same question — *how far can this
+ * date be trusted?* — and because carrying them here gets them the same caveat plumbing.
  */
 export type ProvenanceNote =
   /** No index view was supplied at all. Held and date come from the contract alone. */
@@ -69,6 +74,16 @@ export type ProvenanceNote =
   | 'index-date-disagrees-with-chain'
   /** The contract read failed, so nothing confirms the index's state is still current. */
   | 'freshness-check-unavailable'
+  /**
+   * The credential's date is the block a successor deployment imported it in, not the block it
+   * was issued in — so the credential is older than its date and its ramp weight is a floor.
+   */
+  | 'date-from-registry-import'
+  /**
+   * The credential is transferable and has changed hands, so it is dated from when the current
+   * holder acquired it rather than from when it was created.
+   */
+  | 'credential-transferred-since-issuance'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {

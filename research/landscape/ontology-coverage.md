@@ -207,8 +207,17 @@ the read is):
    `protocols/human-passport-onchain-read.md`. Two findings that changed the ontology entry: a
    passport **hard-expires at 90 days** (`maxScoreAge` on every chain), and its stamps are largely
    credentials we already price, so the probe now names the roots it restates.
-2. **Farcaster** — `IdRegistry.idOf(address)` on OP Mainnet (`0x0000…489b`, `idCounter()` = 3,343,572
-   as of 2026-07-24). One call, no vendor, and it doubles as an aged-account signal.
+2. ~~**Farcaster**~~ — **DONE 2026-07-25.** `IdRegistry.idOf` on OP Mainnet is one call, but the
+   boolean is worth nothing on its own: the registry tripled inside a nine-month subsidy window,
+   so on a Ramp the *date* is the entire signal — and the registry stores no dates. It turns out
+   not to need to. `idCounter()` is monotone and `register()` increments it in the same
+   transaction that writes custody, so the first block where `idCounter() >= fid` is the block the
+   fid was created in, found by searching archive state and verified against the log index. Two
+   findings that changed the answer: fids ≤ 193,791 were imported from the predecessor registry by
+   an admin `SetIdCounter(0, 193791)` and are older than their date, and fids are *transferable*,
+   so what gets dated is this address's custody rather than the fid. Write-up, addresses,
+   endpoint table: `protocols/farcaster-onchain-read.md`. Farcaster Pro — the one signal with a
+   real price — is **not** readable: `TierRegistry` keeps no per-fid state and its logs need a key.
 3. **Holonym / Human ID** — state on Optimism plus a public unauthenticated REST endpoint. Requires
    us to publish a stable action-id first, which is a design decision, not a lookup.
 4. **Linea Proof of Humanity V2** — Verax attestations on Linea, portal `0xe8a3…3922`, attester

@@ -68,7 +68,11 @@ import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
  * us reading a resolver the Decoder has stopped believing.
  */
 export const PASSPORT_DEPLOYMENTS = {
-  optimism: { decoder: '0x5558D441779Eca04A329BcD6b47830D2C6607769', rpc: 'https://mainnet.optimism.io' },
+  // Not `mainnet.optimism.io`, which is one of the few keyless endpoints serving *archive*
+  // state and is therefore spent by the Farcaster probe. Passport only ever reads at head, so
+  // it takes a head-only endpoint and leaves the scarce archive quota to the reader that
+  // needs it. Verified 2026-07-25 to return the same resolver, maxScoreAge and threshold.
+  optimism: { decoder: '0x5558D441779Eca04A329BcD6b47830D2C6607769', rpc: 'https://optimism-rpc.publicnode.com' },
   base: { decoder: '0xaa24a127d10C68C8F9Ac06199AA606953cD82eE7', rpc: 'https://base-rpc.publicnode.com' },
   arbitrum: { decoder: '0x2050256A91cbABD7C42465aA0d5325115C1dEB43', rpc: 'https://arbitrum-one-rpc.publicnode.com' },
   linea: { decoder: '0x423cd60ab053F1b63D6F78c8c0c63e20F009d669', rpc: 'https://linea-rpc.publicnode.com' },
