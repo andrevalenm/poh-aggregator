@@ -23,6 +23,8 @@
   --smoke: #8a7e6f;
   --iron: #b1401f;
   --iron-deep: #8e3013;
+  --oxblood: #58200f;
+  --ochre: #c88a3e;
   --paper: #ddd3c1;
   --paper-2: #d3c8b4;
   --ink-on-paper: #241d17;
@@ -34,6 +36,10 @@
   --measure: 62ch;
   --band-pad: clamp(4rem, 10vw, 8.5rem);
   --gutter: clamp(1.25rem, 4vw, 3.5rem);
+
+  /* Low-frequency fractal clouds, alpha-only — the pigment texture every section washes
+   * with. Same technique as the grain, an octave lower. */
+  --clouds: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.0045 0.0065' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 0.95 0 0 0 0 0.85 0.7 0 0 0 0'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23c)'/%3E%3C/svg%3E");
 }
 
 * {
@@ -155,10 +161,46 @@ a {
   padding: clamp(5rem, 12vh, 8rem) var(--gutter) 4rem;
   isolation: isolate;
   overflow: hidden;
-  /* A kiln-glow behind the print — warmth, not colour. */
+  /* Fired pigment, not flat dark: umber heat behind the print, oxblood low, ochre high. */
   background:
-    radial-gradient(90rem 60rem at 76% 44%, rgb(56 40 28 / 0.55) 0%, transparent 62%),
-    radial-gradient(50rem 40rem at 12% 88%, rgb(43 32 24 / 0.5) 0%, transparent 60%);
+    radial-gradient(90rem 60rem at 76% 44%, rgb(84 52 32 / 0.6) 0%, transparent 62%),
+    radial-gradient(60rem 44rem at 8% 92%, rgb(88 32 15 / 0.38) 0%, transparent 58%),
+    radial-gradient(46rem 30rem at 24% 6%, rgb(120 84 40 / 0.16) 0%, transparent 55%);
+}
+
+/* A slow pigment cloud drifting through the hero — blurred, barely there, alive. */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  z-index: -2;
+  background:
+    radial-gradient(34rem 26rem at 30% 35%, rgb(136 66 34 / 0.2) 0%, transparent 70%),
+    radial-gradient(28rem 30rem at 72% 68%, rgb(96 70 38 / 0.22) 0%, transparent 70%);
+  filter: blur(60px);
+  animation: pigment-drift 46s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes pigment-drift {
+  from {
+    transform: translate3d(-3%, -2%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(4%, 3%, 0) scale(1.12);
+  }
+}
+
+/* Cloud wash over the kiln — smoke in the glaze. */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--clouds);
+  opacity: 0.05;
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 
 #print {
@@ -185,6 +227,44 @@ a {
   position: relative;
   z-index: 1;
   max-width: 46rem;
+}
+
+/* Entrance: the copy surfaces like ink settling — rise, sharpen, in sequence. */
+.hero-copy > * {
+  animation: surface 1s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+.hero-copy > .eyebrow {
+  animation-delay: 0.05s;
+}
+
+.hero-copy > h1 {
+  animation-delay: 0.16s;
+}
+
+.hero-copy > .hero-answer {
+  animation-delay: 0.34s;
+}
+
+.hero-copy > .hero-ctas {
+  animation-delay: 0.5s;
+}
+
+.hero-copy > .hero-live {
+  animation-delay: 0.66s;
+}
+
+@keyframes surface {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
 }
 
 .eyebrow {
@@ -237,7 +317,8 @@ a {
   text-decoration: none;
   padding: 0.85rem 1.7rem;
   border-radius: 999px;
-  transition: transform 0.2s, background 0.25s, color 0.25s, border-color 0.25s;
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.25s, color 0.25s,
+    border-color 0.25s, box-shadow 0.3s;
 }
 
 .cta:active {
@@ -245,12 +326,14 @@ a {
 }
 
 .cta-primary {
-  background: var(--iron);
+  background: linear-gradient(170deg, #c14a24 0%, var(--iron) 55%, var(--iron-deep) 100%);
   color: var(--bone);
+  box-shadow: 0 1px 0 rgb(255 220 190 / 0.25) inset, 0 8px 24px -14px rgb(177 64 31 / 0.8);
 }
 
 .cta-primary:hover {
-  background: var(--iron-deep);
+  transform: translateY(-2px);
+  box-shadow: 0 1px 0 rgb(255 220 190 / 0.3) inset, 0 16px 34px -14px rgb(193 74 36 / 0.9);
 }
 
 .cta-ghost {
@@ -259,6 +342,7 @@ a {
 }
 
 .cta-ghost:hover {
+  transform: translateY(-2px);
   border-color: var(--bone-dim);
 }
 
@@ -322,6 +406,8 @@ a {
   border-bottom: 1px solid var(--umber);
   padding: 0.72rem 0;
   background: var(--kiln-2);
+  mask-image: linear-gradient(90deg, transparent 0%, black 7%, black 93%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 7%, black 93%, transparent 100%);
 }
 
 .ticker-track {
@@ -378,11 +464,24 @@ a {
 /* -------------------------------------------------------------- manifesto */
 
 .manifesto {
-  padding: var(--band-pad) var(--gutter);
+  position: relative;
+  padding: var(--band-pad) var(--gutter) calc(var(--band-pad) + 1.5rem);
   max-width: 62rem;
   margin: 0 auto;
   display: grid;
   gap: clamp(2.4rem, 6vw, 4.5rem);
+}
+
+/* The manifesto floats in kiln-space; give it embers, not blackness. */
+.manifesto::before {
+  content: '';
+  position: absolute;
+  inset: -10% -40vw;
+  z-index: -1;
+  background:
+    radial-gradient(50rem 30rem at 82% 20%, rgb(88 32 15 / 0.28) 0%, transparent 60%),
+    radial-gradient(44rem 30rem at 10% 78%, rgb(84 52 32 / 0.32) 0%, transparent 60%);
+  pointer-events: none;
 }
 
 .beat {
@@ -411,15 +510,37 @@ a {
 
 .daylight {
   position: relative;
+  /* Watercolour paper: light from the upper left, ochre and rose-clay washes bleeding in
+   * from the edges, darker sediment settling toward the bottom. */
   background:
-    radial-gradient(70rem 40rem at 18% 0%, rgb(255 250 238 / 0.5) 0%, transparent 55%),
-    linear-gradient(180deg, #e2d8c6 0%, var(--paper) 34%, var(--paper-2) 100%);
+    radial-gradient(70rem 40rem at 18% 0%, rgb(255 250 238 / 0.55) 0%, transparent 55%),
+    radial-gradient(56rem 34rem at 88% 8%, rgb(200 138 62 / 0.16) 0%, transparent 55%),
+    radial-gradient(48rem 38rem at 4% 82%, rgb(166 96 70 / 0.13) 0%, transparent 55%),
+    linear-gradient(180deg, #e3d9c6 0%, var(--paper) 34%, #cfc2a9 100%);
   color: var(--ink-on-paper);
   padding: var(--band-pad) var(--gutter);
 }
 
+/* Pigment stains soaked into the paper. */
+.daylight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--clouds);
+  opacity: 0.12;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.daylight > .band-inner {
+  position: relative;
+  z-index: 1;
+}
+
 .daylight + .daylight {
-  background: var(--paper-2);
+  background:
+    radial-gradient(60rem 36rem at 78% 100%, rgb(200 138 62 / 0.14) 0%, transparent 55%),
+    linear-gradient(180deg, #cfc2a9 0%, var(--paper-2) 40%, #cbbda3 100%);
 }
 
 .daylight + .daylight {
@@ -463,11 +584,11 @@ a {
 
 .widget {
   margin-top: 2.6rem;
-  background: var(--paper-2);
-  border: 1px solid #b9ac95;
+  background: linear-gradient(165deg, #ded4c1 0%, var(--paper-2) 70%);
+  border: 1px solid #b0a28a;
   border-radius: 4px;
   padding: clamp(1.2rem, 3vw, 2.2rem);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.4) inset, 0 12px 40px -18px rgb(36 29 23 / 0.35);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.45) inset, 0 24px 60px -26px rgb(36 29 23 / 0.55);
 }
 
 #lookup-form {
@@ -707,6 +828,12 @@ a {
   border-radius: 4px;
   padding: 1.8rem 1.6rem;
   box-shadow: 0 1px 0 rgb(255 255 255 / 0.45) inset, 0 10px 30px -22px rgb(36 29 23 / 0.5);
+  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.4s;
+}
+
+.tablet:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.45) inset, 0 26px 44px -24px rgb(36 29 23 / 0.55);
 }
 
 .tablet h3 {
@@ -738,8 +865,24 @@ a {
   position: relative;
   padding: var(--band-pad) var(--gutter);
   background:
-    radial-gradient(80rem 50rem at 50% 0%, rgb(58 40 28 / 0.4) 0%, transparent 60%),
+    radial-gradient(80rem 50rem at 50% 0%, rgb(84 52 32 / 0.42) 0%, transparent 60%),
+    radial-gradient(50rem 40rem at 90% 90%, rgb(88 32 15 / 0.28) 0%, transparent 55%),
     var(--kiln-2);
+}
+
+.install::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--clouds);
+  opacity: 0.045;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.install > .band-inner {
+  position: relative;
+  z-index: 1;
 }
 
 .install .band-head h2 {
@@ -943,11 +1086,28 @@ a {
 .hackathon {
   --azul: #8fa9c9;
   --azul-deep: #5a6e8c;
+  position: relative;
   padding: var(--band-pad) var(--gutter);
   background:
-    radial-gradient(80rem 44rem at 50% -8%, rgb(120 145 180 / 0.09) 0%, transparent 62%),
+    radial-gradient(80rem 44rem at 50% -8%, rgb(120 145 180 / 0.11) 0%, transparent 62%),
+    radial-gradient(52rem 36rem at 10% 100%, rgb(84 52 32 / 0.3) 0%, transparent 55%),
     var(--kiln);
   border-top: 1px solid rgb(74 58 46 / 0.5);
+}
+
+.hackathon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--clouds);
+  opacity: 0.04;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.hackathon > .band-inner {
+  position: relative;
+  z-index: 1;
 }
 
 .hackathon .band-head h2 {
@@ -999,6 +1159,13 @@ a {
   padding: 1.9rem 1.7rem;
   background: linear-gradient(168deg, rgb(40 50 66 / 0.5) 0%, rgb(28 32 42 / 0.12) 55%, rgb(26 21 18 / 0) 100%);
   box-shadow: 0 1px 0 rgb(200 220 255 / 0.1) inset;
+  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), border-color 0.4s, box-shadow 0.4s;
+}
+
+.sponsor-card:hover {
+  transform: translateY(-5px);
+  border-color: rgb(143 169 201 / 0.55);
+  box-shadow: 0 1px 0 rgb(200 220 255 / 0.14) inset, 0 26px 48px -28px rgb(20 30 50 / 0.9);
 }
 
 /* Azulejo corner diamonds. */
@@ -1221,13 +1388,18 @@ a {
 
 .reveal {
   opacity: 0;
-  transform: translateY(14px);
-  transition: opacity 0.7s ease, transform 0.7s ease;
+  transform: translateY(30px);
+  filter: blur(9px);
+  transition:
+    opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
+    filter 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .reveal.in {
   opacity: 1;
   transform: none;
+  filter: none;
 }
 
 /* ------------------------------------------------------------- responsive */
@@ -1267,8 +1439,17 @@ a {
 
   .pulse,
   .scroll-hint,
-  .ticker-track {
+  .ticker-track,
+  .hero::before,
+  .hero-copy > * {
     animation: none;
+  }
+
+  .tablet:hover,
+  .sponsor-card:hover,
+  .cta-primary:hover,
+  .cta-ghost:hover {
+    transform: none;
   }
 
   #smudge {
