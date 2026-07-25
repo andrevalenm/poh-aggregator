@@ -58,6 +58,21 @@ cd ../agent && npm start                                   # live agent flow
 
 ## Award-run (24h, started 2026-07-25 ~11:00) — v4.1+
 
+**Perf scoreboard (Lighthouse mobile, landing): 52 → 89.** TBT 1,280ms → 100ms, FCP
+3.6s → 1.6s, LCP 4.3s → 3.6s, CLS clean. How: canvas mounts deferred past first paint
+(static print on narrow screens), viem/SDK chunk lazy-loaded, fonts self-hosted at stable
+URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also waits for
+Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
+FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
+
+**Juror-agent findings worked through** (12 ranked): showstopper fixed (a sed slip had
+eaten the h1 reveal rule — headline never rendered; E2E now asserts real visibility),
+reveal choreography tightened, section rhythm unified, the numeric story made canonical
+(40 studied / 15 catalogued / 10 roots / 4 live probes everywhere), tear rebuilt as a
+clip-path so the paper texture runs into the ragged edge, hero copy pooled clear of the
+print, footer stamp row fixed, ETHGlobal mark rendered crisp, native scrollbar themed,
+axe: 0 violations on the landing (main landmark + night contrast + console chips).
+
 Goal set per Hugo: the site should be able to win a prestigious design competition — one
 cohesive physical language, zero stacked gimmicks. Running continuously (cron 4868bed3 is
 only a dead-man switch every 25 min; deadline 2026-07-26 11:45, then it self-deletes).
