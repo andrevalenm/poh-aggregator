@@ -101,7 +101,10 @@ https://api.studio.thegraph.com/deploy/`.
    for. Only the on-device checklist at the bottom needs you (~20 min): Selfie Check + Identity Check beta submissions want
    *user testing docs*. `apps/agent`: `npm run worldid` prints a live World ID 4.0 QR —
    scan with World App (staging build works, no Orb needed for Selfie Check). 20 minutes.
-4. **Registry curator + deployer is the burner EOA** — fine for judging, say it out loud in
+4. Housekeeping notes: secrets sweep is clean (no keys in tracked files; the only 64-hex
+   strings are the deploy tx and Coinbase's public schema UID); the burner holds ~1.55
+   Sepolia ETH after your top-up, so gas is covered for anything else we deploy.
+   **Registry curator + deployer is the burner EOA** — fine for judging, say it out loud in
    the pitch. Rotate the World portal API key after the event (it's in chat history).
 5. **ENS booth Sunday morning** (both ENS tracks require presenting).
 6. **Demo videos.** Full shot-by-shot script with voiceover lines is written:
