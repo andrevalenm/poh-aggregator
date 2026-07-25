@@ -10,9 +10,11 @@ import {
 } from '../reconcile.ts'
 import { humanPassportAdapter } from './human-passport.ts'
 import { farcasterAdapter } from './farcaster.ts'
+import { holonymAdapters } from './holonym.ts'
 
 export * from './human-passport.ts'
 export * from './farcaster.ts'
+export * from './holonym.ts'
 
 /**
  * Adapters.
@@ -475,5 +477,6 @@ export function defaultAdapters(opts?: { subgraphUrl?: string }): AdapterProbe[]
     coinbaseVerificationAdapter(),
     humanPassportAdapter(),
     farcasterAdapter(),
+    ...holonymAdapters(),
   ]
 }

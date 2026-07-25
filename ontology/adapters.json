@@ -327,8 +327,8 @@
       "decayHalfLifeDays": 730,
       "live": true,
       "sourceURI": "research/protocols/billions-silk-unitap-sismo-intuition.md",
-      "implemented": false,
-      "notes": "Four IDV vendors are wired into id-server — Onfido, Sumsub, iDenfy, Veriff — and the credential does not say which one issued it, so its strength is the weakest of the four and its root cannot be attributed. Uniqueness is enforced per action-id, so we must publish a stable action-id and cannot cross-reference a subject across apps. Readable without the vendor: state is on Optimism.",
+      "implemented": true,
+      "notes": "Four IDV vendors are wired into id-server — Onfido, Sumsub, iDenfy, Veriff — and the credential does not say which one issued it, so its strength is the weakest of the four and its root cannot be attributed. Read permissionlessly from Hub V3 on OP Mainnet (0x2AA822e2…4DfB): sbtOwners for the record, getSBT for the proof's public values, and the issuer in publicValues[4] is checked against Holonym's key because the Hub's own source warns that anyone can mint an SBT under their own issuer. No action-id needs publishing after all — getSBT is keyed on holder and circuit, and the credential reports whichever action it was minted for. Measured on-chain 2026-07-25: the V3.circom constraint expiry - iat < 31,536,001 makes expiry minus one year a proven lower bound on issuance, and the credential hard-expires within a year of the underlying check, so this 730-day half-life only ever applies over that year.",
       "ageCurve": "Decay"
     },
     {
@@ -341,8 +341,8 @@
       "decayHalfLifeDays": 365,
       "live": true,
       "sourceURI": "research/protocols/billions-silk-unitap-sismo-intuition.md",
-      "implemented": false,
-      "notes": "Holonym self-hosts FaceTec and does run 1:N /3d-db/search before enrolling, so unlike most of this class the dedup is real — within its own gallery. Against that: id-server mounts an explicit allow-sybils route enrolling into 3d-db groupName 2, described in its own comment as non-sybil-resistant, so a credential of this type may have been issued through a path that deliberately skips dedup and we cannot tell from outside which path produced it.",
+      "implemented": true,
+      "notes": "Holonym self-hosts FaceTec and does run 1:N /3d-db/search before enrolling, so unlike most of this class the dedup is real — within its own gallery. Against that: id-server mounts an explicit allow-sybils route enrolling into 3d-db groupName 2, described in its own comment as non-sybil-resistant, so a credential of this type may have been issued through a path that deliberately skips dedup and we cannot tell from outside which path produced it — the two paths share one issuer key and one circuit id, so nothing on chain distinguishes them either. Read from the same Hub V3 SBT as holonym-gov-id, under circuit 0x0b512122…3d15 and issuer 0x0d4f849d…d922, dated by the same expiry-minus-one-year bound.",
       "ageCurve": "Decay"
     },
     {
