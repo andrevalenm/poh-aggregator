@@ -235,6 +235,19 @@ person.isHuman(Thresholds.standard)</code></pre>
           </g>
           <circle cx="40" cy="40" r="2.4" fill="currentColor" opacity="0.55" />
         </pattern>
+
+        <!--
+          Calçada portuguesa — the wave pavement of the Rossio, and the most recognisably
+          Lisbon surface there is. Two sine waves in antiphase, crossing to leave the lens
+          shapes the real stonework makes. Seamless at 64 wide: each wave starts and ends at
+          its centre line with matching slope, so tiles join without a seam.
+        -->
+        <pattern id="calcada" width="64" height="32" patternUnits="userSpaceOnUse">
+          <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M0 10Q16 26 32 10T64 10" />
+            <path d="M0 22Q16 6 32 22T64 22" />
+          </g>
+        </pattern>
       </defs>
     </svg>
 
@@ -281,22 +294,43 @@ person.isHuman(Thresholds.standard)</code></pre>
         flex-wrap: wrap;
         margin: 2rem 0 0;
       }
+      /*
+       * The official mark keeps its own colours — navy and cornflower — which disappear on
+       * the kiln ground, so it sits on a paper chip instead of being recoloured. Same reason
+       * the daylight bands exist: this palette already has a light surface to stand on.
+       */
       .built-at-mark {
-        font-family: var(--mono);
-        font-size: 0.8rem;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        color: var(--bone-dim);
-        border: 1px solid var(--umber);
-        border-radius: 2px;
-        padding: 0.5rem 0.85rem;
+        display: inline-flex;
+        align-items: center;
+        background: var(--paper);
+        border-radius: 3px;
+        padding: 0.7rem 1rem;
         text-decoration: none;
-        white-space: nowrap;
+        box-shadow: 0 1px 0 rgb(255 255 255 / 0.4) inset,
+          0 12px 30px -20px rgb(0 0 0 / 0.7);
+        transition: transform 0.25s ease;
+      }
+      .built-at-mark:hover {
+        transform: translateY(-1px);
       }
       .built-at-mark img {
         display: block;
-        height: 1.6rem;
+        /* 192x92 source, so this stays under 1:1 and renders sharp on hidpi. */
+        height: 3rem;
         width: auto;
+      }
+      .calcada-rule {
+        color: var(--bone);
+        opacity: 0.16;
+        line-height: 0;
+        height: 32px;
+        overflow: hidden;
+        margin: 3rem 0 2.6rem;
+      }
+      .calcada-rule svg {
+        display: block;
+        width: 100%;
+        height: 32px;
       }
       .built-at-note {
         margin: 0;
@@ -338,11 +372,6 @@ person.isHuman(Thresholds.standard)</code></pre>
             attached, whatever happens to us on Sunday.
           </p>
 
-          <!--
-            Event attribution. Text wordmark by default so nothing renders broken; when the
-            official vector lands at apps/demo/public/ethglobal-lisbon.svg, swap the span for
-            the commented <img> below and drop the .built-at-mark border.
-          -->
           <div class="built-at reveal">
             <a
               class="built-at-mark"
@@ -350,15 +379,23 @@ person.isHuman(Thresholds.standard)</code></pre>
               rel="noopener"
               aria-label="ETHGlobal Lisbon 2026"
             >
-              <!-- <img src="/ethglobal-lisbon.svg" alt="ETHGlobal Lisbon 2026" /> -->
-              <span>ETHGlobal Lisbon 2026</span>
+              <img
+                src="/ethglobal-lisbon.png"
+                width="192"
+                height="92"
+                alt="ETHGlobal Lisbon 2026"
+              />
             </a>
             <p class="built-at-note">
-              The tilework on this page is drawn, not photographed — the same way the
-              fingerprint above it is.
+              The tilework and the wave are drawn, not photographed — the same way the
+              fingerprint above them is.
             </p>
           </div>
         </header>
+
+        <div class="calcada-rule" aria-hidden="true">
+          <svg><rect width="100%" height="32" fill="url(#calcada)" /></svg>
+        </div>
 
         <h3 class="reveal">The three sponsors we are submitting to</h3>
         <p class="reveal">
