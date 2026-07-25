@@ -165,6 +165,23 @@ export type ProvenanceNote =
    * may never be turned into a claim about a person, in either direction.
    */
   | 'issuer-check-unavailable'
+  /**
+   * The credential's term was set by another instance of the same protocol on another chain, and
+   * the date here is the registration *that* instance publishes — read from its own state, and
+   * required to reproduce this credential's expiry to the second before it is believed.
+   *
+   * It is the correct date rather than a conservative one, and usually the older of the two: PoH
+   * v2 on Gnosis imports humanities whose term was set by PoH v1 on mainnet, whose term is twice
+   * as long, so subtracting the local term reported a two-year-old credential as one year old.
+   */
+  | 'date-from-origin-instance'
+  /**
+   * The credential's date was derived from a term this run could not attribute. The protocol lets
+   * another instance write an expiry it did not compute, the probe normally reads the log that
+   * says which credentials those are, and this says that read did not answer — not that it found
+   * anything. The date stands on the assumption the check exists to test.
+   */
+  | 'term-origin-unverified'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {

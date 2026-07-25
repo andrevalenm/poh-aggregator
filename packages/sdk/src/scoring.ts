@@ -485,6 +485,22 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     })
   }
 
+  const crossInstance = withNote('date-from-origin-instance')
+  if (crossInstance.length) {
+    out.push({
+      code: 'date-from-origin-instance',
+      message: `${ids(crossInstance)} was moved here from another deployment of the same protocol, which means the expiry it is dated from was computed by that deployment and not this one. Subtracting this chain's term from another chain's expiry is arithmetic about a contract we did not read — and the two terms differ, by a factor of two in the case that supplies most of these credentials — so the date here is the registration the origin deployment still publishes, taken from its own state and required to reproduce this expiry exactly before it is used. It is normally the older of the two dates, and older is worth more.`,
+    })
+  }
+
+  const unattributed = withNote('term-origin-unverified')
+  if (unattributed.length) {
+    out.push({
+      code: 'term-origin-unverified',
+      message: `The date for ${ids(unattributed)} assumes this chain's contract set the credential's term, and this run could not confirm that. The protocol lets another deployment write an expiry it did not compute, we normally read the registry's own log of exactly which credentials arrived that way, and that read did not answer here. Nothing suggests this credential is one of them — a handful in the registry's whole history are — but the check that would rule it out did not happen.`,
+    })
+  }
+
   const stale = withNote('freshness-check-unavailable')
   if (stale.length) {
     out.push({

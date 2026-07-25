@@ -488,6 +488,9 @@ describe('index and chain, reconciled against live data', () => {
     let found: { subject: Address; evidence: Awaited<ReturnType<typeof probe.probe>> } | undefined
     for (const h of humanities) {
       const evidence = await probe.probe(h.id as Address)
+      // An imported humanity is dated from its grant block, not from a claim this registry
+      // logged, so it cannot answer the question below. It has its own test.
+      if (evidence.detail?.termImported === true) continue
       if (evidence.heldUntil !== undefined && evidence.issuedAt !== undefined) {
         found = { subject: h.id as Address, evidence }
         break
@@ -564,6 +567,123 @@ describe('index and chain, reconciled against live data', () => {
 
     const after = applyAsOfToEvidence(asEvidence, evidence.heldUntil!, adapters)
     assert.equal(after.evidence[0]!.held, false, 'and gone at the instant it expired')
+  })
+
+  test('a humanity another chain set the term for is not dated by subtracting ours', async (t) => {
+    // The acceptance test, and every number in it is re-derived from the chain each run.
+    //
+    // `ccGrantHumanity` copies an expiry settled on another instance, so for an imported humanity
+    // `expirationTime - humanityLifespan()` is arithmetic about a contract we never read. The
+    // sample is not a fixture: the registry's own grant log is swept here, one grant whose expiry
+    // is *still* the imported one is picked out of it, and the origin instance is then required to
+    // reproduce that expiry to the second before anything is claimed about it.
+    const grants: { blockNumber: string; topics: string[]; data: string }[] = await gnosisRpc(
+      'eth_getLogs',
+      [
+        {
+          address: POH_V2,
+          topics: ['0x4a05b98253015fe18cb57d239b4209ea44674e1b9a7c9bf0889d401d97152b14'],
+          fromBlock: hexBlock(35_846_827),
+          toBlock: 'latest',
+        },
+      ],
+    )
+    if (!grants?.length) {
+      t.skip('the node refused the cross-chain grant log sweep')
+      return
+    }
+
+    const { createPublicClient, http, parseAbi } = await import('viem')
+    const { mainnet } = await import('viem/chains')
+    const { POH_V1_REGISTRY, POH_V2_MAINNET } = await import('./adapters/index.ts')
+    const eth = createPublicClient({ chain: mainnet, transport: http('https://ethereum-rpc.publicnode.com') })
+    const originAbi = parseAbi([
+      'function getSubmissionInfo(address) view returns (uint8 status, uint64 submissionTime, uint64 index, bool registered, bool hasVouched, uint256 numberOfRequests)',
+      'function submissionDuration() view returns (uint64)',
+      'function getHumanityInfo(bytes20) view returns (bool vouching, bool pendingRevocation, uint48 nbPendingRequests, uint40 expirationTime, address owner, uint256 nbRequests)',
+    ])
+
+    const poh = await pohV2Client()
+    const lifespan = await poh.lifespan()
+    // The two terms differ, and that difference is the whole defect. Read live, both sides.
+    const v1Term = Number(
+      await eth.readContract({ address: POH_V1_REGISTRY, abi: originAbi, functionName: 'submissionDuration' }),
+    )
+    assert.notEqual(v1Term, lifespan, 'PoH v1 and v2 must still disagree about how long a term is')
+
+    const imports = await Promise.all(
+      grants.map(async (log) => {
+        // `bytes20` is a fixed-bytes type, so an indexed one is right-padded in its topic —
+        // the id is the *first* 20 bytes of the word, not the last. An `address` is not.
+        const humanityId = log.topics[1]!.slice(0, 42)
+        return {
+          log,
+          humanityId,
+          owner: `0x${log.topics[2]!.slice(26)}` as Address,
+          granted: parseInt(log.data, 16),
+          info: await poh.humanityInfo(humanityId),
+        }
+      }),
+    )
+    assert.ok(
+      imports.some((i) => i.info.nbRequests >= 1),
+      'an import can land on a humanity with local request history — which is why `nbRequests == 0` is not the discriminator',
+    )
+
+    let sample:
+      | { humanityId: string; owner: Address; grantedAt: number; expirationTime: number; originIssuedAt: number }
+      | undefined
+    for (const { log, humanityId, owner, granted, info } of imports) {
+      // The term is only still foreign if nothing here has written over the imported expiry.
+      if (info.expirationTime !== granted) continue
+
+      const submission = await eth.readContract({
+        address: POH_V1_REGISTRY,
+        abi: originAbi,
+        functionName: 'getSubmissionInfo',
+        args: [humanityId as Address],
+      })
+      const submissionTime = Number(submission[1])
+      if (submissionTime === 0 || submissionTime + v1Term !== granted) continue
+
+      const header = await gnosisRpc('eth_getBlockByNumber', [log.blockNumber, false])
+      sample = {
+        humanityId,
+        owner,
+        grantedAt: parseInt(header.timestamp, 16),
+        expirationTime: granted,
+        originIssuedAt: submissionTime,
+      }
+      break
+    }
+    if (!sample) {
+      t.skip('no import currently carrying an unrewritten PoH v1 term')
+      return
+    }
+
+    // The defect, measured rather than remembered: subtracting this contract's term from the
+    // imported expiry lands exactly one v2 lifespan after the registration PoH v1 records.
+    const naive = sample.expirationTime - lifespan
+    assert.notEqual(naive, sample.originIssuedAt, 'the local subtraction must be the wrong answer here')
+    assert.equal(naive - sample.originIssuedAt, v1Term - lifespan, 'and wrong by the difference in terms')
+
+    const evidence = await pohAdapter().probe(sample.owner)
+    assert.equal(evidence.error, undefined)
+    assert.notEqual(evidence.issuedAt, naive, 'the probe must not report the date it used to')
+    if (evidence.held) {
+      // Held: the age question, answered across the bridge.
+      assert.equal(evidence.issuedAt, sample.originIssuedAt)
+      assert.ok(evidence.provenance?.notes.includes('date-from-origin-instance'))
+    } else {
+      // Lapsed: the window question, which is about the instants *this* registry honoured it.
+      assert.equal(evidence.heldUntil, sample.expirationTime)
+      assert.equal(evidence.issuedAt, sample.grantedAt, 'a window here cannot start before the grant')
+      assert.equal(evidence.detail?.originRegisteredAt, sample.originIssuedAt)
+      assert.ok(evidence.provenance?.notes.includes('date-from-registry-import'))
+    }
+    assert.equal(evidence.detail?.termOrigin, 'poh-v1-mainnet')
+    assert.equal(evidence.detail?.termSeconds, v1Term)
+    void POH_V2_MAINNET
   })
 
   test('the account mapping is where a humanity survives its own expiry', async (t) => {

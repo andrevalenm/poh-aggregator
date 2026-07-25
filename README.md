@@ -507,7 +507,7 @@ cd packages/sdk && node --test --experimental-strip-types src/ens-presentation.l
 cd apps/demo && npx playwright test
 ```
 
-548 of them exist as of 2026-07-26 (18 forge + 517 SDK + 13 browser) and 546 pass. Two SDK tests
+564 of them exist as of 2026-07-26 (18 forge + 533 SDK + 13 browser) and 562 pass. Two SDK tests
 are red and named: the deployed registry gained two adapters from another working copy and this
 tree's ontology has not caught up (`MORNING.md`, "Needs you" item 18). Nothing skips against a
 pinned subgraph version; against Studio's `version/latest` the free-tier quota can throttle the
@@ -649,6 +649,22 @@ its credential is monotonic, so there is no ending to miss. The residual is that
 path is now silence — a subject whose credential is real loses it from the score whenever Gnosis
 is unreachable, which is the direction we would rather be wrong in.
 [`research/protocols/poh-endings-the-index-cannot-see.md`](research/protocols/poh-endings-the-index-cannot-see.md).
+
+**14. A PoH credential that arrived from another chain carries that chain's term, and we used to
+subtract ours from it.** Every PoH v2 score is dated `expirationTime − humanityLifespan()`, which
+is exact only where this contract wrote the expiry. Its cross-chain bridge writes ones it did not
+compute, and of the **nine humanities ever imported, seven came from PoH v1, whose term is twice as
+long** — so the subtraction landed exactly one v2 lifespan (365.25 days) after the true
+registration and priced a two-year-old credential as one year old. The guard that existed
+(`nbRequests == 0`) is sound and **misses three of the nine**, two of them held and scoring today,
+because a transfer out leaves the request history intact and a renewal after an import adds to it.
+Now the registry's own `HumanityGrantedDirectly` log decides it — one memoised sweep, ~400 ms once
+per process and nothing warm — and where the term is foreign the origin instance's own registration
+supplies the date, required to reproduce our expiry to the second first. What it does **not**
+close: both terms are governance-settable, and a change to Gnosis's would silently invalidate every
+locally derived date without anything noticing. The direction of the old error was in the subject's
+disfavour rather than an adversary's, which is why it survived this long.
+[`research/protocols/poh-imported-terms.md`](research/protocols/poh-imported-terms.md).
 
 Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 

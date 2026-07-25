@@ -68,15 +68,59 @@ describe('Proof of Humanity v2 — the humanity that expired', () => {
     assert.equal(r.detail.humanityOwnedByAnother, true)
   })
 
-  test('a humanity this contract never resolved a request for gets an end and no start', () => {
-    // `nbRequests == 0` means `grantHumanityDirectly` wrote the expiry — the cross-chain path,
-    // which copies a term settled on another instance. The derived start is then arithmetic
-    // about a claim that happened somewhere else, and on the live registry it misses by
-    // months in both directions. The end is still a fact; the start is not.
+  test('with nobody to ask about the term, `nbRequests == 0` still refuses a start', () => {
+    // The fallback, for a caller with no network: `nbRequests == 0` means this contract never
+    // resolved a request for the humanity, so the expiry was written by the cross-chain path and
+    // the derived start is arithmetic about a claim that happened somewhere else. Sound, and
+    // incomplete — 3 of the 9 imports carry `nbRequests >= 1`, which is why it is no longer the
+    // discriminator. The end is still a fact; the start is not.
     const r = close({ nbRequests: 0, expirationTime: 1_769_699_447 })
     assert.equal(r.heldUntil, 1_769_699_447)
     assert.equal(r.issuedAt, undefined, 'a bound is not a date, and only a date restores')
     assert.equal(r.detail.grantedWithoutLocalRequest, true)
+  })
+
+  test('a term that is known to be this contract’s overrules `nbRequests == 0`', () => {
+    // The sweep is the better witness. A humanity with no local request whose expiry no grant
+    // log accounts for was written by `executeRequest` or `rule` under some request history the
+    // getter does not expose, and the subtraction is exact for it.
+    const r = close({ nbRequests: 0, term: { kind: 'local' } })
+    assert.equal(r.issuedAt, NOW - 86_400 - LIFESPAN)
+    assert.equal(r.detail.grantedWithoutLocalRequest, undefined)
+  })
+
+  test('an imported window starts at the grant, not at the origin’s registration', () => {
+    // The two dates answer different questions. `dateHumanityFromTerm` gives an *age* the
+    // origin's registration, because the human has held the credential since then; a *window*
+    // is about the instants this registry honoured the humanity for, and that cannot begin
+    // before the grant that created it here. Restoring a Gnosis credential for a Tuesday when
+    // the registration was still on mainnet would be a false statement about this adapter.
+    const grantedAt = NOW - 400 * 86_400
+    const r = close({
+      nbRequests: 0,
+      term: { kind: 'imported', grant: { humanityId: ID, expirationTime: NOW - 86_400, block: 40_000_000, grantedAt } },
+      origin: { instance: 'poh-v1-mainnet', issuedAt: NOW - 900 * 86_400, term: 63_115_200 },
+    })
+    assert.equal(r.heldUntil, NOW - 86_400)
+    assert.equal(r.issuedAt, grantedAt)
+    assert.equal(r.note, 'date-from-registry-import')
+    assert.equal(r.detail.originRegisteredAt, NOW - 900 * 86_400)
+    assert.equal(r.detail.termOrigin, 'poh-v1-mainnet')
+  })
+
+  test('an imported term with no grant block and no origin closes nothing', () => {
+    // Reachable only when the sweep failed *and* the expiry is arithmetically impossible for a
+    // local write. There is no date to be had, so none is invented.
+    const r = close({ term: { kind: 'imported' } })
+    assert.equal(r.heldUntil, NOW - 86_400)
+    assert.equal(r.issuedAt, undefined)
+    assert.equal(r.detail.termImported, true)
+  })
+
+  test('an unverified term keeps the derived date and says it is unverified', () => {
+    const r = close({ term: { kind: 'unverified' } })
+    assert.equal(r.issuedAt, NOW - 86_400 - LIFESPAN)
+    assert.equal(r.note, 'term-origin-unverified')
   })
 
   test('a humanity that has not expired is not a window, whatever else is true', () => {

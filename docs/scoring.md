@@ -203,6 +203,24 @@ Where a protocol dates its own credentials on chain, none of this is needed. PoH
 at claim, so `expirationTime − humanityLifespan` is the claim timestamp — two `eth_call`s, no
 indexer in the path at all. The index then serves as a cross-check on the date rather than the
 source of it, and a disagreement between the two is reported as our fault, not the subject's.
+
+**But a subtraction has a premise, and the premise is that this contract set the term.** PoH v2
+lets its cross-chain bridge write an expiry it did not compute, and of the nine humanities ever
+imported into the Gnosis registry, **seven came from PoH v1, whose term is 63,115,200 seconds
+against v2's 31,557,600**. Subtracting the local term from those landed exactly one v2 lifespan —
+365.25 days — after the true registration, reporting a two-year-old credential as a one-year-old
+one. The guard that existed tested `nbRequests == 0` ("this contract never resolved a request for
+this humanity"), which is sound and misses three of the nine, because a cross-chain discharge
+leaves the request history intact and a renewal made after an import adds to it. It is replaced by
+the log the registry publishes about itself: `HumanityGrantedDirectly` carries the exact expiry it
+wrote, so a grant matching current storage is proof the term is foreign, and a grant *not* matching
+it is proof of a renewal the old flag missed. Where the term is foreign, the origin instance still
+publishes the registration behind it, and that is the date — required to reproduce our expiry to
+the second before it is believed. Two shapes of honesty ride along: an age crosses the bridge
+(`date-from-origin-instance`) but a *window* does not, because an as-of query about this adapter is
+a question about the instants **this** registry honoured the humanity, which cannot begin before
+the grant; and a sweep that failed is not a sweep that found nothing, so the date stands with
+`term-origin-unverified` saying which assumption it stands on.
 Circles has no such slot, which is why the reconciler above exists.
 
 ## 5. Zero out dead protocols, then sum and take log₁₀
