@@ -2,6 +2,7 @@ import { createPublicClient, http, parseAbi, type PublicClient } from 'viem'
 import { worldchain } from 'viem/chains'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
 import type { ProbeProvenance } from '../reconcile.ts'
+import { AGENT_BOOK_DEPLOYED_AT, registrationOf, type RegistrationOfOptions } from '../agentbook.ts'
 
 /**
  * World ID (Orb tier), read from World Chain.
@@ -50,6 +51,27 @@ import type { ProbeProvenance } from '../reconcile.ts'
  * thing the contract actually attests, and says so through the `date-from-latest-reattestation`
  * note. On a decay curve that is the conservative reading of what the chain knows: the human's
  * iris capture is older than the date we use, and the binding it proves is exactly this fresh.
+ *
+ * ## The AgentBook half, dated from its own log
+ *
+ * `AgentBook.lookupHuman` is the other way this credential is held, and until now it was the last
+ * undated credential in the roster — the same defect in the other registry. It stores a mapping
+ * and nothing else: no term, no expiry, no timestamp. But the write emits `AgentRegistered`, and
+ * that log has a block, so the date exists on chain and was simply not being read. It is fetched
+ * (`registrationOf`, `agentbook.ts`) only for wallets the mapping says are registered — a filtered
+ * query costing two calls, not the six-call fleet scan — and it is refused unless the log's
+ * `humanId` is the one state just returned, so a truncated or stale log cannot date a binding it
+ * has not actually seen.
+ *
+ * What that date means is narrower than an enrolment and wider than nothing: at that block the
+ * operator proved a live group-1 Orb credential to this contract, because `register` verifies the
+ * proof before it writes. Registration never expires and cannot be undone, so it is the only
+ * freshness signal the contract has, and the note `date-from-agent-registration` says exactly that.
+ *
+ * When both registries answer, the date used is **the later of the two** — each is a moment the
+ * chain accepted an Orb proof for this address, and the most recent one is the freshest thing
+ * known. Neither can be manufactured without a real proof, so there is no cheap way to move it.
+ * Both dates are reported in `detail` so a consumer can check the choice rather than trust it.
  *
  * ## One live verification per human, enforced on chain
  *
@@ -138,6 +160,22 @@ export interface WorldChainRead {
   verificationLength: number
   /** `AgentBook.lookupHuman(subject)` as a decimal string, or undefined when that read failed. */
   agentBookHumanId?: string
+  /**
+   * The `AgentRegistered` log behind that mapping entry, when it was looked up. Absent means the
+   * lookup was not attempted, because the mapping is empty and there is nothing to date.
+   */
+  agentBookRegistration?: AgentBookRegistrationRead
+}
+
+/** What the registration log said, or why it said nothing. Mirrors `AgentRegistrationLookup`. */
+export interface AgentBookRegistrationRead {
+  status: 'found' | 'not-found' | 'unavailable'
+  /** Block the `AgentRegistered` event was mined in. */
+  block?: number
+  /** Timestamp of that block. */
+  timestamp?: number
+  /** The `humanId` the event carried. Must match state, or the date is refused. */
+  humanId?: string
 }
 
 /**
@@ -173,18 +211,30 @@ export function interpretWorldRead(r: WorldChainRead): AdapterProbeResult {
     }
   }
 
-  let issuedAt: number | undefined
+  let addressBookIssuedAt: number | undefined
   if (addressBookHeld && r.verificationLength > 0) {
     const derived = r.verifiedUntil - r.verificationLength
     // A date before the registry existed, or in the future, means `verificationLength` is not the
     // term this entry was written under. Better no date than a fabricated one — and on a decay
     // curve an over-fresh date is the expensive direction to be wrong in.
     if (derived >= WORLD_ADDRESS_BOOK_DEPLOYED_AT && derived <= r.now) {
-      issuedAt = derived
-      notes.push('date-from-latest-reattestation')
+      addressBookIssuedAt = derived
+      detail.addressBookIssuedAt = derived
     } else {
       detail.dateRejected = derived
     }
+  }
+
+  const agentBookIssuedAt = agentHeld ? dateFromRegistration(agentHumanId!, r, detail) : undefined
+
+  // Each date is a moment the chain accepted an Orb proof for this address, so the later one is
+  // the freshest evidence there is. Both notes fire when the two land on the same second, which
+  // happens: an operator typically registers an agent minutes after verifying the wallet.
+  const dates = [addressBookIssuedAt, agentBookIssuedAt].filter((d) => d !== undefined)
+  const issuedAt = dates.length ? Math.max(...dates) : undefined
+  if (issuedAt !== undefined) {
+    if (addressBookIssuedAt === issuedAt) notes.push('date-from-latest-reattestation')
+    if (agentBookIssuedAt === issuedAt) notes.push('date-from-agent-registration')
   }
 
   if (sources.length) detail.source = sources.join('+')
@@ -204,8 +254,74 @@ export function interpretWorldRead(r: WorldChainRead): AdapterProbeResult {
   }
 }
 
+/**
+ * The registration date, or nothing — with the reason recorded either way.
+ *
+ * Four ways this returns undefined, and every one of them would otherwise be a silent scoring
+ * change, so each lands in `detail`: the log endpoint failed, the log has no registration for a
+ * wallet the mapping says is registered, the log names a different human than state does, or the
+ * timestamp falls outside the contract's own lifetime. In each case the credential stays undated,
+ * which on a `Decay` curve means full weight — so the caller is told rather than left to assume.
+ */
+function dateFromRegistration(
+  stateHumanId: string,
+  r: WorldChainRead,
+  detail: Record<string, unknown>,
+): number | undefined {
+  const reg = r.agentBookRegistration
+  if (reg === undefined || reg.status === 'unavailable') {
+    detail.agentBookDateUnavailable = true
+    return undefined
+  }
+  if (reg.status === 'not-found') {
+    // State says this wallet is registered and the log does not. A registration cannot be
+    // withdrawn, so this is our read being incomplete, not the registry changing its mind.
+    detail.agentBookRegistrationNotInLog = true
+    return undefined
+  }
+  if (reg.block !== undefined) detail.agentBookRegisteredAtBlock = reg.block
+  if (reg.humanId !== undefined && reg.humanId !== stateHumanId) {
+    // The log found belongs to a different binding than the one state holds — a re-registration
+    // seen only half, or a truncated answer. Dating from it would date the wrong event.
+    detail.agentBookDateRejected = 'registration-log-disagrees-with-state'
+    return undefined
+  }
+  if (reg.timestamp === undefined) {
+    detail.agentBookDateUnavailable = true
+    return undefined
+  }
+  if (reg.timestamp < AGENT_BOOK_DEPLOYED_AT || reg.timestamp > r.now) {
+    detail.agentBookDateRejected = reg.timestamp
+    return undefined
+  }
+  detail.agentBookRegisteredAt = reg.timestamp
+  return reg.timestamp
+}
+
 const client = (rpcUrl: string) =>
   createPublicClient({ chain: worldchain, transport: http(rpcUrl) }) as PublicClient
+
+/** `registrationOf` narrowed to what the interpreter needs, and unable to throw. */
+async function registrationRead(
+  subject: Address,
+  logOptions: RegistrationOfOptions,
+): Promise<AgentBookRegistrationRead> {
+  try {
+    const lookup = await registrationOf(subject, logOptions)
+    return lookup.status === 'found'
+      ? {
+          status: 'found',
+          block: lookup.registration.block,
+          humanId: lookup.registration.humanId,
+          ...(lookup.registration.timestamp === undefined
+            ? {}
+            : { timestamp: lookup.registration.timestamp }),
+        }
+      : { status: lookup.status }
+  } catch {
+    return { status: 'unavailable' }
+  }
+}
 
 /**
  * World ID (Orb tier), read permissionlessly from World Chain.
@@ -216,11 +332,19 @@ const client = (rpcUrl: string) =>
  * compared against a `now` from another is a torn read in miniature, and here it would decide
  * whether somebody is verified at all.
  *
+ * A fifth value, the AgentBook registration's date, costs a second round trip and is therefore
+ * fetched only when the mapping says there is a registration to date — a thousand wallets on
+ * World Chain, not every subject. Its failure is never the probe's failure: an undated World
+ * credential is still a held World credential.
+ *
  * The AgentBook read is allowed to fail on its own: it is a second, narrower source, and losing
  * it must not turn an AddressBook positive into an error. Losing the AddressBook read *is* an
  * error, because a network failure must never read as "not a human".
  */
-export function worldIdOrbAdapter(rpcUrl: string = WORLD_RPC): AdapterProbe {
+export function worldIdOrbAdapter(
+  rpcUrl: string = WORLD_RPC,
+  logOptions: RegistrationOfOptions = {},
+): AdapterProbe {
   const c = client(rpcUrl)
   return {
     adapterId: 'world-id-orb',
@@ -260,14 +384,20 @@ export function worldIdOrbAdapter(rpcUrl: string = WORLD_RPC): AdapterProbe {
           }
         }
 
+        const humanId =
+          agentHumanId.status === 'success' ? agentHumanId.result.toString() : undefined
+        const registration =
+          humanId !== undefined && humanId !== '0'
+            ? await registrationRead(subject, logOptions)
+            : undefined
+
         return interpretWorldRead({
           block: Number(block.number),
           now: Number(block.timestamp),
           verifiedUntil: Number(verifiedUntil.result),
           verificationLength: Number(verificationLength.result),
-          ...(agentHumanId.status === 'success'
-            ? { agentBookHumanId: agentHumanId.result.toString() }
-            : {}),
+          ...(humanId === undefined ? {} : { agentBookHumanId: humanId }),
+          ...(registration === undefined ? {} : { agentBookRegistration: registration }),
         })
       } catch (e) {
         return { held: false, error: e instanceof Error ? e.message : String(e) }

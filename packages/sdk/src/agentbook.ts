@@ -58,6 +58,12 @@ export const AGENT_BOOK = '0xA23aB2712eA7BBa896930544C7d6636a96b944dA' as const
 /** Block AgentBook's code first appears at, found by bisecting `eth_getCode`. */
 export const AGENT_BOOK_DEPLOYED_AT_BLOCK = 27_053_063
 
+/**
+ * Timestamp of that block, 2026-03-13T22:42:45Z. The floor for any date derived from a
+ * registration: a registration cannot predate the contract that emitted it.
+ */
+export const AGENT_BOOK_DEPLOYED_AT = 1_773_441_765
+
 /** `AgentRegistered(address indexed agent, uint256 indexed humanId)`. */
 export const AGENT_REGISTERED_TOPIC =
   '0xd1b844701695237443dd884ed7193d9c8788f3befd35adc0910472eb166f3306' as const
@@ -80,6 +86,10 @@ export const AGENT_BOOK_ABI = parseAbi([
  * `0xb667e02591db55f47bcb59beb7ff9cd6886b83a1`, tx `0xc19650a0…a0cfe`.
  */
 export const AGENT_BOOK_FIRST_REGISTRATION_BLOCK = 27_100_652
+
+/** The agent that registration bound. Used as the canary's topic filter — see `registrationOf`. */
+export const AGENT_BOOK_FIRST_REGISTRATION_AGENT =
+  '0xb667e02591db55f47bcb59beb7ff9cd6886b83a1' as const
 
 /**
  * Endpoints that serve World Chain `eth_getLogs` over a useful range. Measured 2026-07-25,
@@ -154,7 +164,15 @@ interface RawLog {
   transactionHash: string
 }
 
-async function getLogs(url: string, from: number, to: number): Promise<RawLog[]> {
+/** An address as a 32-byte topic, which is how an indexed address appears in a log. */
+const asTopic = (a: Address) => `0x${a.toLowerCase().replace(/^0x/, '').padStart(64, '0')}`
+
+async function getLogs(
+  url: string,
+  from: number,
+  to: number | 'latest',
+  agent?: Address,
+): Promise<RawLog[]> {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -165,9 +183,9 @@ async function getLogs(url: string, from: number, to: number): Promise<RawLog[]>
       params: [
         {
           address: AGENT_BOOK,
-          topics: [AGENT_REGISTERED_TOPIC],
+          topics: agent ? [AGENT_REGISTERED_TOPIC, asTopic(agent)] : [AGENT_REGISTERED_TOPIC],
           fromBlock: `0x${from.toString(16)}`,
-          toBlock: `0x${to.toString(16)}`,
+          toBlock: to === 'latest' ? 'latest' : `0x${to.toString(16)}`,
         },
       ],
     }),
@@ -402,4 +420,111 @@ export async function lookupHumans(
     for (const a of agents) out.set(a, { status: 'unknown', error })
   }
   return out
+}
+
+/**
+ * When a registration happened, for one agent — the date `lookupHuman` cannot give.
+ *
+ * `AgentBook` stores `mapping(address => uint256)` and nothing else: no timestamp, no term, no
+ * expiry. So a World credential held only through this contract arrived at scoring undated, and
+ * an undated credential on a `Decay` curve scores at freshness 1 (`freshnessOf`, `scoring.ts`) —
+ * full weight, forever, for a registration that may be a year old. The date is on chain, in the
+ * `AgentRegistered` log, one block away from the mapping write that produced it.
+ *
+ * ## Why this is a filtered query and not the fleet scan
+ *
+ * `scanAgentBook` reads the registry's whole history in six 1M-block calls and is the right shape
+ * for a policy question about siblings. It is the wrong shape for a probe: a scoring request would
+ * pay a five-second full-history scan to learn one timestamp. Filtering on the agent topic makes
+ * the *result* small enough that the endpoint serves the entire 5.8M-block range in one call, so
+ * the cost is two calls rather than six — and only for the wallets AgentBook actually knows.
+ *
+ * ## The canary is wide here, for a different reason than in the scan
+ *
+ * `scanAgentBook`'s canary asks a single block, because its risk is an endpoint that answers `[]`
+ * for everything. This path's risk is narrower and quieter: an endpoint that serves recent blocks
+ * and silently drops the older end of a wide range would return no log for an agent registered in
+ * March, and "no registration in the log" would become "no date" — back to freshness 1, the
+ * permissive answer this function exists to remove. So the canary runs the *same wide filtered
+ * query* for an agent whose registration has been at block 27,100,652 since March. An endpoint
+ * that cannot find it does not get to say anything about the subject.
+ *
+ * Never throws, and never conflates its failure modes. `not-found` is a fact about the log;
+ * `unavailable` is a fact about us. The caller must not date a credential from either.
+ */
+export type AgentRegistrationLookup =
+  | { status: 'found'; registration: AgentRegistration; endpoint: string }
+  /** The log has no registration for this agent — which contradicts state, if state has one. */
+  | { status: 'not-found'; endpoint: string }
+  /** No endpoint could be trusted to answer. Not evidence of anything about the agent. */
+  | { status: 'unavailable'; error: string }
+
+export interface RegistrationOfOptions {
+  endpoints?: readonly { url: string; maxRange: number }[]
+  /** State endpoint, used only when the log endpoint omits `blockTimestamp`. */
+  stateRpcUrl?: string
+}
+
+export async function registrationOf(
+  agent: Address,
+  opts: RegistrationOfOptions = {},
+): Promise<AgentRegistrationLookup> {
+  const endpoints = opts.endpoints ?? AGENT_BOOK_LOG_ENDPOINTS
+  let lastError: unknown = new Error('no log endpoint configured')
+  for (const ep of endpoints) {
+    try {
+      const canary = await withRetry(() =>
+        getLogs(ep.url, AGENT_BOOK_DEPLOYED_AT_BLOCK, 'latest', AGENT_BOOK_FIRST_REGISTRATION_AGENT),
+      )
+      if (
+        !canary.some(
+          (l) => Number.parseInt(l.blockNumber, 16) === AGENT_BOOK_FIRST_REGISTRATION_BLOCK,
+        )
+      ) {
+        throw new Error(
+          `${new URL(ep.url).host} did not return the registration at block ${AGENT_BOOK_FIRST_REGISTRATION_BLOCK} for a full-history filtered query, so it cannot be trusted to find one for ${agent}`,
+        )
+      }
+
+      const logs = await withRetry(() =>
+        getLogs(ep.url, AGENT_BOOK_DEPLOYED_AT_BLOCK, 'latest', agent),
+      )
+      if (logs.length === 0) return { status: 'not-found', endpoint: ep.url }
+
+      // The mapping is a plain overwrite with no deregistration path, so if an address ever were
+      // registered twice the live binding is the latest event — the rule `buildIndex` uses too.
+      const latest = logs.reduce((a, b) =>
+        Number.parseInt(a.blockNumber, 16) >= Number.parseInt(b.blockNumber, 16) ? a : b,
+      )
+      const block = Number.parseInt(latest.blockNumber, 16)
+      let timestamp = latest.blockTimestamp ? Number.parseInt(latest.blockTimestamp, 16) : undefined
+      if (timestamp === undefined) {
+        // `blockTimestamp` on a log is a recent addition to the JSON-RPC spec and not every
+        // endpoint sends it. One header read is cheaper than losing the date.
+        const client = createPublicClient({
+          chain: worldchain,
+          transport: http(opts.stateRpcUrl ?? WORLD_STATE_RPC),
+        }) as PublicClient
+        timestamp = Number((await client.getBlock({ blockNumber: BigInt(block) })).timestamp)
+      }
+
+      return {
+        status: 'found',
+        endpoint: ep.url,
+        registration: {
+          agent: agent.toLowerCase() as Address,
+          humanId: BigInt(latest.topics[2] ?? '0x0').toString(),
+          block,
+          timestamp,
+          txHash: latest.transactionHash,
+        },
+      }
+    } catch (e) {
+      lastError = e
+    }
+  }
+  return {
+    status: 'unavailable',
+    error: lastError instanceof Error ? lastError.message : String(lastError),
+  }
 }

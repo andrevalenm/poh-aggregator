@@ -426,6 +426,14 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     })
   }
 
+  const registered = withNote('date-from-agent-registration').filter((e) => e.held)
+  if (registered.length) {
+    out.push({
+      code: 'issuance-date-is-registration',
+      message: `${ids(registered)} is held here through a registry that records a binding and never an expiry, so the date used is the block that registration was mined in — the moment the protocol last accepted a proof for this address, not when the human was enrolled. The enrolment is older and is not published on chain, so on a decay curve the weight here is a ceiling rather than an estimate. Without this date the credential would carry full weight indefinitely.`,
+    })
+  }
+
   const stale = withNote('freshness-check-unavailable')
   if (stale.length) {
     out.push({

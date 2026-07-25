@@ -252,8 +252,13 @@ a real proof is demonstrable on demand: simulating `verify` reverts `NonExistent
 invented merkle root and `ProofInvalid()` with the group's real one, identically for a stranger, for
 World's own relayer and for the contract's owner. The document and Selfie tiers, by contrast, leave
 no per-holder state anywhere, and the write-up says so with the measurements rather than leaving a
-gap in the queue.
-[`research/protocols/world-id-onchain-read.md`](research/protocols/world-id-onchain-read.md).
+gap in the queue. The AgentBook half is dated now too, from the block its `AgentRegistered` event
+was mined in — a topic-filtered query over the whole history in one call, guarded by a canary wide
+enough that an endpoint which cannot see a registration from March is refused rather than believed,
+because "no log" would silently become "no date" and no date is full weight. An agent registered 73
+days ago is worth 47.73 cents instead of 50.00.
+[`research/protocols/world-id-onchain-read.md`](research/protocols/world-id-onchain-read.md),
+[`research/protocols/world-agentbook-fleets.md`](research/protocols/world-agentbook-fleets.md) §7.
 
 Proof of Humanity v1 is the one that measures how much of a protocol is left. Same trust root as
 v2 on purpose — a subject registered in both holds one vouched identity, not two, and saturation

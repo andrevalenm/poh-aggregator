@@ -51,6 +51,13 @@ import {
   WORLD_RPC,
 } from './world.ts'
 import { freshnessOf } from '../scoring.ts'
+import {
+  AGENT_BOOK_ABI,
+  AGENT_BOOK_LOG_ENDPOINTS,
+  AGENT_BOOK_FIRST_REGISTRATION_AGENT,
+  AGENT_BOOK_FIRST_REGISTRATION_BLOCK,
+  registrationOf,
+} from '../agentbook.ts'
 import type { Address, Adapter } from '../types.ts'
 
 /** Nobody holds the key to this address, so nobody has ever verified with it. */
@@ -104,6 +111,34 @@ async function verificationsNear(from: bigint, attempts = 8): Promise<VerifiedLo
       toBlock: start,
     })
     if (logs.length) return logs as VerifiedLog[]
+  }
+  return []
+}
+
+/**
+ * The one endpoint that serves World Chain logs over a useful range — `agentbook.ts` explains why
+ * the list is one long. Used here only to *find* subjects; the probe is what is under test.
+ */
+const logClient = createPublicClient({
+  chain: worldchain,
+  transport: http(AGENT_BOOK_LOG_ENDPOINTS[0].url, { timeout: 30_000 }),
+})
+
+const AGENT_REGISTERED = AGENT_BOOK_ABI.find(
+  (x) => x.type === 'event' && x.name === 'AgentRegistered',
+)!
+
+/** Recent `AgentRegistered` logs, walking back in 200k-block windows until one is non-empty. */
+async function registrationsNear(from: bigint, attempts = 6) {
+  for (let i = 0; i < attempts; i++) {
+    const to = from - BigInt(i) * 200_000n
+    const logs = await logClient.getLogs({
+      address: WORLD_AGENT_BOOK,
+      event: AGENT_REGISTERED,
+      fromBlock: to - 199_999n,
+      toBlock: to,
+    })
+    if (logs.length) return logs
   }
   return []
 }
@@ -372,6 +407,121 @@ describe('World ID on World Chain', () => {
     assert.equal(entryFor('world-id-orb').implemented, true)
   })
 
+  test('an AgentBook registration is dated from the block it was mined in', async (t) => {
+    await onChain(t, 'agentbook date', async () => {
+      const head = await c.getBlockNumber()
+      const logs = await registrationsNear(head)
+      assert.ok(logs.length, 'expected recent agent registrations')
+
+      // The log says which block. The mapping says which human. The probe consults neither
+      // directly — it asks `registrationOf` — and has to land on the same second and the same id.
+      for (const log of logs.slice(0, 4)) {
+        const agent = getAddress(log.args.agent!)
+        const state = await c.readContract({
+          address: WORLD_AGENT_BOOK,
+          abi: WORLD_AGENT_BOOK_ABI,
+          functionName: 'lookupHuman',
+          args: [agent],
+        })
+        assert.equal(state.toString(), log.args.humanId!.toString(), 'log and mapping must agree')
+
+        const block = await c.getBlock({ blockNumber: log.blockNumber })
+        const r = await worldIdOrbAdapter().probe(agent)
+        assert.equal(r.held, true)
+        assert.equal(r.detail?.agentBookRegisteredAtBlock, Number(log.blockNumber))
+        assert.equal(r.detail?.agentBookRegisteredAt, Number(block.timestamp))
+        assert.ok(
+          r.issuedAt !== undefined && r.issuedAt >= Number(block.timestamp),
+          'the credential is dated at the registration or at a later re-attestation, never earlier',
+        )
+      }
+    })
+  })
+
+  test('the registration date is what stops an agent credential scoring at full weight forever', async (t) => {
+    await onChain(t, 'agentbook freshness', async () => {
+      // The defect this closes: `AgentBook` has no expiry and no timestamp, so a wallet held only
+      // through it reached `freshnessOf` undated — and undated on a Decay curve is freshness 1.
+      // A registration from months ago was priced exactly like one from this morning.
+      const head = await c.getBlockNumber()
+      const now = Number((await c.getBlock({ blockNumber: head })).timestamp)
+      const adapter = entryFor('world-id-orb')
+      const logs = await registrationsNear(head - 3_000_000n) // ~2 months back at 2s blocks
+      assert.ok(logs.length, 'expected an older registration cohort')
+
+      for (const log of logs.slice(0, 8)) {
+        const agent = getAddress(log.args.agent!)
+        const verifiedUntil = await c.readContract({
+          address: WORLD_ID_ADDRESS_BOOK,
+          abi: WORLD_ADDRESS_BOOK_ABI,
+          functionName: 'addressVerifiedUntil',
+          args: [agent],
+        })
+        // Agent-only wallets are the ones the old read left undated; a live AddressBook entry
+        // would have supplied a date of its own and hidden the defect.
+        if (verifiedUntil > BigInt(now)) continue
+
+        const r = await worldIdOrbAdapter().probe(agent)
+        assert.equal(r.held, true, 'an agent registration is a held World credential')
+        assert.equal(r.detail?.source, 'world-agentbook')
+        assert.ok(r.issuedAt !== undefined, 'and it now carries a date')
+        assert.ok(r.provenance?.notes.includes('date-from-agent-registration'))
+
+        const dated = freshnessOf(adapter, r.issuedAt, now)
+        const undated = freshnessOf(adapter, undefined, now)
+        assert.equal(undated, 1, 'the old behaviour, named: no date is full weight')
+        assert.ok(dated < undated, `dated ${dated} must be worth less than undated ${undated}`)
+        const ageDays = (now - r.issuedAt!) / 86_400
+        assert.ok(
+          Math.abs(dated - 2 ** (-ageDays / adapter.decayHalfLifeDays)) < 1e-9,
+          'and it must be the curve, not a constant',
+        )
+        console.log(
+          `    ${agent} registered ${Math.round(ageDays)} days ago → freshness ${dated.toFixed(4)} (was 1)`,
+        )
+        return
+      }
+      t.skip('every sampled agent from that window also holds a live AddressBook verification')
+    })
+  })
+
+  test('a wallet nobody registered is not-found, which is not an error and not a date', async (t) => {
+    await onChain(t, 'agentbook absence', async () => {
+      const lookup = await registrationOf(NEVER_VERIFIED)
+      assert.equal(lookup.status, 'not-found')
+      // And the canary proves the same query shape does find a registration that is really there.
+      const canary = await registrationOf(AGENT_BOOK_FIRST_REGISTRATION_AGENT as Address)
+      assert.equal(canary.status, 'found')
+      assert.equal(
+        canary.status === 'found' ? canary.registration.block : 0,
+        AGENT_BOOK_FIRST_REGISTRATION_BLOCK,
+      )
+    })
+  })
+
+  test('an endpoint that answers [] for everything is refused, not believed', async (t) => {
+    // The quiet failure this guard exists for. An empty answer is indistinguishable from "never
+    // registered", and "never registered" costs nothing — but here it would mean "no date", and
+    // no date is full weight. So the endpoint must clear a wide filtered canary for a
+    // registration that has been on chain since March before anything it says is used.
+    const { createServer } = await import('node:http')
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ jsonrpc: '2.0', id: 1, result: [] }))
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const port = (server.address() as { port: number }).port
+    try {
+      const lookup = await registrationOf(AGENT_BOOK_FIRST_REGISTRATION_AGENT as Address, {
+        endpoints: [{ url: `http://127.0.0.1:${port}`, maxRange: 1_000_000 }],
+      })
+      assert.equal(lookup.status, 'unavailable', 'a liar must not be able to say "not registered"')
+      assert.match(lookup.status === 'unavailable' ? lookup.error : '', /did not return the registration/)
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  })
+
   test('the pure interpreter and the live read agree about a real subject', async (t) => {
     await onChain(t, 'interpreter agreement', async () => {
       const head = await c.getBlockNumber()
@@ -401,12 +551,23 @@ describe('World ID on World Chain', () => {
           blockNumber: head,
         }),
       ])
+      // The sampled account is usually not an agent; when it is, the interpreter needs the same
+      // registration read the probe does, or the two would disagree by construction.
+      const lookup = humanId === 0n ? undefined : await registrationOf(account)
       const expected = interpretWorldRead({
         block: Number(head),
         now: Number(block.timestamp),
         verifiedUntil: Number(verifiedUntil),
         verificationLength: Number(term),
         agentBookHumanId: humanId.toString(),
+        ...(lookup === undefined
+          ? {}
+          : {
+              agentBookRegistration:
+                lookup.status === 'found'
+                  ? { status: 'found' as const, ...lookup.registration }
+                  : { status: lookup.status },
+            }),
       })
       const actual = await worldIdOrbAdapter().probe(account)
       assert.equal(actual.held, expected.held)

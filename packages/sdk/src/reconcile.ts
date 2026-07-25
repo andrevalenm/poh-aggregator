@@ -97,6 +97,13 @@ export type ProvenanceNote =
    * direction the curve runs: a ceiling under `Decay`, a floor under `Ramp`.
    */
   | 'date-from-latest-reattestation'
+  /**
+   * The credential is held through a registry that records a binding and never an expiry, so the
+   * date is the block that registration was mined in — the moment the protocol last accepted a
+   * proof for this address. The enrolment behind it is older and is not published, so the weight
+   * is a ceiling under `Decay` and a floor under `Ramp`, exactly as for a re-attestation.
+   */
+  | 'date-from-agent-registration'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {

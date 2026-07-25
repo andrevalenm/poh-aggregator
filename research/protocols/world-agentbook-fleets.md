@@ -169,7 +169,53 @@ both implemented:
    (agent `0xb667e025…83a1`, tx `0xc19650a0…a0cfe`) since 2026-03-15. An endpoint that cannot
    see it is not asked anything else.
 
-## 7. What this does not establish
+## 7. The registration is also the date the credential was missing
+
+*Added 2026-07-25, iteration 12, implementing `registrationOf` in `agentbook.ts`.*
+
+`world-id-onchain-read.md` §"what the AddressBook gives us" fixed one half of the World date and
+left the other half open, and the open half was a live scoring defect. A wallet held only through
+AgentBook reached `freshnessOf` with `issuedAt` undefined, and an undated credential on a `Decay`
+curve is scored at **freshness 1** — full weight, indefinitely, for a registration of any age.
+World Orb's half-life is 1,095 days, so the error is small per wallet and never in our favour:
+it is the direction that pays whoever has the oldest credential.
+
+The date was on chain the whole time. `AgentRegistered` is emitted in the same transaction that
+writes the mapping, so the registration's block *is* the moment the contract accepted a group-1
+proof for that address. Three things had to be true for it to be usable in a probe rather than in
+a scan:
+
+1. **It has to be cheap.** Filtering on the agent topic makes the result one log, and the whole
+   5.8M-block history is then served in a *single* call — measured 423 ms against tenderly, versus
+   ~4.6 s for the six-call full scan. With the canary it is two calls. A scoring request cannot
+   pay for a fleet scan, and now does not have to.
+2. **It has to fail closed.** The failure mode here is quieter than the fleet scan's: an endpoint
+   that serves recent blocks and drops the old end of a wide range returns no log for an agent
+   registered in March, "no log" becomes "no date", and no date is *back to freshness 1*. So the
+   canary is the same wide filtered query for agent `0xb667e025…83a1`, whose registration has sat
+   at block 27,100,652 since 2026-03-15 — an endpoint that cannot find it says nothing about the
+   subject. A local server answering `{"result":[]}` to everything is refused by that check, which
+   is asserted in the live suite rather than argued for here.
+3. **It has to be the binding state actually holds.** The log's `humanId` must equal the one
+   `lookupHuman` just returned, or the date is dropped. Nothing has ever re-registered on this
+   contract, so today this is defensive — but the mapping is a plain overwrite, and dating a live
+   binding from a superseded event would be exactly the class of torn read the reconciler exists
+   to prevent.
+
+**Both registries can date the same address, and the later date wins.** Sampled agent wallets that
+also hold an AddressBook entry go both ways: `0x4f40c84e…` was AddressBook-verified on 2026-04-16
+and registered as an agent on 2026-05-13 (registration is fresher), while `0xf0ffe69d…` did both
+within ten minutes. Each date is a moment the chain accepted an Orb proof for that address and
+neither can be produced without one, so the most recent is the freshest thing known and there is
+no cheap way for an adversary to move it. Both are reported in `detail`; the notes
+`date-from-agent-registration` and `date-from-latest-reattestation` say which was used, and the
+caveat says the weight is a ceiling because the enrolment behind either is older and unpublished.
+
+Measured effect, from the live suite: an agent registered 73 days ago moves from freshness 1.000
+to **0.9546**. The demo's own agents, registered days ago, move from 50c to 49.98c — which is the
+honest size of the fix on a fresh credential, and the reason it is worth having on an old one.
+
+## 8. What this does not establish
 
 - **That a fleet is abusive.** The cap is a counterparty's policy, not a verdict about a person.
 - **That a human has only one identity.** Grouping holds within *one* registry's nullifier
@@ -182,7 +228,7 @@ both implemented:
   identifier at all, so a per-human cap cannot bind it. That is why the policy has to declare
   what it does with unregistered agents rather than defaulting.
 
-## 8. Open questions
+## 9. Open questions
 
 - **Who the 27-agent operator is, and whether the fleet is one product.** The wallets share no
   observable funding pattern that was checked here; the question was not pursued because the

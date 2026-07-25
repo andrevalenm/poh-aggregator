@@ -22,6 +22,8 @@ import {
   WORLD_STATE_RPC,
   lookupHumans,
   scanAgentBook,
+  registrationOf,
+  AGENT_BOOK_FIRST_REGISTRATION_AGENT,
   type AgentBookIndex,
 } from './agentbook.ts'
 import {
@@ -99,12 +101,44 @@ describe('AgentBook — the index is the registry, not a sample', () => {
     assert.ok(index.registrations.every((r) => r.block >= AGENT_BOOK_DEPLOYED_AT_BLOCK))
   })
 
+  test('the one-agent date lookup returns exactly what the full scan does', async () => {
+    // `registrationOf` is the probe's path: a topic-filtered query over the whole history, two
+    // calls instead of six, because a scoring request cannot pay for a five-second scan. It is
+    // only allowed to be cheaper, never different — so a sample is checked against the scan for
+    // the block, the human and the transaction, and the first constant the scan agrees on is the
+    // canary both paths depend on.
+    const all = index.registrations
+    const step = Math.max(1, Math.floor(all.length / 6))
+    const sample = all.filter((_, i) => i % step === 0).slice(0, 6)
+    let checked = 0
+    for (const r of sample) {
+      const lookup = await registrationOf(r.agent)
+      if (lookup.status === 'unavailable') continue // a transport failure is not a disagreement
+      assert.equal(lookup.status, 'found', `the filtered query lost ${r.agent}`)
+      if (lookup.status !== 'found') continue
+      assert.equal(lookup.registration.block, r.block)
+      assert.equal(lookup.registration.humanId, r.humanId)
+      assert.equal(lookup.registration.txHash, r.txHash)
+      const block = await client.getBlock({ blockNumber: BigInt(r.block) })
+      assert.equal(
+        lookup.registration.timestamp,
+        Number(block.timestamp),
+        'the date a credential is scored from must be the block header, not a log field we trusted',
+      )
+      checked++
+    }
+    assert.ok(checked >= 4, `only ${checked} of ${sample.length} agents were readable`)
+  })
+
   test('the canary block still holds the registration every endpoint is tested against', () => {
     // The scanner refuses any endpoint that cannot see this block. If the constant ever stopped
     // being the earliest registration the guard would still work, but the reason it is safe —
     // it is the first thing the registry ever emitted — would no longer be true.
     const first = index.registrations[0]!
     assert.equal(first.block, AGENT_BOOK_FIRST_REGISTRATION_BLOCK)
+    // `registrationOf` filters its canary on this agent as well as this block, so a wrong
+    // address would make every date lookup fail closed instead of guarding anything.
+    assert.equal(first.agent, AGENT_BOOK_FIRST_REGISTRATION_AGENT)
     assert.equal(
       index.registrations.filter((r) => r.block === AGENT_BOOK_FIRST_REGISTRATION_BLOCK).length,
       1,
