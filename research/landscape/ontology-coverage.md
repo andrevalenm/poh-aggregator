@@ -74,7 +74,7 @@ is why Civic and Sismo are in the file at all.
 | Idena | `ceremony:idena` | — | — | `protocols/poh-kleros-brightid-idena.md` |
 | **Encointer** | `ceremony:encointer` | — | — | `landscape/poh-landscape-sweep.md` |
 | **Humanode** | `biometric-registry:humanode` | ✔ | — | `landscape/poh-landscape-sweep.md` |
-| **Human Passport** | `behavioral:wallet-history` | ✔ | — | `protocols/passport-civic-…-galxe.md` |
+| **Human Passport** | `behavioral:wallet-history` | ✔ | ✔ | `protocols/passport-civic-…-galxe.md` (costs, and the `sourceURI`); `protocols/human-passport-onchain-read.md` (the read) |
 | **Nomis** | `behavioral:wallet-history` | ✔ | — | `landscape/reputation-scoring-products.md` |
 | **Trusta.AI** | `behavioral:wallet-history` | ✔ | — | `landscape/reputation-scoring-products.md` |
 | **Sismo** | `aggregate:republished` | — | — | `protocols/billions-…-intuition.md` |
@@ -200,10 +200,13 @@ The product principle is at the top of `packages/sdk/src/adapters/index.ts`: no 
 critical path, nothing that can rate-limit or revoke us. Ranked by (coverage gained) × (how clean
 the read is):
 
-1. **Human Passport** — `Decoder.getScore(address)` on Optimism, Base, Arbitrum, Linea, Scroll,
-   Shape and zkSync Era. Addresses are tabulated in `protocols/passport-civic-fractal-zkme-galxe.md`.
-   A plain `eth_call`, seven chains, and by far the largest user population in the list. Read the
-   scalar, price it at wallet-history rates, never import its own weighting.
+1. ~~**Human Passport**~~ — **DONE 2026-07-25.** Implemented across all seven deployments, but not
+   as `Decoder.getScore`: that call is revert-driven and discards the issuance date, so the probe
+   reads `GitcoinResolver.getCachedScore` (the same struct the Decoder consults) and gets score,
+   issuance and expiry in one hop. Write-up, addresses, expiry derivation and the stamp→root map:
+   `protocols/human-passport-onchain-read.md`. Two findings that changed the ontology entry: a
+   passport **hard-expires at 90 days** (`maxScoreAge` on every chain), and its stamps are largely
+   credentials we already price, so the probe now names the roots it restates.
 2. **Farcaster** — `IdRegistry.idOf(address)` on OP Mainnet (`0x0000…489b`, `idCounter()` = 3,343,572
    as of 2026-07-24). One call, no vendor, and it doubles as an aged-account signal.
 3. **Holonym / Human ID** — state on Optimism plus a public unauthenticated REST endpoint. Requires
@@ -236,5 +239,7 @@ Explicitly **not** passively readable, and the reason in each case:
    tell us whether any FaceTec credential yields uniqueness rather than liveness.
 3. **Which vendor sits under Humanity Protocol and zkMe?** Resolving either splits
    `kyc-vendor:unattributed` and is the only way that root shrinks.
-4. **Quadrata, Talent Protocol, Binance BABT** — see §2, research debt.
+4. **Quadrata, Talent Protocol, Binance BABT** — see §2, research debt. BABT rose in priority on
+   2026-07-25: it is a *stamp inside a score we now read*, so a live passport can be one third BABT
+   with that third unattributable. See `protocols/human-passport-onchain-read.md` §5.
 5. **The $1,200 KYC forge figure** — see §4.
