@@ -70,7 +70,7 @@ independent trust root. World ID enters three ways:
 Developer-side flow validation used the World ID Simulator against the staging RP
 (`npm run worldid` in `apps/agent` prints the live QR / connector URI).
 
-**[TO COMPLETE ON DEVICE — Hugo, morning]** Real-device pass for both tracks:
+**[TO COMPLETE ON DEVICE]** Real-device pass for both tracks:
 
 - [ ] Selfie Check via World App on the live QR: time-to-complete, retry behaviour,
       clarity of the consent copy, what a non-crypto user would make of it.

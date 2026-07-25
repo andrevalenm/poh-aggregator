@@ -4,13 +4,13 @@ Target: one recording covers The Graph tracks (2–4 min required) and doubles a
 and ENS demo footage. Everything shown is live; nothing needs staging. Rehearse once —
 the RPC waits are the only variable, and the lookup chips make them predictable.
 
-Since the redesign: **http://37.27.67.44:8788 is the landing** (hero, ledger, research
+Since the redesign: **LIVE_URL_TBD is the landing** (hero, ledger, research
 instruments); the full workbench is at **/app.html** (comparison panel, per-adapter
 evidence). The script uses both.
 
 ## Beat sheet
 
-**0:00 — The question, over the hero.** (18s) — http://37.27.67.44:8788
+**0:00 — The question, over the hero.** (18s) — LIVE_URL_TBD
 - Let the thumbprint finish inking itself; move the cursor across it once so it deforms.
 > "What does it cost to be human? On today's internet: about fifty cents — that's the
 > documented resale price of an Orb-verified account. About forty proof-of-personhood
@@ -46,7 +46,7 @@ evidence). The script uses both.
 > protocol history on Studio, plus the registry's own audit trail, self-hosted — every
 > weight we've ever assigned, with its source and block. 'Why did my score change' is a
 > GraphQL query."
-- Flash the audit-trail endpoint (37.27.67.44:8100/subgraphs/name/corroborate-registry).
+- Flash the audit-trail endpoint (REGISTRY_SUBGRAPH_URL_TBD).
 
 **1:58 — Agent flow.** (35s) — `cd apps/agent && npm start` (pre-run it; scroll the trace)
 > "Agents are why this matters now. A counterparty demands proof a human backs the agent.

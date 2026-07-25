@@ -13,18 +13,16 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.
 
-## Blocked on Hugo (each unlocks a chunk)
+## Blocked on decisions (each unlocks a chunk)
 
 - [ ] **Name decision** — thumb / print / corroborate. Gates: npm scope, mainnet ENS,
       public repo name, og/meta copy. Rename is a find-replace; do it BEFORE publish/push.
-- [x] **Repo push (private)** — https://github.com/Hugo0/poh-aggregator (private),
-      full history pushed after a secrets audit (only `0x...` placeholders in history;
-      no real keys). andrevalenm invited with write access — she continues from here.
-      Local remote name: `github` (origin still points at the original clone source).
-      Judges still need a PUBLIC URL eventually — flip visibility or re-push after the
-      name decision.
-- [ ] **Domain + HTTPS** — point a (sub)domain at ax41; Claude wires TLS through the
-      existing traefik stack. Kills the "Not secure" bar and the http-clipboard class of
+- [x] **Repo push (private)** — pushed to a private remote after a secrets audit (only
+      `0x...` placeholders in history; no real keys). andrevalenm has write access and
+      continues from here. Judges still need a PUBLIC URL eventually — flip visibility
+      or re-push after the name decision.
+- [ ] **Domain + HTTPS** — point a (sub)domain at the host and wire TLS through the
+      reverse proxy. Kills the "Not secure" bar and the http-clipboard class of
       bugs for good.
 - [ ] **ENS mainnet** — register the name (~5 min, ~$5/yr) + set `corroborate.subjects`
       text record. **No longer blocking anything:** the whole ENS story is live on Sepolia

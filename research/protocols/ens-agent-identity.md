@@ -46,7 +46,7 @@ It registers in ENSv1 and simultaneously reserves the label in the ENSv2 `.eth` 
 is what "premigration" means.
 
 So: `corroborate.eth` on Sepolia, registered in one transaction, expires 2027-07-25. The mainnet
-name is still Hugo's call and still costs money; nothing in the SDK depends on which network the
+name is still the owner's call and still costs money; nothing in the SDK depends on which network the
 name lives on.
 
 ### 1.1 The controller cannot set your records, and the revert says nothing

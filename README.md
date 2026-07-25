@@ -5,12 +5,14 @@
 One SDK over every proof-of-personhood protocol, scored by what an adversary would actually
 pay. Built at ETHGlobal Lisbon, 2026.
 
-[![What does it cost to be human?](apps/demo/public/og.jpg)](http://37.27.67.44:8788)
+<!-- TODO: live URL -->
+[![What does it cost to be human?](apps/demo/public/og.jpg)](LIVE_URL_TBD)
 
-**Live:** [landing + demo](http://37.27.67.44:8788) · [console](http://37.27.67.44:8788/app.html) ·
+<!-- TODO: live URL (landing, console) and registry audit-trail subgraph URL -->
+**Live:** [landing + demo](LIVE_URL_TBD) · [console](LIVE_URL_TBD/app.html) ·
 [registry on Sepolia](https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07) ·
 [protocol subgraph](https://api.studio.thegraph.com/query/77602/poh/version/latest) ·
-[weight audit trail](http://37.27.67.44:8100/subgraphs/name/corroborate-registry)
+[weight audit trail](REGISTRY_SUBGRAPH_URL_TBD)
 — everything computes in your browser against live chains; nothing is precomputed.
 
 ---
@@ -112,7 +114,10 @@ and nothing to subpoena. Every weight change emits an event carrying the full re
 monotonic revision, so a subject can ask "why did my score move?" and get an answer with a
 block number.
 
-### 2. Subgraph — [`api.studio.thegraph.com/query/77602/poh/version/latest`](https://api.studio.thegraph.com/query/77602/poh/version/latest` — plus a second subgraph, the registry audit trail, self-hosted at `http://37.27.67.44:8100/subgraphs/name/corroborate-registry)
+### 2. Subgraph — [`api.studio.thegraph.com/query/77602/poh/version/latest`](https://api.studio.thegraph.com/query/77602/poh/version/latest)
+
+Plus a second subgraph, the registry audit trail, self-hosted at `REGISTRY_SUBGRAPH_URL_TBD`.
+<!-- TODO: registry audit-trail subgraph URL -->
 
 Indexes Proof of Humanity v2 and Circles v2 on Gnosis. It supplies **issuance dates** where the
 protocol keeps none on chain, **graph position**, and **the block every answer belongs to**.
@@ -374,7 +379,8 @@ past one:**
 
 ```ts
 const corroborate = new Corroborate({
-  registrySubgraphUrl: 'http://37.27.67.44:8100/subgraphs/name/corroborate-registry',
+  // TODO: registry audit-trail subgraph URL
+  registrySubgraphUrl: 'REGISTRY_SUBGRAPH_URL_TBD',
 })
 
 const subject = [
