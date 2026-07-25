@@ -1,0 +1,32 @@
+specVersion: 1.0.0
+description: >
+  The Corroborate trust-root ontology and its full audit trail. Every adapter weight, every
+  change, with the source each judgment was derived from — the answer to "why did my score
+  change" is a query here, with a block number attached.
+repository: https://github.com/andrevalenm/poh-aggregator
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: PersonhoodRegistry
+    network: sepolia
+    source:
+      address: "0x977b028b900cce8ee89c46877e814eff3060aa07"
+      abi: PersonhoodRegistry
+      startBlock: 11344150
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/registry.ts
+      entities:
+        - Adapter
+        - WeightChange
+      abis:
+        - name: PersonhoodRegistry
+          file: ./abis/PersonhoodRegistry.json
+      eventHandlers:
+        - event: AdapterSet(indexed bytes32,string,string,uint8,indexed bytes32,uint64,uint64,uint32,uint8,bool,string,uint64)
+          handler: handleAdapterSet
+        - event: AdapterLivenessSet(indexed bytes32,bool,string,uint64)
+          handler: handleAdapterLivenessSet

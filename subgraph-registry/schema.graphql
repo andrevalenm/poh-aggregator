@@ -1,0 +1,38 @@
+"""
+An adapter in the Corroborate trust-root ontology — one personhood protocol, what it
+proves, and what it costs an adversary to defeat.
+"""
+type Adapter @entity(immutable: false) {
+  "Plaintext adapter id — emitted on-chain and provably the preimage of the hashed key."
+  id: ID!
+  keyHash: Bytes!
+  name: String!
+  evidenceClass: Int!
+  trustRoot: Bytes!
+  forgeCostCents: BigInt!
+  rentCostCents: BigInt!
+  decayHalfLifeDays: Int!
+  ageCurve: Int!
+  live: Boolean!
+  sourceURI: String!
+  revision: BigInt!
+  updatedAt: BigInt!
+  changes: [WeightChange!]! @derivedFrom(field: "adapter")
+}
+
+"""
+The audit trail. Every weight change, forever, with its source — a subject asking
+"why did my score change?" gets an answer with a block number attached.
+"""
+type WeightChange @entity(immutable: true) {
+  id: ID!
+  adapter: Adapter!
+  forgeCostCents: BigInt!
+  rentCostCents: BigInt!
+  live: Boolean!
+  sourceURI: String!
+  revision: BigInt!
+  timestamp: BigInt!
+  block: BigInt!
+  txHash: Bytes!
+}
