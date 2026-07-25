@@ -46,6 +46,15 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       not an ending — read from Hub storage slot 21, because `stopped(address)` validates the
       address you pass and then answers about `msg.sender` and so reports `false` for every
       avatar that has ever stopped. `research/protocols/circles-stop-and-the-broken-getter.md`.
+- [x] **The term we subtract, read at head** — shipped (iteration 24): every PoH v2 date is
+      `expirationTime - humanityLifespan()`, and the term is read at *head* while the expiry was
+      written in the past. `changeDurations` is governance-settable and touches no stored expiry,
+      so one transaction would shift every derived date in the registry at once — and PoH v1's
+      equivalent has already moved (31,557,600 → 63,115,200) while emitting nothing. v2 emits
+      `DurationsChanged`, so the probe sweeps it: **0 logs on Gnosis and 0 on mainnet, ever**, which
+      turns the assumption into a proof and moves nothing at head. Where a change does land, the
+      timeline dates it and each cohort keeps its own era's term.
+      `research/protocols/poh-lifespan-timeline.md`.
 - [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.
