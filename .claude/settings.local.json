@@ -31,14 +31,14 @@
       "Bash(dd:*)",
       "Bash(iptables:*)",
       "Bash(ufw:*)",
-      "Read(/root/.claude/**)",
-      "Read(/root/.ssh/**)",
+      "Read(/root/**)",
+      "Read(//home/*/.ssh/**)",
+      "Read(//home/*/.claude/**)",
       "Read(/etc/shadow)",
       "Edit(/etc/**)",
-      "Write(/etc/**)",
-      "Edit(//root/poh-aggregator/apps/demo/index.html)",
-      "Edit(//root/poh-aggregator/apps/demo/src/landing/**)",
-      "Write(//root/poh-aggregator/apps/demo/src/landing/**)"
+      "Edit(//**/apps/demo/index.html)",
+      "Edit(//**/apps/demo/src/landing/**)",
+      "Edit(//**/apps/demo/public/**)"
     ]
   }
 }
