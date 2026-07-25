@@ -575,3 +575,167 @@ addresses; a live test now asserts that, so the day it changes we will hear abou
 **Blocked:** nothing. Iteration 1's two notes still stand and are Hugo's calls, not blockers:
 `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where `MISSION.md` says to run
 it, and `pnpm-lock.yaml` is still untracked beside a tracked `package-lock.json`.
+
+## Iteration 6 — 2026-07-25
+
+**Did:** P0 #2, job 2 — the next probe off the ranked queue (§6 item 4 of `ontology-coverage.md`):
+**Linea Proof of Humanity V2**, read from the Verax attestation registry on Linea. Nine adapters
+implemented now, up from eight.
+
+**The queue said "passive per-subject read". There is no per-subject read, and there does not need
+to be.** Verax stores `subject` as `bytes` and keys attestations by a sequential id; a subject index
+requires the `IndexerModule`, which the Sumsub portal does not register (`getModules()` → `[]`,
+asserted live). That is why Linea ships a signature path instead, and why our own research file
+concluded "there is no efficient on-chain *does address X have a PoH attestation* read". Both
+premises are true. The conclusion only follows if you have to *search*.
+
+- **The credential expires, so the whole live population is a small contiguous id range.** A PoH V2
+  attestation carries a 90-day term, and `attestedDate` is the block timestamp at write while ids are
+  handed out in order — so `attestedDate` is monotone in id, and every unexpired attestation in the
+  *entire* registry sits in `[first id with attestedDate >= now-90d, counter)`. Measured today: a
+  **1,024-id window against a counter of 6,366,748**, read whole through Multicall3 in six batched
+  calls, 4–5 s. What the probe holds is therefore not one answer but the **complete live
+  population — 500 attestations over 499 addresses** — so `held: false` means *we read every live
+  credential and you are not among them*, and `detail` carries the population that makes the claim
+  checkable. No indexer, no vendor, no API key.
+- **Galloping, not bisecting.** A doubling ladder (`counter-1, counter-2, counter-4, …`) brackets the
+  window in *one* batched round trip; bisecting for an exact boundary would cost ~22 sequential
+  `eth_call`s to save scanning ids we were going to scan anyway. The scan *is* the boundary search.
+  Everything reads at one pinned block, so the counter cannot advance underneath it — the torn read
+  `reconcile.ts` exists to prevent, in miniature — and `now` is that block's timestamp, not the local
+  clock, because expiry is what on-chain consumers compare against `block.timestamp`.
+- **Our own research named the wrong portal, and the fix is not a better constant.**
+  `privado-id-and-verax.md` gave the Sumsub portal as `0xe8a3a57e…b73922`. That one has issued
+  **four** attestations, all on 2025-07-02/03, all expired since September; production is
+  `0x501e742C…7D5B46` with 50,471. An adapter pinned to the researched address would have returned
+  `held: false` for the entire population **while looking like it worked** — the contract answers,
+  the schema matches, nothing errors. There are *three* registered Sumsub portals, so the address is
+  the wrong thing to pin. The anchor is the portal's registered **owner**,
+  `0x887F94C1283697c607b321860bd95263AC0E2467`, with `PortalRegistry.isIssuer(owner)` re-read at
+  runtime (Consensys' allowlist; `deployDefaultPortal` from a non-issuer reverts). The dead test
+  portal is kept in the code as a tripwire and a live test asserts it shares the owner *and*
+  contributes nobody.
+- **`ownerName` and `attester` are both worthless as checks, and the second one took an experiment.**
+  `ownerName` is a string the portal's creator supplies — it says "Sumsub" on all three portals and
+  would on anyone else's. `attester` is `msg.sender` on the portal's `attest` call: simulating
+  `attest` with a bogus 65-byte signature from a stranger, from Sumsub's own attester key, and from
+  the portal owner returns the **identical** revert (`ECDSAInvalidSignature`, `0xf645eedf`), which
+  proves the gate is the signature and not the caller. So `attester` records a relayer. The portal's
+  authorised signer is instead read *from the portal* — `signerAddress()`, selector `0x5b7633d0`,
+  found by brute-forcing its `PUSH4` set since it is unverified on any explorer we can reach without
+  a key — and reported as corroboration rather than used as a filter, because it is a key Sumsub may
+  rotate and a rotation must not retroactively un-verify anybody.
+- **The finding: Linea's own reads are ten months stale, so ours is the *more correct* one, not just
+  the purer one.** `poh-api.linea.build/poh/v2/{addr}` returned **`true` for 45 of 45** addresses
+  whose every attestation had expired (earliest expiries 2025-09-29), sampled across eight cohorts
+  spanning the schema's history. It is not only the REST boolean: the signer API signs for them, and
+  `PohVerifier(0xBf14cFAF…20831).verify(sig, 0xf1d1f857…)` returns **`true` on chain** for an
+  address whose attestations died 2025-09-29. A never-verified address still gets HTTP 500, so the
+  endpoint distinguishes verified from not — it just answers "was **ever** verified".
+  `PohVerifier.getSigner()` is a *different* key from the Verax attester, which is how the two
+  authorities drifted apart. **50,475 attestations ever issued against 500 live** means the vendor
+  boolean and the registry describe populations **101× apart**.
+- **Issuance is a campaign, not a population.** By month: 24,723 in 2026-01 (half the protocol's
+  lifetime issuance), then 1,264 / 571 / 347 / 325 / 121, and **11** in the first 25 days of July.
+  With a 90-day term the campaign has fully expired. `live: true` is still right; the weight this
+  credential can carry for any subject is small and short-lived by construction.
+- **A bug I introduced and caught by re-running.** Extracting the selection logic into the pure
+  `selectLivePoh` dropped the `revoked` guard from the live filter, so the one revoked attestation in
+  the window was counted as a person (500 → 501 live, 499 → 500 subjects). Caught because I compared
+  the refactored number against the pre-refactor one instead of assuming. There is now a unit test
+  for it, and the pure function exists precisely so that branch is testable without a network.
+- **Third instance of one shape, worth naming once.** A hard expiry truncates a decay curve, so a
+  half-life longer than the expiry never completes: Human Passport hard-expires at 90 days against a
+  180-day half-life, Holonym within a year against 730, and Linea PoH at 90 days against 90. The
+  sampled subject scored today was 89.9 days old — freshness **0.5005**, i.e. its weight had just
+  about reached the floor hours before the credential dies.
+- New write-up `research/protocols/linea-poh-onchain-read.md` (addresses, selectors, revert payloads,
+  the three failed anchors and why, the vendor-staleness measurement, and what is deliberately not
+  read). `privado-id-and-verax.md` now carries a **CORRECTED** block at the head of its Linea PoH
+  section naming its two wrong claims, since leaving a known-wrong portal address in a research file
+  is exactly the hazard the mission's rule 5 is about. `ontology-coverage.md` §6 item 4 struck
+  through and its roster row flipped to `impl ✔`, `INDEX.md` lists the fourth implementation
+  write-up, README updated (eight adapters → nine, new section, test counts).
+
+**Verified:** all four suites, on this box, at this commit.
+
+- `PATH=$HOME/.foundry/bin:$PATH forge test` → `18 passed; 0 failed`.
+- `cd packages/sdk && npm test` → `# tests 150 # pass 148 # fail 0 # skipped 2` (was 113: +19 Linea
+  unit, +18 Linea live). The 2 skips are the two tests that consult the Verax subgraph, which
+  returned HTTP 429 — see the honest note below. Per file: 34 scoring, 18 reconcile, 5 input,
+  10 ontology, 10 holonym unit, 19 linea-poh unit, 15 live, 6 passport-live, 8 farcaster-live,
+  7 holonym-live, 18 linea-poh-live.
+- `node --test --experimental-strip-types src/adapters/linea-poh.live.test.ts` → **16/16, `skipped 0`**
+  on the run before I exhausted the subgraph's quota; **16/18 pass, 0 fail, 2 skip** on every run
+  after. Nothing failed at any point; the two skips are `t.skip("the Verax subgraph unreachable:
+  HTTP 429")`, which is the designed behaviour — an unreachable source says nothing about the
+  mechanism. I caused the 429 myself by paging the whole 50,475-attestation history through Studio to
+  measure the term distribution, and then made it worse by launching a background counter that
+  competed with the test; I killed that and the limit had not reset after ~10 minutes, so it is a
+  window longer than that.
+- `npm run build` clean; `node_modules/.bin/tsc -p tsconfig.json --noEmit` clean.
+- `cd apps/demo && npx playwright test` → `10 passed`.
+- End to end through `resolvePersonhood()`: a subject sampled out of the live population scores
+  **3.1768** / 1501.36 cents / one root, `heldFrom: chain`, `dateFrom: chain`, freshness 0.5005.
+- The acceptance test the mission asks for ("a live test that hits the real chain and asserts the
+  mechanism, not a magic number") is **"the population the chain gives us is the population an
+  independent indexer gives us"**: it pins both our enumeration and the Verax subgraph to the *same
+  block* and asserts **set equality** of live subjects plus per-subject date equality — not a count,
+  so a single missed subject fails it. It ran green (500 attestations, 499 subjects, zero symmetric
+  difference in both directions) before the rate limit. Because that oracle is a third party and can
+  be throttled, there is now a **second, chain-only** completeness test that never skips: *"nothing
+  below the window is still alive"* reads the 600 ids immediately beneath `scannedFromId` and
+  requires every attestation on our schema there to be revoked or expired — which, with the
+  monotonicity test beside it, proves the window's lower edge from the chain alone. Plus a live test
+  that re-derives the 90-day term ceiling over the whole live population every run, since that
+  constant is the single assumption completeness rests on (the probe also self-widens and reports
+  `windowWidened` if it is ever exceeded).
+
+  **The subgraph staying throttled for twenty minutes is what made me finish that argument**, and it
+  was the right prompt: an acceptance test whose oracle is somebody else's free dev endpoint can be
+  silenced by anyone, including by me. Completeness is now provable from the chain with no third
+  party in it, as five facts that are each separately asserted: `attestedDate` is monotone in id
+  **across the whole 6.37M-id registry** (sampled logarithmically, not just inside the window — the
+  test that licenses extrapolating past the 600 ids we read directly); the id immediately below the
+  window predates `now - maxTerm`; those 600 ids are each revoked or expired; no live attestation
+  carries a longer term than the bound; and nothing at or above the counter exists, because the
+  contract reverts. The subgraph comparison is now corroboration of a proof rather than the proof.
+
+**No registry write, on purpose.** Root, evidence class, curve, half-life and both costs are
+unchanged — only `implemented` and `notes`, which are off-chain fields — so a reseed would bump
+`revision` to record nothing, which is what iteration 2's incremental seeding exists to prevent.
+Registry stays at **30 adapters, revision 34**.
+
+**Next, in the order I would do it:**
+
+1. **Keep going down the queue.** §6 now reads: **World's document/Selfie tiers** (which P1 wants
+   anyway, so World appears in the *score* and not only in the agent gate), then **PoH v1** on a
+   registry we already talk to. After those the passively-readable queue is empty and the remaining
+   ontology entries are the ones §6 documents as *not* passively readable — at which point the next
+   marginal probe is worth less than P1's as-of scoring or the ENS agent track.
+2. **`docs/scoring.md` should say once what three adapters now say separately:** a hard expiry
+   truncates a decay curve, so a half-life longer than the expiry is a half-life that never
+   completes. Passport (90d vs 180d), Holonym (365d vs 730d) and Linea PoH (90d vs 90d) all have this
+   shape and it is currently only in adapter comments.
+3. **Widen the Circles subgraph window** and add `registrationObserved` to both mappings — still the
+   cheapest way to turn two flagged approximations into real dates (iteration 1's note 1, unchanged
+   through five iterations now).
+
+**Measured while working, worth keeping:** the Verax Linea registry has taken **6,366,748**
+attestations in its life and roughly **700 in the last 90 days**, which is what makes the
+enumeration cheap — and it is a fact about *this* registry, not about Verax, so a future Verax-based
+adapter on Base or Arbitrum must re-measure before assuming the same trick works. `getAttestation`
+reverts `0x0e35f2bc` above the counter, so an absent id is information rather than an error. And the
+Sumsub "Proof of Humanity" schema `0x0094bda6…c0d0af` (11 attestations, from a third Sumsub portal)
+is a variant that never carried a population — recorded so a later iteration does not rediscover it.
+
+**Blocked:** nothing. One measurement I could not close honestly and left written down as an open
+question in the write-up rather than guessed: **how many distinct humans have ever held a Linea PoH**
+(50,475 attestations over an unknown number of subjects). The exhaustive on-chain scan of the full
+99,577-id history was still recovering rate-limited batches after 28 minutes when I stopped it, and
+the paged indexer count hit the same 429 as the tests. The live figure (499 subjects for 500
+attestations) suggests renewal is rare and the answer is probably near 50,000, but "probably" is not
+a measurement and it is not in the ontology. Iteration 1's two notes still stand and are Hugo's
+calls, not blockers: `./test.sh` lives at `apps/demo/test.sh` rather than the repo root where
+`MISSION.md` says to run it, and `pnpm-lock.yaml` is still untracked beside a tracked
+`package-lock.json`.
