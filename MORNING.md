@@ -1,8 +1,8 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 8. All four suites green: 18 forge, 195 SDK
-(193 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 10 Playwright — 223 total._
+detail. _Last updated 2026-07-25, after unattended iteration 9. All four suites green: 18 forge, 228 SDK
+(226 pass, 0 fail, 2 skipped on a rate-limited third-party indexer), 10 Playwright — 256 total._
 
 ---
 
@@ -244,6 +244,41 @@ critical path. The read itself is one call; the two things around it are the sto
 No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up:
 `research/protocols/poh-v1-onchain-read.md`.
 
+**Iteration 9 made the audit trail executable: `resolve(addr, { asOf: block })` scores against
+the ontology as the registry actually held it at a past block.** Until now the trail could be
+*printed* and never *applied*, which meant every weight correction silently rewrote history for
+anyone holding an old score. Revision 34 alone moved three trust roots, retired a placeholder
+root and added fifteen adapters — so "why did my score change?" had an answer with a block
+number, but no way to check it.
+
+- **Worked, on a real subject** holding PoH v2, two Holonym credentials and a Human Passport:
+  **3.61 / $40.73 / 4 roots** today, **1.07 / $0.11 / 1 root** as of Sepolia block 11,345,000.
+  Nothing about the subject moved — Holonym and Human Passport had not been researched yet, and
+  the caveat says the drop is *a change in what we knew, not in the subject*. This is a good
+  demo beat and it is live, not staged: `await corroborate.resolve(subject, { asOf: 11_345_000 })`.
+- **It is the strongest Graph claim in the repo**, because it is the one read an archive node
+  cannot serve: reconstructing an entity *set* at block N means already knowing every adapter
+  id. Graph Node keeps each entity version with its block range, so it is one query.
+- **It refuses rather than degrades.** Without the registry subgraph configured it throws.
+  Answering a question about the past with today's weights and stamping a block number on it
+  would be worse than not answering — and this is the only place in the SDK that does not fall
+  back, on purpose.
+- **It says what it cannot see.** Credentials are still read at chain head; a credential dated
+  after the as-of instant is excluded, but one held then and revoked since is invisible. That
+  error runs one way only — it understates the subject, never the adversary — and every as-of
+  result carries a caveat saying so.
+- **Fixed a real bug in the audit-trail subgraph, found by building on it.**
+  `AdapterLivenessSet` carries only the hashed adapter key, and the mapping looked the adapter up
+  by that hash while entities are keyed on the plaintext id — so it matched nothing and **every
+  liveness flip was dropped silently**. It had never fired on the deployed registry, which is why
+  nobody noticed; it is also the mutation a score feels hardest, since `live: false` zeroes a
+  credential outright. Redeployed to ax41 as **v0.0.3** with an `AdapterKey` reverse index and a
+  `LivenessChange` entity that records the reason the curator gave. Same URL, no action needed —
+  but if you re-deploy the Studio mirror, take the new version.
+
+MCP's `lookup_personhood` now takes `as_of`. No weight moved, so the registry stays at **30
+adapters, revision 34**.
+
 ---
 
 ## State: every phase shipped and tested
@@ -251,8 +286,8 @@ No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up
 | Piece | State | Proof |
 |---|---|---|
 | `PersonhoodRegistry` v2 | Sepolia `0x977b028b900cce8ee89c46877e814eff3060aa07` | 18 forge tests; age curves + plaintext event ids with on-chain integrity check |
-| Ontology | 15 adapters, 10 trust roots, per-adapter age curves | `ontology/adapters.json`, every entry cites `research/` |
-| SDK | builds, publishes clean types | 23 unit + 11 live tests |
+| Ontology | 30 adapters, 18 trust roots, per-adapter age curves | `ontology/adapters.json`, every entry cites `research/` |
+| SDK | builds, publishes clean types | 142 unit + 86 live tests; 10 adapters with live probes |
 | Subgraph | Studio, syncing, serving | `api.studio.thegraph.com/query/77602/poh/version/latest` — feeds claimedAt into the ramp weights |
 | MCP server | verified over stdio | 3 tools; agents get evidence and caveats, never bare booleans |
 | Demo app | Vite SPA, live against real chains | **6/6 Playwright E2E in a real browser** |
