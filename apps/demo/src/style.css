@@ -891,7 +891,46 @@ button:disabled {
 .threshold-slider {
   flex: 1 1 18rem;
   min-width: 12rem;
-  accent-color: var(--iron);
+  appearance: none;
+  -webkit-appearance: none;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.threshold-slider::-webkit-slider-runnable-track {
+  height: 1.5px;
+  background: var(--hairline-strong);
+}
+
+.threshold-slider::-moz-range-track {
+  height: 1.5px;
+  background: var(--hairline-strong);
+}
+
+.threshold-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 17px;
+  height: 17px;
+  margin-top: -7.75px;
+  border-radius: 50%;
+  background: var(--iron);
+  border: 2.5px solid var(--paper-solid);
+  box-shadow: 0 0 0 1.5px var(--iron);
+  transition: transform 0.3s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.threshold-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--iron);
+  border: 2.5px solid var(--paper-solid);
+  box-shadow: 0 0 0 1.5px var(--iron);
+}
+
+.threshold-slider:active::-webkit-slider-thumb {
+  transform: scale(1.25);
 }
 
 .threshold-slider.is-unset {
