@@ -485,7 +485,8 @@ html.js .sl-in .sl-line {
 .example-chip:active,
 .picker button:active,
 .copy-btn:active,
-.threshold-clear:active {
+.threshold-clear:active,
+.sat-preset:active {
   transform: scale(0.93, 0.88);
 }
 
