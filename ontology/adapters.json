@@ -13,12 +13,17 @@
     "because every protocol that hardened did so against sale, and none against rental.",
     "",
     "Costs are dated human judgements derived from the research in research/, not",
-    "measurements. Each carries its source. Figures as of 2026-07-25."
+    "measurements. Each carries its source. Figures as of 2026-07-25.",
+    "",
+    "ageCurve: how weight relates to credential age. 'Decay' = weight falls with age",
+    "(liveness, KYC \u2014 recency is the signal). 'Ramp' = weight RISES with survival",
+    "(vouching registries \u2014 a registration that survived challenge windows beats one",
+    "minted during last week's reward program). One curve for all classes would hand",
+    "full weight to exactly the airdrop-minted cohort."
   ],
-
   "trustRoots": {
     "iris-registry:world-orb": "Iris enrolment in World's Orb registry.",
-    "state-document:icao-9303": "An ICAO-9303 passport chip signed by a national CSCA. Shared by every ZK-passport tool AND World's document tier — the single largest correlation cluster in the landscape.",
+    "state-document:icao-9303": "An ICAO-9303 passport chip signed by a national CSCA. Shared by every ZK-passport tool AND World's document tier \u2014 the single largest correlation cluster in the landscape.",
     "kyc-vendor:persona": "A document + selfie check performed by Persona.",
     "kyc-vendor:sumsub": "A document + selfie check performed by Sumsub.",
     "kyc-vendor:facetec-synaps": "FaceTec liveness deployed by Synaps. Note 1:N dedup is per-integrator, never global, so this yields liveness rather than uniqueness.",
@@ -28,7 +33,6 @@
     "liveness:world-selfie": "World's Selfie Check face-liveness signal.",
     "unknown": "Trust root not established. Scored as its own root, but flagged."
   },
-
   "adapters": [
     {
       "id": "world-id-orb",
@@ -41,7 +45,8 @@
       "live": true,
       "sourceURI": "research/protocols/world-id.md",
       "implemented": true,
-      "notes": "Forging requires defeating iris dedup at an Orb — expensive. Renting does not: an open resale market was documented at $0.50-$15 per verified account (ZachXBT, 2026-04-28). require_user_presence raises the rent floor but does not remove it."
+      "notes": "Forging requires defeating iris dedup at an Orb \u2014 expensive. Renting does not: an open resale market was documented at $0.50-$15 per verified account (ZachXBT, 2026-04-28). require_user_presence raises the rent floor but does not remove it.",
+      "ageCurve": "Decay"
     },
     {
       "id": "world-id-document",
@@ -54,7 +59,8 @@
       "live": true,
       "sourceURI": "research/protocols/world-id.md",
       "implemented": false,
-      "notes": "Reads the same passport chip as ZKPassport, Self and Rarimo. NOT independent evidence from any of them."
+      "notes": "Reads the same passport chip as ZKPassport, Self and Rarimo. NOT independent evidence from any of them.",
+      "ageCurve": "Decay"
     },
     {
       "id": "world-id-selfie",
@@ -67,7 +73,8 @@
       "live": true,
       "sourceURI": "research/landscape/kyc-liveness-vendors.md",
       "implemented": false,
-      "notes": "Liveness only — proves a human was present, never that they are unique or that they hold only one credential. Injection attacks against face liveness rose sharply through 2025, so this decays fast."
+      "notes": "Liveness only \u2014 proves a human was present, never that they are unique or that they hold only one credential. Injection attacks against face liveness rose sharply through 2025, so this decays fast.",
+      "ageCurve": "Decay"
     },
     {
       "id": "poh-v2",
@@ -80,7 +87,8 @@
       "live": true,
       "sourceURI": "research/protocols/poh-kleros-brightid-idena.md",
       "implemented": true,
-      "notes": "requiredNumberOfVouches() == 1 and HumanityRevoked has fired once ever. ~1,299 of 1,364 lifetime registrations arrived in four months tracking a $9.94 PNK airdrop 1:1, so the credential is currently airdrop-inflated. Weight by registration age, not the boolean."
+      "notes": "requiredNumberOfVouches() == 1 and HumanityRevoked has fired once ever. ~1,299 of 1,364 lifetime registrations arrived in four months tracking a $9.94 PNK airdrop 1:1, so the credential is currently airdrop-inflated. Weight by registration age, not the boolean. ageCurve=Ramp: a week-old registration weighs ~0.01, a year-old ~0.5 \u2014 the airdrop cohort discounts itself.",
+      "ageCurve": "Ramp"
     },
     {
       "id": "circles-v2",
@@ -93,7 +101,8 @@
       "live": true,
       "sourceURI": "research/protocols/circles.md",
       "implemented": true,
-      "notes": "A sybil costs roughly two days of freely-minted CRC — a cost denominated in the asset the issuer mints is barely a cost. The public indexer carries events named BotCreated and FarmGrown. Valuable only as a graph-position modifier, never as a standalone proof; genuinely independent of every document and biometric root."
+      "notes": "A sybil costs roughly two days of freely-minted CRC \u2014 a cost denominated in the asset the issuer mints is barely a cost. The public indexer carries events named BotCreated and FarmGrown. Valuable only as a graph-position modifier, never as a standalone proof; genuinely independent of every document and biometric root. ageCurve=Ramp for the same reason: the BotCreated cohort is fresh by definition.",
+      "ageCurve": "Ramp"
     },
     {
       "id": "coinbase-verification",
@@ -106,7 +115,8 @@
       "live": true,
       "sourceURI": "research/protocols/eas-and-disco.md",
       "implemented": true,
-      "notes": "Persona-rooted per Coinbase's own vendor disclosure. Binds a KYC'd account to an address, one-to-many, with no nullifier. 720,503 issued and 406,022 revoked — always check revocation, never presence alone."
+      "notes": "Persona-rooted per Coinbase's own vendor disclosure. Binds a KYC'd account to an address, one-to-many, with no nullifier. 720,503 issued and 406,022 revoked \u2014 always check revocation, never presence alone.",
+      "ageCurve": "Decay"
     },
     {
       "id": "zkpassport",
@@ -119,7 +129,8 @@
       "live": true,
       "sourceURI": "research/protocols/zk-passport-and-eid.md",
       "implemented": false,
-      "notes": "Scopes its nullifier per service and never publishes an unscoped value — good privacy, but it means we cannot detect that this and Self came from one chip. Hence saturation rather than dedup."
+      "notes": "Scopes its nullifier per service and never publishes an unscoped value \u2014 good privacy, but it means we cannot detect that this and Self came from one chip. Hence saturation rather than dedup.",
+      "ageCurve": "Decay"
     },
     {
       "id": "self-protocol",
@@ -132,7 +143,8 @@
       "live": true,
       "sourceURI": "research/protocols/zk-passport-and-eid.md",
       "implemented": false,
-      "notes": "Publishes a global unscoped per-document nullifier on-chain. Same chip as ZKPassport and World's document tier."
+      "notes": "Publishes a global unscoped per-document nullifier on-chain. Same chip as ZKPassport and World's document tier.",
+      "ageCurve": "Decay"
     },
     {
       "id": "galxe-passport",
@@ -145,7 +157,8 @@
       "live": true,
       "sourceURI": "research/landscape/kyc-liveness-vendors.md",
       "implemented": false,
-      "notes": "Sumsub underneath. Shares its root with Linea PoH."
+      "notes": "Sumsub underneath. Shares its root with Linea PoH.",
+      "ageCurve": "Decay"
     },
     {
       "id": "linea-poh",
@@ -158,7 +171,8 @@
       "live": true,
       "sourceURI": "research/protocols/privado-id-and-verax.md",
       "implemented": false,
-      "notes": "Sumsub-attested via a Verax portal registering no validation modules. A hard 90-day expiry left ~502 live credentials out of 50,475 ever issued — cumulative counts are not population."
+      "notes": "Sumsub-attested via a Verax portal registering no validation modules. A hard 90-day expiry left ~502 live credentials out of 50,475 ever issued \u2014 cumulative counts are not population.",
+      "ageCurve": "Decay"
     },
     {
       "id": "anima-pou",
@@ -171,7 +185,8 @@
       "live": true,
       "sourceURI": "research/landscape/kyc-liveness-vendors.md",
       "implemented": false,
-      "notes": "Markets uniqueness, delivers liveness: FaceTec's 1:N dedup runs against the integrator's own database, never across customers."
+      "notes": "Markets uniqueness, delivers liveness: FaceTec's 1:N dedup runs against the integrator's own database, never across customers.",
+      "ageCurve": "Decay"
     },
     {
       "id": "humanity-protocol",
@@ -184,7 +199,8 @@
       "live": true,
       "sourceURI": "research/protocols/humanity-protocol.md",
       "implemented": false,
-      "notes": "Their own config defines is_human as 'passed a KYC check OR palm enrollment', and the KYC provider is unnamed. Root unknown, so it scores as its own root but is flagged — resolving the vendor is a live research question."
+      "notes": "Their own config defines is_human as 'passed a KYC check OR palm enrollment', and the KYC provider is unnamed. Root unknown, so it scores as its own root but is flagged \u2014 resolving the vendor is a live research question.",
+      "ageCurve": "Decay"
     },
     {
       "id": "idena",
@@ -197,7 +213,8 @@
       "live": false,
       "sourceURI": "research/protocols/poh-kleros-brightid-idena.md",
       "implemented": false,
-      "notes": "Marked not-live on scale grounds: 124 validated identities at epoch 214, down from 21,187 at peak. Its sublinear-staking fork killed the puppeteer pools and the network with them. Retained because it is the best-documented failure in the field."
+      "notes": "Marked not-live on scale grounds: 124 validated identities at epoch 214, down from 21,187 at peak. Its sublinear-staking fork killed the puppeteer pools and the network with them. Retained because it is the best-documented failure in the field.",
+      "ageCurve": "Ramp"
     },
     {
       "id": "brightid",
@@ -210,7 +227,8 @@
       "live": false,
       "sourceURI": "research/protocols/poh-kleros-brightid-idena.md",
       "implemented": false,
-      "notes": "Not obtainable: the Aura verification hash is the SHA-256 of the empty string, i.e. zero verified users, and the app node returns 502."
+      "notes": "Not obtainable: the Aura verification hash is the SHA-256 of the empty string, i.e. zero verified users, and the app node returns 502.",
+      "ageCurve": "Ramp"
     },
     {
       "id": "civic-pass",
@@ -223,7 +241,8 @@
       "live": false,
       "sourceURI": "research/landscape/identity-infra-prior-art.md",
       "implemented": false,
-      "notes": "Discontinued 2025-07-31. Retained deliberately: a major competitor still assigns points to Civic stamps for a product that no longer exists, which is exactly the failure the live flag prevents."
+      "notes": "Discontinued 2025-07-31. Retained deliberately: a major competitor still assigns points to Civic stamps for a product that no longer exists, which is exactly the failure the live flag prevents.",
+      "ageCurve": "Decay"
     }
   ]
 }

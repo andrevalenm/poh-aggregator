@@ -24,6 +24,15 @@ export type EvidenceClass =
  */
 export type TrustRoot = string
 
+/**
+ * How weight relates to credential age. 'Decay': weight falls with age — right for
+ * liveness and KYC, where recency is the signal. 'Ramp': weight RISES with survival —
+ * right for vouching registries, where a registration that survived challenge windows
+ * beats one minted during last week's reward program. A single curve for all classes
+ * would hand full weight to exactly the airdrop-minted cohort.
+ */
+export type AgeCurve = 'None' | 'Decay' | 'Ramp'
+
 export interface Adapter {
   id: string
   name: string
@@ -33,8 +42,9 @@ export interface Adapter {
   forgeCostCents: number
   /** Cost to borrow one from a willing holder, in cents. Separate on purpose. */
   rentCostCents: number
-  /** Days after which the credential carries half weight. 0 means no decay. */
+  /** Half-life in days for whichever ageCurve applies. 0 means age is ignored. */
   decayHalfLifeDays: number
+  ageCurve: AgeCurve
   /** False when the upstream protocol is discontinued. */
   live: boolean
   /** Where the costs above came from. */

@@ -18,6 +18,7 @@ const input = {
   sources,
   settings: {
     optimizer: { enabled: true, runs: 200 },
+    viaIR: true,
     outputSelection: { '*': { '*': ['abi', 'evm.bytecode.object'] } },
   },
 }

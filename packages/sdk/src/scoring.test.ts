@@ -12,6 +12,7 @@ function adapter(over: Partial<Adapter> & Pick<Adapter, 'id' | 'trustRoot'>): Ad
     forgeCostCents: 100_000,
     rentCostCents: 100_000,
     decayHalfLifeDays: 0,
+    ageCurve: 'Decay',
     live: true,
     sourceURI: 'test',
     ...over,
@@ -185,6 +186,49 @@ describe('cost model', () => {
     assert.equal(r.totalCostCents, 0)
     assert.equal(r.evidence.length, 1, 'still reported')
     assert.ok(r.caveats.some((c) => c.code === 'discontinued-protocol'))
+  })
+})
+
+describe('age curves', () => {
+  const now = 1_700_000_000
+  // Real ontology costs: PoH forge $10, rent $5. The evidence floor is 10¢.
+  const ramp = adapter({
+    id: 'poh-v2',
+    trustRoot: 'social-vouching:poh',
+    forgeCostCents: 1_000,
+    rentCostCents: 500,
+    decayHalfLifeDays: 365,
+    ageCurve: 'Ramp',
+  })
+
+  test('ramp: a week-old registration weighs almost nothing', () => {
+    const f = freshnessOf(ramp, now - 7 * 86_400, now)
+    assert.ok(f < 0.02, `expected ~0.013, got ${f}`)
+  })
+
+  test('ramp: one half-life of survival earns half weight', () => {
+    const f = freshnessOf(ramp, now - 365 * 86_400, now)
+    assert.ok(Math.abs(f - 0.5) < 1e-9)
+  })
+
+  test('ramp: unknown age gets the midpoint, never full weight', () => {
+    // Full weight on missing data would make subgraph downtime profitable for a farm.
+    assert.equal(freshnessOf(ramp, undefined, now), 0.5)
+  })
+
+  test('the airdrop scenario: fresh claim vs survived claim, same protocol', () => {
+    const fresh = ev(ramp, { issuedAt: now - 7 * 86_400, freshness: freshnessOf(ramp, now - 7 * 86_400, now) })
+    fresh.effectiveCostCents = effectiveCost(ramp, fresh.freshness)
+    const survived = ev(ramp, { issuedAt: now - 700 * 86_400, freshness: freshnessOf(ramp, now - 700 * 86_400, now) })
+    survived.effectiveCostCents = effectiveCost(ramp, survived.freshness)
+
+    const freshResult = run([ramp], [fresh])
+    const survivedResult = run([ramp], [survived])
+    assert.ok(
+      survivedResult.score > freshResult.score * 1.5,
+      `survival must dominate: survived ${survivedResult.score} vs fresh ${freshResult.score}`,
+    )
+    assert.equal(freshResult.independentRoots, 0, 'a week-old airdrop claim alone is below the evidence floor')
   })
 })
 

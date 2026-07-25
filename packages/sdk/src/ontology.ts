@@ -1,6 +1,6 @@
 import { createPublicClient, http, keccak256, toHex } from 'viem'
 import { sepolia } from 'viem/chains'
-import type { Adapter, EvidenceClass } from './types.ts'
+import type { Adapter, AgeCurve, EvidenceClass } from './types.ts'
 
 /**
  * Loads the trust-root ontology from the on-chain registry.
@@ -31,6 +31,7 @@ export const REGISTRY_ABI = [
           { name: 'forgeCostCents', type: 'uint64' },
           { name: 'rentCostCents', type: 'uint64' },
           { name: 'decayHalfLifeDays', type: 'uint32' },
+          { name: 'ageCurve', type: 'uint8' },
           { name: 'live', type: 'bool' },
           { name: 'exists', type: 'bool' },
           { name: 'sourceURI', type: 'string' },
@@ -56,6 +57,8 @@ const EVIDENCE_CLASSES: readonly (EvidenceClass | 'Unspecified')[] = [
   'Liveness',
   'Behavioral',
 ]
+
+const AGE_CURVES: readonly AgeCurve[] = ['None', 'Decay', 'Ramp']
 
 /** Adapter and root ids are hashed identically on-chain and here. */
 export const adapterKey = (id: string) => keccak256(toHex(`adapter:${id}`))
@@ -109,6 +112,7 @@ export async function loadOntology(opts: OntologyOptions): Promise<Ontology> {
       forgeCostCents: Number(row.forgeCostCents),
       rentCostCents: Number(row.rentCostCents),
       decayHalfLifeDays: row.decayHalfLifeDays,
+      ageCurve: AGE_CURVES[row.ageCurve] ?? 'None',
       live: row.live,
       sourceURI: row.sourceURI,
     })

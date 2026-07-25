@@ -1,6 +1,7 @@
 import { createPublicClient, http, type PublicClient } from 'viem'
 import { gnosis, worldchain, base } from 'viem/chains'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
+import { pohEnrichment, circlesEnrichment } from '../subgraph.ts'
 
 /**
  * Adapters.
@@ -105,7 +106,7 @@ const POH_ABI = [
  * registrations arrived in a four-month window tracking a ~$9.94 PNK airdrop one-for-one,
  * `requiredNumberOfVouches()` is 1, and `HumanityRevoked` has fired exactly once ever.
  */
-export function pohAdapter(rpcUrl: string = RPC.gnosis): AdapterProbe {
+export function pohAdapter(rpcUrl: string = RPC.gnosis, subgraphUrl?: string): AdapterProbe {
   const c = client(gnosis, rpcUrl)
   return {
     adapterId: 'poh-v2',
@@ -129,6 +130,24 @@ export function pohAdapter(rpcUrl: string = RPC.gnosis): AdapterProbe {
           })
         } catch {
           // Optional detail; absence must not turn a positive into a negative.
+        }
+
+        // The subgraph supplies what the contract read cannot: WHEN this was claimed. PoH
+        // is airdrop-inflated, so age is most of the signal — a 2022 registration and one
+        // from last week's reward window are different evidence.
+        if (subgraphUrl) {
+          const enriched = await pohEnrichment(subgraphUrl, subject)
+          if (enriched) {
+            return {
+              held: !enriched.revoked,
+              issuedAt: enriched.claimedAt,
+              detail: {
+                ...(humanityId ? { humanityId } : {}),
+                claimedAt: enriched.claimedAt,
+                source: 'subgraph',
+              },
+            }
+          }
         }
         return { held: true, detail: humanityId ? { humanityId } : {} }
       }),
@@ -155,7 +174,11 @@ const CIRCLES_ABI = [
  * What carries signal is position in the trust graph, so we fetch incoming trust edges and
  * expose them as detail for the graph-derived modifier.
  */
-export function circlesAdapter(rpcUrl: string = RPC.gnosis, indexerUrl = 'https://rpc.aboutcircles.com/'): AdapterProbe {
+export function circlesAdapter(
+  rpcUrl: string = RPC.gnosis,
+  indexerUrl = 'https://rpc.aboutcircles.com/',
+  subgraphUrl?: string,
+): AdapterProbe {
   const c = client(gnosis, rpcUrl)
   return {
     adapterId: 'circles-v2',
@@ -168,6 +191,19 @@ export function circlesAdapter(rpcUrl: string = RPC.gnosis, indexerUrl = 'https:
           args: [subject],
         })
         if (!held) return { held: false }
+
+        // Subgraph first: registeredAt enables decay, trustedByCount is the graph position,
+        // and neither depends on the vendor's indexer staying up.
+        if (subgraphUrl) {
+          const enriched = await circlesEnrichment(subgraphUrl, subject)
+          if (enriched) {
+            return {
+              held: !enriched.stopped,
+              issuedAt: enriched.registeredAt,
+              detail: { trustedBy: enriched.trustedByCount, source: 'subgraph' },
+            }
+          }
+        }
 
         let trustedBy: number | undefined
         try {
@@ -257,6 +293,11 @@ export function coinbaseVerificationAdapter(
 }
 
 /** Every adapter that can be read without vendor cooperation. */
-export function defaultAdapters(): AdapterProbe[] {
-  return [worldIdOrbAdapter(), pohAdapter(), circlesAdapter(), coinbaseVerificationAdapter()]
+export function defaultAdapters(opts?: { subgraphUrl?: string }): AdapterProbe[] {
+  return [
+    worldIdOrbAdapter(),
+    pohAdapter(RPC.gnosis, opts?.subgraphUrl),
+    circlesAdapter(RPC.gnosis, undefined, opts?.subgraphUrl),
+    coinbaseVerificationAdapter(),
+  ]
 }

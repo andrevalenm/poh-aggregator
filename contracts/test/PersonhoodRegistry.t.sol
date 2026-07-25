@@ -13,9 +13,9 @@ contract PersonhoodRegistryTest is Test {
     bytes32 constant ROOT_IRIS = keccak256("iris-registry:world-orb");
     bytes32 constant ROOT_ICAO = keccak256("state-document:icao-9303");
 
-    bytes32 constant WORLD_ORB = keccak256("adapter:world-id-orb");
-    bytes32 constant WORLD_DOC = keccak256("adapter:world-id-document");
-    bytes32 constant ZKPASSPORT = keccak256("adapter:zkpassport");
+    bytes32 constant WORLD_ORB = keccak256(abi.encodePacked("adapter:", "world-id-orb"));
+    bytes32 constant WORLD_DOC = keccak256(abi.encodePacked("adapter:", "world-id-document"));
+    bytes32 constant ZKPASSPORT = keccak256(abi.encodePacked("adapter:", "zkpassport"));
 
     function setUp() public {
         reg = new PersonhoodRegistry(curator);
@@ -27,15 +27,22 @@ contract PersonhoodRegistryTest is Test {
         vm.prank(curator);
         reg.setAdapter(
             WORLD_ORB,
+            "world-id-orb",
             "World ID (Orb)",
             PersonhoodRegistry.EvidenceClass.Uniqueness,
             ROOT_IRIS,
             5_00, // $5 forge — an Orb visit costs real travel time
             50, // $0.50 rent — observed floor of the resale market
             1095, // 3y validity
+            PersonhoodRegistry.AgeCurve.Decay,
             true,
             "research/protocols/world-id.md"
         );
+    }
+
+    /// @dev The hashed key for a given plaintext id, mirroring the SDK's adapterKey().
+    function _key(string memory idString) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked("adapter:", idString));
     }
 
     // ---------------------------------------------------------- happy path
@@ -77,12 +84,14 @@ contract PersonhoodRegistryTest is Test {
         vm.prank(curator);
         reg.setAdapter(
             WORLD_ORB,
+            "world-id-orb",
             "World ID (Orb)",
             PersonhoodRegistry.EvidenceClass.Uniqueness,
             ROOT_IRIS,
             5_00,
             15_00, // resale market repriced
             1095,
+            PersonhoodRegistry.AgeCurve.Decay,
             true,
             "zachxbt 2026-04-28"
         );
@@ -101,23 +110,27 @@ contract PersonhoodRegistryTest is Test {
         vm.startPrank(curator);
         reg.setAdapter(
             WORLD_DOC,
+            "world-id-document",
             "World ID (document)",
             PersonhoodRegistry.EvidenceClass.StateIdentity,
             ROOT_ICAO,
             2_00,
             1_00,
             3650,
+            PersonhoodRegistry.AgeCurve.Decay,
             true,
             "research/protocols/world-id.md"
         );
         reg.setAdapter(
             ZKPASSPORT,
+            "zkpassport",
             "ZKPassport",
             PersonhoodRegistry.EvidenceClass.StateIdentity,
             ROOT_ICAO, // same passport chip as World's document tier
             2_00,
             1_00,
             3650,
+            PersonhoodRegistry.AgeCurve.Decay,
             true,
             "research/protocols/zk-passport-and-eid.md"
         );
@@ -164,7 +177,17 @@ contract PersonhoodRegistryTest is Test {
         vm.prank(stranger);
         vm.expectRevert(PersonhoodRegistry.NotCurator.selector);
         reg.setAdapter(
-            WORLD_ORB, "x", PersonhoodRegistry.EvidenceClass.Uniqueness, ROOT_IRIS, 1, 1, 0, true, "src"
+            WORLD_ORB,
+            "world-id-orb",
+            "x",
+            PersonhoodRegistry.EvidenceClass.Uniqueness,
+            ROOT_IRIS,
+            1,
+            1,
+            0,
+            PersonhoodRegistry.AgeCurve.None,
+            true,
+            "src"
         );
     }
 
@@ -182,7 +205,17 @@ contract PersonhoodRegistryTest is Test {
 
         vm.prank(stranger);
         reg.setAdapter(
-            WORLD_ORB, "x", PersonhoodRegistry.EvidenceClass.Uniqueness, ROOT_IRIS, 1, 1, 0, true, "src"
+            WORLD_ORB,
+            "world-id-orb",
+            "x",
+            PersonhoodRegistry.EvidenceClass.Uniqueness,
+            ROOT_IRIS,
+            1,
+            1,
+            0,
+            PersonhoodRegistry.AgeCurve.None,
+            true,
+            "src"
         );
         assertEq(reg.adapterCount(), 1);
     }
@@ -196,7 +229,17 @@ contract PersonhoodRegistryTest is Test {
         vm.prank(curator);
         vm.expectRevert(PersonhoodRegistry.EmptyId.selector);
         reg.setAdapter(
-            bytes32(0), "x", PersonhoodRegistry.EvidenceClass.Uniqueness, ROOT_IRIS, 1, 1, 0, true, "src"
+            bytes32(0),
+            "x",
+            "x",
+            PersonhoodRegistry.EvidenceClass.Uniqueness,
+            ROOT_IRIS,
+            1,
+            1,
+            0,
+            PersonhoodRegistry.AgeCurve.None,
+            true,
+            "src"
         );
     }
 
@@ -212,12 +255,14 @@ contract PersonhoodRegistryTest is Test {
         vm.prank(curator);
         reg.setAdapter(
             ZKPASSPORT,
+            "zkpassport",
             "ZKPassport",
             PersonhoodRegistry.EvidenceClass.StateIdentity,
             ROOT_ICAO,
             2_00,
             1_00,
             3650,
+            PersonhoodRegistry.AgeCurve.Decay,
             true,
             "src"
         );
@@ -232,17 +277,27 @@ contract PersonhoodRegistryTest is Test {
     // ----------------------------------------------------------------- fuzz
 
     function testFuzz_setAdapter_roundTrips(
-        bytes32 id,
+        string memory idString,
         bytes32 root,
         uint64 forgeCost,
         uint64 rentCost,
         uint32 halfLife
     ) public {
-        vm.assume(id != bytes32(0));
+        bytes32 id = _key(idString);
 
         vm.prank(curator);
         reg.setAdapter(
-            id, "fuzz", PersonhoodRegistry.EvidenceClass.Behavioral, root, forgeCost, rentCost, halfLife, true, "s"
+            id,
+            idString,
+            "fuzz",
+            PersonhoodRegistry.EvidenceClass.Behavioral,
+            root,
+            forgeCost,
+            rentCost,
+            halfLife,
+            PersonhoodRegistry.AgeCurve.Ramp,
+            true,
+            "s"
         );
 
         PersonhoodRegistry.Adapter memory a = reg.getAdapter(id);
@@ -250,19 +305,52 @@ contract PersonhoodRegistryTest is Test {
         assertEq(a.forgeCostCents, forgeCost);
         assertEq(a.rentCostCents, rentCost);
         assertEq(a.decayHalfLifeDays, halfLife);
+        assertEq(uint8(a.ageCurve), uint8(PersonhoodRegistry.AgeCurve.Ramp));
     }
 
-    function testFuzz_adapterCountNeverExceedsDistinctIds(bytes32 id, uint8 writes) public {
-        vm.assume(id != bytes32(0));
+    function testFuzz_adapterCountNeverExceedsDistinctIds(string memory idString, uint8 writes) public {
+        bytes32 id = _key(idString);
         writes = uint8(bound(writes, 1, 20));
 
         for (uint256 i; i < writes; ++i) {
             vm.prank(curator);
             reg.setAdapter(
-                id, "fuzz", PersonhoodRegistry.EvidenceClass.Behavioral, ROOT_IRIS, 1, 1, 0, true, "s"
+                id,
+                idString,
+                "fuzz",
+                PersonhoodRegistry.EvidenceClass.Behavioral,
+                ROOT_IRIS,
+                1,
+                1,
+                0,
+                PersonhoodRegistry.AgeCurve.None,
+                true,
+                "s"
             );
         }
         assertEq(reg.adapterCount(), 1);
         assertEq(reg.revision(), writes);
+    }
+
+    /// @notice The emitted plaintext id is provably the preimage of the key — an indexer
+    ///         can trust AdapterSet.idString without an off-chain table.
+    function test_setAdapter_rejectsMismatchedIdString() public {
+        vm.prank(curator);
+        vm.expectRevert(
+            abi.encodeWithSelector(PersonhoodRegistry.IdMismatch.selector, WORLD_ORB, "zkpassport")
+        );
+        reg.setAdapter(
+            WORLD_ORB,
+            "zkpassport", // wrong preimage for this key
+            "x",
+            PersonhoodRegistry.EvidenceClass.Uniqueness,
+            ROOT_IRIS,
+            1,
+            1,
+            0,
+            PersonhoodRegistry.AgeCurve.None,
+            true,
+            "src"
+        );
     }
 }

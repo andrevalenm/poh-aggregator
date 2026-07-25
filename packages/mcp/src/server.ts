@@ -33,6 +33,9 @@ try {
 
 const client = new Corroborate({
   registryAddress: (process.env.CORROBORATE_REGISTRY as `0x${string}`) ?? DEFAULT_REGISTRY,
+  // The subgraph supplies issuance dates (decay) and trust-graph position. Without it the
+  // server still works but results carry the issuance-date-unknown caveat.
+  ...(process.env.CORROBORATE_SUBGRAPH_URL ? { subgraphUrl: process.env.CORROBORATE_SUBGRAPH_URL } : {}),
   knownIds,
   knownRoots,
 })
@@ -102,7 +105,7 @@ server.tool(
     threshold: z
       .number()
       .describe(
-        'Score to clear. Rough guide: 1.0 ~ one weak credential, 2.0 ~ one solid credential, 2.5+ ~ several independent roots.',
+        'Score to clear. From the deployed ontology: ~1.7 = one cheap-to-rent credential (World Orb resells from $0.50; Circles registration), ~2.7 = a PoH registration, ~3.5 = a KYC-rooted credential or several independent roots. Exported presets: lenient 1.5, standard 2.5, strict 3.5.',
       ),
   },
   async ({ subject, threshold }) => {

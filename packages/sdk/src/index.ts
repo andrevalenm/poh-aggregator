@@ -10,13 +10,43 @@ export * from './types.ts'
 export { score, freshnessOf, effectiveCost } from './scoring.ts'
 export { loadOntology, adapterKey, rootKey, REGISTRY_ABI } from './ontology.ts'
 export * from './adapters/index.ts'
+export * from './subgraph.ts'
 
-/** Registry holding the trust-root ontology. Sepolia. */
-export const DEFAULT_REGISTRY = '0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9' as const
+/**
+ * Named thresholds for `isHuman(threshold)`, exported as documented constants rather than
+ * baked in as a default — the choice stays visible at every call site.
+ *
+ * Derivation, from the deployed ontology (score = log10 of adversary cost in cents):
+ *  - a single rentable credential (World Orb at its observed $0.50 resale floor, or a
+ *    Circles registration) scores ~1.71
+ *  - a Proof of Humanity registration (~$5 rent) scores ~2.70
+ *  - a KYC-rooted credential (~$30 rent) scores ~3.48; multiple independent roots go higher
+ */
+export const Thresholds = {
+  /** Any single live credential clears this. Filters only pure zero-evidence subjects. */
+  lenient: 1.5,
+  /** Requires a mid-cost credential or several weak independent roots. */
+  standard: 2.5,
+  /** Requires a strong credential plus independent corroboration. Expect false negatives. */
+  strict: 3.5,
+} as const
+
+/**
+ * Registry holding the trust-root ontology. Sepolia.
+ * v2 — adds age curves and plaintext ids in events. v1 (same ontology, uniform decay)
+ * remains at 0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9.
+ */
+export const DEFAULT_REGISTRY = '0x977b028b900cce8ee89c46877e814eff3060aa07' as const
 
 export interface CorroborateOptions {
   registryAddress?: `0x${string}`
   registryRpcUrl?: string
+  /**
+   * GraphQL endpoint of the Corroborate subgraph. Supplies issuance dates (which unlock
+   * decay) and trust-graph position. Without it the SDK degrades to bare contract reads and
+   * results carry the issuance-date-unknown caveat.
+   */
+  subgraphUrl?: string
   /** For resolving ENS names. Defaults to a public mainnet endpoint. */
   ensRpcUrl?: string
   adapters?: AdapterProbe[]
@@ -41,7 +71,8 @@ export class Corroborate {
 
   constructor(opts: CorroborateOptions = {}) {
     this.#opts = { registryAddress: opts.registryAddress ?? DEFAULT_REGISTRY, ...opts }
-    this.#adapters = opts.adapters ?? defaultAdapters()
+    this.#adapters =
+      opts.adapters ?? defaultAdapters(opts.subgraphUrl ? { subgraphUrl: opts.subgraphUrl } : undefined)
   }
 
   /** Ontology is cached per instance; call `refresh()` after a registry update. */
@@ -91,7 +122,15 @@ export class Corroborate {
    * rather than failing it, and a failed probe is reported as an error, never as a negative.
    */
   async resolve(subject: string | readonly string[]): Promise<PersonhoodResult> {
-    const inputs = typeof subject === 'string' ? [subject] : [...subject]
+    const raw = typeof subject === 'string' ? [subject] : [...subject]
+    // Dedupe case-insensitively: the same wallet pasted twice must not probe twice.
+    const seen = new Set<string>()
+    const inputs = raw.filter((s) => {
+      const k = s.toLowerCase()
+      if (seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
     if (inputs.length === 0) throw new Error('resolve requires at least one address or name')
 
     const [resolved, ontology] = await Promise.all([

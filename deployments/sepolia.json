@@ -1,7 +1,13 @@
 {
   "chainId": 11155111,
-  "PersonhoodRegistry": "0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9",
-  "deployedAtBlock": 11343959,
+  "PersonhoodRegistry": "0x977b028b900cce8ee89c46877e814eff3060aa07",
+  "deployedAtBlock": 11344158,
   "deployer": "0xE3C03709B2b8439Eb07Aac06CC4Fa9886CE5BF87",
-  "txHash": "0xd4d81610ad85dcdfd1e7fe547f643122f6d0bbe9c06cd5eafe5999dd1327b344"
+  "txHash": "0xe6b715cde4c0d7cb27041ee61f8b4de8d06dfe7bd2e2f306b67e0ca24677e427",
+  "previous": [
+    {
+      "PersonhoodRegistry": "0x17e7f009d9ef1b6fe0809e3f0a4bf89114cc66c9",
+      "note": "v1 \u2014 uniform decay, hashed-only event ids. Superseded by v2 (age curves + plaintext event ids) but left deployed; same ontology, revision 15."
+    }
+  ]
 }

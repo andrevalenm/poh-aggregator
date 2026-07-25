@@ -25,6 +25,7 @@ const EVIDENCE_CLASS = {
   Liveness: 4,
   Behavioral: 5,
 }
+const AGE_CURVE = { None: 0, Decay: 1, Ramp: 2 }
 
 const artifact = JSON.parse(readFileSync('contracts/out/PersonhoodRegistry.json', 'utf8'))
 const ontology = JSON.parse(readFileSync('ontology/adapters.json', 'utf8'))
@@ -91,12 +92,14 @@ for (const a of ontology.adapters) {
     nonce: nonce++,
     args: [
       keccak256(toHex(`adapter:${a.id}`)),
+      a.id,
       a.name,
       EVIDENCE_CLASS[a.evidenceClass],
       keccak256(toHex(`root:${a.trustRoot}`)),
       BigInt(a.forgeCostCents),
       BigInt(a.rentCostCents),
       a.decayHalfLifeDays,
+      AGE_CURVE[a.ageCurve],
       a.live,
       a.sourceURI,
     ],

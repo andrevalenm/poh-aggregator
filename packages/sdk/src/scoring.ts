@@ -47,15 +47,29 @@ export interface ScoreInput {
 }
 
 /**
- * Decay multiplier from an exponential half-life.
- * Returns 1 when the adapter does not decay or the issue date is unknown — an unknown age
- * must not be silently penalised, only flagged.
+ * Age weight from the adapter's curve and half-life.
+ *
+ * Decay: weight falls with age — a stale selfie or KYC check means less than a fresh one.
+ * Ramp: weight RISES with survival — right for vouching registries, where the suspect
+ * cohort is by definition the fresh one. PoH took ~95% of its lifetime registrations in a
+ * four-month reward window; under Ramp a week-old registration weighs ~0.01 while one that
+ * has survived challenge windows for two years approaches full weight. Uniform decay would
+ * have given the airdrop cohort full weight and discounted the organic one — exactly
+ * backwards.
+ *
+ * Unknown age: Decay returns 1 (the credential's existence was verified live on-chain, and
+ * absence of a date must not silently penalise) but Ramp returns 0.5 — Ramp exists to
+ * discount fresh farms, and granting full weight on missing data would make the subgraph
+ * being unreachable strictly profitable for an attacker. Both cases are flagged by the
+ * issuance-date-unknown caveat.
  */
 export function freshnessOf(adapter: Adapter, issuedAt: number | undefined, now: number): number {
-  if (!adapter.decayHalfLifeDays || issuedAt === undefined) return 1
+  if (!adapter.decayHalfLifeDays || adapter.ageCurve === 'None') return 1
+  if (issuedAt === undefined) return adapter.ageCurve === 'Ramp' ? 0.5 : 1
   const ageDays = (now - issuedAt) / 86_400
-  if (ageDays <= 0) return 1
-  return 2 ** (-ageDays / adapter.decayHalfLifeDays)
+  if (ageDays <= 0) return adapter.ageCurve === 'Ramp' ? 0 : 1
+  const decay = 2 ** (-ageDays / adapter.decayHalfLifeDays)
+  return adapter.ageCurve === 'Ramp' ? 1 - decay : decay
 }
 
 /**

@@ -47,12 +47,25 @@ contract PersonhoodRegistry {
     ///                         identity staking) leaves rental untouched, and collapsing
     ///                         both into one number overrates exactly the protocols that
     ///                         did the most security work.
-    /// @param decayHalfLifeDays Days after which the credential carries half weight.
-    ///                          Zero means it does not decay.
+    /// @param ageCurve         How weight relates to credential age. 0 = constant.
+    ///                          1 = decay: weight falls with age (liveness, KYC — recency is
+    ///                          the signal). 2 = ramp: weight RISES with survival (vouching
+    ///                          registries — a registration that survived two years of
+    ///                          challenge windows is stronger evidence than one minted during
+    ///                          last week's reward program). One curve for all classes would
+    ///                          hand full weight to exactly the airdrop-minted cohort.
+    /// @param decayHalfLifeDays Half-life in days for whichever curve applies.
+    ///                          Zero means age does not affect weight.
     /// @param live             False when the upstream protocol is discontinued. Kept
     ///                         rather than deleted so historical scores stay explicable.
     /// @param sourceURI        Where the costs above were derived from. Auditability is
     ///                         the whole basis for trusting a curated weight.
+    enum AgeCurve {
+        None,
+        Decay,
+        Ramp
+    }
+
     struct Adapter {
         string name;
         EvidenceClass evidenceClass;
@@ -60,6 +73,7 @@ contract PersonhoodRegistry {
         uint64 forgeCostCents;
         uint64 rentCostCents;
         uint32 decayHalfLifeDays;
+        AgeCurve ageCurve;
         bool live;
         bool exists;
         string sourceURI;
@@ -77,14 +91,18 @@ contract PersonhoodRegistry {
 
     // -------------------------------------------------------------- events
 
+    /// @dev idString is the plaintext adapter id; the require in setAdapter guarantees it
+    ///      matches the hashed key, so indexers can reverse ids without an off-chain table.
     event AdapterSet(
         bytes32 indexed id,
+        string idString,
         string name,
         EvidenceClass evidenceClass,
         bytes32 indexed trustRoot,
         uint64 forgeCostCents,
         uint64 rentCostCents,
         uint32 decayHalfLifeDays,
+        AgeCurve ageCurve,
         bool live,
         string sourceURI,
         uint64 revision
@@ -98,6 +116,7 @@ contract PersonhoodRegistry {
     error UnknownAdapter(bytes32 id);
     error EmptyId();
     error ZeroAddress();
+    error IdMismatch(bytes32 id, string idString);
 
     // ----------------------------------------------------------- modifiers
 
@@ -114,19 +133,24 @@ contract PersonhoodRegistry {
 
     // ---------------------------------------------------------- mutations
 
-    /// @notice Create or update an adapter. Idempotent on `id`.
+    /// @notice Create or update an adapter. Idempotent on `id`, which must equal
+    ///         keccak256("adapter:" ++ idString) so the emitted plaintext is provably the
+    ///         preimage of the key.
     function setAdapter(
         bytes32 id,
+        string calldata idString,
         string calldata name,
         EvidenceClass evidenceClass,
         bytes32 trustRoot,
         uint64 forgeCostCents,
         uint64 rentCostCents,
         uint32 decayHalfLifeDays,
+        AgeCurve ageCurve,
         bool live,
         string calldata sourceURI
     ) external onlyCurator {
         if (id == bytes32(0)) revert EmptyId();
+        if (keccak256(abi.encodePacked("adapter:", idString)) != id) revert IdMismatch(id, idString);
 
         Adapter storage a = _adapters[id];
         if (!a.exists) {
@@ -140,6 +164,7 @@ contract PersonhoodRegistry {
         a.forgeCostCents = forgeCostCents;
         a.rentCostCents = rentCostCents;
         a.decayHalfLifeDays = decayHalfLifeDays;
+        a.ageCurve = ageCurve;
         a.live = live;
         a.sourceURI = sourceURI;
 
@@ -147,7 +172,18 @@ contract PersonhoodRegistry {
             ++revision;
         }
         emit AdapterSet(
-            id, name, evidenceClass, trustRoot, forgeCostCents, rentCostCents, decayHalfLifeDays, live, sourceURI, revision
+            id,
+            idString,
+            name,
+            evidenceClass,
+            trustRoot,
+            forgeCostCents,
+            rentCostCents,
+            decayHalfLifeDays,
+            ageCurve,
+            live,
+            sourceURI,
+            revision
         );
     }
 
