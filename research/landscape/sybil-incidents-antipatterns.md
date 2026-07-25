@@ -14,7 +14,7 @@ failure that is already documented.
 verified become **de facto sybils** — real, unique, verified people acting as programmable puppets
 for a high-information operator. At Idena's peak (May 2022), **23 entities — under 1% of distinct
 entities — controlled ≥40% of accounts and almost half of rewards**
-(`/home/hugo/Projects/poh-aggregator/research/references/ohlhaver-ethberlin-2024-transcript.md`;
+(`research/references/ohlhaver-ethberlin-2024-transcript.md`;
 paper: *Compressed to Zero: The Silent Strings of Proof of Personhood*, 2024). Every number in this
 file should be read against that framing: **detection numbers measure bots, not control.**
 
@@ -257,7 +257,7 @@ Three problems, and they generalise far beyond World:
 
 1. **It is a product control, not a cryptographic one.** Nothing in the ZK proof asserts presence.
    Per this research set's World ID write-up
-   (`/home/hugo/Projects/poh-aggregator/research/protocols/world-id.md`), the presence signal
+   (`research/protocols/world-id.md`), the presence signal
    surfaces to integrators as a **payload field** (`user_presence_completed` / a
    `require_user_presence` request flag), i.e. **an assertion made by the verifying service about a
    check it performed**, not a proven claim carried in the credential. A verifier who trusts that
@@ -299,7 +299,7 @@ sensor; it is the operator's employment contract.
 ### 2.3 Idena — the puppeteering crisis (the most important case in this file)
 
 Full transcript:
-`/home/hugo/Projects/poh-aggregator/research/references/ohlhaver-ethberlin-2024-transcript.md`.
+`research/references/ohlhaver-ethberlin-2024-transcript.md`.
 Paper: Ohlhaver & Nikulin, *Compressed to Zero: The Silent Strings of Proof of Personhood* (2024).
 The transcript is a machine ASR track — cite the paper for anything public.
 
@@ -368,7 +368,7 @@ only get worse.**
 ### 2.4 Circles — invitation farming, measured on-chain (2026)
 
 Measured directly on the Circles v2 public indexer by this research set on **2026-07-24**
-(see `/home/hugo/Projects/poh-aggregator/research/protocols/circles.md` for the queries):
+(see `research/protocols/circles.md` for the queries):
 
 - The indexer exposes a namespace **`CrcV2_InvitationsAtScale`** whose events are literally named
   **`BotCreated`** and **`FarmGrown`** (plus `InviterQuotaSet`, `InvitesClaimed`,
@@ -1031,7 +1031,7 @@ who do not are the ones who will blame us later.
 
 - Ohlhaver & Nikulin, *Compressed to Zero: The Silent Strings of Proof of Personhood* (2024) —
   local ETHBerlin04 keynote transcript at
-  `/home/hugo/Projects/poh-aggregator/research/references/ohlhaver-ethberlin-2024-transcript.md`
+  `research/references/ohlhaver-ethberlin-2024-transcript.md`
   (machine ASR — cite the paper, not the transcript, in anything public).
 - Motoyama, Levchenko, Kanich, McCoy, Voelker, Savage, *Re: CAPTCHAs — Understanding
   CAPTCHA-Solving Services in an Economic Context*, USENIX Security 2010 —
@@ -1090,10 +1090,10 @@ who do not are the ones who will blame us later.
 
 **Sibling files in this research set (measured on-chain findings, 2026-07-24)**
 
-- `/home/hugo/Projects/poh-aggregator/research/protocols/circles.md` — `BotCreated`/`FarmGrown`,
+- `research/protocols/circles.md` — `BotCreated`/`FarmGrown`,
   `originInviter` concentration, `Hub.sol` invitation economics
-- `/home/hugo/Projects/poh-aggregator/research/protocols/world-id.md` — presence-flag semantics
-- `/home/hugo/Projects/poh-aggregator/research/landscape/kyc-liveness-vendors.md` — the vendor set
+- `research/protocols/world-id.md` — presence-flag semantics
+- `research/landscape/kyc-liveness-vendors.md` — the vendor set
   named in the KYC-bypass reporting
 
 **Known gaps — where to look next**

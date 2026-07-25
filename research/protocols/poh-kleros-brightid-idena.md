@@ -719,7 +719,7 @@ This is the strongest documented case anywhere that a **working** proof-of-perso
 can still fail completely. Co-authored with **Mikhail Nikulin, Idena's own founder**, using
 Idena's internal data. Talk: ETHBerlin04 keynote, 2024-08-16,
 https://www.youtube.com/watch?v=-mwUQp2qwjk — transcript at
-`/home/hugo/Projects/poh-aggregator/research/references/ohlhaver-ethberlin-2024-transcript.md`
+`research/references/ohlhaver-ethberlin-2024-transcript.md`
 (auto-generated captions, lightly cleaned; cite the paper for anything public).
 
 The argument, in order:
@@ -1015,5 +1015,5 @@ next follow-up, below re-measuring registrations in 2026-10 after the PNK pool e
 - Explorer: https://scan.idena.io/ ; public indexer API: https://api.idena.io/api/
 - Ohlhaver & Nikulin, *Compressed to Zero: The Silent Strings of Proof of Personhood* (2024);
   ETHBerlin04 talk https://www.youtube.com/watch?v=-mwUQp2qwjk ; local transcript
-  `/home/hugo/Projects/poh-aggregator/research/references/ohlhaver-ethberlin-2024-transcript.md`
+  `research/references/ohlhaver-ethberlin-2024-transcript.md`
 - IDNA market data: CoinGecko `/api/v3/coins/idena`, 2026-07-24

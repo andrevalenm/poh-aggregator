@@ -90,7 +90,7 @@ distinction is load-bearing for our positioning.
   attestation rail. Anything we build that competes on "privacy-preserving 18+ proof" loses to a
   government freebie.**
 - **eIDAS2 / EUDI Wallet**: rollout targeted end-2026 (see sibling file
-  `/home/hugo/Projects/poh-aggregator/research/landscape/eidas2-eudi-wallet.md`). Same conclusion —
+  `research/landscape/eidas2-eudi-wallet.md`). Same conclusion —
   state-issued, free at point of use, and it will carry the age attribute.
 - **Member states going further:** France's SREN law + Arcom's binding technical référentiel (in
   force Jan 2025), penalties up to **€150,000 or 2% of worldwide annual turnover**. Germany
@@ -139,7 +139,7 @@ distinction is load-bearing for our positioning.
 `UNVERIFIED:` there is no reliable public number for total global age-assurance spend. Directional
 evidence only: an entire top-100 porn industry, 10 designated Australian platforms, and every UK
 Part 3 service with a stated minimum age are now buying HEAA. The vendors capturing it are the
-incumbents in `/home/hugo/Projects/poh-aggregator/research/landscape/kyc-liveness-vendors.md`
+incumbents in `research/landscape/kyc-liveness-vendors.md`
 (Yoti, Persona, Incode, VerifyMy, k-ID, Veriff…), not personhood protocols. If we want a number,
 look at Yoti's Companies House filings (UK-registered, publishes accounts) and k-ID / Persona
 funding rounds — that is the best available proxy for revenue in this niche.
@@ -629,7 +629,7 @@ theoretical — it has already killed or crippled the largest players in our sup
   `UNVERIFIED:` I have not re-fetched each DPA's own decision this run — do that before citing
   specific figures externally.)
 - **Fractal ID's 2024 breach** exposed KYC documents of web3 users (see
-  `/home/hugo/Projects/poh-aggregator/research/landscape/kyc-liveness-vendors.md`), demonstrating
+  `research/landscape/kyc-liveness-vendors.md`), demonstrating
   that the web3 identity supply chain is not operationally hardened.
 - **Civic discontinued its uniqueness and liveness products on 2025-07-31** and pivoted to embedded
   wallet auth. The most direct precedent available: a funded, credible team in exactly our category
@@ -872,10 +872,10 @@ Secondary (labelled as such throughout):
 
 Sibling research files relied on:
 
-- `/home/hugo/Projects/poh-aggregator/research/landscape/identity-infra-prior-art.md` (Human Passport, Civic, Spruce numbers)
-- `/home/hugo/Projects/poh-aggregator/research/landscape/kyc-liveness-vendors.md`
-- `/home/hugo/Projects/poh-aggregator/research/landscape/eidas2-eudi-wallet.md`
-- `/home/hugo/Projects/poh-aggregator/research/landscape/poh-landscape-sweep.md` (Humanity Protocol pivot, World AgentKit partner list)
+- `research/landscape/identity-infra-prior-art.md` (Human Passport, Civic, Spruce numbers)
+- `research/landscape/kyc-liveness-vendors.md`
+- `research/landscape/eidas2-eudi-wallet.md`
+- `research/landscape/poh-landscape-sweep.md` (Humanity Protocol pivot, World AgentKit partner list)
 
 ## Open questions for us
 
