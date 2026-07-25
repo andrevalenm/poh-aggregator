@@ -464,6 +464,16 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     })
   }
 
+  // Filtered on `held` like the rest: a lapsed window carries the note too, and there it only
+  // becomes a claim about the subject once an as-of instant puts the credential back in the score.
+  const unpinned = withNote('issuer-check-unavailable').filter((e) => e.held)
+  if (unpinned.length) {
+    out.push({
+      code: 'credential-issuer-unverified',
+      message: `${ids(unpinned)} is counted here on a record whose issuer could not be checked this run. The protocol names the only issuer its registry accepts and we normally read the attestation behind the credential to confirm it — a credential attributed to anyone else is not counted at all. This is the case where that second read did not answer, so the credential stands on the registry's own say-so alone.`,
+    })
+  }
+
   const stale = withNote('freshness-check-unavailable')
   if (stale.length) {
     out.push({

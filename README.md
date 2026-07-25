@@ -205,6 +205,16 @@ mapped back to the adapters that own them, and the result says so out loud:
 `aggregate-restates-other-credentials`. The whole thesis, on one address:
 [`research/protocols/human-passport-onchain-read.md`](research/protocols/human-passport-onchain-read.md).
 
+That read is one mapping lookup, so the question underneath it is *who is allowed to write to
+that mapping*. Passport's resolver answers on two independent grounds and both were moved rather
+than read: a stranger calling it reverts `NotAllowlisted()`, and EAS itself calling it with a
+struct attesting to anyone but Passport's own attester contract reverts `InvalidAttester()`. So
+every credential we count is now checked against the attestation behind it — un-revoked, still
+naming this subject, written by the attester **the resolver names at run time** — five distinct
+addresses across the seven chains, so a table of constants would have been five chances to be
+wrong about somebody's identity. A mismatch removes the credential; a read that
+would not answer never does. [`research/protocols/passport-attester-pin.md`](research/protocols/passport-attester-pin.md).
+
 Holonym closes that loop, because it is the protocol behind both of those stamps. The same
 address now reads directly against Holonym's Hub on Optimism and both credentials are there —
 so the collapse is one credential seen from two directions rather than a stamp name we trusted.
@@ -497,10 +507,11 @@ cd packages/sdk && node --test --experimental-strip-types src/ens-presentation.l
 cd apps/demo && npx playwright test
 ```
 
-506 of them pass as of 2026-07-25 (18 forge + 475 SDK + 13 browser). Two SDK tests are red and
-named: the deployed registry gained two adapters from another working copy and this tree's
-ontology has not caught up (`MORNING.md`, "Needs you" item 18). Three skip loudly, waiting on a
-subgraph version that is still syncing. Some live tests also skip rather than fail when the
+537 of them exist as of 2026-07-25 (18 forge + 506 SDK + 13 browser) and 535 pass. Two SDK tests
+are red and named: the deployed registry gained two adapters from another working copy and this
+tree's ontology has not caught up (`MORNING.md`, "Needs you" item 18). Nothing skips against a
+pinned subgraph version; against Studio's `version/latest` the free-tier quota can throttle the
+four tests that consult it, and some live tests likewise skip rather than fail when the
 third-party Verax indexer they cross-check against returns HTTP 429 — an unreachable source says
 nothing about the mechanism under test. The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
@@ -611,6 +622,16 @@ behind a proxy, so that cannot be fixed in place. Our residual is the mirror ima
 slot in someone else's contract. It is checked against `isHuman` on every call, so a moved layout
 costs us the flag and can never invent one — measured over 40 avatars sampled from the Hub's logs
 each live run. [`research/protocols/circles-stop-and-the-broken-getter.md`](research/protocols/circles-stop-and-the-broken-getter.md).
+
+**12. Pinning an issuer excludes third parties, not the issuer.** Passport's cached score is now
+checked per subject against the EAS attestation behind it, and the resolver enforces the same
+thing itself on two independent grounds — so nobody outside Passport can put a score in that
+mapping. But the resolver is UUPS-upgradeable by its owner and that owner can also add writers to
+an allowlist that emits no event and cannot be enumerated, so *Passport* can write whatever it
+likes about anybody. The same holds for every hosted credential in the ontology: Holonym's issuer
+key, Linea's portal owner, World's Orb. This is what a trust root *is*, which is why the weight
+tracks the root's cost rather than the strength of any signature check — and why a passport is
+priced at a dollar. [`research/protocols/passport-attester-pin.md`](research/protocols/passport-attester-pin.md).
 
 Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 

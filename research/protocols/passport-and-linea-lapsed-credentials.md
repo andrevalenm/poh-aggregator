@@ -244,11 +244,15 @@ distinguishable from the subject not existing.
 
 ## 6. Open questions
 
-1. **Does `GitcoinResolver.onAttest` constrain the attester?** The probe's authority model rests on
-   only EAS being able to write to the resolver and on Passport's schema pointing at it. That was
-   true before this change and is unchanged by it, but the EAS record read in §1.2 now gives us the
-   attester (`0x843829986e895facd330486a61Ebee9E1f1adB1a`) for free — pinning it the way Holonym's
-   issuer and Linea's portal owner are pinned would close the question rather than assume it.
+1. ~~**Does `GitcoinResolver.onAttest` constrain the attester?**~~ **Answered 2026-07-25 —
+   [passport-attester-pin.md](passport-attester-pin.md).** Yes, twice over, and the question was
+   phrased against the wrong function: this resolver implements the older `attest(Attestation)`
+   shape and has no `onAttest`. `attest` is `onlyAllowlisted` on the caller and `_attest` reverts
+   `InvalidAttester()` unless the struct's attester is `_gitcoinAttester`. Both were confirmed by
+   simulation, both anchors are public getters on the resolver, and the probe now reads them at
+   run time and checks the EAS record behind every credential it counts. `0x84382998…dB1a` is
+   Optimism's; there are five distinct attesters across the seven deployments, which is why the
+   address is read rather than pinned as a constant.
 2. **How often does a Passport re-mint overwrite a window we would have wanted?** Unmeasurable
    without historical `Attested` logs on seven chains (§5). It bounds how complete Passport's
    as-of coverage can ever be.

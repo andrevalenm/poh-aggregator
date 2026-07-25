@@ -142,6 +142,14 @@ export type ProvenanceNote =
    * head and not-held whenever the chain read failed.
    */
   | 'credential-minting-stopped'
+  /**
+   * The credential is held on the strength of a record whose issuer we could not check this run.
+   * The protocol publishes an issuer and the probe normally pins it — a mismatch is a statement
+   * and returns the credential as not held — so this says the *check* did not happen, not that it
+   * failed. It is the authority-side twin of `freshness-check-unavailable`: an unreadable source
+   * may never be turned into a claim about a person, in either direction.
+   */
+  | 'issuer-check-unavailable'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {

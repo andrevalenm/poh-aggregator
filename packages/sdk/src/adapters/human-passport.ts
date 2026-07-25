@@ -87,6 +87,47 @@ import type { ProbeProvenance } from '../reconcile.ts'
  * - **A zero score never was a credential.** A passport with no stamps is not wallet-history
  *   evidence while it is live (`held` is false for it), so its expiry does not close a window
  *   over anything. Those readings are excluded and counted rather than restored.
+ *
+ * ## Who is allowed to write a passport into that struct
+ *
+ * Everything above reads one mapping and trusts it. That trust was an assumption until it was
+ * measured, and measuring it is what this section records — the resolver's own source
+ * (`passportxyz/eas-proxy`, `GitcoinResolver.sol`, whose every selector matches the deployed
+ * Optimism implementation `0x2999Ef5C…79dC`) gates the write twice:
+ *
+ * ```solidity
+ * function attest(Attestation calldata a) external payable whenNotPaused onlyAllowlisted {…}
+ * function _attest(Attestation calldata a) internal returns (bool) {
+ *   if (a.attester != address(_gitcoinAttester)) revert InvalidAttester();
+ * ```
+ *
+ * Simulated on Optimism at head, one axis at a time, because a gate you have not moved is a gate
+ * you have not seen:
+ *
+ * | caller | `attester` in the struct | result |
+ * |---|---|---|
+ * | a stranger | Passport's attester | revert `NotAllowlisted()` `0x06fb10a9` |
+ * | EAS | a stranger | revert `InvalidAttester()` `0xb8daf542` |
+ * | EAS | Passport's attester | `true` — the write lands |
+ *
+ * So a cached score is Passport's or it is nobody's, and the probe now checks that per subject
+ * rather than resting on it: `userAttestations(subject, schema)` gives the uid the resolver filed,
+ * and the EAS attestation behind it must be un-revoked, still name this subject as recipient, and
+ * carry `attester == _gitcoinAttester()`. **Neither address is hard-coded.** The resolver names
+ * its own EAS and its own attester, and both differ per chain (`0x84382998…dB1a` on Optimism,
+ * `0xCc90105D…F422` on Base, Scroll and Shape, `0x7848a357…0475` on Arbitrum,
+ * `0xBC778313…10A2` on Linea, `0x2B5D97CB…83cC` on zkSync Era, all read 2026-07-25) — a table of
+ * seven attester constants would have been seven chances to be wrong about somebody's identity.
+ * This is the same shape as `gitcoinResolver()`: ask the contract what it trusts.
+ *
+ * A mismatch is a *statement*, not a failure, so it returns `held: false` with both keys named.
+ * A read that could not be made is a failure and never moves `held`: it keeps the credential and
+ * raises `issuer-check-unavailable`. That asymmetry is the rule at the top of `adapters/index.ts`
+ * applied to an authority check instead of to a presence check.
+ *
+ * What this does **not** close: the resolver is UUPS-upgradeable and its owner can add writers to
+ * the allowlist, so Passport can still write whatever it likes about anybody. The pin excludes
+ * *third parties*, which is the whole of what an issuer pin can ever mean for a hosted credential.
  */
 
 /**
@@ -125,7 +166,22 @@ const DECODER_ABI = parseAbi([
 
 const RESOLVER_ABI = parseAbi([
   'function getCachedScore(address user) view returns ((uint32 score, uint64 time, uint64 expirationTime))',
+  // The three the authority check rests on. Every one of them is the resolver telling us what it
+  // enforces, rather than us telling the resolver what we expect it to be.
+  'function _gitcoinAttester() view returns (address)',
+  'function _eas() view returns (address)',
+  'function scoreSchema() view returns (bytes32)',
+  'function scoreV2Schema() view returns (bytes32)',
+  'function userAttestations(address user, bytes32 schema) view returns (bytes32)',
 ])
+
+const EAS_ABI = parseAbi([
+  'function getAttestation(bytes32 uid) view returns ((bytes32 uid, bytes32 schema, uint64 time, uint64 expirationTime, uint64 revocationTime, bytes32 refUID, address recipient, address attester, bool revocable, bytes data))',
+])
+
+const ZERO_BYTES32 = '0x0000000000000000000000000000000000000000000000000000000000000000'
+const isZeroWord = (h: string): boolean => /^0x0*$/.test(h)
+const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e)).split('\n')[0]!
 
 /** Passport stores its score as a uint32 with four implied decimals: 288470 is 28.847. */
 const SCORE_DECIMALS = 10_000
@@ -254,11 +310,121 @@ export function closeLapsedPassportWindow(
   return { heldUntil: best.expiresAt, issuedAt: best.time, chain: best.chain, detail }
 }
 
+/** One EAS attestation, as much of it as the authority check needs. */
+export interface BackingAttestation {
+  uid: string
+  schema: string
+  /** Unix seconds EAS recorded the attestation at. */
+  time: number
+  /** 0 when live. Non-zero is an ending EAS dates, and a credential we may not count. */
+  revocationTime: number
+  recipient: Address
+  /** `msg.sender` of the `EAS.attest` call — the only field in here that carries authority. */
+  attester: Address
+}
+
+export type AttestationVerdict =
+  /** An un-revoked attestation by the resolver's own attester, naming this subject, at this instant. */
+  | { status: 'verified'; uid: string; schema: string; attester: Address }
+  /** A record exists and says something incompatible with this being Passport's credential. */
+  | { status: 'rejected'; reason: string; uid?: string }
+  /** Nothing contradicts the cached score; we simply could not corroborate it. Never moves `held`. */
+  | { status: 'unchecked'; reason: string }
+
+/**
+ * Decide whether the struct we read is backed by an attestation Passport itself wrote.
+ *
+ * Pure over what was read, because this is the only part of the adapter that can turn a held
+ * credential into an absent one, and every branch of it should be exercisable without a network.
+ *
+ * The check is worth precisely what the resolver's own gate is worth. `_attest` reverts
+ * `InvalidAttester()` unless `attestation.attester == address(_gitcoinAttester)`, and EAS sets
+ * `attester` to the `msg.sender` of the `attest` call it received — so an attestation carrying
+ * that address really did go through `GitcoinAttester`, whose `submitAttestations` in turn
+ * requires `verifiers[msg.sender]`. Nothing a third party controls appears anywhere on that path.
+ *
+ * Three fields have to agree and each is a distinct way of being wrong:
+ *
+ * - **`attester`** — the whole of the authority. Anything else is somebody else's credential
+ *   filed under Passport's schema, and it is `rejected`.
+ * - **`recipient`** — the binding to a person. An attestation about someone else says nothing
+ *   about this subject however impeccable its issuer.
+ * - **`revocationTime`** — EAS keeps a revoked attestation readable. `_revoke` normally clears
+ *   the cache with it, so a revoked attestation still sitting behind a live cached score is a
+ *   state we have never observed; it is rejected rather than assumed impossible.
+ *
+ * And one that decides *which* record to judge rather than whether to accept it. Passport files
+ * a uid per schema and mints under two of them, so a subject who moved from the legacy score to
+ * score-v2 has two uids on file and only one of them describes the cached struct. `time` is the
+ * discriminator: the resolver copies `attestation.time` verbatim into the struct, so the record
+ * behind *this* score is the one whose `time` is the score's. If no filed record carries it, the
+ * cache is uncorroborated rather than disproved — the ordinary cause is Passport rotating a
+ * schema after the write, which leaves the old uid on file under a key we no longer ask about —
+ * so that is `unchecked` and the credential stands.
+ */
+export function judgeBackingAttestation(
+  subject: Address,
+  cachedTime: number,
+  expectedAttester: Address,
+  records: readonly (BackingAttestation | null)[],
+): AttestationVerdict {
+  const filed = records.filter((r): r is BackingAttestation => r !== null)
+  if (filed.length === 0) {
+    return { status: 'unchecked', reason: 'the resolver has no attestation on file under either score schema' }
+  }
+  const dated = filed.filter((r) => r.time === cachedTime)
+  if (dated.length === 0) {
+    return {
+      status: 'unchecked',
+      reason:
+        `no attestation on file carries the cached score's instant (${cachedTime}); ` +
+        `on file: ${filed.map((r) => r.time).join(', ')}`,
+    }
+  }
+
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+  let firstRejection: AttestationVerdict | undefined
+  for (const r of dated) {
+    if (!same(r.attester, expectedAttester)) {
+      firstRejection ??= {
+        status: 'rejected',
+        uid: r.uid,
+        reason: `attested by ${r.attester}, and the resolver only accepts writes attested by ${expectedAttester}`,
+      }
+      continue
+    }
+    if (!same(r.recipient, subject)) {
+      firstRejection ??= {
+        status: 'rejected',
+        uid: r.uid,
+        reason: `the attestation behind this score names ${r.recipient}, not ${subject}`,
+      }
+      continue
+    }
+    if (r.revocationTime !== 0) {
+      firstRejection ??= {
+        status: 'rejected',
+        uid: r.uid,
+        reason: `the attestation behind this score was revoked at ${r.revocationTime}`,
+      }
+      continue
+    }
+    return { status: 'verified', uid: r.uid, schema: r.schema, attester: r.attester }
+  }
+  return firstRejection as AttestationVerdict
+}
+
 /** Per-chain configuration that never changes between lookups, fetched once per instance. */
 interface ChainConfig {
   resolver: Address
   maxScoreAge: number
   threshold: number
+  /** The EAS the resolver itself points at. Differs per chain; never hard-coded. */
+  eas: Address
+  /** The only attester whose writes this resolver accepts. Differs per chain; never hard-coded. */
+  attester: Address
+  /** `scoreSchema` and `scoreV2Schema`, minus any the resolver has not set. */
+  schemas: readonly string[]
 }
 
 export interface HumanPassportOptions {
@@ -298,11 +464,32 @@ export function humanPassportAdapter(opts: HumanPassportOptions = {}): AdapterPr
         c.readContract({ address: decoder, abi: DECODER_ABI, functionName: 'gitcoinResolver' }),
         c.readContract({ address: decoder, abi: DECODER_ABI, functionName: 'maxScoreAge' }),
         c.readContract({ address: decoder, abi: DECODER_ABI, functionName: 'threshold' }),
-      ]).then(([resolver, maxScoreAge, threshold]) => ({
-        resolver: resolver as Address,
-        maxScoreAge: Number(maxScoreAge),
-        threshold: Number(threshold),
-      }))
+      ]).then(async ([resolver, maxScoreAge, threshold]) => {
+        const at = { address: resolver as Address, abi: RESOLVER_ABI } as const
+        // A resolver that will not name its attester leaves us unable to check the credential,
+        // not free to skip checking it — so this failure takes the chain down to
+        // `chainsUnreadable` rather than producing a probe that trusts whatever it finds.
+        const [attester, eas] = await Promise.all([
+          c.readContract({ ...at, functionName: '_gitcoinAttester' }),
+          c.readContract({ ...at, functionName: '_eas' }),
+        ])
+        // The two schema getters are allowed to be missing: `scoreV2Schema` arrived in a later
+        // implementation, and a deployment without it still has a legacy score worth reading.
+        const schemas = (
+          await Promise.all([
+            c.readContract({ ...at, functionName: 'scoreSchema' }).catch(() => ZERO_BYTES32),
+            c.readContract({ ...at, functionName: 'scoreV2Schema' }).catch(() => ZERO_BYTES32),
+          ])
+        ).filter((s) => !isZeroWord(s))
+        return {
+          resolver: resolver as Address,
+          maxScoreAge: Number(maxScoreAge),
+          threshold: Number(threshold),
+          attester,
+          eas,
+          schemas,
+        }
+      })
       p.catch(() => configs.delete(chain))
       configs.set(chain, p)
     }
@@ -333,6 +520,69 @@ export function humanPassportAdapter(opts: HumanPassportOptions = {}): AdapterPr
       expiresAt,
       expired: now >= expiresAt,
       meetsOwnThreshold: score >= cfg.threshold,
+    }
+  }
+
+  /**
+   * Ask the chain whether Passport really wrote this score, and never let the asking break it.
+   *
+   * Two `eth_call`s for the uids the resolver filed, then one per distinct uid for the record
+   * behind it — at most four, and only on the chain whose reading is actually being used. The
+   * other six deployments stay disclosure in `detail.perChain`, unchecked and marked as such,
+   * because nothing there reaches a score.
+   *
+   * Everything in here is wrapped: an RPC that will not answer must produce `unchecked`, which
+   * cannot move `held`. Turning an outage into a rejected credential is the exact failure the
+   * rule at the top of `adapters/index.ts` forbids, one level up from presence.
+   */
+  const verifyAttestation = async (
+    chain: PassportChain,
+    subject: Address,
+    reading: ChainReading,
+  ): Promise<AttestationVerdict> => {
+    let cfg: ChainConfig
+    try {
+      cfg = await configFor(chain)
+    } catch (e) {
+      return { status: 'unchecked', reason: `resolver configuration unavailable: ${errText(e)}` }
+    }
+    if (cfg.schemas.length === 0) {
+      return { status: 'unchecked', reason: 'the resolver has no score schema set, so nothing is filed by uid' }
+    }
+    const c = clientFor(chain)
+    try {
+      const uids = await Promise.all(
+        cfg.schemas.map((schema) =>
+          c.readContract({
+            address: cfg.resolver,
+            abi: RESOLVER_ABI,
+            functionName: 'userAttestations',
+            args: [subject, schema as `0x${string}`],
+          }),
+        ),
+      )
+      const distinct = [...new Set(uids.filter((u) => !isZeroWord(u)))]
+      const records = await Promise.all(
+        distinct.map(async (uid): Promise<BackingAttestation> => {
+          const a = await c.readContract({
+            address: cfg.eas,
+            abi: EAS_ABI,
+            functionName: 'getAttestation',
+            args: [uid],
+          })
+          return {
+            uid,
+            schema: a.schema,
+            time: Number(a.time),
+            revocationTime: Number(a.revocationTime),
+            recipient: a.recipient as Address,
+            attester: a.attester as Address,
+          }
+        }),
+      )
+      return judgeBackingAttestation(subject, reading.time, cfg.attester, records)
+    } catch (e) {
+      return { status: 'unchecked', reason: `EAS record unreadable: ${errText(e)}` }
     }
   }
 
@@ -388,16 +638,68 @@ export function humanPassportAdapter(opts: HumanPassportOptions = {}): AdapterPr
         }
       }
 
+      /**
+       * A reading whose backing attestation the chain disowns is dropped, and the choice is made
+       * again over what is left. One chain carrying a record we cannot attribute to Passport must
+       * not hide a genuine passport on another — the same reason we read seven chains at all.
+       */
+      const rejections: { chain: PassportChain; reason: string }[] = []
+      const disowned = new Set<PassportChain>()
+      const surviving = () => readings.filter((r) => !disowned.has(r.chain))
+      const attestationDetail = (v: AttestationVerdict | undefined): Record<string, unknown> => {
+        if (v === undefined) return {}
+        if (v.status === 'verified') {
+          return { attestation: { uid: v.uid, schema: v.schema, attester: v.attester, verified: true } }
+        }
+        return { attestationUnverified: v.reason }
+      }
+      const rejectedList = () =>
+        rejections.length
+          ? { attestationsRejected: rejections.map((r) => `${r.chain}: ${r.reason}`) }
+          : {}
+
       // Freshest unexpired mint wins: it is the strongest evidence available and the one the
       // subject most recently paid to publish. A score of 0 is a real passport carrying no
       // stamps, which is not wallet-history evidence, so it does not count as held.
-      const valid = readings.filter((r) => !r.expired && r.score > 0)
-      if (valid.length === 0) {
-        const newest = readings.reduce((a, b) => (b.expiresAt > a.expiresAt ? b : a))
+      let best: ChainReading | undefined
+      let verdict: AttestationVerdict | undefined
+      for (;;) {
+        const pool = surviving().filter((r) => !r.expired && r.score > 0)
+        if (pool.length === 0) break
+        const candidate = pool.reduce((a, b) => (b.time > a.time ? b : a))
+        const v = await verifyAttestation(candidate.chain, subject, candidate)
+        if (v.status === 'rejected') {
+          rejections.push({ chain: candidate.chain, reason: v.reason })
+          disowned.add(candidate.chain)
+          continue
+        }
+        best = candidate
+        verdict = v
+        break
+      }
+      if (best === undefined) {
         // The resolver keeps the struct after the Decoder stops honouring it, so this negative
-        // can carry the whole life of the credential rather than only its absence.
-        const window = closeLapsedPassportWindow(readings, now)
+        // can carry the whole life of the credential rather than only its absence — but only for
+        // a credential we can still attribute, which is the test iteration 16 refused Holonym on.
+        let window = closeLapsedPassportWindow(surviving(), now)
+        let lapsedVerdict: AttestationVerdict | undefined
+        while (window.chain !== undefined) {
+          const r = surviving().find((x) => x.chain === window.chain)!
+          const v = await verifyAttestation(window.chain, subject, r)
+          if (v.status !== 'rejected') {
+            lapsedVerdict = v
+            break
+          }
+          rejections.push({ chain: window.chain, reason: v.reason })
+          disowned.add(window.chain)
+          window = closeLapsedPassportWindow(surviving(), now)
+        }
         if (window.heldUntil !== undefined) provenance.notes.push('date-from-lapsed-verification')
+        if (window.heldUntil !== undefined && lapsedVerdict?.status === 'unchecked') {
+          provenance.notes.push('issuer-check-unavailable')
+        }
+        const left = surviving()
+        const newest = left.length ? left.reduce((a, b) => (b.expiresAt > a.expiresAt ? b : a)) : undefined
         return {
           held: false,
           ...(window.issuedAt !== undefined ? { issuedAt: window.issuedAt } : {}),
@@ -408,15 +710,22 @@ export function humanPassportAdapter(opts: HumanPassportOptions = {}): AdapterPr
           },
           detail: {
             minted: true,
-            reason: newest.score === 0 ? 'score-zero' : 'score-expired',
-            expiredAt: newest.expiresAt,
+            reason:
+              newest === undefined
+                ? 'attestation-not-passports'
+                : newest.score === 0
+                  ? 'score-zero'
+                  : 'score-expired',
+            ...(newest ? { expiredAt: newest.expiresAt } : {}),
             ...window.detail,
+            ...(window.heldUntil !== undefined ? attestationDetail(lapsedVerdict) : {}),
+            ...rejectedList(),
             perChain,
             ...unreadable,
           },
         }
       }
-      const best = valid.reduce((a, b) => (b.time > a.time ? b : a))
+      if (verdict?.status === 'unchecked') provenance.notes.push('issuer-check-unavailable')
 
       // Stamps are disclosure only — they never change `held` or the weight. Best-effort:
       // getPassport reverts AttestationNotFound when only a community-scoped score is cached,
@@ -455,6 +764,8 @@ export function humanPassportAdapter(opts: HumanPassportOptions = {}): AdapterPr
           meetsPassportThreshold: best.meetsOwnThreshold,
           ...(stamps ? { stamps } : {}),
           ...(restatedAdapters.length ? { restatesAdapters: restatedAdapters } : {}),
+          ...attestationDetail(verdict),
+          ...rejectedList(),
           perChain,
           ...unreadable,
         },
