@@ -335,17 +335,30 @@ a {
 }
 
 #print {
+  /* The print used to bleed 6% of the hero *above* the hero's top edge, which is exactly
+     where the nav sits, so the ridges ran under the menu links. Masking that band out was
+     worse than the bug — it amputated the crown of the whorl and read as a rendering fault
+     rather than a decision. The print is drawn whole instead, and simply given less room:
+     the box starts below the nav and ends at the hero's floor, so the whole stamp lands
+     inside the fold with nothing clipped at either end.
+
+     fingerprint.ts derives everything from this box — centre at 49% of its height, radius
+     at min(33% of width, 41% of height) — and re-lays out on resize at devicePixelRatio,
+     so shrinking the box shrinks the print itself and it stays crisp on retina. Costs about
+     a sixth of the radius; the whorl still owns the right half of the hero.
+
+     `top` is real pixels because the nav is real pixels: 1.5rem of padding either side of a
+     1.35rem wordmark, ~83px at every viewport we ship. A percentage is what failed before —
+     the canvas grows with the viewport while the nav does not, so any share-of-the-canvas
+     offset slides out from under the menu on tall screens. And a canvas is a replaced
+     element, so it needs an explicit width/height; insets alone leave it at 300x150. */
   position: absolute;
-  inset: -6% 0;
+  top: 4rem;
+  left: 0;
   width: 100%;
-  height: 112%;
+  height: calc(100% - 4rem);
   z-index: -1;
   will-change: transform;
-  /* The whorl bleeds 6% above the hero, which is exactly where the nav sits —
-     the ridges ran under the menu links. Fade the top out so the nav lands on
-     clean paper, rather than moving the print and losing the composition. */
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 3%, #000 13%);
-  mask-image: linear-gradient(to bottom, transparent 0, transparent 3%, #000 13%);
 }
 
 .hero .contour-layer {
