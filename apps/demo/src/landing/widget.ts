@@ -243,7 +243,7 @@ export function mountWidget(): void {
       h(
         'p',
         { class: 'probe-lede' },
-        `Probing 4 protocols against ${subjects.length} wallet${subjects.length === 1 ? '' : 's'}, live:`,
+        `Probing the 4 live adapters against ${subjects.length} wallet${subjects.length === 1 ? '' : 's'}:`,
       ),
     )
     const slot = h('div')
