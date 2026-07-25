@@ -266,7 +266,7 @@ const EXAMPLES: { label: string; value: string }[] = [
       '0x58b849f60b0515871fcfa80c7907d097571f2a12, 0xd267eba602e692216703626a81157214b24c85fb, 0x7D8459e2ca3f62E6d8599E98ebf8c42d88218C87',
   },
   { label: 'An Orb-verified wallet', value: '0x58b849f60b0515871fcfa80c7907d097571f2a12' },
-  { label: 'A 2024 PoH survivor', value: '0x17a91203a9e9c3519c2f76210497ef7f4be2352f' },
+  { label: 'A Proof of Humanity member', value: '0x17a91203a9e9c3519c2f76210497ef7f4be2352f' },
 ]
 
 export function wireLookup(): void {
