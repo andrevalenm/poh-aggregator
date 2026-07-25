@@ -341,6 +341,11 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Repo is on GitHub (private)**: https://github.com/Hugo0/poh-aggregator — full history
+(secrets-audited first: only placeholder `0x...` strings, no real keys, no World API key
+anywhere in history). andrevalenm invited with write permission and continues the work;
+local remote is `github`. Public visibility deferred until the name decision.
+
 **Consolidation verified + perf held**: the merged SDK passes its full suite (224 tests,
 0 failures — grown from 34). The research module (four sections below the fold) now
 lazy-loads at idle instead of competing with first paint; mobile Lighthouse holds at 85
