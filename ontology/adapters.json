@@ -271,8 +271,8 @@
       "decayHalfLifeDays": 365,
       "live": true,
       "sourceURI": "research/protocols/poh-kleros-brightid-idena.md",
-      "implemented": false,
-      "notes": "Superseded by v2 but the v1 registry still answers on Ethereum mainnet and Gnosis. Shares v2’s root on purpose: a subject registered in both holds one vouched identity, not two, and saturation is what says so. Priced as v2 — the deposit differs, the rental economics do not.",
+      "implemented": true,
+      "notes": "Superseded by v2 but the v1 registry still answers on Ethereum mainnet (0xC5E9dDebb09Cd64DfaCab4011A0D5cEDaf7c9BDb). Shares v2’s root on purpose: a subject registered in both holds one vouched identity, not two, and saturation is what says so. Priced as v2 — the deposit differs, the rental economics do not. Read 2026-07-25: isRegistered is `registered && now - submissionTime <= submissionDuration`, and the struct’s `registered` flag is never cleared on expiry — 33 of 215 sampled submitters have it set with the credential long dead. PoH v2 keeps its own overlay for the frozen contract (ForkModule 0x068a27Db9c3B8595D03be263d52c813cb2C99cCB): 9 registrations are retired there while v1 goes on honouring them, one for 510 days. Term is 730.5 days (was 365.25 until governance changed it), which caps the ramp at 0.75 however long anyone survives. Population enumerated from the chain at block 25,610,404: **2 registered addresses out of 20,740 lifetime submissions**, expiring 2026-09-07 and 2026-11-16. live:true means the contract works, not that it has users.",
       "ageCurve": "Ramp"
     },
     {

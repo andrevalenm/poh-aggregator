@@ -57,6 +57,7 @@ what the read cannot see. Each names the deep dive above that it builds on.
 | [holonym-human-id-onchain-read.md](protocols/holonym-human-id-onchain-read.md) | Holonym / Human ID Hub V3 on OP Mainnet | No action-id needed after all; the issuer must be checked or the SBT is forgeable; the circuit's one-year ceiling is the date |
 | [world-id-onchain-read.md](protocols/world-id-onchain-read.md) | World ID on World Chain | `WorldIDAddressBook` is the registry World populates, not AgentBook; `verifiedUntil − 168 days` is the exact verification block; the mapping is never cleared, so held is a comparison; one live binding per human, enforced on chain; the document and Selfie tiers leave no per-holder state anywhere |
 | [linea-poh-onchain-read.md](protocols/linea-poh-onchain-read.md) | Linea PoH V2 via Verax on Linea | There is no per-subject read, so enumerate the whole live population — a 90-day term confines it to 1,024 of 6.37M ids; the portal our research named is the dead test one; Linea's own `poh-api` and `PohVerifier` say yes ten months after expiry |
+| [poh-v1-onchain-read.md](protocols/poh-v1-onchain-read.md) | Proof of Humanity v1 on Ethereum mainnet | `isRegistered` is a comparison and the struct's `registered` flag outlives the term; PoH v2's ForkModule retires registrations v1 keeps honouring, one for 510 days; acceptance emits nothing and can lag the request by 761 days, so only a full-history scan enumerates the registry — 2 registered out of 20,740 lifetime submissions |
 
 ## Landscape — the field, the theory, and the adversary
 

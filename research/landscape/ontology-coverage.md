@@ -67,7 +67,7 @@ is why Civic and Sismo are in the file at all.
 | Humanity Protocol | `kyc-vendor:unattributed` | — | — | `protocols/humanity-protocol.md` |
 | **Fractal ID** | `kyc-vendor:fractal` | ✔ | — | `landscape/kyc-liveness-vendors.md` |
 | Proof of Humanity v2 | `social-vouching:poh` | ✔ | ✔ | `protocols/poh-kleros-brightid-idena.md` |
-| **Proof of Humanity v1** | `social-vouching:poh` | ✔ | — | `protocols/poh-kleros-brightid-idena.md` |
+| **Proof of Humanity v1** | `social-vouching:poh` | ✔ | ✔ | `protocols/poh-kleros-brightid-idena.md` (costs); `protocols/poh-v1-onchain-read.md` (the read) |
 | BrightID | `social-vouching:brightid` | — | — | `protocols/poh-kleros-brightid-idena.md` |
 | Circles v2 | `social-trust:circles` | ✔ | ✔ | `protocols/circles.md` |
 | **Farcaster account** | `social-account:farcaster` | ✔ | — | `landscape/social-and-zktls-signals.md` |
@@ -123,7 +123,7 @@ Bold rows are new in this revision.
 | `kyc-vendor:unattributed` | 3 | Deliberately merged; see below. |
 | `behavioral:wallet-history` | 3 | One farmed wallet → Human Passport, Nomis, Trusta. |
 | `kyc-vendor:sumsub` | 2 | One Sumsub check → Galxe Passport, Linea PoH V2. |
-| `social-vouching:poh` | 2 | One vouched registration → PoH v1 and v2. |
+| `social-vouching:poh` | 2 | One vouched registration → PoH v1 and v2. Both probed; v1's live population is 2 addresses out of 20,740 lifetime submissions, so the saturation this root exists for is real but currently unexercised. |
 
 Two root decisions are judgement calls and are recorded as such:
 
@@ -273,8 +273,28 @@ the read is):
    live verified address per human, enforced on chain. Coverage: ~28,000 verifications a day at
    head against AgentBook's 1,068 lifetime transactions. Write-up:
    `protocols/world-id-onchain-read.md`.
-6. **Proof of Humanity v1** — a second `isRegistered` call on a registry we already talk to. Cheap,
-   and it exercises saturation against v2 with real data.
+6. ~~**Proof of Humanity v1**~~ — **DONE 2026-07-25.** It really is a second `isRegistered` call,
+   and the two things around it are what mattered. `isRegistered` is a *comparison* —
+   `registered && now - submissionTime <= submissionDuration` — while the struct's `registered`
+   flag, which is the fourth field `getSubmissionInfo` hands you, is **never cleared on expiry**:
+   33 of 215 sampled submitters have it set with the credential dead. And PoH v2 cannot write to
+   the frozen v1 contract, so it keeps an overlay (`ForkModule.removed`, `0x068a27Db…9cCB`)
+   recording registrations it has retired by migration or revocation — nine are set, and one of
+   them went on being honoured by v1 for **510 days** after v2 retired it. `held` is therefore
+   `v1.isRegistered && !forkModule.removed`, and *not* `ForkModule.isRegistered`, which adds v2's
+   migration-eligibility condition and is false for the entire live population.
+
+   The population is the finding: enumerated from the registry's whole event history plus one
+   `isRegistered` each, **2 addresses are registered today out of 20,740 lifetime submissions**,
+   both expiring in late 2026. A window-bounded enumeration is unsound — `executeRequest` emits
+   nothing and can be called at any time, and one survivor's single request sat 761 days between
+   being made and being accepted. So `live: true` here means the contract works, not that the
+   protocol has users, and the ontology note now says exactly that. Write-up:
+   `protocols/poh-v1-onchain-read.md`.
+
+**The passively-readable queue is now empty.** Everything below is documented as *not* readable
+without vendor cooperation, so the next marginal probe would cost the product principle at the top
+of `packages/sdk/src/adapters/index.ts` rather than buy coverage.
 
 Explicitly **not** passively readable, and the reason in each case:
 
