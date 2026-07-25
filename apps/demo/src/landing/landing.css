@@ -360,15 +360,14 @@ a {
 
 .sl-line {
   display: inline-block;
+}
+
+html.js .sl-line {
   transform: translateY(118%);
   transition: transform 1.15s cubic-bezier(0.19, 0.8, 0.22, 1);
 }
 
-.sl-in .sl-line {
-  transform: none;
-}
-
-.hero-answer {
+html.js .hero-answer {
   max-width: 52ch;
   font-size: clamp(1.08rem, 1.7vw, 1.28rem);
   line-height: 1.6;
@@ -1712,13 +1711,13 @@ a {
 
 /* ---------------------------------------------------------------- reveals */
 
-.reveal {
+html.js .reveal {
   opacity: 0;
   transform: translateY(28px);
   transition: opacity 1s cubic-bezier(0.19, 0.8, 0.22, 1), transform 1s cubic-bezier(0.19, 0.8, 0.22, 1);
 }
 
-.reveal.in {
+html.js .reveal.in {
   opacity: 1;
   transform: none;
 }
