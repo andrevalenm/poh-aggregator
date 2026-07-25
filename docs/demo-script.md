@@ -36,8 +36,9 @@ the RPC waits are the only variable, and the lookup chips make them predictable.
 - Chip: "A 2024 PoH survivor". Point at the PoH row: freshness ~73%.
 > "This weight is computed from the credential's real age, indexed by our subgraph —
 > registration during last week's airdrop weighs almost nothing, two years of survival
-> weighs a lot. Without The Graph this number degrades to a flagged midpoint: same
-> wallet, 2.40 instead of 2.56. And it's two subgraphs: protocol history on Studio, and
+> weighs a lot. Without The Graph this weight degrades to a flagged
+> midpoint. The subgraph moves it toward the truth in whichever direction the real age
+> points — a freshly-renewed registration weighs less, a long-survived one more. And it's two subgraphs: protocol history on Studio, and
 > the registry's audit trail self-hosted — every weight we've ever assigned, with its
 > source and block. 'Why did my score change' is a GraphQL query."
 - Flash the audit-trail query result (terminal or browser at
