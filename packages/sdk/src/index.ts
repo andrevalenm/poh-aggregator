@@ -27,6 +27,7 @@ export * from './as-of.ts'
 export * from './fleet.ts'
 export * from './agentbook.ts'
 export * from './ens-agents.ts'
+export * from './ens-presentation.ts'
 
 /**
  * Named thresholds for `isHuman(threshold)`, exported as documented constants rather than

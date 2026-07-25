@@ -1,7 +1,8 @@
 import { getAddress, isAddress, keccak256, namehash, parseAbi, toBytes, type Hex, type PublicClient } from 'viem'
 import { normalize } from 'viem/ens'
 import type { Address, Caveat } from './types.ts'
-import type { FleetAgent, HumanBacking } from './fleet.ts'
+import type { FleetAgent, HumanBacking, PresenterAuthentication } from './fleet.ts'
+import type { EnsPresentationResult } from './ens-presentation.ts'
 
 /**
  * ENS as the carrier of *agent* identity.
@@ -374,8 +375,18 @@ export async function resolveEnsAgents(
  * An agent whose name carries no `addr` record still needs an address to be keyed on. Its node
  * hash is used, prefixed, so two such agents remain distinguishable and neither is mistaken for
  * a wallet.
+ *
+ * `presentations` are the results of the presenter gate (`ens-presentation.ts`), keyed by the
+ * normalized name each was issued for. They attach **per wallet**, not per name: a signature
+ * proves control of a key, and every name in this batch resolving to that key designates the
+ * same key — so authenticating under one of a wallet's names authenticates the wallet. Omit them
+ * and every agent arrives with no presenter field, which is what a caller with no challenge
+ * channel should look like.
  */
-export function toFleetAgents(identities: readonly EnsAgentIdentity[]): FleetAgent[] {
+export function toFleetAgents(
+  identities: readonly EnsAgentIdentity[],
+  presentations?: ReadonlyMap<string, EnsPresentationResult>,
+): FleetAgent[] {
   // Several names can carry the same `addr` record, and in ENS that is ordinary rather than
   // exotic — a name is an identity, a wallet is a key, and one key can be named many times.
   // The fleet engine keys agents by address, so two names for one wallet must be collapsed
@@ -384,18 +395,57 @@ export function toFleetAgents(identities: readonly EnsAgentIdentity[]): FleetAge
   const out: FleetAgent[] = []
   for (const id of identities) {
     if (!id.agent) {
-      out.push(fleetAgentOf([id], `0xname:${id.node.slice(2, 42)}` as unknown as Address))
+      out.push(fleetAgentOf([id], `0xname:${id.node.slice(2, 42)}` as unknown as Address, presentations))
       continue
     }
     const key = lower(id.agent)
     if (!byWallet.has(key)) byWallet.set(key, [])
     byWallet.get(key)!.push(id)
   }
-  for (const group of byWallet.values()) out.push(fleetAgentOf(group, group[0]!.agent!))
+  for (const group of byWallet.values()) {
+    out.push(fleetAgentOf(group, group[0]!.agent!, presentations))
+  }
   return out
 }
 
-function fleetAgentOf(group: readonly EnsAgentIdentity[], agent: Address): FleetAgent {
+/**
+ * Collapse a wallet's presentations into one answer.
+ *
+ * Any authentication wins, because one is all the claim needs: this key answered a challenge.
+ * Failing that, a definite refusal outranks an unreadable one — if one name's signature came back
+ * signed by the wrong wallet, that is a fact, and it should not be softened into `unknown` by a
+ * second name whose ERC-1271 read timed out.
+ */
+function presenterOf(
+  group: readonly EnsAgentIdentity[],
+  presentations?: ReadonlyMap<string, EnsPresentationResult>,
+): PresenterAuthentication | undefined {
+  if (!presentations) return undefined
+  const results = group.map((g) => presentations.get(g.name)).filter((r): r is EnsPresentationResult => !!r)
+  if (!results.length) return undefined
+
+  const ok = results.find((r) => r.status === 'authenticated')
+  if (ok) {
+    return {
+      status: 'authenticated',
+      detail: `${ok.address} signed this counterparty's challenge for ${ok.name}${
+        ok.method === 'erc-1271' ? ', verified by that account’s own ERC-1271 check' : ''
+      }`,
+    }
+  }
+  const refused = results.find((r) => r.status === 'unauthenticated')
+  if (refused) {
+    return { status: 'unauthenticated', detail: refused.error ?? `presentation for ${refused.name} was refused` }
+  }
+  const unknown = results[0]!
+  return { status: 'unknown', error: unknown.error ?? `presentation for ${unknown.name} could not be checked` }
+}
+
+function fleetAgentOf(
+  group: readonly EnsAgentIdentity[],
+  agent: Address,
+  presentations?: ReadonlyMap<string, EnsPresentationResult>,
+): FleetAgent {
   const label = group.map((g) => g.name).join(' + ')
   const blocks = group.map((g) => g.createdAtBlock).filter((b): b is number => b !== undefined)
   const registeredAtBlock = blocks.length ? Math.min(...blocks) : undefined
@@ -432,11 +482,13 @@ function fleetAgentOf(group: readonly EnsAgentIdentity[], agent: Address): Fleet
     }
   }
 
+  const presenter = presenterOf(group, presentations)
   return {
     agent,
     label,
     backing,
     ...(registeredAtBlock !== undefined ? { registeredAtBlock } : {}),
+    ...(presenter ? { presenter } : {}),
   }
 }
 
@@ -481,14 +533,36 @@ export function sharedWalletHumans(
     .map((v) => ({ wallet: v.wallet, humanIds: [...v.humanIds] }))
 }
 
-/** Caveats about the batch as a whole, to sit beside the fleet decision's own. */
-export function ensBatchCaveats(identities: readonly EnsAgentIdentity[]): Caveat[] {
+/**
+ * Caveats about the batch as a whole, to sit beside the fleet decision's own.
+ *
+ * Pass the presenter-gate results to have the authentication caveat describe what actually
+ * happened. With none — a caller that has no challenge channel — it says the same thing it has
+ * always said: nothing here authenticates anybody.
+ */
+export function ensBatchCaveats(
+  identities: readonly EnsAgentIdentity[],
+  presentations?: ReadonlyMap<string, EnsPresentationResult>,
+): Caveat[] {
   const caveats: Caveat[] = []
-  caveats.push({
-    code: 'agent-presenter-not-authenticated',
-    message:
-      'An ENS name says which wallet an agent is; it does not establish that the party presenting the name controls that wallet. That is a signature check the counterparty runs itself — the World AgentKit flow in this repo does it with CAIP-122.',
-  })
+  const named = identities.map((id) => presentations?.get(id.name))
+  const authenticated = named.filter((r) => r?.status === 'authenticated').length
+  if (authenticated === 0) {
+    caveats.push({
+      code: 'agent-presenter-not-authenticated',
+      message:
+        'An ENS name says which wallet an agent is; it does not establish that the party presenting the name controls that wallet. That is a signature check the counterparty runs itself — the World AgentKit flow in this repo does it with CAIP-122, and `verifyEnsPresentation` does it for a name.',
+    })
+  } else {
+    const unproven = identities.length - authenticated
+    caveats.push({
+      code: 'agent-presenter-authenticated',
+      message:
+        `${authenticated} of ${identities.length} name(s) in this batch were presented by a party that signed this counterparty's challenge with the wallet the name resolves to${
+          unproven > 0 ? `; the other ${unproven} was not, and everything read about it is a statement about a public name rather than about whoever is asking` : ''
+        }. A signature proves control of that key at this moment for this request. It does not prove the presenter is the agent's operator, does not stand in for the human's acknowledgement, and does not survive the addr record being rewritten by whoever owns the node.`,
+    })
+  }
   const wallets = new Map<string, string[]>()
   for (const id of identities) {
     if (!id.agent) continue

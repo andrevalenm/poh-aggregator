@@ -84,7 +84,7 @@ The test asserts both directions — that the person wins under our model, *and*
 sum would have inverted the ranking. If saturation ever broke, the second assertion fails.
 
 ```bash
-cd packages/sdk && npm test    # 314 tests
+cd packages/sdk && npm test    # 389 tests
 ```
 
 ---
@@ -300,6 +300,13 @@ the human behind the name, the human's acknowledgement of that agent, every sibl
 tree, and then shows what a self-published binding costs — one agent walks the per-human cap by
 naming a second wallet of its own operator, until the policy requires the acknowledgement.
 
+Its last two runs are the **presenter gate**: everything above is read from public records, so
+none of it says the party on the connection holds anything. Each agent answers an ERC-4361
+challenge with the wallet its name designates and 2 of 3 are admitted — the same result as
+without the gate, because proof costs an honest agent nothing. Then the *same three names* are
+presented by a wallet generated one second earlier, with identical records, identical human and
+identical score: **0 of 3**.
+
 Its fourth gate is a **fleet policy**, `evaluateFleet()` in the SDK. A counterparty declares
 `maxAgentsPerHuman`, `minScore`, `minIndependentRoots`, what to do with agents nobody
 registered, and which of a human's agents keeps the slot; the engine allocates the slots and
@@ -447,9 +454,10 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 314 SDK tests: 202 unit (scoring model, index reconciliation, input, ontology, SBT
+# 389 SDK tests: 271 unit (scoring model, index reconciliation, input, ontology, SBT
 # interpretation, Verax attestation selection, World address-book interpretation, PoH v1
-# submission interpretation, as-of reconstruction, fleet policy, ENS agent identity) + 112 live
+# submission interpretation, as-of reconstruction, fleet policy, ENS agent identity,
+# ENS presenter authentication) + 118 live
 cd packages/sdk && npm test
 
 # the live ones alone — real chains, the deployed registry, no mocks
@@ -463,12 +471,13 @@ cd packages/sdk && node --test --experimental-strip-types src/adapters/poh-v1.li
 cd packages/sdk && node --test --experimental-strip-types src/as-of.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/agentbook.live.test.ts
 cd packages/sdk && node --test --experimental-strip-types src/ens-agents.live.test.ts
+cd packages/sdk && node --test --experimental-strip-types src/ens-presentation.live.test.ts
 
 # 13 browser E2E against the built demo, real chains
 cd apps/demo && npx playwright test
 ```
 
-All 345 pass as of 2026-07-25 (18 forge + 314 SDK + 13 browser; two of the SDK live tests skip
+All 420 pass as of 2026-07-25 (18 forge + 389 SDK + 13 browser; two of the SDK live tests skip
 loudly when the third-party Verax indexer they cross-check against returns HTTP 429, and did not
 on this run). The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
@@ -627,7 +636,19 @@ while every individual answer stays true. Our own tree runs that attack against 
 `unverified.corroborate.eth` names a wallet its own operator already declares, and walks the cap.
 An acknowledgement from the human's side makes the binding `mutual`, `requireAttestedBinding`
 refuses one-way claims, and the caveat `fleet-cap-soft-on-asserted-bindings` fires whenever a
-policy admits them. Full write-up:
+policy admits them.
+
+A third piece answers the other question a public name cannot: **who is presenting it?** A name
+is public, so until this existed anyone could type `alpha.corroborate.eth` into a counterparty's
+form and be scored on the credentials of the human behind it. `verifyEnsPresentation()` closes
+that with an ERC-4361 challenge bound to the name (`ens:<name>` in `Resources`, so a signature
+collected for one name is refused for another) and one comparison: does the signer equal the
+`addr` record read in the same pass? The **wallet** signs, not the name's owner — the owner
+signing would prove only control of the name, which is exactly the impersonation the gate stops.
+An EOA never touches the network; a smart account's ERC-1271 check does, and a failed read comes
+back `unknown` → `indeterminate` rather than as an accusation. `requirePresenterAuthentication`
+is the policy flag; `agent-presenter-authenticated-for-this-wallet-only` states what a signature
+does not prove. Full write-up:
 [`research/protocols/ens-agent-identity.md`](research/protocols/ens-agent-identity.md), which
 also documents how to register a Sepolia `.eth` name today (free, no commit/reveal — the
 migration made it easier, not harder).

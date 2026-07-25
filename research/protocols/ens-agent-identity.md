@@ -160,9 +160,56 @@ It establishes that whoever controls the human's name accepts this agent. It doe
 that the human is a distinct person, that they are *operating* the agent, or that the wallets in
 `corroborate.subjects` are theirs — that last one is the pre-existing
 `address-set-asserted-by-name-owner` caveat and it is unchanged. Nor does resolving a name
-authenticate the party presenting it: `agent-presenter-not-authenticated` fires on every batch,
-and pointing at the CAIP-122 signature gate in the World flow is the answer, not a claim that
-ENS solved it.
+authenticate the party presenting it — see §5.1, which was open when this file was written and
+is now closed.
+
+### 5.1 The presenter gate (added 2026-07-25)
+
+A name is public and so is everything read from it, so until this was built, anyone could type
+`alpha.corroborate.eth` into a counterparty's form and be scored on the credentials of the human
+behind it — riding a stranger's evidence with no key, no transaction and no trace, while the
+counterparty's own log named a party that was never there. `agent-presenter-not-authenticated`
+reported the gap honestly on every batch for four iterations. `packages/sdk/src/ens-presentation.ts`
+closes it: an ERC-4361 challenge the counterparty issues, a signature the presenter returns, and
+one comparison against the `addr` record read in the same pass.
+
+Four decisions in it are worth more than the code:
+
+- **The wallet signs, not the node owner.** Both keys exist and prove different things. The
+  wallet proves the presenter is the party the name currently designates — the party about to be
+  transacted with, and the key the fleet slot is allocated to. The owner would prove only control
+  of the *name*, so an operator pointing a name at a wallet it does not hold could present as
+  that wallet, which is the impersonation the gate exists to stop. Whether the signer *also* owns
+  the node is reported (`signerIsNodeOwner`, `agent-signer-owns-the-name`) because it says whether
+  the key in front of you can rewrite the records you just read — never as a condition.
+- **The name is inside the signed message**, as `ens:<name>` in ERC-4361 `Resources`, and a
+  signature carrying any other name is refused. Without it one signature authenticates its signer
+  for every name in the tree pointing at that wallet, and a signature collected for one name can
+  be presented for another. A signature that does not name what it authorises is a bearer token.
+  Both the unit suite and the live suite prove this with the *same nonce* on both challenges, so
+  the refusal can only come from the name binding.
+- **The gate runs before the grouping, not merely before the slot allocation.** An impostor
+  presenting a stranger's name must not be counted as one of that human's agents: grouping first
+  would let it inflate a stranger's fleet size and then have the stranger refused by the cap for
+  agents they never ran. Everything counted per human is counted over the agents that survived
+  the gate.
+- **Failure is three-valued.** A wrong-key signature is a fact about the presenter and is a
+  denial. A smart-account signature (ERC-1271/6492) needs a chain read, and a failed read says
+  nothing about anybody, so it comes back `unknown` → `indeterminate`. An EOA never touches the
+  network at all: local recovery first, chain second.
+
+`requirePresenterAuthentication` is the policy flag, off by default for the same reason
+`requireAttestedBinding` is — the World AgentKit path authenticates at the HTTP layer before it
+ever reaches this engine, and a policy demanding proof from a caller with no channel to collect
+it refuses everybody. `npm run ens` runs both sides: run 5 has each agent answer with its own key
+(2 of 3 admitted, unchanged from run 1–3 — proof costs an honest agent nothing), and run 6
+presents the *same three names* from a wallet generated a second earlier (0 of 3, identical
+records, identical human, identical score).
+
+What a signature here still does not prove: that the presenter is the agent's operator (keys are
+shared and stolen), that the named human consents to anything (that is the acknowledgement
+record), or anything at all after the `addr` record is rewritten by whoever owns the node. All
+three ship as `agent-presenter-authenticated-for-this-wallet-only`.
 
 ## 6. Two implementation details worth keeping
 
@@ -191,3 +238,7 @@ human rather than two — otherwise "name it twice" would itself be a way to hol
   11,348,926; every field read back and recorded in `deployments/ens-sepolia.json`.
 - Live suite: `packages/sdk/src/ens-agents.live.test.ts` (14 tests), unit suite
   `packages/sdk/src/ens-agents.test.ts` (24 tests).
+- Presenter gate: `packages/sdk/src/ens-presentation.ts`, unit suite `ens-presentation.test.ts`
+  (31 tests, every signature real), live suite `ens-presentation.live.test.ts` (7 tests against
+  the Sepolia tree). ERC-4361 message construction and parsing via `viem/siwe`; the ERC-1271
+  branch via viem's `verifyMessage`, exercised against a live Sepolia node in the live suite.

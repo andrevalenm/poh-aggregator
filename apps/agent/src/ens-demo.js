@@ -11,7 +11,7 @@
  * blocks, the subnode count and the personhood evidence all come from chain reads at run time.
  * Nothing is hard-coded, and if the records change under us the output changes with them.
  *
- * Four runs:
+ * Six runs:
  *
  *   1. One agent presents a name. The counterparty resolves the human behind it, scores that
  *      human across ten protocols, and decides.
@@ -20,9 +20,14 @@
  *      it. Under the default policy it is admitted as a human of its own, and the cap it
  *      just walked around is the point of the run.
  *   4. The same three agents under a policy that requires the acknowledgement. One admitted.
+ *   5. The same three agents under a policy that requires the *presenter* to hold the wallet.
+ *      They each signed the counterparty's challenge, so the gate costs them nothing.
+ *   6. The same three names, presented by a wallet generated seconds ago that holds none of
+ *      them. Same records, same human, same score — and nobody is served.
  */
 
 import { createPublicClient, http } from 'viem'
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -30,19 +35,90 @@ import {
   Corroborate,
   creationBlocks,
   ensBatchCaveats,
+  ensPresentationMessage,
   evaluateFleet,
   humanAddressSets,
+  issueEnsPresentationChallenge,
   resolveEnsAgents,
   scanNameTree,
   toFleetAgents,
+  verifyEnsPresentation,
 } from '@corroborate/sdk'
-import { corroborate as corroborateConfig, REPO_ROOT } from './config.js'
+import { corroborate as corroborateConfig, ensAgentKey, REPO_ROOT } from './config.js'
 import { fleetPolicy } from './counterparty/policy.js'
 import { banner, colour as C } from './trace.js'
 
 const deployment = JSON.parse(readFileSync(resolve(REPO_ROOT, 'deployments/ens-sepolia.json'), 'utf8'))
 
 const ENS_RPC = process.env.ENS_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com'
+
+/**
+ * The counterparty's own identity, as ERC-4361 defines it. A signature is bound to this domain
+ * and this resource, so one collected by any other venue is not a credential here.
+ */
+const DOMAIN = 'meridian.example'
+const RESOURCE = 'https://meridian.example/order'
+
+const client = createPublicClient({ chain: sepolia, transport: http(ENS_RPC) })
+
+/** Nonces this counterparty has issued and not yet spent. Replay protection lives here. */
+const liveNonces = new Set()
+
+/**
+ * Run the challenge/response for every name in the batch.
+ *
+ * `signerFor(name)` returns the account presenting that name, or undefined if nobody can sign
+ * for it. That is the whole variable: run 5 hands over each agent's own key, run 6 hands over a
+ * single wallet generated at start-up that owns none of the names. Every other input — the
+ * challenge, the message, the verification, the address it is checked against — is identical.
+ */
+async function collectPresentations(identities, signerFor) {
+  const results = new Map()
+  for (const id of identities) {
+    const account = signerFor(id.name)
+    if (!account) continue
+    const challenge = issueEnsPresentationChallenge({
+      domain: DOMAIN,
+      uri: RESOURCE,
+      name: id.name,
+      chainId: deployment.chainId,
+    })
+    liveNonces.add(challenge.nonce)
+    // The presenter signs the address it controls, which is exactly how an impostor gives
+    // itself away: everything about the message is well-formed and the signer is simply not
+    // the wallet the name designates.
+    const message = ensPresentationMessage(challenge, account.address)
+    const signature = await account.signMessage({ message })
+    const result = await verifyEnsPresentation({
+      challenge,
+      presentation: { name: id.name, message, signature },
+      expectedAddress: id.agent,
+      nodeOwner: id.owner,
+      checkNonce: (n) => liveNonces.has(n),
+      client,
+    })
+    liveNonces.delete(challenge.nonce)
+    results.set(result.name, result)
+  }
+  return results
+}
+
+function renderPresentations(results) {
+  for (const r of results.values()) {
+    const verdict =
+      r.status === 'authenticated'
+        ? C.green('authenticated')
+        : r.status === 'unknown'
+          ? C.yellow('unreadable')
+          : C.red('refused')
+    console.log(
+      `  ${C.bold(r.name)}  ${verdict} ${C.dim(r.status === 'authenticated' ? (r.method ?? '') : (r.failure ?? ''))}`,
+    )
+    console.log(`    signed by  ${r.address ?? C.dim('—')}`)
+    console.log(`    name says  ${r.expected ?? C.dim('—')}`)
+    if (r.error) console.log(`    ${C.dim(r.error)}`)
+  }
+}
 
 const mark = (v) => (v === 'allow' ? C.green('ALLOW') : v === 'deny' ? C.red('DENY') : C.yellow('UNKNOWN'))
 
@@ -64,7 +140,7 @@ function renderIdentity(id) {
   if (id.createdAtBlock) console.log(`    created  ${C.dim(`block ${id.createdAtBlock}`)}`)
 }
 
-function renderDecision(decision, identities) {
+function renderDecision(decision, identities, presentations) {
   for (const v of decision.agents) {
     console.log(`  ${mark(v.verdict)}  ${C.bold(v.label ?? v.agent)}`)
     console.log(`        ${C.dim(v.because)}`)
@@ -77,9 +153,10 @@ function renderDecision(decision, identities) {
   const s = decision.summary
   console.log(
     `  ${C.bold('summary')}  ${s.agents} agent(s) · ${s.humans} human(s) · ${s.allowed} allowed · ` +
-      `${s.denied} denied (${s.deniedByCap} by the cap) · ${s.assertedBindings} one-way binding(s)`,
+      `${s.denied} denied (${s.deniedByCap} by the cap) · ${s.assertedBindings} one-way binding(s) · ` +
+      `${s.unauthenticatedPresenters} unproven presenter(s)`,
   )
-  for (const c of [...decision.caveats, ...ensBatchCaveats(identities)]) {
+  for (const c of [...decision.caveats, ...ensBatchCaveats(identities, presentations)]) {
     console.log(`  ${C.yellow('!')} ${C.bold(c.code)}`)
     console.log(`    ${C.dim(c.message)}`)
   }
@@ -95,7 +172,6 @@ async function main() {
     ),
   )
 
-  const client = createPublicClient({ chain: sepolia, transport: http(ENS_RPC) })
   const names = deployment.agents.map((a) => a.name)
 
   // ── the tree, from the registry's own log ───────────────────────────────────────────
@@ -155,7 +231,25 @@ async function main() {
     }
   }
 
-  const fleetAgents = toFleetAgents(identities)
+  // ── the challenge/response ──────────────────────────────────────────────────────────
+  banner(
+    'The presenter gate — who is actually asking?',
+    'Everything above was read from public records. A name is public, so none of it says the party on this connection holds anything at all.',
+  )
+  const agentAccounts = new Map()
+  for (const id of identities) {
+    const key = ensAgentKey(id.name)
+    if (key) agentAccounts.set(id.name, privateKeyToAccount(key))
+  }
+  const presentations = await collectPresentations(identities, (name) => agentAccounts.get(name))
+  if (presentations.size === 0) {
+    console.log(C.yellow('  No agent keys on this machine, so nobody can answer a challenge.'))
+    console.log(C.dim('  scripts/ens-agents-keys.mjs writes them to .env.local; they hold no funds.'))
+  } else {
+    renderPresentations(presentations)
+  }
+
+  const fleetAgents = toFleetAgents(identities, presentations)
   const policy = { ...fleetPolicy, admission: 'earliest-registered' }
 
   // ── runs 1–3: one policy, three requesters ──────────────────────────────────────────
@@ -163,7 +257,7 @@ async function main() {
     `RUN 1–3 — ${policy.name}'s policy as written: ≥${policy.minScore} over ${policy.minIndependentRoots} roots, ${policy.maxAgentsPerHuman} agent per human`,
     'One-way bindings admitted. Watch what that costs.',
   )
-  renderDecision(evaluateFleet({ policy, agents: fleetAgents, evidence }), identities)
+  renderDecision(evaluateFleet({ policy, agents: fleetAgents, evidence }), identities, presentations)
 
   // ── run 4: the acknowledgement made mandatory ───────────────────────────────────────
   banner(
@@ -171,7 +265,30 @@ async function main() {
     'A counterparty deciding that an unacknowledged claim about a person is not evidence about that person.',
   )
   const strict = { ...policy, requireAttestedBinding: true }
-  renderDecision(evaluateFleet({ policy: strict, agents: fleetAgents, evidence }), identities)
+  renderDecision(evaluateFleet({ policy: strict, agents: fleetAgents, evidence }), identities, presentations)
+
+  // ── run 5: the presenter gate, with the agents themselves presenting ────────────────
+  banner(
+    'RUN 5 — the same three agents, requirePresenterAuthentication: true',
+    'Each answered the challenge with the wallet its name designates, so requiring proof costs an honest agent nothing.',
+  )
+  const gated = { ...policy, requirePresenterAuthentication: true }
+  renderDecision(evaluateFleet({ policy: gated, agents: fleetAgents, evidence }), identities, presentations)
+
+  // ── run 6: the same three names, presented by somebody else ────────────────────────
+  const impostor = privateKeyToAccount(generatePrivateKey())
+  banner(
+    `RUN 6 — the same three names, presented by ${impostor.address}`,
+    'A wallet generated one second ago, holding none of these names. Identical records, identical human, identical score.',
+  )
+  const stolen = await collectPresentations(identities, () => impostor)
+  renderPresentations(stolen)
+  console.log('')
+  renderDecision(
+    evaluateFleet({ policy: gated, agents: toFleetAgents(identities, stolen), evidence }),
+    identities,
+    stolen,
+  )
 
   console.log('')
   console.log(C.dim('  Everything above was read from Sepolia at run time. Re-run after editing a text'))

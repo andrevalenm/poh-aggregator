@@ -75,3 +75,12 @@ export const corroborate = {
  * wallet they have registered themselves via `npx @worldcoin/agentkit-cli register`.
  */
 export const agentPrivateKey = process.env.AGENT_PRIVATE_KEY
+
+/**
+ * Signing key for one ENS agent name, keyed on its leftmost label.
+ *
+ * `scripts/ens-agents-keys.mjs` wrote these; they hold no funds and exist so the ENS demo can
+ * answer a counterparty's challenge as the agent rather than describing what answering it would
+ * look like. Absent is an ordinary state — the demo then shows the presenter gate refusing.
+ */
+export const ensAgentKey = (name) => process.env[`AGENT_${name.split('.')[0].toUpperCase()}_PRIVATE_KEY`]

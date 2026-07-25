@@ -94,6 +94,21 @@ export interface FleetPolicy {
    * that an unacknowledged claim about a person is not evidence about that person.
    */
   requireAttestedBinding?: boolean
+  /**
+   * Refuse agents whose presenter has not proved control of the wallet.
+   *
+   * Off by default for the same reason as `requireAttestedBinding`: the flow this engine was
+   * written against authenticates at a different layer (the World AgentKit path verifies a
+   * CAIP-122 signature over the wire before it ever calls this), and a policy that demands proof
+   * from a caller with no channel to collect it refuses everybody.
+   *
+   * It is the ENS path that needs it. There, a name is public and everything read from it is
+   * public, so an unauthenticated presenter is scored on a stranger's credentials and takes that
+   * stranger's slot — every individual answer true, the wrong party served, and the
+   * counterparty's own log naming somebody who was never there. `ens-presentation.ts` collects
+   * the proof; this flag is a counterparty deciding to require it.
+   */
+  requirePresenterAuthentication?: boolean
 }
 
 /**
@@ -117,6 +132,24 @@ export type HumanBacking =
   /** The read failed. Not a negative — see the header. */
   | { status: 'unknown'; error: string }
 
+/**
+ * Whether the party presenting this agent proved it holds the agent's key.
+ *
+ * A separate axis from `backing`, and the distinction matters: `backing` is about *who stands
+ * behind* the wallet, this is about *who is asking*. An agent can have an impeccable attested
+ * human and be presented by somebody who has never held its key.
+ *
+ * Three-valued for the reason every read in this SDK is: `unknown` is a failure of our own
+ * connection to the chain (a smart-account signature we could not check), and it must not read
+ * as an accusation. Absent means the caller never ran the gate, which is different again — a
+ * policy requiring authentication refuses that, because a request offering no proof is not the
+ * same as a proof we could not evaluate.
+ */
+export type PresenterAuthentication =
+  | { status: 'authenticated'; detail?: string }
+  | { status: 'unauthenticated'; detail: string }
+  | { status: 'unknown'; error: string }
+
 export interface FleetAgent {
   agent: Address
   /** Human-readable name for the trace. */
@@ -124,6 +157,8 @@ export interface FleetAgent {
   backing: HumanBacking
   /** Block its AgentBook registration was mined in. Drives `earliest-registered` admission. */
   registeredAtBlock?: number
+  /** Result of the presenter gate, when the caller ran one. */
+  presenter?: PresenterAuthentication
 }
 
 /**
@@ -148,6 +183,7 @@ export type Verdict = 'allow' | 'deny' | 'indeterminate'
 
 export interface RuleOutcome {
   rule:
+    | 'presenter-authenticated'
     | 'human-identified'
     | 'human-binding'
     | 'evidence-resolved'
@@ -202,6 +238,12 @@ export interface FleetSummary {
    */
   assertedBindings: number
   /**
+   * Agents whose presenter did not prove control of the wallet — including those where no
+   * presentation was offered at all. Under a policy that admits them, everything downstream is a
+   * statement about a name rather than about whoever is holding the connection.
+   */
+  unauthenticatedPresenters: number
+  /**
    * Agents per identified human. The number a venue counting requesters gets wrong: 1.0 means
    * agent count and human count agree, 27.0 means it is off by 27×.
    */
@@ -242,6 +284,8 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
   const groups = new Map<string, { synthetic: boolean; agents: FleetAgent[] }>()
   const verdicts = new Map<Address, AgentVerdict>()
   const order: Address[] = []
+  /** Agents that survived the presenter gate. Everything counted per human is counted here. */
+  const gated: FleetAgent[] = []
 
   for (const a of agents) {
     order.push(a.agent)
@@ -253,6 +297,13 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
       rules: [],
     }
     verdicts.set(a.agent, v)
+
+    // The presenter gate runs before the grouping, not merely before the slot allocation. An
+    // agent presented by somebody who cannot show its key must not be counted as one of its
+    // named human's agents at all: grouping it first would let an impostor inflate a stranger's
+    // fleet size, and then have that stranger refused by the cap for agents they never ran.
+    if (!presenterGate(v, a, policy)) continue
+    gated.push(a)
 
     if (a.backing.status === 'backed') {
       v.humanId = a.backing.humanId
@@ -414,12 +465,19 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
   // ---- 4. summary and caveats ---------------------------------------------------------
   const all = order.map((a) => verdicts.get(a)!)
   const realHumans = humans.filter((h) => !h.synthetic)
-  const unbacked = agents.filter((a) => a.backing.status === 'unbacked').length
-  const unresolved = agents.filter((a) => a.backing.status === 'unknown').length
-  const attributed = agents.length - unbacked - unresolved
+  // Counted over the agents that survived the presenter gate, not over everything presented. An
+  // agent refused because whoever presented it could not show its key is not a fact about the
+  // human whose name it borrowed, and must not appear in that human's fleet size or in the
+  // registry-coverage numbers below.
+  const unbacked = gated.filter((a) => a.backing.status === 'unbacked').length
+  const unresolved = gated.filter((a) => a.backing.status === 'unknown').length
+  const attributed = gated.length - unbacked - unresolved
   const largestFleet = realHumans.reduce((m, h) => Math.max(m, h.agents.length), 0)
-  const assertedBindings = agents.filter(
+  const assertedBindings = gated.filter(
     (a) => a.backing.status === 'backed' && a.backing.binding === 'asserted',
+  ).length
+  const unauthenticatedPresenters = agents.filter(
+    (a) => a.presenter === undefined || a.presenter.status !== 'authenticated',
   ).length
 
   const summary: FleetSummary = {
@@ -437,6 +495,7 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
     indeterminate: all.filter((v) => v.verdict === 'indeterminate').length,
     largestFleet,
     assertedBindings,
+    unauthenticatedPresenters,
     collapseRatio: realHumans.length === 0 ? 0 : round(attributed / realHumans.length, 2),
   }
 
@@ -484,6 +543,12 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
       message: `${assertedBindings} agent(s) name a human who has not acknowledged them, and this policy admits one-way claims. The cap groups agents by the human they name, so an operator naming a fresh identifier per agent holds one slot each — and each such agent may also be riding credentials its named human never lent it. requireAttestedBinding refuses them.`,
     })
   }
+  if (unauthenticatedPresenters > 0 && !policy.requirePresenterAuthentication) {
+    caveats.push({
+      code: 'fleet-presenter-not-authenticated',
+      message: `${unauthenticatedPresenters} of ${agents.length} agent(s) in this decision carry no proof that whoever presented them holds their key. Everything known about such an agent was read from a public identifier, so the decision is about that identifier and not about the party on the connection: somebody presenting a name they do not hold is scored on that human's credentials and takes that human's slot. Agents discovered by scanning a registry rather than presented are expected to carry none — the ones to look at are the ones actually asking for something. requirePresenterAuthentication refuses them.`,
+    })
+  }
   if (largestFleet > policy.maxAgentsPerHuman) {
     caveats.push({
       code: 'fleet-detected',
@@ -497,6 +562,60 @@ export function evaluateFleet(input: EvaluateFleetInput): FleetDecision {
   })
 
   return { policy, agents: all, humans, summary, caveats }
+}
+
+/**
+ * Record the presenter gate on this agent's trace, and decide it outright when the policy
+ * requires authentication. Returns false when the agent has been decided and the rest of the
+ * pipeline should skip it.
+ *
+ * The three inputs are three different claims and get three different answers. An *absent*
+ * presenter means the caller never ran a gate — a policy demanding proof refuses a request that
+ * offered none. `unauthenticated` is a fact about the presenter and is a denial. `unknown` is a
+ * failure of our own signature check (a smart account whose ERC-1271 read did not answer) and is
+ * `indeterminate`, because a broken chain read must never read as an accusation.
+ */
+function presenterGate(v: AgentVerdict, a: FleetAgent, policy: FleetPolicy): boolean {
+  const p = a.presenter
+  const required = policy.requirePresenterAuthentication === true
+
+  if (p === undefined) {
+    if (!required) return true
+    v.rules.push({
+      rule: 'presenter-authenticated',
+      pass: false,
+      detail: 'no signed presentation accompanied this agent',
+    })
+    v.verdict = 'deny'
+    v.because = `${policy.name} requires the party presenting an agent to prove it controls the agent's wallet, and this request carried no signed presentation`
+    return false
+  }
+
+  if (p.status === 'authenticated') {
+    v.rules.push({
+      rule: 'presenter-authenticated',
+      pass: true,
+      detail: p.detail ?? 'the presenter signed this counterparty’s challenge with the agent wallet',
+    })
+    return true
+  }
+
+  if (p.status === 'unknown') {
+    v.rules.push({ rule: 'presenter-authenticated', pass: null, detail: p.error })
+    if (!required) return true
+    v.verdict = 'indeterminate'
+    v.because = `whether the presenter controls this agent's wallet could not be determined (${p.error}), and ${policy.name} requires it — refusing to guess in either direction`
+    return false
+  }
+
+  v.rules.push({ rule: 'presenter-authenticated', pass: false, detail: p.detail })
+  if (!required) return true
+  v.verdict = 'deny'
+  // The specifics are on the rule; repeating them here makes the headline unreadable in a trace
+  // that prints both. What belongs in the headline is what the refusal means.
+  v.because =
+    'the party presenting this agent did not prove control of its wallet, so nothing read from its name is evidence about whoever is asking'
+  return false
 }
 
 function bucket(
