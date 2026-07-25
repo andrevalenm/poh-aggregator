@@ -127,8 +127,25 @@ penalise an honest subject. `Ramp` returns 0.5. Granting full Ramp weight on mis
 make "keep the indexer unreachable" a profitable move for an attacker, which is not a property
 you want in a scoring function. Both cases raise the `issuance-date-unknown` caveat.
 
-This is the half of the model the subgraph exists to feed. `isHuman(addr)` is a storage slot;
-`claimedAt` is an event.
+**An age that is bounded is not an age that is unknown.** Asking a contract *whether* a
+credential is held and an index *when* it was issued is a torn read: while the index is behind,
+a real credential comes back held with no date, which on a `Ramp` curve is the 0.5 midpoint —
+about twenty-three times the weight a week-old registration deserves. That made index lag worth
+buying. So absence in the index is now used as evidence in its own right. If the index has
+complete history for a credential class and does not have this credential at block *B*, then
+the credential was issued after *B*, which caps its age; the ramp is evaluated at that cap and
+the result carries `credential-not-yet-indexed` naming the block. The cap is `min(bound,
+midpoint)`, never a grant, so a lagging index can at worst recover the midpoint it would have
+had anyway — and where the index only covers a *window* of history, absence proves nothing, the
+old fallback applies unchanged, and `index-coverage-partial` says so. Full decision table:
+[`packages/sdk/src/reconcile.ts`](../packages/sdk/src/reconcile.ts).
+
+Where a protocol dates its own credentials on chain, none of this is needed. PoH v2's
+`getHumanityInfo` returns `expirationTime`, and `humanityLifespan()` is the fixed term granted
+at claim, so `expirationTime − humanityLifespan` is the claim timestamp — two `eth_call`s, no
+indexer in the path at all. The index then serves as a cross-check on the date rather than the
+source of it, and a disagreement between the two is reported as our fault, not the subject's.
+Circles has no such slot, which is why the reconciler above exists.
 
 ## 5. Zero out dead protocols, then sum and take log₁₀
 

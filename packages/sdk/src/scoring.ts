@@ -62,10 +62,32 @@ export interface ScoreInput {
  * discount fresh farms, and granting full weight on missing data would make the subgraph
  * being unreachable strictly profitable for an attacker. Both cases are flagged by the
  * issuance-date-unknown caveat.
+ *
+ * `issuedAfter` is a proven lower bound on issuance — the credential was absent from an index
+ * with complete history at a block that index named, so it cannot be older than that block.
+ * On a Ramp curve, where weight rises with age, the curve evaluated at that bound is the
+ * highest weight the evidence can support, so we take it as a *cap*, never as a grant:
+ * `min(unknown-age policy, curve(bound))`. Two consequences, both wanted. A synced index
+ * prices a brand-new credential as brand new (~0) instead of at the 0.5 midpoint, which is
+ * the bug this fixes. And an attacker who makes our index lag can at best recover the 0.5 it
+ * would have had anyway — lag is never worth more than it costs. On a Decay curve the same
+ * bound is a lower bound on weight rather than an upper one (a younger credential decays
+ * less), so it cannot tighten the unknown-age answer and is ignored there.
  */
-export function freshnessOf(adapter: Adapter, issuedAt: number | undefined, now: number): number {
+export function freshnessOf(
+  adapter: Adapter,
+  issuedAt: number | undefined,
+  now: number,
+  issuedAfter?: number,
+): number {
   if (!adapter.decayHalfLifeDays || adapter.ageCurve === 'None') return 1
-  if (issuedAt === undefined) return adapter.ageCurve === 'Ramp' ? 0.5 : 1
+  if (issuedAt === undefined) {
+    const unknown = adapter.ageCurve === 'Ramp' ? 0.5 : 1
+    if (issuedAfter === undefined || adapter.ageCurve !== 'Ramp') return unknown
+    const maxAgeDays = Math.max(0, (now - issuedAfter) / 86_400)
+    const atBound = 1 - 2 ** (-maxAgeDays / adapter.decayHalfLifeDays)
+    return Math.min(unknown, atBound)
+  }
   const ageDays = (now - issuedAt) / 86_400
   if (ageDays <= 0) return adapter.ageCurve === 'Ramp' ? 0 : 1
   const decay = 2 ** (-ageDays / adapter.decayHalfLifeDays)
@@ -183,13 +205,17 @@ function caveatsFor(evidence: Evidence[], roots: RootContribution[]): Caveat[] {
     })
   }
 
-  const unknownAge = evidence.filter((e) => e.held && e.issuedAt === undefined)
+  const unknownAge = evidence.filter(
+    (e) => e.held && e.issuedAt === undefined && e.issuedAfter === undefined,
+  )
   if (unknownAge.length) {
     caveats.push({
       code: 'issuance-date-unknown',
       message: `Issue date unavailable for: ${unknownAge.map((e) => e.adapterId).join(', ')}. Decay-class credentials keep full weight and may be stale; survival-ramp credentials are held at the 0.5 midpoint rather than granted full weight.`,
     })
   }
+
+  caveats.push(...indexCaveats(evidence))
 
   const unknownRoot = roots.find((r) => r.trustRoot === 'unknown')
   if (unknownRoot) {
@@ -208,4 +234,79 @@ function caveatsFor(evidence: Evidence[], roots: RootContribution[]): Caveat[] {
   }
 
   return caveats
+}
+
+/**
+ * Caveats derived from probe provenance — how each answer was reached, and at which block.
+ *
+ * These exist because the index-first inversion trades silence for noise on purpose. The old
+ * behaviour was quiet and wrong: a lagging index moved scores with nothing in the result to
+ * say so. A degraded read is now always visible, and always names the block it came from, so
+ * "why did my score move?" has an answer a subject can check.
+ */
+function indexCaveats(evidence: Evidence[]): Caveat[] {
+  const out: Caveat[] = []
+  const withNote = (note: string) =>
+    evidence.filter((e) => e.provenance?.notes.includes(note as never))
+  const ids = (es: Evidence[]) => es.map((e) => e.adapterId).join(', ')
+  const blocks = (es: Evidence[]) =>
+    [...new Set(es.map((e) => e.provenance?.indexedBlock).filter((b) => b !== undefined))].join(', ')
+
+  const notIndexed = withNote('credential-not-yet-indexed').filter((e) => e.held)
+  if (notIndexed.length) {
+    out.push({
+      code: 'credential-not-yet-indexed',
+      message: `Held on chain but absent from the index at block ${blocks(notIndexed)}: ${ids(notIndexed)}. The credential therefore did not exist at that block, so it is dated no earlier than it and priced at that upper bound on age — not at the unknown-age midpoint. Index lag cannot raise this score.`,
+    })
+  }
+
+  const ceased = withNote('credential-ceased-since-index')
+  if (ceased.length) {
+    out.push({
+      code: 'credential-ceased-since-index',
+      message: `The index lists ${ids(ceased)} as held at block ${blocks(ceased)}, but the contract read at chain head does not. Scored as not held: a revocation must not stay invisible for as long as the index lags.`,
+    })
+  }
+
+  const lowerBound = withNote('index-date-is-lower-bound').filter((e) => e.held)
+  if (lowerBound.length) {
+    out.push({
+      code: 'issuance-date-lower-bound',
+      message: `The index dated ${ids(lowerBound)} from a side-event (a vouch or a trust edge) rather than from the issuance event itself, because the issuance falls outside its indexed window. The real credential is therefore older than the date used, and on a survival ramp its weight here is a floor rather than an estimate.`,
+    })
+  }
+
+  const disagrees = withNote('index-date-disagrees-with-chain').filter((e) => e.held)
+  if (disagrees.length) {
+    out.push({
+      code: 'index-date-disagrees-with-chain',
+      message: `Index and contract disagree about the issuance date of ${ids(disagrees)} by more than an hour. The contract read was used, since it needs no indexer; the disagreement is a fault in our indexing, not in the credential.`,
+    })
+  }
+
+  const partial = withNote('index-outside-coverage').filter((e) => e.held)
+  if (partial.length) {
+    out.push({
+      code: 'index-coverage-partial',
+      message: `The index does not cover the full history of ${ids(partial)}, so its silence says nothing about this credential. Fell back to the contract read alone, exactly as if no index were configured.`,
+    })
+  }
+
+  const unreachable = withNote('index-unreachable').filter((e) => e.held)
+  if (unreachable.length) {
+    out.push({
+      code: 'index-unreachable',
+      message: `An index was configured but did not answer for ${ids(unreachable)}. Held state comes from the contract read; anything only the index can supply — graph position, revocation history — is missing from this result.`,
+    })
+  }
+
+  const stale = withNote('freshness-check-unavailable')
+  if (stale.length) {
+    out.push({
+      code: 'freshness-check-unavailable',
+      message: `The contract read failed for ${ids(stale)}, so this rests on the index alone at block ${blocks(stale)}. Nothing here confirms the credential has not been revoked since that block.`,
+    })
+  }
+
+  return out
 }

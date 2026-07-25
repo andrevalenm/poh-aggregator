@@ -5,6 +5,36 @@ detail. _Last updated 2026-07-25, ~07:30. All suites green (58 tests + 1 new liv
 
 ---
 
+## Unattended run on ax41 — read `PROGRESS.md` for the full log
+
+**Iteration 1 fixed a live scoring bug: subgraph lag was silently changing scores.** The probes
+asked the contract *whether* a credential was held and the subgraph *when* it was issued, as if
+the two answers described the same moment. While the index was behind, a real credential came
+back held-with-no-date, and no date on a survival ramp means the 0.5 midpoint — about 23× what a
+week-old registration earns. So making our index lag was worth buying. Now every index read
+returns the block the index reached, absence at a known block *bounds* the age instead of
+erasing it, and Proof of Humanity is dated straight from the contract
+(`expirationTime − humanityLifespan()`), so no indexer can move a PoH score at all. All four
+suites green: 18 forge, 66 SDK (28 scoring + 18 new reconciliation + 5 input + 15 live), 10
+browser E2E. 94 total.
+
+Two things for you, neither urgent:
+
+- **The README's headline example changed and I updated it to today's real numbers.** That
+  address pair now scores **1.5683**, not 2.4409. Nothing regressed — the old figure predates
+  real dates being computed, and our own PoH vector was re-claimed 11.7 days ago, so the
+  anti-airdrop ramp prices it at 0.022. If a demo beat depended on 2.4409, it needs re-shooting;
+  the honest version of that beat is better anyway ("our own credential is discounted by our own
+  curve").
+- **The Circles half of the subgraph is a two-month window**, and that now shows up in results
+  as caveats rather than as wrong dates. The oldest avatars (Hub's first registrations, block
+  36501311) are missing from it entirely, and some avatars it does have are dated from a trust
+  edge instead of their registration — up to 1.6 years late. Widening the window and re-syncing
+  is next up in `PROGRESS.md`; it needs no decision from you unless you would rather I not spend
+  the sync time before the deadline.
+
+---
+
 ## State: every phase shipped and tested
 
 | Piece | State | Proof |

@@ -129,56 +129,150 @@ describe('end to end', () => {
   })
 })
 
-describe('subgraph enrichment (live)', () => {
+describe('index and chain, reconciled against live data', () => {
   /**
-   * The load-bearing claim, as a test: with the subgraph, a credential's age weight is
-   * computed from its real on-chain claimedAt and the unknown-age caveat clears; without
-   * it, the weight is the flagged 0.5 midpoint.
-   *
-   * It asserts the MECHANISM, not a specific age. PoH humanities expire (~1y) and must be
+   * These assert the MECHANISM, not a specific age. PoH humanities expire (~1y) and must be
    * renewed, so "a currently-live two-year-old registration" is not a stable premise — the
-   * durable invariant is that the enriched freshness is exactly the ramp value implied by
-   * whatever date the subgraph returns. (An earlier version hardcoded a Sept-2024 date that
+   * durable invariants are that the two sources agree, and that the score does not depend on
+   * which of them answered. (An earlier version of this suite hardcoded a Sept-2024 date that
    * turned out to be a vouch-timestamp artifact of a subgraph indexing bug; asserting the
-   * mechanism is why the corrected data no longer breaks it.) Skips while the subgraph is
-   * still syncing so a fresh deployment does not redden the suite.
+   * mechanism is why corrected data no longer breaks it.) Skips while the subgraph is still
+   * syncing so a fresh deployment does not redden the suite.
    */
   const SUBGRAPH = process.env.CORROBORATE_SUBGRAPH_URL ?? 'https://api.studio.thegraph.com/query/77602/poh/version/latest'
-  // A currently-registered PoH human. Used only because it is live; the test reads its real
-  // claimedAt rather than assuming one.
+  // A currently-registered PoH human. Used only because it is live; the tests read its real
+  // dates rather than assuming any.
   const LIVE_POH = '0xd267eba602e692216703626a81157214b24c85fb' as Address
   const POH_HALF_LIFE_DAYS = 365 // must match ontology/adapters.json poh-v2
 
-  test('enriched freshness is the ramp value implied by the real claimedAt', async (t) => {
-    const { subgraphReady, pohEnrichment } = await import('./subgraph.ts')
-    const enrichment = (await subgraphReady(SUBGRAPH)) ? await pohEnrichment(SUBGRAPH, LIVE_POH) : undefined
-    if (!enrichment) {
+  /**
+   * A Circles avatar registered at block 36503055, more than ten million blocks before the
+   * subgraph's Circles window opens at 46300000, and never trusted inside that window — so it
+   * is genuinely held on chain and genuinely absent from our index. Found by walking the Hub's
+   * own RegisterHuman history; the test re-verifies both halves rather than trusting the note.
+   */
+  const CIRCLES_BEFORE_WINDOW = '0x3fc5c255a43aa5bc07a3129a0feb6c9e212ecb6d' as Address
+  /**
+   * A Circles avatar from the Hub's very first registrations (block 36501311) that the index
+   * *does* have — but only because a trust edge inside the window materialised it, so its
+   * `registeredAt` is ~1.6 years late and its `inviter` is null.
+   */
+  const CIRCLES_SIDE_EVENT_DATED = '0xd40133ea712e7012a95fdd3c008ab58f7918b446' as Address
+
+  /**
+   * Public RPCs blip. A probe that reported an `error` tells us nothing about the mechanism
+   * under test, so skip loudly with the reason rather than reddening the suite — while a
+   * probe that *answered* and answered wrongly still fails, which is the whole point of
+   * testing against live chains.
+   */
+  function answered(
+    t: { skip: (m: string) => void },
+    evidence: { detail?: Record<string, unknown> } | undefined,
+    what: string,
+  ): boolean {
+    if (!evidence) {
+      t.skip(`${what}: no evidence returned`)
+      return false
+    }
+    if (evidence.detail?.unavailable) {
+      t.skip(`${what}: probe could not reach its source — ${String(evidence.detail.error)}`)
+      return false
+    }
+    return true
+  }
+
+  test('the contract dates a PoH registration, and the index agrees', async (t) => {
+    const { subgraphReady, pohIndexRead } = await import('./subgraph.ts')
+    const index = (await subgraphReady(SUBGRAPH)) ? await pohIndexRead(SUBGRAPH, LIVE_POH) : undefined
+    if (!index?.entity) {
       t.skip('subgraph not synced past this claim yet')
       return
     }
 
-    const bare = await new Corroborate({ knownIds, knownRoots }).resolve(LIVE_POH)
-    const enriched = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(LIVE_POH)
+    const r = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(LIVE_POH)
+    const poh = r.evidence.find((e) => e.adapterId === 'poh-v2')
+    if (!answered(t, poh, 'poh-v2')) return
+    assert.ok(poh!.held, 'vector must still be registered on-chain')
 
-    const barePoh = bare.evidence.find((e) => e.adapterId === 'poh-v2')
-    const richPoh = enriched.evidence.find((e) => e.adapterId === 'poh-v2')
-    assert.ok(barePoh?.held && richPoh?.held, 'vector must still be registered on-chain')
+    // expirationTime - humanityLifespan is the claim timestamp, read from the contract with no
+    // indexer involved. The index is a cross-check on it, not the source.
+    assert.equal(poh.provenance?.dateFrom, 'chain')
+    assert.ok(poh.issuedAt, 'the chain supplied a date')
+    assert.ok(
+      Math.abs(poh.issuedAt - index.entity.issuedAt) < 3600,
+      `chain-derived date ${poh.issuedAt} should match the index's claimedAt ${index.entity.issuedAt}`,
+    )
+    assert.ok(!r.caveats.some((c) => c.code === 'index-date-disagrees-with-chain'))
 
-    // Without ages, Ramp holds the flagged midpoint and flags it.
-    assert.equal(barePoh.freshness, 0.5)
-    assert.ok(bare.caveats.some((c) => c.code === 'issuance-date-unknown'))
-
-    // With the subgraph, the date is real, the caveat clears, and the weight is exactly the
-    // ramp value that date implies — self-consistent, no magic number.
-    assert.equal(richPoh.issuedAt, enrichment.claimedAt)
-    assert.ok(!enriched.caveats.some((c) => c.code === 'issuance-date-unknown'))
-
-    const ageDays = (enriched.computedAt - enrichment.claimedAt) / 86_400
+    // And the weight is exactly the ramp value that date implies — self-consistent, no magic
+    // number anywhere in the assertion.
+    const ageDays = (r.computedAt - poh.issuedAt) / 86_400
     const expected = 1 - 2 ** (-ageDays / POH_HALF_LIFE_DAYS)
     assert.ok(
-      Math.abs(richPoh.freshness - expected) < 0.02,
-      `enriched freshness ${richPoh.freshness} should match ramp(${ageDays.toFixed(0)}d)=${expected.toFixed(3)}`,
+      Math.abs(poh.freshness - expected) < 0.02,
+      `freshness ${poh.freshness} should match ramp(${ageDays.toFixed(0)}d)=${expected.toFixed(3)}`,
     )
-    assert.notEqual(richPoh.freshness, 0.5, 'a computed weight is not the unknown-age midpoint')
+    assert.notEqual(poh.freshness, 0.5, 'a computed weight is not the unknown-age midpoint')
+  })
+
+  test('the same PoH score comes out with the index and without it', async (t) => {
+    // This is the torn read, gone. The old probe took held from the contract and the date from
+    // the index, so a subject's score moved with our indexing infrastructure; now the contract
+    // answers both and the index only corroborates.
+    const [bare, enriched] = await Promise.all([
+      new Corroborate({ knownIds, knownRoots }).resolve(LIVE_POH),
+      new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(LIVE_POH),
+    ])
+    const barePoh = bare.evidence.find((e) => e.adapterId === 'poh-v2')
+    const richPoh = enriched.evidence.find((e) => e.adapterId === 'poh-v2')
+    if (!answered(t, barePoh, 'poh-v2 without index') || !answered(t, richPoh, 'poh-v2 with index')) return
+    assert.ok(barePoh!.held && richPoh!.held, 'vector must still be registered on-chain')
+
+    assert.equal(barePoh.issuedAt, richPoh.issuedAt)
+    assert.equal(barePoh.freshness, richPoh.freshness)
+    assert.ok(!bare.caveats.some((c) => c.code === 'issuance-date-unknown'))
+    assert.ok(barePoh.provenance?.notes.includes('index-unavailable'), 'and it says no index was used')
+    assert.ok(barePoh.provenance?.headBlock, 'the block the read was taken at is reported')
+  })
+
+  test('a real credential outside the index window is flagged, not silently re-dated', async (t) => {
+    const r = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(
+      CIRCLES_BEFORE_WINDOW,
+    )
+    const circles = r.evidence.find((e) => e.adapterId === 'circles-v2')
+    if (!answered(t, circles, 'circles-v2')) return
+    assert.ok(circles!.held, 'vector must still be a registered Circles human')
+
+    // The index answered, at a block it named, and does not have this avatar. Absence in a
+    // windowed data source is not evidence, so no bound is derived from it.
+    assert.ok(circles.provenance?.indexedBlock, 'the indexed block is reported either way')
+    assert.equal(circles.issuedAt, undefined)
+    assert.equal(circles.issuedAfter, undefined, 'a windowed index must not bound the age')
+    assert.ok(circles.provenance?.notes.includes('index-outside-coverage'))
+    assert.ok(r.caveats.some((c) => c.code === 'index-coverage-partial'))
+    assert.equal(circles.freshness, 0.5, 'the flagged midpoint, exactly as before the change')
+  })
+
+  test('an index date inferred from a trust edge is reported as a floor on age', async (t) => {
+    const { circlesIndexRead } = await import('./subgraph.ts')
+    const index = await circlesIndexRead(SUBGRAPH, CIRCLES_SIDE_EVENT_DATED)
+    if (!index?.entity) {
+      t.skip('subgraph has not indexed a trust edge for this avatar')
+      return
+    }
+    assert.equal(
+      index.entity.issuanceObserved,
+      false,
+      'this avatar registered before the window, so the index never saw its RegisterHuman',
+    )
+
+    const r = await new Corroborate({ knownIds, knownRoots, subgraphUrl: SUBGRAPH }).resolve(
+      CIRCLES_SIDE_EVENT_DATED,
+    )
+    const circles = r.evidence.find((e) => e.adapterId === 'circles-v2')
+    if (!answered(t, circles, 'circles-v2')) return
+    assert.ok(circles!.held)
+    assert.equal(circles!.issuedAt, index.entity.issuedAt, 'kept: it understates age, never inflates')
+    assert.ok(r.caveats.some((c) => c.code === 'issuance-date-lower-bound'))
   })
 })

@@ -241,6 +241,21 @@ describe('age curves', () => {
     assert.equal(freshnessOf(ramp, undefined, now), 0.5)
   })
 
+  test('ramp: a proven upper bound on age caps the weight instead of taking the midpoint', () => {
+    // The credential was absent from a complete index an hour ago, so it is at most an hour
+    // old — the ramp value for an hour, not the 0.5 given to a genuinely unknown age.
+    const capped = freshnessOf(ramp, undefined, now, now - 3600)
+    assert.ok(capped < 0.0002, `expected ~0.00008, got ${capped}`)
+    assert.ok(capped < freshnessOf(ramp, undefined, now), 'strictly tighter than unknown')
+  })
+
+  test('ramp: a loose bound never beats the unknown-age midpoint', () => {
+    // A three-year-stale index permits a three-year-old credential, which the curve would put
+    // at 0.87 — but the bound is an upper limit on age, not a measurement, so it only ever
+    // caps. Otherwise slowing our index down would be a way to buy weight.
+    assert.equal(freshnessOf(ramp, undefined, now, now - 1095 * 86_400), 0.5)
+  })
+
   test('the airdrop scenario: fresh claim vs survived claim, same protocol', () => {
     const fresh = ev(ramp, { issuedAt: now - 7 * 86_400, freshness: freshnessOf(ramp, now - 7 * 86_400, now) })
     fresh.effectiveCostCents = effectiveCost(ramp, fresh.freshness)
@@ -282,6 +297,13 @@ describe('freshness', () => {
   test('non-decaying adapters ignore age', () => {
     const permanent = adapter({ id: 'p', trustRoot: 'r', decayHalfLifeDays: 0 })
     assert.equal(freshnessOf(permanent, 0, 1_700_000_000), 1)
+  })
+
+  test('an age bound cannot penalise a decay curve', () => {
+    // On Decay the same bound says the credential is *young*, which means less decay, not
+    // more — so it cannot tighten the unknown-age answer and must be ignored.
+    const now = 1_700_000_000
+    assert.equal(freshnessOf(decaying, undefined, now, now - 400 * 86_400), 1)
   })
 })
 

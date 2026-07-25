@@ -8,6 +8,8 @@
  * default we ship.
  */
 
+import type { ProbeProvenance } from './reconcile.ts'
+
 export type Address = `0x${string}`
 
 /** What a credential fundamentally demonstrates. Ordering is not significance. */
@@ -69,6 +71,15 @@ export interface Evidence {
   held: boolean
   /** Unix seconds the credential was issued, when the protocol exposes it. */
   issuedAt?: number
+  /**
+   * Lower bound on issuance, set when the exact date is unknown but the credential provably
+   * did not exist at this time — it was absent from an index with complete history at a block
+   * the index named. On a survival ramp this caps the weight instead of granting the
+   * unknown-age midpoint, so index lag can no longer be worth anything to an attacker.
+   */
+  issuedAfter?: number
+  /** Which source decided held and the date, and at which blocks. */
+  provenance?: ProbeProvenance
   /** Decay multiplier in [0,1] derived from issuedAt and the adapter's half-life. */
   freshness: number
   /** Effective adversary cost after decay and liveness, in cents. */
@@ -136,6 +147,10 @@ export interface AdapterProbe {
 export interface AdapterProbeResult {
   held: boolean
   issuedAt?: number
+  /** See `Evidence.issuedAfter`: a proven lower bound on issuance, used to cap ramp weight. */
+  issuedAfter?: number
+  /** How this answer was reached — which source decided held, which dated it, at what block. */
+  provenance?: ProbeProvenance
   detail?: Record<string, unknown>
   /** Set when the probe failed, so a network error is never silently a negative. */
   error?: string
