@@ -65,6 +65,11 @@ URLs + preloaded + metric-matched fallbacks (no swap jiggle — the h1 also wait
 Fraunces before rising), entrance animations start at opacity .02 so the LCP paints at
 FCP, og.png→jpg 647→129KB, robots.txt. Desktop was already 98/100.
 
+**Cross-browser**: full Firefox visual pass (hero, ledger, tear/night, code blocks) —
+renders faithfully, zero fixes needed; the -moz slider rules and mask prefixes were
+already in place. The hero registry line confirmed live with the grown ontology: "30
+protocols catalogued, 18 trust roots, 4 probed live · rev 34".
+
 **Signature elements are now guarded**: after the invisible-h1 incident, both
 load-bearing design moments carry E2E insurance — the headline must be *visibly* risen
 (computed transform + bounding box) and the print must *actually deform* under the
