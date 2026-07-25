@@ -1,11 +1,11 @@
 # Morning brief
 
 Overnight build log for **Corroborate**. Everything below is committed; the git log has the
-detail. _Last updated 2026-07-25, after unattended iteration 17. 18 forge, 425 SDK (418 pass,
-**2 fail**, 5 skipped), 13 Playwright — 456 total. The two failures are not a regression: the
+detail. _Last updated 2026-07-25, after unattended iteration 18. 18 forge, 450 SDK (445 pass,
+**2 fail**, 3 skipped), 13 Playwright — 481 total. The two failures are not a regression: the
 deployed registry gained two adapters from another working copy during iteration 15 and this
 tree's ontology has not caught up. **"Needs you" item 18** has the fix and it is a merge, not a
-bug. The 5 skips are the tests that need the new subgraph version, which was still syncing when
+bug. The 3 skips are the tests that need the new subgraph version, which was still syncing when
 the run was taken; they assert normally against it and skip loudly against the old one._
 
 ---
@@ -511,6 +511,53 @@ go at the rate through the dense region), so until it lands the hosted demo and 
 endpoint keep the old flagged behaviour for those two avatars; the numbers above were measured
 against both deployments, not predicted. Nothing to do — but if `version/latest` has *not* flipped
 by the time you read this, pin `SUBGRAPH_URL` to `v0.0.3`.
+
+**Iteration 18 made a lapsed Proof of Humanity registration legible to a historical score.** Same
+shape as iteration 16, on both PoH registries — and the reason it works is worth the sentence:
+**neither contract deletes the ending.** PoH v2 applies its expiry check inside `isHuman`,
+`humanityOf` and `boundTo`, so all three go quiet for an expired humanity while `getHumanityInfo`
+happily returns the same struct with the owner and the expiry still in it. PoH v1 never clears
+`submission.registered` when a term runs out — the defect the adapter was built to avoid, which
+read the other way round says the credential ended *by arithmetic and nothing else*, and both ends
+of that arithmetic are in the registry.
+
+Nothing at head moved. A credential that is not held is priced at zero, and no weight, root, curve
+or cost changed, so no registry write. What changed is what `resolve(addr, { asOf })` can prove.
+
+- **The census is the argument, and 196 of it is a refusal.** Of the 1,569 humanities our index
+  knows: 1,352 live, **21 lapsed and still owned by the subject**, and **196 whose `owner` was
+  cleared** by a revocation or a cross-chain transfer. That clearing is undated, so those 196 stay
+  invisible rather than being restored from an expiry that may be months after the credential
+  actually died.
+- **Two more restorations refused, on a discriminator the chain hands us.** `expirationTime −
+  humanityLifespan()` recovers the claim second — checked against the index's own `claimedAt` on
+  all 21, it agrees **to the second in 19** and misses by −215.5 and +144.7 days in the other two.
+  Those two are exactly the humanities with `nbRequests == 0`, i.e. written by the cross-chain
+  grant path, which copies a term settled somewhere else. +144.7 days is the direction that would
+  hand somebody a window they never had, so they get an ending and no start and are named in
+  `ceasedStartUndated`.
+- **One `private` mapping read from storage, safely.** Finding a lapsed humanity needs the
+  account→humanity link, which is `private` — a Solidity concept, not a chain one. It is at
+  **storage slot 62**, found by scanning slots against a live subject rather than taken from a
+  published layout, and re-derived by the live suite every run. It cannot invent a credential:
+  nothing is reported unless the record it points at names the subject as `owner`, so a layout
+  change after a proxy upgrade costs us the window and can never fabricate one.
+- **A research question closed, because a window depends on it.** Every v1 window is
+  `submissionTime + submissionDuration()`, and that term is governance-settable. Bisected over
+  mainnet archive state: it moved **once**, from 365.25 to 730.5 days at block 14,330,755
+  (2022-03-06), and every as-of instant this SDK can be asked about is four years the other side
+  of that. A live test pins all three readings.
+
+`docs/scoring.md` was corrected while I was in it: it still said an as-of score cannot see a
+credential held then and revoked since, which stopped being true in iteration 16. Write-up:
+`research/protocols/poh-lapsed-credentials.md`.
+
+**The v0.0.3 subgraph cutover is still pending and still healthy** — 42.29 M of 47.39 M at the end
+of this iteration, no indexing errors, ~65,000 blocks/min, so roughly 75 minutes left. Nothing to
+do: `version/latest` tracks the latest *synced* version, so it flips by itself and no consumer ever
+reads a half-indexed index. One trap if you go looking: a labelled version answers at
+`api.studio.thegraph.com/query/77602/poh/**v0.0.3**`, not under `/version/v0.0.3` — that path
+returns `Not found`, which reads exactly like a deleted deployment.
 
 ---
 
