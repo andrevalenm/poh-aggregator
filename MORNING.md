@@ -86,6 +86,15 @@ Studio, then `cd subgraph-registry && npx graph deploy corroborate-registry
 --version-label v0.0.1 --deploy-key $GRAPH_DEPLOY_KEY --node
 https://api.studio.thegraph.com/deploy/`.
 
+## Name is provisional
+
+"Corroborate" was my pick (means "confirm with independent evidence" — the thesis). Hugo
+will rename later; candidates he floated: **thumb** / **print** (thumbprint = the original
+unique-human mark — short, brandable, on-thesis). Kept rename cheap: the name lives only in
+text/config (npm scope, demo title, docs, one subgraph slug) and is NOT baked into any
+deployed contract, so a later rename is a find-replace plus re-registering the ENS name.
+Do the rename BEFORE registering the mainnet ENS name and pushing the public repo.
+
 ## Needs you (in priority order)
 
 1. **Repo has no pushable remote.** Judges need a URL. Fork to Hugo0 or get collaborator
