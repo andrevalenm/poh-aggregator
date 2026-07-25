@@ -100,14 +100,29 @@ block number.
 
 ### 2. Subgraph — [`api.studio.thegraph.com/query/77602/poh/version/latest`](https://api.studio.thegraph.com/query/77602/poh/version/latest` — plus a second subgraph, the registry audit trail, self-hosted at `http://37.27.67.44:8100/subgraphs/name/corroborate-registry)
 
-Indexes Proof of Humanity v2 and Circles v2 on Gnosis. It supplies the two things a boolean
-contract read cannot: **issuance dates** and **graph position**.
+Indexes Proof of Humanity v2 and Circles v2 on Gnosis. It supplies **issuance dates** where the
+protocol keeps none on chain, **graph position**, and **the block every answer belongs to**.
 
-`isHuman(addr)` answers "does this credential exist". It cannot answer "when was it issued" —
-an age curve needs an event, not a storage slot — and PoH is currently airdrop-inflated, so age
-is most of the signal there. It also cannot answer "how many avatars trust this one", which is
-the only part of a Circles registration that carries weight. Without the subgraph the SDK
-degrades to contract reads: scores stay correct, but carry the `issuance-date-unknown` caveat.
+`isHuman(addr)` answers "does this credential exist" and nothing else. It cannot say how many
+avatars trust this one, which is the only part of a Circles registration that carries weight,
+and it cannot date a Circles registration at all — the Hub stores no registration timestamp, so
+the ramp that discounts fresh avatars has no input without an index.
+
+**Each index read returns the entity and the block the index had reached, in the same request.**
+That is not bookkeeping. Probing the contract for existence and the index for the date treats
+two different moments as one, and while the index is behind, a real credential came back held
+with no date — the `Ramp` 0.5 midpoint, roughly twenty-three times what a week-old registration
+earns. Index lag silently moved scores, in the attacker's favour. Now absence at a *named* block
+is itself evidence: a credential missing from an index with complete history was issued after
+that block, which caps its age, and the result says so. Where the index covers only a window of
+history, absence proves nothing, the contract read stands alone as before, and the caveat names
+the gap. See [`packages/sdk/src/reconcile.ts`](packages/sdk/src/reconcile.ts).
+
+Proof of Humanity needs none of that, because it dates itself on chain:
+`expirationTime − humanityLifespan()` is the claim timestamp, two `eth_call`s, no indexer in the
+path. PoH scores are therefore identical with and without the subgraph — there is a live test
+asserting exactly that — and the index becomes a cross-check whose disagreements are reported
+as our fault rather than the subject's.
 
 ### 3. SDK — [`packages/sdk`](packages/sdk)
 
@@ -172,29 +187,38 @@ const result = await corroborate.resolve([
   '0x317C407725145Fa197701045c3383F58fa14204B', // holds Circles v2
 ])
 
-result.score            // 2.4409  — log10 of adversary cost in cents
+result.score            // 1.5683  — log10 of adversary cost in cents
 result.independentRoots // 2
-result.totalCostCents   // 275     — $2.75 to obtain this evidence fraudulently
+result.totalCostCents   // 36      — $0.36 to obtain this evidence fraudulently
 
 result.roots
-//  { trustRoot: 'social-vouching:poh',  contributionCents: 250, saturated: false }
-//  { trustRoot: 'social-trust:circles', contributionCents:  25, saturated: false }
+//  { trustRoot: 'social-trust:circles', contributionCents: 25.0, saturated: false }
+//  { trustRoot: 'social-vouching:poh',  contributionCents: 11.0, saturated: false }
+
+result.evidence[0].provenance
+//  { heldFrom: 'chain', dateFrom: 'chain', headBlock: 47382483, notes: ['index-unavailable'] }
 
 result.caveats.map((c) => c.code)
 //  independent-control-not-attested
 //  multi-address-subject
-//  issuance-date-unknown
+//  issuance-date-unknown          // circles only: the Hub keeps no registration date
 ```
 
-Those are the real values from that call against the live registry and live chains. Both
-credentials sit on `Ramp` age curves and neither issuance date was available, so each carries
-the 0.5 unknown-age weight — pass `subgraphUrl` to replace that placeholder with a real
-age-derived weight. See [`docs/scoring.md`](docs/scoring.md#4-apply-the-age-curve).
+Those are the real values from that call against the live registry and live chains on
+2026-07-25, and they will drift, because both credentials sit on `Ramp` curves and the ramp
+moves with the calendar. The PoH claim is 11.7 days old, so survival weight prices it at 0.022
+of its $5.00 rent — the anti-airdrop curve discounting a real credential of ours, which is the
+model working rather than the model failing. `dateFrom: 'chain'` is PoH being dated by
+`expirationTime − humanityLifespan()` with no indexer involved; Circles has no such slot, so
+without a `subgraphUrl` it takes the flagged 0.5 midpoint. Pass one and this same call returns
+**1.0909** with **1** independent root, because the real Circles avatar turns out to be 1.6 days
+old and the ramp prices it at $0.003 — below the floor at which a root counts as independent.
+See [`docs/scoring.md`](docs/scoring.md#4-apply-the-age-curve).
 
 **`isHuman` throws without a threshold, and that is the feature:**
 
 ```ts
-result.isHuman(2.0)                  // true
+result.isHuman(1.5)                  // true
 result.isHuman(Thresholds.standard)  // false  (standard = 2.5)
 result.isHuman()                     // TypeError: isHuman requires an explicit numeric threshold
 ```
@@ -226,8 +250,9 @@ cd packages/mcp && npm run build
 }
 ```
 
-`CORROBORATE_SUBGRAPH_URL` is optional — without it the server still works, results just carry
-the `issuance-date-unknown` caveat. `CORROBORATE_REGISTRY` pins a different registry, so a
+`CORROBORATE_SUBGRAPH_URL` is optional — without it the server still works, and PoH is dated
+from the chain either way; what is lost is Circles' registration date and graph position, so
+those results carry the `issuance-date-unknown` caveat. `CORROBORATE_REGISTRY` pins a different registry, so a
 consumer who disagrees with our weights can run their own and ignore ours entirely.
 
 ### Demo
@@ -242,18 +267,23 @@ cd apps/demo && npm run dev     # http://localhost:5173
 # 18 contract tests (needs Foundry on PATH)
 forge test
 
-# 34 SDK unit tests — the scoring model, no network
+# 66 SDK tests: 51 unit (scoring model, index reconciliation, input handling) + 15 live
 cd packages/sdk && npm test
 
-# 11 live tests — real chains, the deployed registry, no mocks
+# the 15 live ones alone — real chains, the deployed registry, no mocks
 cd packages/sdk && node --test --experimental-strip-types src/live.test.ts
+
+# 10 browser E2E against the built demo, real chains
+cd apps/demo && npx playwright test
 ```
 
-All 63 pass as of writing. The live tests hit real chains on purpose: the failure mode we care
-about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
+All 94 pass as of 2026-07-25. The live tests hit real chains on purpose: the failure mode we
+care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
 assert the seeded ontology loads, that the ICAO cluster really does have three protocols on
 one root, that discontinued protocols are marked dead, that every weight cites a `research/`
-file, and that rent never exceeds forge for any adapter.
+file, that rent never exceeds forge for any adapter, that the chain-derived PoH date matches the
+index's to within the hour, and that a real credential outside the index's window is flagged
+rather than silently re-dated.
 
 ---
 
@@ -304,9 +334,14 @@ probed. An absent credential is reported as absence of evidence, never as eviden
 World Chain, but no Orb-verified address turned up in the windows scanned, so every World
 lookup so far has legitimately returned `false`.
 
-**8. The subgraph is still backfilling.** It answers queries and reports no indexing errors,
-but at time of writing has not reached the Circles start block, so Circles enrichment falls
-back to the vendor indexer and most PoH lookups still carry `issuance-date-unknown`.
+**8. The subgraph covers only a two-month window of Circles.** It is synced and reports no
+indexing errors, but its Circles data source starts at block 46300000 while the Hub's first
+registration was at 36501311, so the oldest and most legitimate avatars are missing from it — and
+avatars it *does* have may be dated from a trust edge rather than their registration, which
+understates their age. Both cases are now detected and flagged (`index-coverage-partial`,
+`issuance-date-lower-bound`) instead of silently mis-dated, and both are fixed by widening the
+window and re-syncing. PoH is indexed from its deployment block and is dated from the chain
+regardless.
 
 **9. We cannot offer maximal unlinkability and maximal dedup at once.** An aggregator is a
 cross-application deduplicator by definition; app-scoped nullifiers make cross-app dedup
@@ -350,11 +385,16 @@ demo in [`apps/agent`](apps/agent) puts the whole thing to work: an agent proves
 behind it, and the counterparty — not us — picks the line.
 
 **The Graph.** The subgraph is not decoration — it carries the half of the model contract reads
-cannot reach. The age curves need `claimedAt`, which is an event; the airdrop-inflation
-correction needs the registration-rate curve, which is a daily rollup; the Circles modifier
-needs `trustedByCount`, which is a graph traversal. `ProtocolDay` exists specifically so an
-integrator can *see* an airdrop happening to a credential they depend on, rather than reading
-about it in a postmortem.
+cannot reach. Circles keeps no registration timestamp on chain, so its ramp has no input without
+an index; the airdrop-inflation correction needs the registration-rate curve, which is a daily
+rollup; the Circles modifier needs `trustedByCount`, which is a graph traversal. `ProtocolDay`
+exists specifically so an integrator can *see* an airdrop happening to a credential they depend
+on, rather than reading about it in a postmortem. And every read returns the block the index had
+reached, which is what lets *absence* from the index be used as evidence — a credential missing
+from a fully-indexed history was issued after that block, so the index bounds an age it has not
+yet seen. Where we found a date the chain could answer for itself (PoH's `expirationTime`), we
+took it off the index and left the index cross-checking it, because an indexer on the critical
+path of a score is a dependency we would rather not have.
 
 **ENS.** A subject is an address set, and a set needs a handle. The SDK resolves ENS names
 anywhere an address is accepted (`resolve('vitalik.eth')`, verified against mainnet), so a

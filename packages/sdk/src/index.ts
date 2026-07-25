@@ -12,6 +12,7 @@ export { score, freshnessOf, effectiveCost } from './scoring.ts'
 export { loadOntology, adapterKey, rootKey, REGISTRY_ABI } from './ontology.ts'
 export * from './adapters/index.ts'
 export * from './subgraph.ts'
+export * from './reconcile.ts'
 
 /**
  * Named thresholds for `isHuman(threshold)`, exported as documented constants rather than
@@ -241,16 +242,19 @@ export class Corroborate {
           held: false,
           freshness: 0,
           effectiveCostCents: 0,
+          ...(result.provenance ? { provenance: result.provenance } : {}),
           detail: { error: result.error, unavailable: true },
         })
         continue
       }
 
-      const freshness = freshnessOf(adapter, result.issuedAt, now)
+      const freshness = freshnessOf(adapter, result.issuedAt, now, result.issuedAfter)
       evidence.push({
         ...base,
         held: result.held,
         ...(result.issuedAt !== undefined ? { issuedAt: result.issuedAt } : {}),
+        ...(result.issuedAfter !== undefined ? { issuedAfter: result.issuedAfter } : {}),
+        ...(result.provenance ? { provenance: result.provenance } : {}),
         freshness,
         effectiveCostCents: result.held ? effectiveCost(adapter, freshness) : 0,
         ...(result.detail ? { detail: result.detail } : {}),

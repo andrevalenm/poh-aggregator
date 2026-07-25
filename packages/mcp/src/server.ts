@@ -33,8 +33,9 @@ try {
 
 const client = new Corroborate({
   registryAddress: (process.env.CORROBORATE_REGISTRY as `0x${string}`) ?? DEFAULT_REGISTRY,
-  // The subgraph supplies issuance dates (decay) and trust-graph position. Without it the
-  // server still works but results carry the issuance-date-unknown caveat.
+  // The subgraph supplies trust-graph position, and issuance dates for protocols that keep
+  // none on chain. Without it the server still works — PoH is dated from the contract either
+  // way — but Circles results carry the issuance-date-unknown caveat.
   ...(process.env.CORROBORATE_SUBGRAPH_URL ? { subgraphUrl: process.env.CORROBORATE_SUBGRAPH_URL } : {}),
   knownIds,
   knownRoots,
