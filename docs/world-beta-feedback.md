@@ -1,6 +1,6 @@
 # World beta testing documentation — Selfie Check & Identity Check
 
-Testing feedback from building Corroborate against World ID 4.0 during ETHGlobal Lisbon
+Testing feedback from building Print against World ID 4.0 during ETHGlobal Lisbon
 2026. Everything in the developer section was hit directly during this build; nothing is
 speculative. App `app_bbbec994f8bf39c2bad8d57d4b2be0d2`, relying party
 `rp_1db8a6710d795086` (production + staging, both registered on-chain), action
@@ -8,7 +8,7 @@ speculative. App `app_bbbec994f8bf39c2bad8d57d4b2be0d2`, relying party
 
 ## How World ID is used here
 
-Corroborate aggregates personhood credentials across protocols and scores them by
+Print aggregates personhood credentials across protocols and scores them by
 independent trust root. World ID enters three ways:
 
 1. **AgentBook, permissionlessly** — `lookupHuman(address)` on World Chain is our
@@ -82,7 +82,7 @@ Developer-side flow validation used the World ID Simulator against the staging R
 
 ## Data-minimization statement (Identity Check track requirement)
 
-Corroborate requests **no document attributes**. The scoring model consumes the assertion
+Print requests **no document attributes**. The scoring model consumes the assertion
 "a state-issued document was verified for this subject" as one credential on the
 `state-document:icao-9303` trust root — where it is deliberately *saturated* against
 ZKPassport, Self and every other credential reading the same chip, because one passport

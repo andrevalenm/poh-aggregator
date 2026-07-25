@@ -1,6 +1,6 @@
-# Corroborate
+# Print
 
-**Corroborate** *(v.)* — to confirm with independent evidence.
+**Print** *(n.)* — the mark that identifies one person, and the thing a forger has to reproduce.
 
 One SDK over every proof-of-personhood protocol, scored by what an adversary would actually
 pay. Built at ETHGlobal Lisbon, 2026.
@@ -78,8 +78,8 @@ From [`packages/sdk/src/scoring.test.ts`](packages/sdk/src/scoring.test.ts), the
 | Credentials | World ID (doc), ZKPassport, Self | World ID (Orb), Circles v2, Coinbase |
 | Independent trust roots | **1** | **3** |
 | Naive additive total | **$60.00** | $31.00 |
-| Corroborate root-cost total | $20.00 | **$31.00** |
-| **Corroborate score** | **3.30** | **3.49** |
+| Print root-cost total | $20.00 | **$31.00** |
+| **Print score** | **3.30** | **3.49** |
 
 Additive scoring ranks the farm first by a factor of two. Root-cost aggregation reverses it.
 The test asserts both directions — that the person wins under our model, *and* that a naive
@@ -291,7 +291,7 @@ precomputed picture, and takes a comma-separated address set for lookup.
 
 [`apps/agent`](apps/agent) is a World AgentKit demo: an agent signs a CAIP-122 challenge, a
 fictional counterparty checks that a real human stands behind it via AgentBook plus
-Corroborate, and picks its own limits. The limits live in the counterparty's policy file, not
+Print, and picks its own limits. The limits live in the counterparty's policy file, not
 in our SDK — that separation is the point of the demo.
 
 `npm run ens` in the same app is the second flow: the same counterparty, the same policy
@@ -325,13 +325,13 @@ npm install
 ### SDK
 
 ```ts
-import { Corroborate, Thresholds } from '@corroborate/sdk'
+import { Print, Thresholds } from '@print/sdk'
 
-const corroborate = new Corroborate()
+const print = new Print()
 
 // A subject is an address SET. Real people spread credentials across wallets.
 // ENS names work anywhere an address does: resolve('vitalik.eth').
-const result = await corroborate.resolve([
+const result = await print.resolve([
   '0xd267eba602e692216703626a81157214b24c85fb', // holds Proof of Humanity v2
   '0x317C407725145Fa197701045c3383F58fa14204B', // holds Circles v2
 ])
@@ -378,7 +378,7 @@ result.isHuman()                     // TypeError: isHuman requires an explicit 
 past one:**
 
 ```ts
-const corroborate = new Corroborate({
+const print = new Print({
   // TODO: registry audit-trail subgraph URL
   registrySubgraphUrl: 'REGISTRY_SUBGRAPH_URL_TBD',
 })
@@ -388,9 +388,9 @@ const subject = [
   '0xA6b7471fe0338F8B45266734A1346E6f1D7267b1', // Holonym gov-ID + biometric, Human Passport
 ]
 
-await corroborate.resolve(subject)                          // 3.61  · 4 roots · revision 34
-await corroborate.resolve(subject, { asOf: 11_345_000 })    // 1.07  · 1 root  · revision 15
-await corroborate.resolve(subject, { asOf: '2026-07-25T02:00:00Z' })  // same, by instant
+await print.resolve(subject)                          // 3.61  · 4 roots · revision 34
+await print.resolve(subject, { asOf: 11_345_000 })    // 1.07  · 1 root  · revision 15
+await print.resolve(subject, { asOf: '2026-07-25T02:00:00Z' })  // same, by instant
 ```
 
 Nothing about that subject moved between those two calls. What moved is what we knew: at revision
@@ -420,20 +420,20 @@ cd packages/mcp && npm run build
 ```json
 {
   "mcpServers": {
-    "corroborate": {
+    "print": {
       "command": "node",
       "args": ["/absolute/path/to/poh-aggregator/packages/mcp/dist/server.js"],
       "env": {
-        "CORROBORATE_SUBGRAPH_URL": "https://api.studio.thegraph.com/query/77602/poh/version/latest"
+        "PRINT_SUBGRAPH_URL": "https://api.studio.thegraph.com/query/77602/poh/version/latest"
       }
     }
   }
 }
 ```
 
-`CORROBORATE_SUBGRAPH_URL` is optional — without it the server still works, and PoH is dated
+`PRINT_SUBGRAPH_URL` is optional — without it the server still works, and PoH is dated
 from the chain either way; what is lost is Circles' registration date and graph position, so
-those results carry the `issuance-date-unknown` caveat. `CORROBORATE_REGISTRY` pins a different registry, so a
+those results carry the `issuance-date-unknown` caveat. `PRINT_REGISTRY` pins a different registry, so a
 consumer who disagrees with our weights can run their own and ignore ours entirely.
 
 ### Demo
@@ -513,7 +513,7 @@ delegation. Every result carries a permanent, non-suppressible
 ([`research/references/ohlhaver-corpus.md`](research/references/ohlhaver-corpus.md)) accepted
 into the design rather than argued away.
 
-**3. Corroborate does not authenticate the address set.** `resolve()` scores whatever addresses
+**3. Print does not authenticate the address set.** `resolve()` scores whatever addresses
 it is handed. An integration that lets a user type an arbitrary address into a box has no sybil
 resistance at all, regardless of what the score says. Proving control is the integrator's job
 and duplicating it here would mean holding user state — but this is the most likely way to
@@ -613,10 +613,10 @@ anywhere an address is accepted (`resolve('vitalik.eth')`, verified against main
 person with a PoH wallet and a separate Circles avatar can be referred to by one name rather
 than two hex strings the caller must keep in sync.
 
-ENS also carries **agent** identity, which is the harder half. `corroborate.eth` and its
+ENS also carries **agent** identity, which is the harder half. `print.eth` and its
 subnames are live on Sepolia ([`deployments/ens-sepolia.json`](deployments/ens-sepolia.json)):
-each agent's name publishes `corroborate.human`, and the human's name publishes
-`corroborate.agents` back. A counterparty handed nothing but a name resolves the agent's wallet,
+each agent's name publishes `print.human`, and the human's name publishes
+`print.agents` back. A counterparty handed nothing but a name resolves the agent's wallet,
 the human behind it, that human's declared address set, and every sibling agent under the same
 tree — from public infrastructure, with no server of ours involved. `npm run ens` in
 [`apps/agent`](apps/agent) does exactly that, live, against the real tree.
@@ -625,7 +625,7 @@ The second record is the one that matters, and it exists because of a defect we 
 building the first. A cap of *N agents per human* groups agents by the human they name — and if
 naming a human is free, an operator names a fresh wallet per agent and the cap binds nothing
 while every individual answer stays true. Our own tree runs that attack against us:
-`unverified.corroborate.eth` names a wallet its own operator already declares, and walks the cap.
+`unverified.print.eth` names a wallet its own operator already declares, and walks the cap.
 An acknowledgement from the human's side makes the binding `mutual`, `requireAttestedBinding`
 refuses one-way claims, and the caveat `fleet-cap-soft-on-asserted-bindings` fires whenever a
 policy admits them. Full write-up:
@@ -641,7 +641,7 @@ migration made it easier, not harder).
   sale-versus-rental argument for `min(forge, rent)`, the decay-versus-ramp age curves, a
   worked example over the real ontology, and the case where our own model produces an answer
   we do not like.
-- [`docs/threat-model.md`](docs/threat-model.md) — what Corroborate defends against, what it
+- [`docs/threat-model.md`](docs/threat-model.md) — what Print defends against, what it
   provably cannot, each tied to the research file it derives from.
 
 ## Research

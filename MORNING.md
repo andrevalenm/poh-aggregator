@@ -1,6 +1,6 @@
 # Morning brief
 
-Overnight build log for **Corroborate**. Everything below is committed; the git log has the
+Overnight build log for **Print**. Everything below is committed; the git log has the
 detail. _Last updated 2026-07-25, after unattended iteration 11. All four suites green: 18 forge, 314 SDK
 (314 pass, 0 fail, 0 skipped — the rate-limited third-party indexer answered this time),
 13 Playwright — 345 total._
@@ -256,7 +256,7 @@ number, but no way to check it.
   **3.61 / $40.73 / 4 roots** today, **1.07 / $0.11 / 1 root** as of Sepolia block 11,345,000.
   Nothing about the subject moved — Holonym and Human Passport had not been researched yet, and
   the caveat says the drop is *a change in what we knew, not in the subject*. This is a good
-  demo beat and it is live, not staged: `await corroborate.resolve(subject, { asOf: 11_345_000 })`.
+  demo beat and it is live, not staged: `await print.resolve(subject, { asOf: 11_345_000 })`.
 - **It is the strongest Graph claim in the repo**, because it is the one read an archive node
   cannot serve: reconstructing an entity *set* at block N means already knowing every adapter
   id. Graph Node keeps each entity version with its block range, so it is one query.
@@ -320,9 +320,9 @@ No weight moved, so the registry stays at **30 adapters, revision 34**. Write-up
 `research/protocols/world-agentbook-fleets.md`.
 
 **Iteration 11 made ENS carry agent identity — and found that doing so quietly breaks the cap
-iteration 10 built, then closed it.** `corroborate.eth` and three agent subnames are **live on
+iteration 10 built, then closed it.** `print.eth` and three agent subnames are **live on
 Sepolia**, records set and read back (`deployments/ens-sepolia.json`). An agent's name publishes
-`corroborate.human`; the human's name publishes `corroborate.agents` back. `npm run ens` in
+`print.human`; the human's name publishes `print.agents` back. `npm run ens` in
 `apps/agent` resolves a name into a wallet, a human, that human's declared address set, every
 sibling under the tree, a live score across ten protocols, and a decision — all from public
 infrastructure, with the parent name as the only input.
@@ -361,7 +361,7 @@ No weight moved; the registry stays at **30 adapters, revision 34**. Write-up:
 | Subgraph | Studio, syncing, serving | `api.studio.thegraph.com/query/77602/poh/version/latest` — feeds claimedAt into the ramp weights |
 | MCP server | verified over stdio | 3 tools; agents get evidence and caveats, never bare booleans |
 | Demo app | Vite SPA, live against real chains | **6/6 Playwright E2E in a real browser** |
-| Agent flow | fully live, nothing stubbed | AgentKit 402/SIWE + AgentBook + Corroborate; fleet-detection demo included |
+| Agent flow | fully live, nothing stubbed | AgentKit 402/SIWE + AgentBook + Print; fleet-detection demo included |
 | Docs | README, LICENSE, docs/scoring.md, docs/threat-model.md | every printed command was executed before being written down |
 
 Run everything:
@@ -393,7 +393,7 @@ cd ../agent && npm start                                   # live agent flow
    to exactly the airdrop-minted cohort. Vouching registries now *ramp* (weight rises with
    survival), liveness/KYC *decay*. Unknown age under Ramp gets 0.5, never 1.0 — otherwise
    subgraph downtime would be profitable for a farm.
-2. **ENS subjects record.** `resolveSubject()` reads `corroborate.subjects` from any ENS
+2. **ENS subjects record.** `resolveSubject()` reads `print.subjects` from any ENS
    name and expands the address set — ENS as the user-controlled home of "these wallets are
    me". Self-asserted → dedicated caveat; countersigning is documented roadmap.
 3. **The Graph is now load-bearing**, not decorative: claimedAt feeds the ramp,
@@ -620,7 +620,7 @@ anti-robotic. What shipped:
   the hosted deployment.**
 - NOT done (deliberate): sound/ambient audio — felt gimmick-prone; say the word and I'll add
   a muted-by-default toggle. Also note the MCP/SDK install commands reference npm packages
-  that aren't published yet (`@corroborate/mcp`, `@corroborate/sdk`) — they go live the
+  that aren't published yet (`@print/mcp`, `@print/sdk`) — they go live the
   moment you `npm publish` both packages (or I can, post-rename).
 - **Live-data note**: our Circles demo wallet's registration is now ~1 day old on the
   subgraph, so the ramp prices it at $0 and the three-wallet chip shows 2 *independent*
@@ -651,19 +651,20 @@ The self-hosted registry subgraph endpoint — the second Graph product:
 all 15 adapters by plaintext id (the integrity-checked event field from registry v2), plus
 an immutable WeightChange per mutation. "Why did my score change?" is a GraphQL query.
 Self-hosted graph-node on the remote box (publicnode 403'd graph-node's eth_getLogs; switched to
-drpc). Studio mirror needs 60s of your wallet: create slug `corroborate-registry` in
-Studio, then `cd subgraph-registry && npx graph deploy corroborate-registry
+drpc). Studio mirror needs 60s of your wallet: create slug `print-registry` in
+Studio, then `cd subgraph-registry && npx graph deploy print-registry
 --version-label v0.0.1 --deploy-key $GRAPH_DEPLOY_KEY --node
 https://api.studio.thegraph.com/deploy/`.
 
-## Name is provisional
+## Name is settled
 
-"Corroborate" was my pick (means "confirm with independent evidence" — the thesis). The
-owner will rename later; candidates floated: **thumb** / **print** (thumbprint = the original
-unique-human mark — short, brandable, on-thesis). Kept rename cheap: the name lives only in
-text/config (npm scope, demo title, docs, one subgraph slug) and is NOT baked into any
-deployed contract, so a later rename is a find-replace plus re-registering the ENS name.
-Do the rename BEFORE registering the mainnet ENS name and pushing the public repo.
+The overnight working name was a verb meaning "confirm with independent evidence" — the
+thesis. The owner has since picked **print** (thumbprint = the original unique-human mark —
+short, brandable, on-thesis) over the other candidate, **thumb**. The rename was cheap as
+planned: the name lived only in text/config (npm scope, demo title, docs, one subgraph slug)
+and was NOT baked into any deployed contract, so it was a find-replace plus re-registering
+the ENS name. The ENS names and the subgraph slug still need re-registering under the new
+name before the mainnet ENS name and the public repo go out.
 
 ## Needs you (in priority order)
 
@@ -679,17 +680,17 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
 
 1. **Repo has no pushable remote.** Judges need a URL. Fork to a personal account or get collaborator
    access from the owner, then `git push`. Nothing was pushed anywhere overnight.
-2. **corroborate.eth — no longer blocking, and the Sepolia half is done.** The earlier
+2. **print.eth — no longer blocking, and the Sepolia half is done.** The earlier
    "Sepolia ENS is mid-migration" verdict was wrong: it was the wrong controller and a wrong
    event topic. Sepolia `.eth` registration is **free and instant** today through
    `TestnetV1PremigrationRegistrar` (no commit/reveal, no price oracle — the migration made it
-   easier). `corroborate.eth` plus `alpha`/`beta`/`unverified` subnames are live on Sepolia
+   easier). `print.eth` plus `alpha`/`beta`/`unverified` subnames are live on Sepolia
    with all records set and verified, recorded in `deployments/ens-sepolia.json`, and both ENS
    demos run against them (`cd apps/agent && npm run ens`). The write-up is
    `research/protocols/ens-agent-identity.md`.
 
-   What is left for you is optional and cosmetic-for-judging: **register `corroborate.eth` on
-   mainnet** (~$5/yr) and set `corroborate.subjects` to your wallet list, if you want the demo
+   What is left for you is optional and cosmetic-for-judging: **register `print.eth` on
+   mainnet** (~$5/yr) and set `print.subjects` to your wallet list, if you want the demo
    to point at a mainnet name rather than a testnet one. Nothing depends on it — every ENS
    feature is live-tested against a real name today. Do it after the naming decision, since
    the Sepolia name is disposable and a mainnet one is not.

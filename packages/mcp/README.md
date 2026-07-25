@@ -1,4 +1,4 @@
-# @corroborate/mcp
+# @print/mcp
 
 An MCP server that lets an AI agent ask whether a real human stands behind an address —
 and, more usefully, **why**. Built on [The Graph](https://thegraph.com): credential issuance
@@ -18,8 +18,8 @@ cd ../mcp && npm i && npm run build
 Register with your MCP client — for Claude Code:
 
 ```bash
-claude mcp add corroborate \
-  --env CORROBORATE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/77602/poh/version/latest \
+claude mcp add print \
+  --env PRINT_SUBGRAPH_URL=https://api.studio.thegraph.com/query/77602/poh/version/latest \
   -- node /path/to/poh-aggregator/packages/mcp/dist/server.js
 ```
 
@@ -28,11 +28,11 @@ Or as JSON config (Claude Desktop / Cursor):
 ```json
 {
   "mcpServers": {
-    "corroborate": {
+    "print": {
       "command": "node",
       "args": ["/path/to/poh-aggregator/packages/mcp/dist/server.js"],
       "env": {
-        "CORROBORATE_SUBGRAPH_URL": "https://api.studio.thegraph.com/query/77602/poh/version/latest"
+        "PRINT_SUBGRAPH_URL": "https://api.studio.thegraph.com/query/77602/poh/version/latest"
       }
     }
   }
@@ -41,8 +41,8 @@ Or as JSON config (Claude Desktop / Cursor):
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `CORROBORATE_SUBGRAPH_URL` | *(unset)* | The Graph endpoint supplying issuance dates and graph position. Without it the server still works, but age weights fall back to flagged midpoints. With it, weights are computed from real registration age — a live PoH wallet moves from the 2.40 midpoint to a computed weight that reflects its actual age (freshly-renewed credentials weigh less, long-survived ones more). |
-| `CORROBORATE_REGISTRY` | Sepolia `0x977b…aa07` | The on-chain trust-root ontology to score against. |
+| `PRINT_SUBGRAPH_URL` | *(unset)* | The Graph endpoint supplying issuance dates and graph position. Without it the server still works, but age weights fall back to flagged midpoints. With it, weights are computed from real registration age — a live PoH wallet moves from the 2.40 midpoint to a computed weight that reflects its actual age (freshly-renewed credentials weigh less, long-survived ones more). |
+| `PRINT_REGISTRY` | Sepolia `0x977b…aa07` | The on-chain trust-root ontology to score against. |
 
 ## Tools
 
@@ -58,7 +58,7 @@ derivations ship in the SDK (`Thresholds.lenient/standard/strict` = 1.5/2.5/3.5)
 
 **`explain_weight_history`** — the audit trail for one adapter, from the registry
 subgraph: every weight ever assigned, each with its source and the block it landed in.
-Enable with `CORROBORATE_REGISTRY_SUBGRAPH_URL`.
+Enable with `PRINT_REGISTRY_SUBGRAPH_URL`.
 
 **`explain_trust_roots`** — the ontology itself: every known personhood protocol, what it
 proves, which trust root it reads, what it costs to forge or *rent*, with shared roots
@@ -98,7 +98,7 @@ Two deliberate ones shape this surface:
   every change emits an event).
 - Credentials: permissionless reads on World Chain (AgentBook), Gnosis (PoH v2, Circles v2)
   and Base (EAS/Coinbase) — no vendor API on the critical path.
-- Age and graph position: the Corroborate subgraph on The Graph (PoH `claimedAt`, vouch
+- Age and graph position: the Print subgraph on The Graph (PoH `claimedAt`, vouch
   edges, Circles trust edges with net-active counting).
 
-MIT. Part of [Corroborate](../../README.md); scoring model in [docs/scoring.md](../../docs/scoring.md).
+MIT. Part of [Print](../../README.md); scoring model in [docs/scoring.md](../../docs/scoring.md).

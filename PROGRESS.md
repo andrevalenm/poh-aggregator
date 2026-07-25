@@ -26,7 +26,7 @@ else — the queue in `MISSION.md` is untouched and P0 items are both open.
 - 66 tests green as of `c743f82` (18 contract, 25 scoring, 5 input, 12 live, 6 E2E).
 - Registry v2 live on Sepolia at `0x977b028b900cce8ee89c46877e814eff3060aa07`.
 - Protocol subgraph on Studio, synced. Registry audit-trail subgraph self-hosted on `:8100`.
-- Demo served by the `corroborate-demo` container on `:8788`.
+- Demo served by the `print-demo` container on `:8788`.
 - 15 adapters in the ontology across 10 trust roots; **only 4 have live probes**.
 - `node_modules` was not copied — run `pnpm install` before building or testing.
 - Foundry is not installed here; `scripts/compile.mjs` uses solc via npm instead.
@@ -1132,9 +1132,9 @@ said when they did. Now they can.
    address per human, and `nullifierHashes(nullifier) → address` is public. "At most N agents per
    human" can be *checked* against World rather than asserted, which is the difference between a
    product and an illustration.
-2. **P1's ENS agent track** — `corroborate.human` on an agent's name, the counterparty resolving
+2. **P1's ENS agent track** — `print.human` on an agent's name, the counterparty resolving
    it and checking the backing human's personhood, a second agent under the same tree refused
-   because it is the same human. `corroborate.subjects` already works for humans; the record is
+   because it is the same human. `print.subjects` already works for humans; the record is
    self-asserted and the caveat must keep saying so. Blocked on the owner registering a mainnet name
    (`MORNING.md` item 2, open since before iteration 1).
 3. **Base EAS subgraph**, replacing the `easscan.org` GraphQL dependency in
@@ -1304,7 +1304,7 @@ nothing. Registry stays at **30 adapters, revision 34**.
 2. **Base EAS subgraph**, replacing the `easscan.org` GraphQL dependency in
    `coinbaseVerificationAdapter` — the last vendor on the critical path, and the last place the
    repo contradicts its own stated principle.
-3. **P1's ENS agent track** — `corroborate.human` on an agent's name, the counterparty resolving
+3. **P1's ENS agent track** — `print.human` on an agent's name, the counterparty resolving
    it and checking the backing human's personhood, a second agent under the same tree refused
    because it is the same human. The refusal half now exists as a policy engine and would only
    need the ENS name tree; still blocked on the owner registering a mainnet name (`MORNING.md` item 2).
@@ -1348,10 +1348,10 @@ not blocked, and the block was the interesting part.
   `TestnetV1PremigrationRegistrar` — *"free testnet-only v1 registration controller that
   immediately reserves names in ENSv2"*. No commit/reveal, no price oracle, `_refund()` returns
   any ETH you send. ≥3 characters, ≥28 days. The migration made Sepolia *easier*, not harder.
-  `corroborate.eth` is now ours on Sepolia until 2027-07-25, with three agent subnames.
+  `print.eth` is now ours on Sepolia until 2027-07-25, with three agent subnames.
 - **The records, and why the second one is the whole increment.** An agent's name publishes
-  `corroborate.human`; the human's name publishes `corroborate.agents` back, beside the
-  `corroborate.subjects` record that already existed. `packages/sdk/src/ens-agents.ts` resolves
+  `print.human`; the human's name publishes `print.agents` back, beside the
+  `print.subjects` record that already existed. `packages/sdk/src/ens-agents.ts` resolves
   a name into an agent wallet, the human behind it, that human's declared address set, the
   strength of the binding and the tree it sits in — public infrastructure only, no API key.
 - **The finding: a self-published binding makes iteration 10's per-human cap free to evade.**
@@ -1360,8 +1360,8 @@ not blocked, and the block was the interesting part.
   addresses are free — so an operator names a fresh wallet per agent, every agent is its own
   human, and **the cap binds nothing while every individual answer stays true**. Nothing looks
   wrong: nobody is refused and no rule reports a failure. The live tree runs the attack against
-  us. `unverified.corroborate.eth` names an address that is *already in `corroborate.eth`'s own
-  `corroborate.subjects` list*, takes a second slot, and inherits a **3.6087** credential set
+  us. `unverified.print.eth` names an address that is *already in `print.eth`'s own
+  `print.subjects` list*, takes a second slot, and inherits a **3.6087** credential set
   (Holonym gov-ID + FaceTec biometrics + Human Passport) it never acquired.
 - **The fix is the other direction, not more cryptography.** A binding both ends assert is
   `mutual`; the acknowledgement costs a transaction from the key controlling the human's name,
@@ -1398,7 +1398,7 @@ not blocked, and the block was the interesting part.
   PublicResolver authorises on registry ownership, so the controller is no longer the owner when
   the multicall lands; `multicall` bubbles that through a bare `require`. Confirmed by
   simulating `setText` from both addresses (owner succeeds, controller reverts). Records are
-  therefore written in follow-up transactions, and a missing `corroborate.human` is treated as
+  therefore written in follow-up transactions, and a missing `print.human` is treated as
   "not an agent name" rather than as an error.
 
 **Verified:** all four suites, on this box, at this commit.

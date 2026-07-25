@@ -15,8 +15,10 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
 
 ## Blocked on decisions (each unlocks a chunk)
 
-- [ ] **Name decision** — thumb / print / corroborate. Gates: npm scope, mainnet ENS,
-      public repo name, og/meta copy. Rename is a find-replace; do it BEFORE publish/push.
+- [x] **Name decision** — **print** (picked over thumb and the original working name).
+      Find-replace landed across the tree. Still gated on: npm scope, mainnet ENS,
+      public repo name, og/meta copy. Sepolia ENS names need re-registering under
+      `print.eth` before the live demo works again.
 - [x] **Repo push (private)** — pushed to a private remote after a secrets audit (only
       `0x...` placeholders in history; no real keys). andrevalenm has write access and
       continues from here. Judges still need a PUBLIC URL eventually — flip visibility
@@ -24,9 +26,9 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
 - [ ] **Domain + HTTPS** — point a (sub)domain at the host and wire TLS through the
       reverse proxy. Kills the "Not secure" bar and the http-clipboard class of
       bugs for good.
-- [ ] **ENS mainnet** — register the name (~5 min, ~$5/yr) + set `corroborate.subjects`
+- [ ] **ENS mainnet** — register the name (~5 min, ~$5/yr) + set `print.subjects`
       text record. **No longer blocking anything:** the whole ENS story is live on Sepolia
-      (`corroborate.eth` + agent subnames, `deployments/ens-sepolia.json`, `npm run ens`),
+      (`print.eth` + agent subnames, `deployments/ens-sepolia.json`, `npm run ens`),
       because Sepolia registration turned out to be free and instant. Mainnet is now a
       presentation choice — and one to make *after* the name decision.
 - [ ] **Demo video** — script is current (docs/demo-script.md), beat-timed at 3:00.
@@ -46,7 +48,7 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       tests + demo build on every push; Playwright E2E job initially gated off (SwiftShader
       breaks the WebGL/canvas guards) with instructions to enable on a GPU runner.
 - [ ] **Rotate the World portal API key** — it passed through chat history. Post-event.
-- [ ] **corroborate.subjects countersigning** — roadmap item already documented in the
+- [ ] **print.subjects countersigning** — roadmap item already documented in the
       ENS caveat copy; design sketch lives in docs/threat-model.md notes.
 
 ## Considered and parked

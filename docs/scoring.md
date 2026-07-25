@@ -292,7 +292,7 @@ Rough calibration against the deployed ontology:
 Note that the threshold is itself an attack surface. Farmers optimise to whatever cut is in
 use, and the signature is a spike in the score histogram immediately above it
 ([`research/landscape/sybil-incidents-antipatterns.md`](../research/landscape/sybil-incidents-antipatterns.md)
-§4.2). Corroborate does not currently plot that histogram — an integrator running at scale
+§4.2). Print does not currently plot that histogram — an integrator running at scale
 should.
 
 ---
@@ -309,8 +309,8 @@ So a score is only meaningful alongside the revision it was computed against —
 is on every result for that reason — and the registry's own event history can be replayed:
 
 ```ts
-await corroborate.resolve(subject, { asOf: 11_345_000 })            // a Sepolia registry block
-await corroborate.resolve(subject, { asOf: '2026-07-25T02:00:00Z' }) // or an instant
+await print.resolve(subject, { asOf: 11_345_000 })            // a Sepolia registry block
+await print.resolve(subject, { asOf: '2026-07-25T02:00:00Z' }) // or an instant
 ```
 
 Two things change, and it is worth being exact about which.

@@ -15,7 +15,7 @@ evidence). The script uses both.
 > "What does it cost to be human? On today's internet: about fifty cents — that's the
 > documented resale price of an Orb-verified account. About forty proof-of-personhood
 > protocols exist, and they collapse into a handful of trust roots — one passport, read
-> by three protocols, is one credential, not three. Corroborate prices every credential
+> by three protocols, is one credential, not three. Print prices every credential
 > at what an adversary would actually pay."
 
 **0:18 — The live ledger.** (40s) — scroll to "Ask it about a wallet"
@@ -62,7 +62,7 @@ evidence). The script uses both.
 > and the research that produced them is on the page, including the criticisms we can't
 > answer. Try to buy a high score yourself: the instrument uses the deployed registry's
 > real prices. The registry stores protocols, never people; scoring runs in your browser;
-> nobody — including us — holds the join key. Corroborate: confirm with independent
+> nobody — including us — holds the join key. Print: confirm with independent
 > evidence."
 
 ## Recording notes
@@ -74,7 +74,7 @@ evidence). The script uses both.
 - If asked for per-track cuts: Graph tracks use 1:28–1:58 expanded (add the MCP
   `explain_weight_history` call in a Claude window); World uses 1:58 plus the
   `npm run worldid` QR moment; ENS footage should wait for the mainnet name + subjects
-  record (5-min task, see MORNING) and then show `resolve("corroborate.eth")` expanding
+  record (5-min task, see MORNING) and then show `resolve("print.eth")` expanding
   to the declared wallet set with the asserted-not-countersigned caveat.
 - The hero press interaction and the ink-press on buttons read beautifully on video —
   linger on them for a beat; they are the design language doing the talking.

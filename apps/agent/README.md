@@ -1,6 +1,6 @@
 # Human-backing verification for agents
 
-**Corroborate × World AgentKit.** An agent asks a counterparty to transact. The counterparty
+**Print × World AgentKit.** An agent asks a counterparty to transact. The counterparty
 will not deal with it until a real human is shown to stand behind it. This is that check,
 running end to end against live World Chain state, live Gnosis state, and the live World ID
 4.0 relying-party API.
@@ -46,7 +46,7 @@ npm start
    ║                                                            └──────────┘ ║
    ╠═════════════════════════════════════════════════════════════════════════╣
    ║  GATE 3   Evidence — resolved once per HUMAN, not once per agent        ║
-   ║           operator's declared address set  ──►  @corroborate/sdk        ║
+   ║           operator's declared address set  ──►  @print/sdk        ║
    ║                                                     │                   ║
    ║      ┌──────────────────────────────────────────────┴───────────────┐   ║
    ║      │  world-id-orb    root iris-registry:world-orb    World Chain  │   ║
@@ -111,8 +111,8 @@ network calls.
 | AgentKit 402 challenge / `agentkit` header / SIWE signature | **real**, full HTTP round trip, `@worldcoin/agentkit@0.2.0` |
 | Signature verification, message binding, freshness, nonce replay | **real**, `validateAgentkitMessage` + `verifyAgentkitSignature` |
 | AgentBook `lookupHuman` | **real**, `eth_call` on World Chain `0xA23aB…944dA` |
-| Corroborate resolution: World ID + Proof of Humanity + Circles | **real**, Sepolia registry rev 15, Gnosis + World Chain reads |
-| Scoring, saturation, caveats | **real**, `@corroborate/sdk` |
+| Print resolution: World ID + Proof of Humanity + Circles | **real**, Sepolia registry rev 15, Gnosis + World Chain reads |
+| Scoring, saturation, caveats | **real**, `@print/sdk` |
 | World ID 4.0 RP signature + proof request + `/api/v4/verify` | **real** — `npm run worldid`, needs a human to answer |
 
 **One gate cannot run for two of the three agents, and the trace says so rather than faking
@@ -214,14 +214,14 @@ npm run ens               # the same counterparty, but the agent presents an ENS
 ```
 
 `npm run ens` is the second identity path. Instead of asking AgentBook who registered a wallet,
-it resolves `corroborate.human` from the agent's own name on Sepolia, resolves that human's
-declared wallet set and its `corroborate.agents` acknowledgement, enumerates every sibling under
+it resolves `print.human` from the agent's own name on Sepolia, resolves that human's
+declared wallet set and its `print.agents` acknowledgement, enumerates every sibling under
 the same name tree from the ENS registry's `NewOwner` log, scores each human once, and runs the
 same `evaluateFleet()` policy engine over the result. Nothing is hard-coded: the only input is
 the parent name in `deployments/ens-sepolia.json`.
 
 It ends on the case worth watching. AgentBook's `humanId` is a nullifier hash and cannot be
-minted; an ENS `corroborate.human` record is whatever the agent wrote there, and an operator has
+minted; an ENS `print.human` record is whatever the agent wrote there, and an operator has
 as many addresses as it likes. So under the policy as written, a cap of *one agent per human*
 admits two of our three agents — the third named a second wallet of the same operator and became
 its own human. `requireAttestedBinding: true` refuses one-way claims and closes it. Both runs are
@@ -261,7 +261,7 @@ src/
     server.js               the 402 challenge and the AgentKit verification
     policy.js               the counterparty's FleetPolicy — every number it owns
     decide.js               the four gates; gate 4 delegates to evaluateFleet()
-    corroborate.js          @corroborate/sdk lookup
+    print.js          @print/sdk lookup
 ```
 
 ---
@@ -349,7 +349,7 @@ Reported rather than silently patched.
    resource server on a non-default port that follows the spec has every signature rejected
    with `Domain mismatch: expected "127.0.0.1", got "127.0.0.1:37411"`.
 
-**`@corroborate/sdk`** — both of these were fixed upstream mid-build by the SDK author; noted
+**`@print/sdk`** — both of these were fixed upstream mid-build by the SDK author; noted
 because they are the failure modes to watch for.
 
 4. **Omitting `knownIds`/`knownRoots` used to fail silently and catastrophically.** The
@@ -375,9 +375,9 @@ with a **working end-to-end flow**. That is precisely and only what this does.
 Explicitly out of scope for the track, and absent here: agent reputation (no scoring of the
 agent, no history, no behaviour); content generation (the agent generates nothing).
 
-What Corroborate adds on top of AgentKit alone: AgentBook answers *whether* a human backs an
+What Print adds on top of AgentKit alone: AgentBook answers *whether* a human backs an
 agent, as a boolean. It cannot answer *how much that human's identity would cost to fake*, and
 it has one trust root, so an attack on World's iris registry is an attack on every answer it
-gives. Corroborate resolves the operator's other credentials across protocols, saturates the
+gives. Print resolves the operator's other credentials across protocols, saturates the
 ones that share a trust root, and prices the whole set in adversary cost — turning a boolean
 into evidence a counterparty can put a number on and set its own line against.

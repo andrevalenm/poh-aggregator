@@ -1,6 +1,6 @@
 # Threat model
 
-What Corroborate defends against, and what it provably does not. Each item names the research
+What Print defends against, and what it provably does not. Each item names the research
 file it derives from, so the reasoning can be checked rather than taken on trust.
 
 The scoring mechanics referenced here are in [scoring.md](scoring.md).
@@ -9,7 +9,7 @@ The scoring mechanics referenced here are in [scoring.md](scoring.md).
 
 ## Scope
 
-Corroborate answers one question: **how expensive would it be to obtain this evidence
+Print answers one question: **how expensive would it be to obtain this evidence
 fraudulently, today.** It is a pricing function over public credentials, computed in the
 caller's process.
 
@@ -222,7 +222,7 @@ perfect score for anyone.
 
 This is deliberate — proving control is a signature check the integrator already has to perform
 for their own session, and duplicating it here would mean holding user state — but it means
-**Corroborate is only as good as the authentication in front of it**. An integration that lets
+**Print is only as good as the authentication in front of it**. An integration that lets
 a user type an arbitrary address into a box has no sybil resistance at all, regardless of what
 the score says. This is the single most likely way to deploy it wrong.
 
@@ -273,7 +273,7 @@ suppress a competitor, or mark a live protocol dead can do so unilaterally.
   rather than merely observed. Live tests assert every weight cites a `research/` file.
 - Results carry the `registryRevision` they were computed against, so a score is reproducible.
 - Scoring is client-side, so a consumer who disagrees can pin their own registry address
-  (`registryAddress` on the client, `CORROBORATE_REGISTRY` in the MCP server) and ignore ours
+  (`registryAddress` on the client, `PRINT_REGISTRY` in the MCP server) and ignore ours
   entirely.
 
 **Not mitigated:** there is no multisig, no timelock, no curation market, and no appeal path.
@@ -291,7 +291,7 @@ record is worse than the theory: Arbitrum open-sourced Louvain clustering and le
 BlockScience's honest recall interval was 57–100%; the largest published flag rate came with no
 recall figure at all.
 
-Corroborate does not claim to beat any of that. It prices credentials; it does not detect
+Print does not claim to beat any of that. It prices credentials; it does not detect
 sybils. An attacker willing to spend $31 per identity on genuinely independent roots gets a
 score of 3.49 and is indistinguishable from the person in our own headline test. **The model
 raises the price; it does not close the door.** The honest product claim is bounded: *passing
@@ -351,7 +351,7 @@ Resolving the vendor is open question #3 in
 ## Displacement
 
 For every defence above, the discipline is to name what the next-cheapest attack becomes. The
-short version for Corroborate as it stands: once saturation, `min(forge, rent)` and the age
+short version for Print as it stands: once saturation, `min(forge, rent)` and the age
 curves are all working, **the cheapest attack is to buy genuinely independent roots** — a
 rented Orb account plus a rented Persona-rooted KYC account plus a matured Circles avatar. At
 the deployed weights that is about $31 per identity for a score of 3.49, and it defeats

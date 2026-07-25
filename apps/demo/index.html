@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Corroborate — what does it cost to be human?</title>
+    <title>Print — what does it cost to be human?</title>
     <meta
       name="description"
       content="One call over every proof-of-personhood protocol, scored by what an adversary would actually pay. Live on four chains, no server of ours."
     />
-    <meta property="og:title" content="Corroborate — what does it cost to be human?" />
+    <meta property="og:title" content="Print — what does it cost to be human?" />
     <meta
       property="og:description"
       content="Proof of personhood, aggregated. Priced by what an adversary would actually pay."
@@ -32,7 +32,7 @@
     <a class="skip" href="#try">Skip to the live demo</a>
 
     <nav class="nav" aria-label="Main">
-      <a class="wordmark" href="/">corroborate</a>
+      <a class="wordmark" href="/">print</a>
       <div class="nav-links">
         <a href="#try">Live demo</a>
         <a href="#install">Install</a>
@@ -54,7 +54,7 @@
           <span class="sl-mask"><span class="sl-line"><em>to be human?</em></span></span>
         </h1>
         <p class="hero-answer">
-          On today’s internet: about fifty cents. Corroborate reads every proof-of-personhood
+          On today’s internet: about fifty cents. Print reads every proof-of-personhood
           protocol a wallet holds and prices each credential at what an adversary would actually
           pay to fake it — then tells you which ones are the same evidence wearing different
           names.
@@ -148,11 +148,11 @@
               public chains, scoring in your process.
             </p>
             <div class="command-block">
-              <pre><code id="sdk-install">npm install @corroborate/sdk</code><button class="copy-btn" data-copy="npm install @corroborate/sdk" aria-label="Copy install command">copy</button></pre>
+              <pre><code id="sdk-install">npm install @print/sdk</code><button class="copy-btn" data-copy="npm install @print/sdk" aria-label="Copy install command">copy</button></pre>
             </div>
-            <pre class="code-sample"><code><span class="tk">import</span> { Corroborate, Thresholds } <span class="tk">from</span> <span class="ts">'@corroborate/sdk'</span>
+            <pre class="code-sample"><code><span class="tk">import</span> { Print, Thresholds } <span class="tk">from</span> <span class="ts">'@print/sdk'</span>
 
-<span class="tk">const</span> person = <span class="tk">await new</span> Corroborate().resolve(<span class="ts">'name.eth'</span>)
+<span class="tk">const</span> person = <span class="tk">await new</span> Print().resolve(<span class="ts">'name.eth'</span>)
 person.score            <span class="tc">// log₁₀ of adversary cost</span>
 person.independentRoots <span class="tc">// uncorrelated evidence</span>
 person.isHuman(Thresholds.standard)</code></pre>
@@ -978,7 +978,7 @@ person.isHuman(Thresholds.standard)</code></pre>
                 counterparty is handed an agent's ENS name, resolves the records that name the
                 backing human, and checks that human's personhood before agreeing to anything —
                 no registry of ours, no API, no allowlist. The same mechanism serves people: the
-                <code>corroborate.subjects</code> text record lets someone declare their own set
+                <code>print.subjects</code> text record lets someone declare their own set
                 of wallets, and the SDK reads it live from any name.
               </dd>
 
@@ -1031,9 +1031,9 @@ person.isHuman(Thresholds.standard)</code></pre>
       <div class="band-inner">
         <div class="colophon-grid">
           <div class="colophon-brand">
-            <span class="wordmark">corroborate</span>
+            <span class="wordmark">print</span>
             <p>
-              Confirm with independent evidence. The registry stores protocols, never people —
+              Every print a wallet leaves, priced. The registry stores protocols, never people —
               scoring runs client-side, and nobody, including us, holds the join key.
             </p>
           </div>
@@ -1057,7 +1057,7 @@ person.isHuman(Thresholds.standard)</code></pre>
           analytics, no server: this page reads public chains from your browser.
         </p>
       </div>
-      <div class="ghost" aria-hidden="true">corroborate</div>
+      <div class="ghost" aria-hidden="true">print</div>
     </footer>
 
     <div class="grain" aria-hidden="true"></div>
