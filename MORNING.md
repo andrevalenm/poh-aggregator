@@ -56,6 +56,27 @@ cd ../agent && npm start                                   # live agent flow
 4. Thresholds: exported `Thresholds.lenient/standard/strict` constants (1.5/2.5/3.5) with
    derivations — still no default inside `isHuman()`.
 
+## Landing v4 — "Human terrain" complete redesign (night 2026-07-25)
+
+Commit 5fafe41, live at http://37.27.67.44:8788. Research-driven, per your ask:
+
+- **The finding that mattered**: Sage's backgrounds are *scanned photographs of real
+  flecked paper*, not gradients. So v4 synthesizes exactly that — the whole page now sits
+  on a generated sheet of cotton paper (pulp blotches, fibre hairs, specks), seeded.
+- **The site flipped light.** Ink on paper, letterpress editorial type at poster scale,
+  no card boxes anywhere on paper — the widget is a double-ruled field ledger. Night ink
+  survives only for install/hackathon/footer, behind a torn sheet edge.
+- **The thumb you love is untouched** — same dense rings, now pressed in ink. Still
+  deforms under the cursor.
+- **The smoke is dead, deleted.** Replaced by restraint: a trailing ink-ring cursor and
+  the press interaction. Plus the new nature motif that is *ours*: topographic contour
+  fields behind hero/manifesto — a fingerprint is a contour map of a person.
+- **Award-site motion grammar**: Lenis inertial scroll, split-line mask reveal on the h1,
+  parallax layers, anchor glides, staggered rises. All off under reduced-motion.
+- **Azulejo went authentic**: cream tiles, cobalt ornament, on the night wall.
+- 10/10 E2E green locally + hosted. Note: full-page screenshots distort parallax layers;
+  judge it live in a browser.
+
 ## Landing v3 — fluid ink + pigment (evening 2026-07-25)
 
 Commit 166f86d, live at http://37.27.67.44:8788. Your three notes:
