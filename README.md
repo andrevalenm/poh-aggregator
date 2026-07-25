@@ -5,6 +5,14 @@
 One SDK over every proof-of-personhood protocol, scored by what an adversary would actually
 pay. Built at ETHGlobal Lisbon, 2026.
 
+[![What does it cost to be human?](apps/demo/public/og.jpg)](http://37.27.67.44:8788)
+
+**Live:** [landing + demo](http://37.27.67.44:8788) · [console](http://37.27.67.44:8788/app.html) ·
+[registry on Sepolia](https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07) ·
+[protocol subgraph](https://api.studio.thegraph.com/query/77602/poh/version/latest) ·
+[weight audit trail](http://37.27.67.44:8100/subgraphs/name/corroborate-registry)
+— everything computes in your browser against live chains; nothing is precomputed.
+
 ---
 
 ## The problem, in one diagram
