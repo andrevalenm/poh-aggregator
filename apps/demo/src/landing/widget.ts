@@ -45,6 +45,22 @@ function probeRows(events: Map<string, ProbeEvent>): HTMLElement {
   return wrap
 }
 
+/** The score numeral counts up like a meter settling — unless the visitor asked for calm. */
+function scoreNumeral(score: number): HTMLElement {
+  const el = h('span', { class: 'w-score' }, fmtScore(score))
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || score <= 0) return el
+  const t0 = performance.now()
+  const DURATION = 700
+  const tick = (now: number) => {
+    const t = Math.min((now - t0) / DURATION, 1)
+    const eased = 1 - (1 - t) ** 3
+    el.textContent = fmtScore(score * eased)
+    if (t < 1) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+  return el
+}
+
 function resultView(result: PersonhoodResult, elapsedMs: number): HTMLElement {
   const held = result.evidence.filter((e) => e.held).length
   const seconds = (elapsedMs / 1000).toFixed(1)
@@ -59,7 +75,7 @@ function resultView(result: PersonhoodResult, elapsedMs: number): HTMLElement {
         'div',
         {},
         h('span', { class: 'w-score-label' }, 'Root-cost score'),
-        h('span', { class: 'w-score' }, fmtScore(result.score)),
+        scoreNumeral(result.score),
       ),
       h(
         'p',
