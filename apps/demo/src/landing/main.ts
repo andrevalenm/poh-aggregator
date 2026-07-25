@@ -129,20 +129,43 @@ function mountPicker(): void {
   paint(MCP_CLIENTS[0]!)
 }
 
+/**
+ * navigator.clipboard only exists in secure contexts — on the plain-http host every copy
+ * silently failed. The textarea+execCommand path works everywhere.
+ */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    /* insecure context or permission — fall through */
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.append(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    ta.remove()
+    return ok
+  } catch {
+    return false
+  }
+}
+
 function copyButton(text: string, label: string): HTMLElement {
   const btn = h('button', { class: 'copy-btn', type: 'button', 'aria-label': label }, 'copy')
   btn.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(text)
-      btn.textContent = 'copied'
-      btn.classList.add('copied')
-      setTimeout(() => {
-        btn.textContent = 'copy'
-        btn.classList.remove('copied')
-      }, 1600)
-    } catch {
-      btn.textContent = 'select it'
-    }
+    const ok = await copyText(text)
+    btn.textContent = ok ? 'copied' : 'select it'
+    if (ok) btn.classList.add('copied')
+    setTimeout(() => {
+      btn.textContent = 'copy'
+      btn.classList.remove('copied')
+    }, 1600)
   })
   return btn
 }
@@ -192,12 +215,18 @@ function mountTornEdges(): void {
   }
   const install = document.querySelector<HTMLElement>('.install')
   if (!install) return
-  const pts: string[] = []
+  // The night section is an island in the paper now — both edges tear.
+  const top: string[] = []
   for (let x = 0; x <= 100; x += 1.1 + rand() * 1.3) {
     const y = 2 + rand() * 14 + Math.sin(x * 0.5) * 2
-    pts.push(`${Math.min(x, 100).toFixed(1)}% ${y.toFixed(1)}px`)
+    top.push(`${Math.min(x, 100).toFixed(1)}% ${y.toFixed(1)}px`)
   }
-  install.style.clipPath = `polygon(${pts.join(', ')}, 100% 0px, 100% 100%, 0% 100%)`
+  const bottom: string[] = []
+  for (let x = 100; x >= 0; x -= 1.1 + rand() * 1.3) {
+    const y = 2 + rand() * 14 + Math.sin(x * 0.6 + 2) * 2
+    bottom.push(`${Math.max(x, 0).toFixed(1)}% calc(100% - ${y.toFixed(1)}px)`)
+  }
+  install.style.clipPath = `polygon(${top.join(', ')}, 100% 0px, 100% 100%, ${bottom.join(', ')}, 0% 100%)`
 }
 
 // ----------------------------------------------- smooth scroll + parallax

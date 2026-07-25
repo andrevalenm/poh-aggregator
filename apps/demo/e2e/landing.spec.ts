@@ -68,7 +68,13 @@ test.describe('Corroborate landing', () => {
     await expect(result).toContainText(/independent trust root/i)
     // The caveats are surfaced, not hidden, and the console is one click away.
     await expect(result).toContainText(/caveats/i)
-    await expect(result.locator('a[href="/app.html"]')).toBeVisible()
+    // The console is absorbed: one button unfolds the full technical record in place.
+    const btn = result.locator('.detail-btn')
+    await expect(btn).toBeVisible()
+    await btn.click()
+    await expect(result.locator('.evd-rows')).toBeVisible()
+    await expect(result.locator('.cv-list')).toBeVisible()
+    await expect(result).toContainText('independent-control-not-attested')
   })
 
   test('MCP picker switches clients and shows a copyable command', async ({ page }) => {
@@ -81,10 +87,12 @@ test.describe('Corroborate landing', () => {
     await expect(page.locator('#mcp-command .copy-btn')).toBeVisible()
   })
 
-  test('console is reachable from the landing', async ({ page }) => {
-    await page.goto('/')
-    await page.locator('.nav-links a[href="/app.html"]').click()
+  test('the workbench deep-link still renders (unlinked, kept for tooling)', async ({ page }) => {
+    await page.goto('/app.html')
     await expect(page.locator('h1')).toContainText('Corroborate')
     await expect(page.locator('#lookup-form')).toBeVisible()
+    // And the landing itself no longer links to it — the experience is one page.
+    await page.goto('/')
+    await expect(page.locator('.nav-links a[href="/app.html"]')).toHaveCount(0)
   })
 })

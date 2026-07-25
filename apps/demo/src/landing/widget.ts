@@ -197,14 +197,50 @@ function resultView(result: PersonhoodResult, elapsedMs: number): HTMLElement {
       ),
     ),
     thresholdBlock(result),
-    evidenceDetails(result),
-    caveatsDetails(result),
+    fullDetailBlock(result),
+  )
+}
+
+/**
+ * The console, absorbed: one button unfolds the complete technical record in place —
+ * evidence first, caveats a beat later, then the view glides to it. No separate page.
+ */
+function fullDetailBlock(result: PersonhoodResult): HTMLElement {
+  const evidence = evidenceDetails(result)
+  const caveats = caveatsDetails(result)
+  const wrap = h('div', { class: 'w-full-detail' }, evidence, caveats)
+
+  const btn = h(
+    'button',
+    { type: 'button', class: 'detail-btn', 'aria-expanded': 'false' },
+    'Show the full technical detail',
+  )
+  btn.addEventListener('click', () => {
+    const open = btn.getAttribute('aria-expanded') === 'true'
+    if (open) {
+      evidence.removeAttribute('open')
+      caveats.removeAttribute('open')
+      btn.setAttribute('aria-expanded', 'false')
+      btn.textContent = 'Show the full technical detail'
+      return
+    }
+    btn.setAttribute('aria-expanded', 'true')
+    btn.textContent = 'Fold the detail away'
+    evidence.setAttribute('open', '')
+    setTimeout(() => caveats.setAttribute('open', ''), 180)
+    setTimeout(() => evidence.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120)
+  })
+
+  return h(
+    'div',
+    {},
     h(
-      'p',
+      'div',
       { class: 'w-meta' },
-      'The caveats are the result, not small print. Prefer a separate workbench? ',
-      h('a', { href: '/app.html' }, 'Open the console →'),
+      h('span', {}, 'The caveats are the result, not small print. '),
+      btn,
     ),
+    wrap,
   )
 }
 
