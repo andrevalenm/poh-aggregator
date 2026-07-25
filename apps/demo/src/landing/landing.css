@@ -872,7 +872,7 @@ html.js .hero-answer {
 .probe-row .p-ms {
   flex: 0 0 4.5em;
   text-align: right;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
 
@@ -939,7 +939,7 @@ html.js .hero-answer {
 }
 
 .w-root.is-zero {
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   border-style: dashed;
 }
 
@@ -1078,7 +1078,7 @@ html.js .hero-answer {
   font-weight: 650;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
 }
 
 .evd-row.is-held .evd-verdict {
@@ -1534,7 +1534,7 @@ html.js .hero-answer {
 
 .sponsor-alt {
   font-size: 0.8rem;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   margin: -0.2rem 0 0.6rem;
 }
 
