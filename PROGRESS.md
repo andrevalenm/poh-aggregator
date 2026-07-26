@@ -3683,3 +3683,164 @@ chain publish that would contradict it?", which turned out to be the mint block,
 `package-lock.json` and `MISSION.md` pointing at a `./test.sh` that lives at `apps/demo/test.sh`.
 Environment note, unchanged from iterations 24–25: Studio's `poh/version/latest` still returns "Too
 many requests", so every run here pins `poh/v0.0.3`.
+
+## Iteration 27 — 2026-07-26
+
+**Did:** iteration 26's next-step 2 — **is the issuer key in `publicValues[4]` itself rotatable?**
+It is, silently and at the protocol's discretion. But the answer that mattered was one level up, in
+our own probe, and finding it is the iteration.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: the same two `as-of.live.test.ts` tests are red and nothing else
+is. MORNING "Needs you" item 18 stands, unchanged for a thirteenth iteration.
+
+**We were refusing credentials without telling anyone.** `publicValues[4]` is the only thing
+separating a real Holonym credential from one somebody signed for themselves under the same circuit
+id — `Hub.setSBT` runs no proof verification and anyone may run an issuer key, which is why the
+contract's own source warns consumers to check it. We pin that issuer from two Poseidon hashes
+transcribed out of Holonym's repositories, because nothing on chain declares them. So the pin can be
+wrong in two directions and they are not symmetric:
+
+- **too wide** — we accept a key that is not Holonym's — counts a forgery, and no read closes that;
+- **too narrow** — Holonym rotates or adds a key and we do not — refuses **real people**, one at a
+  time, for as long as it takes somebody to notice.
+
+The second was live and it was silent. `interpretSbt` returned `{ held: false, detail: { sbt:
+'issuer-mismatch', … } }` — no note, no caveat. From outside, **a credential we threw away and an
+address that holds nothing are the same result**: the subject sees a lower score and no reason, and
+whoever reads the score sees somebody who has done nothing. Every other `held: false` this adapter
+produces means the subject holds nothing; exactly one means the subject holds something we chose not
+to count, and that one must not look like the others. It is the same class as index lag moving a
+score and a stopped Circles avatar read as a revocation, arriving from a new direction: not a wrong
+answer, but a **correct answer that says nothing about the evidence it discarded**.
+`credential-issuer-not-recognised` is now on the refusal, and it is the second caveat in
+`scoring.ts` deliberately **not** filtered on `held` — the reason `index-cannot-see-endings` is not:
+a subject who loses a trust root to a decision of *ours* is owed the reason.
+
+**And the pin is no longer a transcription.** Ten windows of 30,000 blocks spread evenly from the
+Hub's deployment block (115,616,235) to head (154,715,253), every mint transaction in each decoded
+from its calldata: **every `gov-id` mint in every era carries `0x03fae82f…1993` and every
+`biometrics` mint carries `0x0d4f849d…d922`** — 2024-02-01 to 2026-07-25, unchanged. A denser
+200,000-block sweep at head (104 mint transactions, the largest sample taken) agrees exactly: 55
+gov-id, 32 biometrics, 17 phone, one issuer each. `getSBT` cannot answer this — it reverts once a
+credential expires, so the issuer of an expired SBT survives only in the transaction that minted it
+— which is why the timeline is a live test and not a probe.
+
+**At probe time, a census of what live credentials are actually carrying.** `holonym-issuer.ts`
+takes recent mint `Transfer`s, reads `getSBT(holder, circuitId)` back at head through one
+`multicall`, and reports whether the pin is still the key in use: 439–540 ms measured over three
+runs, 9 holders / 10 live credentials in a 30,000-block window, four round trips. Asked for once per
+process and **only when a subject holds or is refused something** — no credential, no issuer to
+corroborate, and that is most subjects.
+
+**The control is free and it is load-bearing.** A pin that matched everything would be worth
+nothing, so both the census and the timeline have to show `publicValues[4]` *discriminates*. It
+does, at no extra call: the two scored circuits carry different keys from each other in every
+window, and the Hub's unscored `phone` circuit carries a third (`0x0040b881…30a4`) throughout.
+`IssuerCensus.discriminates` reports it per run; the timeline test asserts no key appears on two
+circuits.
+
+**Two transport traps, both of which fail by answering.**
+
+1. **viem's `getLogs` action silently drops a caller-supplied `topics` array** (2.55.8 — `topics` is
+   a local built from `event`/`events`/`args` and the caller's is never destructured), so the
+   request goes out unfiltered. Over blocks 154,700,000–154,709,999 the action returns two logs, one
+   of which is not a `Transfer` at all, where `client.request` with the identical filter returns
+   one. Every production `eth_getLogs` in this repo already goes through raw JSON-RPC, so nothing
+   shipped was affected — but two reads in `holonym.live.test.ts` used the action, including one
+   asserting `logs.length === 1` for a filter it was never sending, which **passed because that
+   block happens to hold nothing else**. An assertion resting on a coincidence.
+2. **`multicall`'s `allowFailure: true` swallows the transport.** A rate-limited `eth_call` comes
+   back as every entry `status: 'failure'` carrying the same HTTP error, the promise *resolves*, and
+   the endpoint rotation never fails over — so a throttled `mainnet.optimism.io` reads as a registry
+   in which nobody holds anything. Not hypothetical: it is how the census failed on its first live
+   run, silently, as `uncorroborated`. A multicall is one `eth_call`, so a batch in which nothing
+   succeeded is refused and another endpoint gets it.
+
+**The refusal path is tested against the real chain, because it has never happened.** A path that
+has never run is not a path — the same argument that pointed the signer sweep's bisection at slot 0.
+`holonymAdapters({ credentials })` makes the pin injectable, so the live suite takes a **real,
+currently-held** gov-id credential and probes it against `issuer ^ 1n`: same read, same holder, a
+key we do not have, which is exactly what an upstream rotation looks like from in here. It requires
+`held: false` with no `error`, the note present, and the census to have landed on `pin-not-in-use`
+and to **name the real issuer** among `unpinnedIssuers`. Nothing written down: the holder is found
+from the chain each run and the wrong pin is derived from the right one.
+
+**Verified:** on this box, at this commit.
+
+- `CORROBORATE_SUBGRAPH_URL=…/poh/v0.0.3 ./apps/demo/test.sh` → **all suites green, exit 0**: forge
+  18, sdk unit 35, sdk live **23/23, 0 skipped**, Playwright **13 passed**. Run twice.
+- `cd packages/sdk && npm test` → **619 tests, 616 pass, 2 fail, 1 skip** (**+24** over iteration
+  26's 595: 20 unit in a new `holonym-issuer.test.ts`, 4 live). The 2 failures are iteration 15's
+  registry-drift pair, unchanged and untouched; the skip is a Base endpoint hiccup, not this change.
+- `holonym.live.test.ts` alone: **17/17, 0 skipped**, three times.
+- `npm run build` and `tsc --noEmit` clean in `packages/sdk`; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` → DENY / ALLOW **3.6151 over 5 roots** / DENY the sibling / DENY the
+  fleet. **Identical to iteration 26**, so nothing at head moves.
+- **Cost, measured against the parent commit** — same live gov-id holder found from the chain
+  (`0xb8e2fcdf…c9a5`), two processes each: cold **752/784 → 797/1003 ms**, warm **141/158 →
+  132/142 ms**, no credential **48/57 → 46/56 ms**. The census is ~450 ms of work costing ~50–220 ms
+  because it shares a `Promise.all` with the signer sweep; the warm and no-credential paths do not
+  move, which is the point — the check is paid for by the subjects it is about.
+- **The acceptance tests assert mechanism.** The timeline decodes whatever mints each window holds;
+  the census reads whatever live credentials the window holds; the refusal is exercised against a
+  real held credential with a derived pin. All stay true the day a rotation lands — only the status
+  changes.
+
+**Committed:** `396b05a` fix(sdk): a Holonym credential we refuse is a credential the score never
+mentions.
+
+**Write-up:** `research/protocols/holonym-issuer-pin.md` — the two failure directions, the defect,
+the census with its cost table, the ten-window timeline, both transport traps and three open
+questions. Indexed in `research/INDEX.md` (header recount, actually counted: **46 files / 26,786
+lines**). `holonym-signed-not-proven.md` open question 2 struck through and answered.
+`docs/scoring.md` §4 gains the exclusion-by-premise paragraph beside the three term premises; README
+gains **honest limit 18**.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved: this decides
+what we say about a credential we *refuse*, not what one is worth. Registry stays as the chain has
+it (32 adapters / revision 36, written by the other tree; this tree still has 30).
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15–26, still
+   the only *real* red in the suite, still Hugo's call.
+2. **The same pin exists in `human-passport.ts` and `coinbase.ts`, uncensused.** Open question 3 of
+   the new write-up, and the one that generalises furthest. Both pin an attester read from
+   documentation rather than from the chain, both refuse on mismatch, and neither says a word when
+   it does. The machinery built here — a census of what live credentials actually carry, plus an
+   audible refusal — is protocol-independent; what differs is only where the mints come from.
+   `passport-attester-pin.md` records what those pins are.
+3. **`maxProofTime` is a second unread World term.** Iteration 25's next-step 3, standing since:
+   `verify()` rejects a proof older than 7 days, settable the same way. It enters no date, but it
+   bounds how stale the underlying Orb proof may be when the entry is written.
+4. **Index the two PoH cross-chain events** and give `PohHuman` an `expirationTime`. Iterations
+   22–26's standing next step. Four of the five term/authority/issuer checks are now per-process
+   reads against public endpoints; a subgraph over them removes that whole class of fragility.
+
+**Worth keeping, because it generalises.** Iteration 26's lesson was *when a derivation cites a
+document, check that the thing enforcing the document is the thing you are reading*. This one is the
+same instinct pointed the other way: **check what the code does with the answer it does not like.**
+The issuer check was correct, well-documented, adversarially motivated, and the *only* branch nobody
+had followed to the end was the branch where it fires. Everything in this package is built to say
+loudly when a read is degraded or a date is a bound; the one place it fell silent was where it was
+most confident, because a refusal *feels* like a finished decision rather than a partial one. The
+tell was cheap and available: `interpretSbt` has five `held: false` returns and four of them mean
+"nothing here" — a fifth that means something completely different, returning through the same
+channel with the same shape, was the whole bug.
+
+The other one is about the two traps. Both were in *transport plumbing that appeared to work*, both
+were found only because a new read exercised them, and both fail by answering rather than by
+erroring — the third and fourth instances of that pattern in four iterations (Tenderly's truncated
+log range, the Circles `stopped()` getter, and now these). It is worth stating as a rule rather than
+a coincidence: **when a dependency can return a plausible wrong answer instead of an error, assume
+it will, and re-check its contract on our side of the boundary.** `mintHoldersFromLogs` re-checks
+every log's topics even though it asked for them; that is not paranoia, it is the only thing that
+would have caught the viem behaviour before it mattered.
+
+**Blocked:** nothing. Nothing new for Hugo this iteration; MORNING is untouched. Carried: iteration
+15's ontology/registry drift (Hugo), iteration 25's two dead `.rootowned` directories (one
+`sudo rm -rf`), and iteration 1's two notes, `pnpm-lock.yaml` untracked beside a tracked
+`package-lock.json` and `MISSION.md` pointing at a `./test.sh` that lives at `apps/demo/test.sh`.
+Environment note, unchanged from iterations 24–26: Studio's `poh/version/latest` still returns "Too
+many requests", so every run here pins `poh/v0.0.3`.

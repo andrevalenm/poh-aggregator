@@ -79,6 +79,19 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       constructor→head, never moved. The ceiling is falsifiable even though it is unprovable
       (`expiry − mintTimestamp` ≤ 365 d; largest observed 364.969 d).
       `research/protocols/holonym-signed-not-proven.md`.
+- [x] **The credential we refuse, and never mention** — shipped (iteration 27): iteration 26's
+      next step 2 asked whether the issuer in `publicValues[4]` is rotatable. It is, silently — but
+      the live defect was ours. A subject holding an SBT under an unrecognised issuer got
+      `held: false` with **no note and no caveat**, so a credential we threw away and an address
+      holding nothing were the same result; and if the protocol rotates its key, that refusal is
+      ours, not the holder's. Now `credential-issuer-not-recognised`, the second caveat deliberately
+      not filtered on `held`. The pin is also measured rather than transcribed: ten windows from the
+      deployment block to head, every mint decoded from calldata, **one issuer per circuit in every
+      era**, and a free control — the two scored circuits carry different keys, so a match is
+      information. Probe-time census of live credentials, ~450 ms, only when a subject holds or is
+      refused. Two transport traps written down: viem's `getLogs` silently drops a caller's `topics`
+      and `multicall`'s `allowFailure` swallows a rate limit.
+      `research/protocols/holonym-issuer-pin.md`.
 - [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.
