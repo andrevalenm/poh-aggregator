@@ -9,9 +9,12 @@ The scoring mechanics referenced here are in [scoring.md](scoring.md).
 
 ## Scope
 
-Print answers one question: **how expensive would it be to obtain this evidence
-fraudulently, today.** It is a pricing function over public credentials, computed in the
-caller's process.
+Print answers one question: **which personhood credentials does this subject hold, and how many
+independent trust roots do they rest on.** It reads public credentials and collapses the ones that
+are the same credential wearing different branding, in the caller's process. It also prices what
+each surviving root would cost an adversary — that is what makes the collapse quantitative — but
+the price is the machinery and the root count is the answer. See
+[the score is not the verdict](scoring.md#the-score-is-not-the-verdict).
 
 It is not an authentication system, not a KYC provider, and not a fraud engine. In particular
 it does not verify that the caller controls the addresses it is asked about — see
@@ -24,25 +27,34 @@ first thing an integrator must handle.
 
 ### Double-counted trust roots
 
-**Attack.** Present one passport to World's document tier, ZKPassport and Self; present one
-Sumsub check to Galxe Passport and Linea PoH. Collect three or two "independent" credentials
+**Attack.** Present one passport to World's document tier, ZKPassport, Self and Rarimo; present one
+Sumsub check to Galxe Passport and Linea PoH. Collect four or two "independent" credentials
 for one act, and clear an additive threshold that a real person with diverse evidence cannot.
 
-**Why it works elsewhere.** Roughly 40 protocols in the landscape collapse into about 6 trust
-roots, and almost nothing in production prices that collapse. A farm's credentials are
-maximally correlated by construction; a real person's are diverse. Additive scoring therefore
-ranks the farm higher — it rewards exactly the pattern it exists to catch.
+**Why it works elsewhere.** The ontology's 30 catalogued adapters sit on 18 trust roots, and the
+six largest roots carry 18 of the 30 adapters — the ICAO passport root alone carries four. Almost
+nothing in production prices that collapse. A farm's credentials are maximally correlated by
+construction; a real person's are diverse. Additive scoring therefore ranks the farm higher — it
+rewards exactly the pattern it exists to catch.
 
 **Defence.** Saturation within a trust root. The strongest credential in a root counts; the
 rest are discarded and reported under a `correlated-evidence-saturated` caveat naming which
 adapters were folded. Because saturation operates on the credential *class*, it needs no
 cross-protocol linkability and creates no correlation the protocols themselves prevent.
 
-**Measured effect.** In the test named *"the whole thesis in one test"*, a farm holding three
-ICAO-rooted credentials totals $20.00 (score 3.30) against a person holding three
-differently-rooted credentials at $31.00 (score 3.49). Under naive addition the farm totals
-$60.00 and wins by a factor of two. The test asserts both directions, so a regression in
-saturation fails the build.
+**Measured effect.** A farm holding four ICAO-rooted credentials totals $20.00 rather than $80.00,
+which is one independent root rather than four. In the test named *"the whole thesis in one test"*,
+where the person's evidence includes a $30 KYC-rooted credential, that collapse is enough to
+reverse the ranking outright — the test asserts both directions, so a regression in saturation
+fails the build.
+
+**What this defence does not do.** It does not guarantee the farm scores lower. Against a person
+holding four cheap independent roots the same farm still scores 3.30 against 2.85, because a
+passport is genuinely expensive. What saturation guarantees is that the farm cannot manufacture
+*independence* by integrating more protocols — the root count stays at 1 no matter how many
+passport readers it presents to. A consumer that gates on `independentRoots` gets the defence;
+a consumer that gates on the score alone gets much less of it. Worked numbers:
+[scoring.md](scoring.md#the-score-is-not-the-verdict).
 
 **Derives from.**
 [`research/landscape/prior-art-scoring.md`](../research/landscape/prior-art-scoring.md) (why
@@ -291,11 +303,13 @@ record is worse than the theory: Arbitrum open-sourced Louvain clustering and le
 BlockScience's honest recall interval was 57–100%; the largest published flag rate came with no
 recall figure at all.
 
-Print does not claim to beat any of that. It prices credentials; it does not detect
-sybils. An attacker willing to spend $31 per identity on genuinely independent roots gets a
-score of 3.49 and is indistinguishable from the person in our own headline test. **The model
-raises the price; it does not close the door.** The honest product claim is bounded: *passing
-threshold T costs an attacker at least $X per identity, as of date D* — and nothing stronger.
+Print does not claim to beat any of that. It reports evidence and its independence; it does not
+detect sybils. An attacker willing to buy genuinely independent roots — a rented Orb account, a
+rented Persona-rooted KYC account, a matured Circles avatar, about $31 per identity at the deployed
+weights — holds three independent roots and is indistinguishable from a real person here, because
+at that point the difference is no longer visible on chain. **Independence raises the price; it
+does not close the door.** The honest claim is bounded: *N independent roots cost an attacker at
+least $X per identity, as of date D* — and nothing stronger.
 
 **A wrong weight breaks this directly.** Every cost in the ontology is a dated human judgement,
 not a measurement. If `rentCostCents` for an adapter is wrong by a factor of k, every score
@@ -354,8 +368,9 @@ For every defence above, the discipline is to name what the next-cheapest attack
 short version for Print as it stands: once saturation, `min(forge, rent)` and the age
 curves are all working, **the cheapest attack is to buy genuinely independent roots** — a
 rented Orb account plus a rented Persona-rooted KYC account plus a matured Circles avatar. At
-the deployed weights that is about $31 per identity for a score of 3.49, and it defeats
+the deployed weights that is three independent roots for about $31 per identity, and it defeats
 everything in this document.
 
-That number is the product. It is not zero, it is checkable, and it is the only claim the
-evidence supports.
+Which is the product, stated exactly: a farm cannot get independence for free by integrating one
+document with more protocols; it has to go and buy roots, one at a time, at a price this registry
+publishes. That is not zero, it is checkable, and it is the only claim the evidence supports.

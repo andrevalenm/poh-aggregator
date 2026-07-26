@@ -2,14 +2,15 @@
 
 **Print** *(n.)* — the mark that identifies one person, and the thing a forger has to reproduce.
 
-One SDK over every proof-of-humanity protocol, scored by what an adversary would actually
-pay. Built at ETHGlobal Lisbon, 2026.
+One SDK over the proof-of-humanity protocols. Hand it an address or an ENS name and it reports
+which personhood credentials that subject holds — and **how many independent trust roots those
+credentials actually rest on.** Built at ETHGlobal Lisbon, 2026.
 
-<!-- TODO: live URL -->
-[![What does it cost to be human?](apps/demo/public/og.jpg)](LIVE_URL_TBD)
+[![Are you real?](apps/demo/public/og.jpg)](https://print.observer)
 
-<!-- TODO: live URL (landing, console) and registry audit-trail subgraph URL -->
-**Live:** [landing + demo](LIVE_URL_TBD) · [console](LIVE_URL_TBD/app.html) ·
+<!-- TODO: registry audit-trail subgraph URL -->
+**Live:** [landing + demo](https://print.observer) ·
+[console](https://print.observer/app.html) ·
 [registry on Sepolia](https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07) ·
 [protocol subgraph](https://api.studio.thegraph.com/query/77602/poh/version/latest) ·
 [weight audit trail](REGISTRY_SUBGRAPH_URL_TBD)
@@ -17,10 +18,34 @@ pay. Built at ETHGlobal Lisbon, 2026.
 
 ---
 
+## The claim, in one sentence
+
+> **One passport read by four protocols is one credential, not four.**
+
+Protocol count is not evidence count. What a checker actually checks is a **trust root** — a
+passport chip, an iris registry, one KYC vendor's decision, a social graph — and protocols
+routinely share one. A subject holding World's document tier, ZKPassport, Self and Rarimo made
+one trip to a passport office and four integrations. So the number worth reporting is not how
+many badges a subject has collected; it is how many independent things had to be true.
+
+Three counts get quoted about this project and it matters which one you mean:
+
+| | Figure | What it counts |
+|---|---|---|
+| **Integrated** | 10 adapters | protocols Print actually reads, permissionlessly — no API key, nothing a vendor can revoke. As of registry revision 34, 2026-07-25; listed in [§3](#3-sdk--packagessdk). |
+| **Catalogued** | 30 adapters over 18 trust roots | every entry priced and trust-rooted in the on-chain registry, probed or not. Same revision. |
+| **Surveyed** | ~40 protocols\* | the roster in [`research/landscape/poh-landscape-sweep.md`](research/landscape/poh-landscape-sweep.md) §3. |
+
+\* The survey figure is soft and we are not going to pretend otherwise: it counts projects, and
+where you draw the line between a protocol, a wallet and a rebranded vendor moves it by several.
+The 30 and the 18 are hard — they are rows in [`ontology/adapters.json`](ontology/adapters.json),
+deployed on chain, countable.
+
+---
+
 ## The problem, in one diagram
 
-There are roughly forty proof-of-humanity protocols. They collapse into about six trust
-roots. Each collapse below is traced to a primary source in [`research/`](research/INDEX.md).
+Each collapse below is traced to a primary source in [`research/`](research/INDEX.md).
 
 ```
    PROTOCOLS (what an app integrates)              TRUST ROOTS (what is actually checked)
@@ -47,10 +72,10 @@ roots. Each collapse below is traced to a primary source in [`research/`](resear
    Circles v2               ──────────────────────► social-trust:circles
 ```
 
-**One passport read by three protocols is one credential, not three.** A scorer that adds
-credentials therefore fails in the adversary's favour, because a farm's credentials are
-maximally correlated (one document, presented everywhere) while a real person's are diverse
-(an iris, a bank KYC, a social graph). Additive scoring ranks the farm *above* the person.
+A scorer that adds credentials up fails in the adversary's favour, because a farm's credentials
+are maximally correlated (one document, presented everywhere) while a real person's are diverse
+(an iris, a bank KYC, a social graph). The farm collects the badges more cheaply than the person
+collects the roots.
 
 We cannot fix this by deduplicating credentials: ZKPassport scopes its nullifier per service
 and never publishes an unscoped value, Self publishes a global one, World hashes a
@@ -62,28 +87,44 @@ prevent.
 to know that *your* two credentials share a root, only that those two *protocols* read the
 same root — a public fact about the world.
 
-> **Saturate within a trust root, sum across roots, price each root at min(forge, rent).**
+> **Saturate within a trust root, sum across roots. Report the root count as its own answer.**
 
-Zero cross-protocol linkability required. Full derivation in [`docs/scoring.md`](docs/scoring.md).
+Zero cross-protocol linkability required. How much a root is worth once collapsed — the cost model
+behind the weighting — is derived in [`docs/scoring.md`](docs/scoring.md). That model is the
+machinery; the one-sentence claim at the top of this file is the point.
 
 ---
 
 ## The farm and the person
 
-From [`packages/sdk/src/scoring.test.ts`](packages/sdk/src/scoring.test.ts), the test named
-*"the whole thesis in one test"*. Both subjects hold **three credentials**.
+Arithmetic over the deployed weights, revision 34. Both subjects hold **four credentials**, all
+at full weight.
 
-| | Farm — one passport, three protocols | Person — three unrelated credentials |
+| | Farm — one passport, four protocols | Person — four unrelated credentials |
 |---|---|---|
-| Credentials | World ID (doc), ZKPassport, Self | World ID (Orb), Circles v2, Coinbase |
-| Independent trust roots | **1** | **3** |
-| Naive additive total | **$60.00** | $31.00 |
-| Print root-cost total | $20.00 | **$31.00** |
-| **Print score** | **3.30** | **3.49** |
+| Credentials | World ID (document), ZKPassport, Self, Rarimo | World ID (Orb), Human Passport, Proof of Humanity v2, Circles v2 |
+| **Independent trust roots** | **1** | **4** |
+| Score, credentials added up | **3.90** | 2.85 |
+| Score, roots saturated (what Print computes) | **3.30** | 2.85 |
 
-Additive scoring ranks the farm first by a factor of two. Root-cost aggregation reverses it.
-The test asserts both directions — that the person wins under our model, *and* that a naive
-sum would have inverted the ranking. If saturation ever broke, the second assertion fails.
+Read the last two rows honestly. Saturation deletes $60 of double-counted evidence from the
+farm — and the farm still scores higher than the person, under both scorings. A passport is
+genuinely expensive to obtain, the model says so, and we are not going to fudge the weight to
+make the story land. **The number that inverts is the root count: 1 against 4.** That is the
+output to gate on, and no additive score can express it, because addition has no way to say
+"those two proofs were the same proof".
+
+A consumer requiring **two independent roots** admits the person and refuses the farm, from the
+same API call. [print.observer](https://print.observer) ships exactly that as its default and
+prints the rule next to the answer. The library ships no default at all — see
+[`isHuman` throws](#quickstart).
+
+The shipped test named *"the whole thesis in one test"*
+([`packages/sdk/src/scoring.test.ts`](packages/sdk/src/scoring.test.ts)) asserts the narrower
+claim: give the person a KYC-rooted credential and root-cost aggregation does reverse a ranking
+addition got backwards. The table above is the case that test does not cover, and it is the more
+common one — which is why `independentRoots` is a top-level field on every result rather than a
+footnote in a doc.
 
 ```bash
 cd packages/sdk && npm test    # 314 tests
@@ -177,7 +218,8 @@ authenticates the set; we never infer that two addresses belong to one person, b
 inference is the linkage we exist to avoid. Saturation spans the set, so splitting credentials
 across wallets cannot inflate a score — there is a test for exactly that.
 
-Ten adapters are implemented, all readable **without vendor cooperation** — no API key on the
+Ten of the thirty catalogued adapters are implemented as live probes, as of revision 34
+(2026-07-25). All are readable **without vendor cooperation** — no API key on the
 critical path, nothing that can rate-limit or revoke us: World ID Orb (`WorldIDAddressBook` and
 AgentBook on World Chain), Proof of Humanity v2 (Gnosis), Proof of Humanity v1 (the original
 registry on Ethereum mainnet), Circles v2 (Gnosis + trust graph), Coinbase
@@ -278,10 +320,12 @@ exactly that.
 
 ### 4. MCP server — [`packages/mcp`](packages/mcp)
 
-Three tools for agents: `lookup_personhood`, `check_personhood`, `explain_trust_roots`. No
-tool returns a bare boolean, and nothing writes. An agent that gets a number cannot reason
-about its own uncertainty, so every response carries the evidence, the trust roots, and what
-was discounted as correlated — the agent asks *why*, not just *whether*.
+Four tools for agents: `lookup_personhood`, `check_personhood`, `explain_trust_roots` and
+`explain_weight_history`. No tool returns a bare boolean, and nothing writes. An agent that gets a
+number cannot reason about its own uncertainty, so every response carries the evidence, the trust
+roots, and what was discounted as correlated — the agent asks *why*, not just *whether*.
+`explain_trust_roots` exists so an agent can find out that two credentials it was handed are the
+same credential.
 
 ### 5. Demo and agent apps — [`apps/`](apps)
 
@@ -318,9 +362,13 @@ Both were built last and are the least polished thing here.
 ## Quickstart
 
 ```bash
-git clone <this repo> && cd poh-aggregator
-npm install
+git clone https://github.com/andrevalenm/poh-aggregator && cd poh-aggregator
+pnpm install
 ```
+
+The workspace is pnpm (`packageManager` in the root `package.json`); `npm install` at the root
+fails on `packages/mcp`'s `workspace:` dependency. Consumers of the published package need none of
+this — `npm install @printid/sdk` is a plain npm install.
 
 ### SDK
 
@@ -336,10 +384,11 @@ const result = await print.resolve([
   '0x317C407725145Fa197701045c3383F58fa14204B', // holds Circles v2
 ])
 
-result.score            // 1.5683  — log10 of adversary cost in cents, stamped 2026-07-25.
-                        // It creeps upward daily: the PoH credential is on a survival ramp,
-                        // so surviving is the thing that earns the weight. 1.5687 today.
-result.independentRoots // 2
+result.independentRoots // 2       — two things had to be true, and they are unrelated
+result.score            // 1.5683  — how much the two roots are worth once collapsed:
+                        // log10 of adversary cost in cents, stamped 2026-07-25. It creeps
+                        // upward daily, because the PoH credential is on a survival ramp
+                        // and surviving is what earns the weight. 1.5687 today.
 result.totalCostCents   // 36      — $0.36 to obtain this evidence fraudulently
 
 result.roots
@@ -373,6 +422,19 @@ result.isHuman(1.5)                  // true
 result.isHuman(Thresholds.standard)  // false  (standard = 2.5)
 result.isHuman()                     // TypeError: isHuman requires an explicit numeric threshold
 ```
+
+**A score is not the only policy available, and often not the best one.** Gating on
+`independentRoots` is the rule that separates a farm from a person in the table above, where the
+score does not:
+
+```ts
+result.independentRoots >= 2         // true
+```
+
+That is the default [print.observer](https://print.observer) applies so a visitor gets a binary
+answer, with the rule printed beside it. It is a default, not a truth — two independent roots is
+a line somebody chose, and a caller who bears a different cost of being wrong should choose a
+different one.
 
 **A score is only meaningful with the revision it was computed against, so you can ask for a
 past one:**
@@ -469,12 +531,18 @@ cd packages/sdk && node --test --experimental-strip-types src/ens-agents.live.te
 cd apps/demo && npx playwright test
 ```
 
-All 345 pass as of 2026-07-25 (18 forge + 314 SDK + 13 browser; two of the SDK live tests skip
-loudly when the third-party Verax indexer they cross-check against returns HTTP 429, and did not
-on this run). The live tests hit real chains on purpose: the failure mode we
+The SDK suite is **302 pass / 2 fail / 10 skipped of 314**, run 2026-07-26. The two failures are
+in `src/live.test.ts` and the premise is stale rather than the code: both assert against a Circles
+avatar registered *before* the subgraph's indexing window, and the subgraph has since been
+backfilled with earlier coverage, so it now sees the registration the test needed it to miss. The
+fix is on the data side — repoint at an avatar genuinely outside the window, or narrow the
+subgraph's start block — and not in the assertions. Ten skip loudly rather than silently, mostly
+when the third-party Verax indexer they cross-check against returns HTTP 429.
+
+The live tests hit real chains on purpose: the failure mode we
 care about is "an adapter silently stopped matching reality", and a mock cannot catch that. They
-assert the seeded ontology loads, that the ICAO cluster really does have three protocols on
-one root, that discontinued protocols are marked dead, that every weight cites a `research/`
+assert the seeded ontology loads, that the ICAO cluster really does carry at least three protocols
+on one root (four, at revision 34), that discontinued protocols are marked dead, that every weight cites a `research/`
 file, that rent never exceeds forge for any adapter, that the chain-derived PoH date matches the
 index's to within the hour, and that a real credential outside the index's window is flagged
 rather than silently re-dated. The Passport suite asserts the mechanism rather than a score,
@@ -532,11 +600,19 @@ in October 2026 after the pool empties.
 change is an event — but not decentralised. There is no multisig, no timelock, and no appeal
 path. `transferCuratorship` exists and has not been used.
 
-**6. Coverage is 10 of 30 adapters.** The other twenty are priced in the ontology but not yet
-probed — and that is now the end of the road rather than a backlog: every remaining entry is
-documented in `research/landscape/ontology-coverage.md` §6 as gated, off-chain or dead, so no
-further probe is possible without putting a vendor on the critical path. An absent credential is
-reported as absence of evidence, never as evidence of absence.
+**6. Most of the ontology is catalogued but not probed — 10 of 30, at revision 34.** That gap is
+smaller than it looks, and it is partly a design property rather than a backlog. Every remaining
+entry is documented in `research/landscape/ontology-coverage.md` §6 as gated, off-chain or dead,
+so the next probe would cost the no-vendor-on-the-critical-path rule rather than buy coverage —
+and some entries are unreadable *by design*, which is the privacy property working. ZKPassport
+scopes its nullifier per service and never publishes an unscoped value, so nobody can look a
+holder up unsolicited; Self and Galxe Passport likewise consume a proof the subject has to
+generate. **A catalogued-but-unprobed entry still carries a trust root, and the trust root is
+what stops a credential being double-counted whether or not we can ever read it** — that is the
+rule at the top of `ontology-coverage.md` §1, and it is why the ontology describes classes we
+cannot query. What it costs us is real all the same: if a subject holds a credential we cannot
+read, we under-report their evidence. An absent credential is reported as absence of evidence,
+never as evidence of absence.
 
 **7. World's document and Selfie tiers cannot be read at all.** Not by us and not by anyone
 without World's cooperation: a World ID 4.0 credential leaves no per-holder state on any chain,
@@ -558,10 +634,13 @@ regardless.
 cross-application deduplicator by definition; app-scoped nullifiers make cross-app dedup
 impossible by construction. We chose unlinkability, and saturation is the price.
 
-**10. The score raises the price; it does not close the door.** An attacker willing to spend
-~$31 per identity on genuinely independent roots scores 3.49 and is indistinguishable from the
-person in our own headline test. That number *is* the product claim, and it is the only one the
-evidence supports.
+**10. Independence raises the price; it does not close the door.** An attacker who buys
+genuinely independent roots — an iris enrolment, a KYC check from a different vendor, a social
+registration old enough to have survived — holds four independent roots and is
+indistinguishable from a real person here, because at that point the difference is no longer
+visible on chain. What Print does is make the farm pay for independence instead of collecting it
+for free from one document. That *is* the product claim, and it is the only one the evidence
+supports.
 
 Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 
@@ -585,8 +664,11 @@ Canonical values live in [`deployments/sepolia.json`](deployments/sepolia.json).
 
 ### Tracks
 
-**World.** World ID is the highest-weight uniqueness credential in the ontology and the one
-that forced the cost model. We read the Orb tier permissionlessly from two World Chain contracts —
+**World.** World ID is the protocol that forced this design. It has three tiers in the ontology
+and they do not sit on one root: the Orb tier is an iris registry of its own, while the document
+tier reads the same passport chip as ZKPassport, Self and Rarimo — so a subject presenting one
+passport through World *and* through any of those three holds one credential, not two. We read the
+Orb tier permissionlessly from two World Chain contracts —
 `WorldIDAddressBook.addressVerifiedUntil` and AgentBook's `lookupHuman`, both plain `eth_call`s,
 no API key, no relying-party id, no user interaction — which is why the adapter cannot be
 rate-limited or revoked out from under an integrator. It is also the
@@ -637,10 +719,11 @@ migration made it easier, not harder).
 
 ## Docs
 
-- [`docs/scoring.md`](docs/scoring.md) — the scoring model: root-cost aggregation, the
-  sale-versus-rental argument for `min(forge, rent)`, the decay-versus-ramp age curves, a
-  worked example over the real ontology, and the case where our own model produces an answer
-  we do not like.
+- [`docs/scoring.md`](docs/scoring.md) — how a root gets weighted once the credentials in it have
+  collapsed: root-cost aggregation, the sale-versus-rental argument for `min(forge, rent)`, the
+  decay-versus-ramp age curves, a worked example over the real ontology, the case where the model
+  produces an answer we do not like, and the case where the score ranks a farm above a person and
+  only the root count separates them.
 - [`docs/threat-model.md`](docs/threat-model.md) — what Print defends against, what it
   provably cannot, each tied to the research file it derives from.
 
