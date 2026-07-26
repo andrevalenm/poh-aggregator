@@ -32,7 +32,7 @@ The public repo's previous 16-commit research lineage is preserved two ways: as 
 why it coexists with `research/`.
 
 **2. Rename: Corroborate → Print.** 401 occurrences across 63 files. Packages are now
-`@print/sdk` and `@print/mcp`. One genuine English use of "corroborate" survives deliberately
+`@printid/sdk` and `@printid/mcp`. One genuine English use of "corroborate" survives deliberately
 at `research/landscape/sybil-incidents-antipatterns.md:206`; 27 inflected forms
 (`corroborated`, `corroboration`, …) were preserved intentionally.
 
@@ -85,7 +85,7 @@ Ask for it again if needed.
 
 - Landing and console run locally: `pnpm -C <repo> --filter @print/demo dev`, port 5173.
 - **304 unit tests pass.**
-- **12 tests are RED** — all in `packages/sdk/src/ens-agents.live.test.ts`, purely because
+- **14 tests are RED** — all in `packages/sdk/src/ens-agents.live.test.ts`, purely because
   `print.eth` does not exist on Sepolia. Not a regression; proven by running the same file
   against a pristine worktree at the pre-rename HEAD, where it passed 14/14.
 - Credentials: `.env.local` in the repo (gitignored, mode 600). Backup and the original
@@ -107,10 +107,17 @@ not one:
      correct, but `owner`/`expires` still describe the old registration).
    Scripts live at `scripts/ens-*.mjs`. Nothing on-chain was run this session.
 
-**2. `@print` npm scope** — unverified whether the org is claimable. A 404 on `@print/sdk`
-only proves the package doesn't exist, not that the scope is free. **Needs `npm login`.** If
-the org is taken, package names change and the install copy on the landing page changes with
-them. *No publish was performed and none should be until this is checked.*
+**2. npm — ALREADY PUBLISHED.** `@printid/sdk` is live at **0.1.0 and 0.1.1**, `@printid/mcp` at
+**0.1.0**, published as npm user `andreval`. **`@print` was not available** — that is why the
+scope is `@printid`, and it is why the workspace has two scopes: the publishable packages are
+`@printid/*` while the private apps are `@print/demo` and `@print/agent-demo`.
+
+Two things outstanding on the published packages. **0.1.0 was unimportable** — `enroll.ts`
+imported `ontology/enrollment.json` by a path that climbs out of the package, which resolves
+into `node_modules` once published; fixed in 0.1.1 by copying the JSON into `src/` during the
+build, the same way `adapters.json` was already handled. And the SDK's `description` in
+`package.json` still says "proof-of-personhood", which is what renders on the npm package page
+while the site says humanity throughout.
 
 **3. Subgraph slug** `corroborate-registry` → `print-registry`, re-created in Graph Studio.
 
