@@ -112,15 +112,19 @@ export function mountWidget(): void {
       slot.append(probeRows(events))
     })
 
-    // With the full adapter roster a multi-wallet lookup streams dozens of rows. The drama is
-    // worth watching live; keeping the residue is not, because the answer below then has to
-    // compete with a wall of the working-out for the reader's eye. On completion the whole
-    // stream folds to one line of provenance and the answer takes the sheet.
+    // With the full adapter roster a multi-wallet lookup streams dozens of rows. Watching them
+    // arrive is the most direct evidence on the page that nothing is precomputed — but leaving
+    // the wall above the answer makes the verdict compete with its own working-out. So the
+    // stream is not thrown away on completion: the sheet keeps a one-line summary, and the rows
+    // themselves are HANDED to the console, timings and arrival order intact.
     const settleReceipt = () => {
       const all = [...events.values()]
       const held = all.filter((ev) => ev.state === 'held').length
       const unavailable = all.filter((ev) => ev.state === 'unavailable').length
       const absent = all.length - held - unavailable
+      // Detach rather than clear: `slot` is about to be re-parented into the console, so
+      // emptying streamEl would destroy the very rows we are preserving.
+      slot.remove()
       clear(streamEl)
       streamEl.append(
         h(
@@ -129,7 +133,7 @@ export function mountWidget(): void {
           `${all.length} probes · ${held} found · ${absent} empty${
             unavailable ? ` · ${unavailable} unreachable` : ''
           }`,
-          h('span', { class: 'probe-receipt-note' }, 'every read is listed in the console below'),
+          h('span', { class: 'probe-receipt-note' }, 'every read is kept in the console below'),
         ),
       )
     }
@@ -139,7 +143,7 @@ export function mountWidget(): void {
       const result = await client.resolve(subjects)
       settleReceipt()
       resultEl.append(
-        resultView(result, performance.now() - started, Thresholds, rootDescriptions),
+        resultView(result, performance.now() - started, Thresholds, rootDescriptions, slot),
       )
     } catch (err) {
       resultEl.append(

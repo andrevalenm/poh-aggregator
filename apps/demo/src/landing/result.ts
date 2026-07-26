@@ -407,6 +407,7 @@ function consoleBlock(
   result: PersonhoodResult,
   elapsedMs: number,
   thresholds: ThresholdSet,
+  liveRead?: HTMLElement,
 ): HTMLElement {
   const rank = (e: Evidence) => (e.held ? 0 : isUnavailable(e) ? 1 : 2)
   const sorted = [...result.evidence].sort(
@@ -418,6 +419,13 @@ function consoleBlock(
     { class: 'console-panel', id: 'console-panel', hidden: true },
     h('h5', { class: 'sheet-label' }, 'The record'),
     recordBlock(result, elapsedMs, thresholds),
+    // The live probe stream, adopted rather than discarded. It carries what the settled
+    // evidence rows below cannot: per-adapter latency and the order the answers actually
+    // arrived in. That is the page's most direct evidence that nothing here is precomputed,
+    // so it is kept — just moved off the sheet so the verdict is not buried under it.
+    ...(liveRead
+      ? [h('h5', { class: 'sheet-label' }, 'The live read, as it happened'), liveRead]
+      : []),
     h('h5', { class: 'sheet-label' }, `Every read — ${result.evidence.length} adapters`),
     h('div', { class: 'evd-rows' }, ...sorted.map(evidenceRow)),
     h('h5', { class: 'sheet-label' }, `Caveats — ${result.caveats.length}, in the SDK's own words`),
@@ -468,6 +476,8 @@ export function resultView(
   elapsedMs: number,
   thresholds: ThresholdSet,
   rootNotes: Record<string, string>,
+  /** The live probe stream node, adopted into the console. See `consoleBlock`. */
+  liveRead?: HTMLElement,
 ): HTMLElement {
   // Only the verdict depends on the chosen number; the rule control mutates in place.
   const answer = h('div', { class: 'answer', role: 'status', 'aria-live': 'polite' })
@@ -487,6 +497,6 @@ export function resultView(
     unreachableNote(result),
     permanentCaveat(result.caveats),
     credentialList(result, rootNotes),
-    consoleBlock(result, elapsedMs, thresholds),
+    consoleBlock(result, elapsedMs, thresholds, liveRead),
   )
 }
