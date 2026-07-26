@@ -3,6 +3,11 @@ import { worldchain } from 'viem/chains'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
 import type { ProbeProvenance } from '../reconcile.ts'
 import { AGENT_BOOK_DEPLOYED_AT, registrationOf, type RegistrationOfOptions } from '../agentbook.ts'
+import { assumedTermHistory, termForLocalExpiry, type TermHistory } from '../term-history.ts'
+import {
+  readVerificationTermHistory,
+  type ReadVerificationTermsOptions,
+} from './world-term.ts'
 
 /**
  * World ID (Orb tier), read from World Chain.
@@ -37,8 +42,9 @@ import { AGENT_BOOK_DEPLOYED_AT, registrationOf, type RegistrationOfOptions } fr
  *   block the verification was mined in. Confirmed on 24 sampled verifications spanning
  *   2025-04-18 to 2026-07-25, every one to the second, and asserted every run by the live suite
  *   against a fresh sample. `verificationLength` is 14,515,200 s (168 days) and has been since the
- *   contract's `WorldIDAddressBookInitialized` event; it is read at runtime rather than pinned, so
- *   a governance change is visible instead of silently re-dating everybody.
+ *   contract's `WorldIDAddressBookInitialized` event; it is read at runtime rather than pinned, and
+ *   `world-term.ts` sweeps every change the owner has ever made to it so the entry is dated with
+ *   the term that was in force when *it* was written, rather than with the one at head.
  *
  * Coverage is not comparable to AgentBook's: sampled 100-block windows give ~28,000 verifications
  * a day at head and 60,000–80,000 a day through 2025, against a 168-day term.
@@ -131,9 +137,9 @@ export const WORLD_ID_ORB_GROUP_ID = 1n
 export const WORLD_ADDRESS_BOOK_DEPLOYED_AT_BLOCK = 2_711_105
 export const WORLD_ADDRESS_BOOK_DEPLOYED_AT = 1_724_757_849
 /**
- * The term set at initialisation, 168 days. Never used to date anything — the probe reads the
- * live value — but the live suite holds the chain to it, because every date we derive is only
- * exact while it is unchanged.
+ * The term the constructor announced, 168 days. Never used to date anything — the probe reads the
+ * live value, and `world-term.ts` reads every value the field has ever held — but the live suite
+ * holds the chain to it, because it is what the deployment's own event says.
  */
 export const WORLD_ADDRESS_BOOK_VERIFICATION_LENGTH = 14_515_200
 
@@ -165,6 +171,13 @@ export interface WorldChainRead {
   verifiedUntil: number
   /** `verificationLength()` at the same block. */
   verificationLength: number
+  /**
+   * Every term the contract has ever been set to, from `world-term.ts`. Absent means nobody swept
+   * — the pre-existing contract, which subtracts head's term and says nothing about it. Present
+   * with `observed: false` means a sweep was attempted and failed, which is a different claim and
+   * gets `term-origin-unverified`.
+   */
+  terms?: TermHistory
   /** `AgentBook.lookupHuman(subject)` as a decimal string, or undefined when that read failed. */
   agentBookHumanId?: string
   /**
@@ -226,16 +239,32 @@ export function interpretWorldRead(r: WorldChainRead): AdapterProbeResult {
   let addressBookIssuedAt: number | undefined
   let lapsedIssuedAt: number | undefined
   if (r.verificationLength > 0 && r.verifiedUntil > 0) {
-    const derived = r.verifiedUntil - r.verificationLength
-    // A date before the registry existed, or in the future, means `verificationLength` is not the
-    // term this entry was written under. Better no date than a fabricated one — and on a decay
-    // curve an over-fresh date is the expensive direction to be wrong in.
-    if (derived >= WORLD_ADDRESS_BOOK_DEPLOYED_AT && derived <= r.now) {
+    // Which of the contract's terms wrote this entry. `setVerificationLength` moves the field
+    // without touching a single stored expiry, so subtracting head's term from an entry written
+    // under a different one shifts the date by the whole size of the change — for every entry in
+    // the book at once. `world-term.ts` reads that history; with no change ever emitted the
+    // timeline is one era and this is exactly the deployment-floor guard it replaces.
+    const history = r.terms ?? assumedTermHistory(r.verificationLength, WORLD_ADDRESS_BOOK_DEPLOYED_AT)
+    const solved = termForLocalExpiry(history, r.verifiedUntil, r.now)
+    if (solved.kind === 'settled') {
+      const derived = r.verifiedUntil - solved.term
       detail.addressBookIssuedAt = derived
+      if (solved.term !== r.verificationLength) detail.termAtVerification = solved.term
       if (addressBookHeld) addressBookIssuedAt = derived
       else lapsedIssuedAt = derived
+    } else if (solved.kind === 'ambiguous') {
+      // Two terms the contract really did set both place the write inside their own era. Nothing
+      // in the entry distinguishes them, so there is no date here — only a choice of two.
+      detail.termAmbiguous = solved.terms
+    } else if (solved.kind === 'era-unknown') {
+      // Unreachable on this contract — the constructor publishes the first era's term — and kept
+      // because the timeline type allows it and a silent fall-through would be a wrong date.
+      detail.termEraUnpublished = true
     } else {
-      detail.dateRejected = derived
+      // A date before the registry existed, or in the future, means no term this contract has
+      // ever set wrote this entry. Better no date than a fabricated one — and on a decay curve an
+      // over-fresh date is the expensive direction to be wrong in.
+      detail.dateRejected = r.verifiedUntil - r.verificationLength
     }
   }
 
@@ -261,6 +290,17 @@ export function interpretWorldRead(r: WorldChainRead): AdapterProbeResult {
   if (ended && lapsedIssuedAt !== undefined) notes.push('date-from-lapsed-verification')
 
   const reportedIssuedAt = issuedAt ?? (ended ? lapsedIssuedAt : undefined)
+
+  // The AddressBook date rests on the premise the sweep exists to test, so when the sweep was
+  // attempted and did not answer, the date is the old assumed one and says so. A caller who
+  // supplied no history at all is not in this case: nobody asked, so no check was skipped — the
+  // same asymmetry `dateHumanityFromTerm` draws.
+  const fromAddressBook =
+    reportedIssuedAt !== undefined &&
+    (reportedIssuedAt === addressBookIssuedAt || reportedIssuedAt === lapsedIssuedAt)
+  if (fromAddressBook && r.terms !== undefined && !r.terms.observed) {
+    notes.push('term-origin-unverified')
+  }
 
   const provenance: ProbeProvenance = {
     heldFrom: 'chain',
@@ -364,12 +404,34 @@ async function registrationRead(
  * The AgentBook read is allowed to fail on its own: it is a second, narrower source, and losing
  * it must not turn an AddressBook positive into an error. Losing the AddressBook read *is* an
  * error, because a network failure must never read as "not a human".
+ *
+ * A sixth value, the history of `verificationLength` itself, is swept once per process and only
+ * for a subject who actually has an AddressBook entry — no entry, no subtraction, no premise to
+ * check, and that is most subjects. See `world-term.ts` for why the term is not a constant and
+ * why the sweep is chunked.
  */
 export function worldIdOrbAdapter(
   rpcUrl: string = WORLD_RPC,
   logOptions: RegistrationOfOptions = {},
+  termOptions: ReadVerificationTermsOptions = {},
 ): AdapterProbe {
   const c = client(rpcUrl)
+  /**
+   * Every term the AddressBook has ever been set to, read once and shared.
+   *
+   * Memoised on success only, exactly as PoH's two sweeps are and for the same reason: a rate
+   * limit is a moment, not a property of the registry, and one failed sweep must not mark every
+   * later probe in the process `term-origin-unverified`. The pin is the *first* head reached, so
+   * a change mined during a long-lived process is missed until it restarts — one owner
+   * transaction that has never happened, against a four-call sweep per subject.
+   */
+  let terms: Promise<TermHistory | undefined> | undefined
+  const termsFor = async (termAtHead: number, head: number): Promise<TermHistory | undefined> => {
+    const read = await (terms ??= readVerificationTermHistory(termAtHead, head, termOptions))
+    if (!read) terms = undefined
+    return read
+  }
+
   return {
     adapterId: 'world-id-orb',
     probe: async (subject: Address): Promise<AdapterProbeResult> => {
@@ -410,16 +472,27 @@ export function worldIdOrbAdapter(
 
         const humanId =
           agentHumanId.status === 'success' ? agentHumanId.result.toString() : undefined
-        const registration =
+        const term = Number(verificationLength.result)
+        const entry = Number(verifiedUntil.result)
+        // Both extra reads are conditional and independent, so they cost one round trip together
+        // and nothing at all for a subject neither registry knows.
+        const [registration, history] = await Promise.all([
           humanId !== undefined && humanId !== '0'
-            ? await registrationRead(subject, logOptions)
-            : undefined
+            ? registrationRead(subject, logOptions)
+            : undefined,
+          entry > 0 ? termsFor(term, Number(block.number)) : undefined,
+        ])
 
         return interpretWorldRead({
           block: Number(block.number),
           now: Number(block.timestamp),
-          verifiedUntil: Number(verifiedUntil.result),
-          verificationLength: Number(verificationLength.result),
+          verifiedUntil: entry,
+          verificationLength: term,
+          // Only when the sweep was actually asked for: an unasked question and an unanswered one
+          // license different confidence, and `interpretWorldRead` distinguishes them.
+          ...(entry > 0
+            ? { terms: history ?? assumedTermHistory(term, WORLD_ADDRESS_BOOK_DEPLOYED_AT) }
+            : {}),
           ...(humanId === undefined ? {} : { agentBookHumanId: humanId }),
           ...(registration === undefined ? {} : { agentBookRegistration: registration }),
         })

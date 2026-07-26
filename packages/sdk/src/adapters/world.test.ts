@@ -314,3 +314,117 @@ describe('World ID dated from the AgentBook registration', () => {
     assert.equal(r.issuedAt, NOW + 100 - TERM)
   })
 })
+
+/**
+ * Which of the contract's terms wrote this entry.
+ *
+ * `setVerificationLength` moves `verificationLength` and touches not one stored expiry, so
+ * subtracting head's term from an entry written under a different one shifts the date by the whole
+ * size of the change — for every address in the book at once, in the same direction, silently. On
+ * a decay curve a shortened term makes the whole registry look fresher, which is the direction
+ * that pays an adversary and the reason `world-term.ts` reads the history rather than pinning a
+ * constant.
+ *
+ * Nothing here changes a score today: the sweep finds one era, so `termForLocalExpiry` reduces to
+ * the deployment-floor guard the probe always applied. These are the branches for the day it does
+ * not, plus the regression that the old behaviour survives for a caller who supplies no history.
+ */
+describe('World ID dated with the term that was in force, not the term at head', () => {
+  /** Two eras: 168 days until a change 300 days ago, 84 days since. */
+  const CHANGED_AT = NOW - 300 * 86_400
+  const TWO_ERAS = {
+    eras: [
+      { from: WORLD_ADDRESS_BOOK_DEPLOYED_AT, seconds: TERM, until: CHANGED_AT },
+      { from: CHANGED_AT, seconds: TERM / 2, block: 21_000_000 },
+    ],
+    observed: true,
+  }
+
+  test('an entry written under the old term is dated with the old term', () => {
+    // Verified 400 days ago, when the term was still 168 days: the entry has lapsed, and its
+    // window opens where the *old* term puts it. Head's term would place it 84 days later.
+    const verifiedAt = NOW - 400 * 86_400
+    const verifiedUntil = verifiedAt + TERM
+    // Head's term is the running era's, which is the halved one.
+    const r = read({
+      verifiedUntil,
+      verificationLength: TERM / 2,
+      agentBookHumanId: '0',
+      terms: TWO_ERAS,
+    })
+    assert.equal(r.issuedAt, verifiedAt)
+    assert.notEqual(r.issuedAt, verifiedUntil - TERM / 2)
+    assert.equal(r.detail?.termAtVerification, TERM)
+    assert.equal(r.heldUntil, verifiedUntil)
+  })
+
+  test('an entry written since the change is dated with head’s term, and says nothing extra', () => {
+    const verifiedAt = NOW - 10 * 86_400
+    const r = read({
+      verifiedUntil: verifiedAt + TERM / 2,
+      verificationLength: TERM / 2,
+      agentBookHumanId: '0',
+      terms: TWO_ERAS,
+    })
+    assert.equal(r.issuedAt, verifiedAt)
+    // The term in force is the term at head, so there is nothing to qualify.
+    assert.equal(r.detail?.termAtVerification, undefined)
+    assert.equal(r.provenance?.notes.includes('term-origin-unverified'), false)
+  })
+
+  test('two eras that both explain the entry leave it undated rather than guessed at', () => {
+    // Reachable whenever a change is smaller than the gap between the eras it separates: the same
+    // `verifiedUntil` is then consistent with a write in either era, and nothing in the entry says
+    // which. A date here would be a coin flip wearing a timestamp.
+    const shortened = TERM - 20 * 86_400
+    const ambiguous = {
+      eras: [
+        { from: WORLD_ADDRESS_BOOK_DEPLOYED_AT, seconds: TERM, until: CHANGED_AT },
+        { from: CHANGED_AT, seconds: shortened, block: 21_000_000 },
+      ],
+      observed: true,
+    }
+    // Written 10 days before the change under the long term, or 10 days after it under the short
+    // one — both land inside their own era.
+    const verifiedUntil = CHANGED_AT - 10 * 86_400 + TERM
+    assert.equal(verifiedUntil - shortened, CHANGED_AT + 10 * 86_400)
+    const r = read({ verifiedUntil, agentBookHumanId: '0', terms: ambiguous })
+    assert.equal(r.issuedAt, undefined)
+    assert.deepEqual(r.detail?.termAmbiguous, [TERM, shortened])
+  })
+
+  test('a sweep that was attempted and failed keeps the date and says the check did not happen', () => {
+    const verifiedUntil = NOW + 1000
+    const r = read({
+      verifiedUntil,
+      agentBookHumanId: '0',
+      terms: { eras: [{ from: WORLD_ADDRESS_BOOK_DEPLOYED_AT, seconds: TERM }], observed: false },
+    })
+    assert.equal(r.issuedAt, verifiedUntil - TERM)
+    assert.ok(r.provenance?.notes.includes('term-origin-unverified'))
+  })
+
+  test('a caller who never asked for a sweep is told nothing, because no check was skipped', () => {
+    // The pre-existing contract, and the regression that matters: an unasked question and an
+    // unanswered one license different confidence, and only the second is a caveat.
+    const verifiedUntil = NOW + 1000
+    const r = read({ verifiedUntil, agentBookHumanId: '0' })
+    assert.equal(r.issuedAt, verifiedUntil - TERM)
+    assert.equal(r.provenance?.notes.includes('term-origin-unverified'), false)
+  })
+
+  test('the AgentBook date is not qualified by a term it does not use', () => {
+    // The registration date comes from a log's block, with no subtraction in it. A failed
+    // AddressBook sweep says nothing about it, so the note must not ride along when the date the
+    // probe reports is AgentBook's.
+    const r = read({
+      verifiedUntil: NOW + TERM - 300 * 86_400, // an older re-attestation than the registration
+      agentBookHumanId: '12345',
+      agentBookRegistration: registration(),
+      terms: { eras: [{ from: WORLD_ADDRESS_BOOK_DEPLOYED_AT, seconds: TERM }], observed: false },
+    })
+    assert.equal(r.issuedAt, REGISTERED_AT)
+    assert.ok(r.provenance?.notes.includes('date-from-agent-registration'))
+    assert.equal(r.provenance?.notes.includes('term-origin-unverified'), false)
+  })
+})

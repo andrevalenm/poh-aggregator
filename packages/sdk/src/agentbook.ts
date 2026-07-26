@@ -204,10 +204,18 @@ async function getLogs(
  * by anything downstream, and an empty registry is a *permissive* answer here — every human
  * looks like they run one agent. So no endpoint's history is used before it has proved it can
  * see a registration that has been on chain since March.
+ *
+ * Retried, and only for a *throw*. A rate limit is a moment and used to fail the whole scan on the
+ * first one — `registrationOf`'s canary has always retried and this one did not, which is an
+ * oversight rather than a distinction. An endpoint that answers `[]` successfully is a different
+ * thing and is still refused on the spot: that is the lie the canary exists to catch, and retrying
+ * it would eventually let a flaky liar through.
  */
 async function canaryOk(url: string): Promise<boolean> {
   try {
-    const logs = await getLogs(url, AGENT_BOOK_FIRST_REGISTRATION_BLOCK, AGENT_BOOK_FIRST_REGISTRATION_BLOCK)
+    const logs = await withRetry(() =>
+      getLogs(url, AGENT_BOOK_FIRST_REGISTRATION_BLOCK, AGENT_BOOK_FIRST_REGISTRATION_BLOCK),
+    )
     return logs.length > 0
   } catch {
     return false

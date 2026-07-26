@@ -55,6 +55,18 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       turns the assumption into a proof and moves nothing at head. Where a change does land, the
       timeline dates it and each cohort keeps its own era's term.
       `research/protocols/poh-lifespan-timeline.md`.
+- [x] **The same question, asked of World** — shipped (iteration 25): iteration 24's next step 2.
+      `verifiedUntil - verificationLength()` had the identical premise — term read at head, entry
+      written in the past — and `setVerificationLength` is `onlyOwner` with `renounceOwnership`
+      overridden to revert, so the power to re-date the whole book is permanent. The live suite's
+      tripwire (`term === init.args.verificationLength`) is replaced by a sweep of
+      `VerificationLengthUpdated`: **two governance logs in the contract's life, zero term changes
+      ever**, so nothing at head moves. Better than PoH's, because the *constructor* emits its term
+      — every era has one, so no cohort can be lost to an unrecoverable first era. The sharp edge
+      was the endpoint: Tenderly answers this 30.1M-block range with HTTP 200 and a silently
+      incomplete, non-deterministic subset, so the sweep is chunked and refused unless the
+      constructor's own log is in it and its newest term explains head.
+      `research/protocols/world-verification-term-timeline.md`.
 - [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.

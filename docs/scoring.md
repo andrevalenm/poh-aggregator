@@ -236,6 +236,20 @@ Where a change does land, the timeline dates it, so each cohort is dated with th
 force for it rather than every date being discarded — and where two eras both explain one expiry,
 or where only the era before the first change does (the term `initialize` never published), there
 is no date, because there is a choice rather than an answer.
+
+**World ID has the identical second premise, and it is swept the same way.** Every World date is
+`addressVerifiedUntil − verificationLength()`, exact to the second because `verify()` writes
+`block.timestamp + verificationLength` — and `setVerificationLength` is `onlyOwner`, touches no
+stored entry, and cannot be renounced, so one owner transaction would re-date the whole book at
+once. On a decay curve a shortened term makes every World credential look uniformly fresher, which
+is the direction that pays an adversary. `VerificationLengthUpdated` publishes each change and the
+constructor publishes the initial term, so unlike PoH **every era of this timeline has a term** and
+no cohort can be lost to an unpublished first era. Swept over the contract's whole life:
+**zero changes, ever**, so nothing at head moves. What is different here is the *endpoint*: World
+Chain's one keyless log endpoint answers a full-range query with HTTP 200 and a silently incomplete
+subset, so the sweep is chunked and refused outright unless the constructor's own log is in it and
+its newest term explains head. A sweep that did not answer costs a caveat, never a date.
+
 Circles has no such slot, which is why the reconciler above exists.
 
 ## 5. Zero out dead protocols, then sum and take log₁₀

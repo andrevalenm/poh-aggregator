@@ -44,6 +44,7 @@ export * from './linea-poh.ts'
 export * from './poh-term.ts'
 export * from './poh-v1.ts'
 export * from './world.ts'
+export * from './world-term.ts'
 
 /**
  * Adapters.

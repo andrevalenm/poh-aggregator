@@ -50,6 +50,8 @@ import {
   WORLD_ID_ROUTER,
   WORLD_RPC,
 } from './world.ts'
+import { readVerificationTermHistory } from './world-term.ts'
+import type { TermHistory } from '../term-history.ts'
 import { freshnessOf } from '../scoring.ts'
 import { applyAsOfToEvidence } from '../as-of.ts'
 import {
@@ -158,6 +160,39 @@ const AGENT_REGISTERED = AGENT_BOOK_ABI.find(
   (x) => x.type === 'event' && x.name === 'AgentRegistered',
 )!
 
+/**
+ * One adapter for the whole suite, which is how a process uses it.
+ *
+ * Not a convenience. The probe memoises its `verificationLength` sweep per instance, so nine
+ * instances meant nine full-history sweeps against the one keyless World Chain log endpoint — the
+ * same endpoint `agentbook.live.test.ts` scans twice, in parallel, under `node --test`. Sharing the
+ * instance keeps the suite's footprint on it to one sweep, and exercises the memo besides.
+ */
+const orb = worldIdOrbAdapter()
+
+/**
+ * The default-chunk term sweep, read once for the whole suite — same reason as `orb` above.
+ * Pinned to the head it first saw, which is what a process does.
+ */
+let sweptTerms: Promise<{ termAtHead: number; head: number; history: TermHistory | undefined }> | undefined
+const termTimeline = () =>
+  (sweptTerms ??= (async () => {
+    const [head, term] = await Promise.all([
+      c.getBlockNumber(),
+      c.readContract({
+        address: WORLD_ID_ADDRESS_BOOK,
+        abi: WORLD_ADDRESS_BOOK_ABI,
+        functionName: 'verificationLength',
+      }),
+    ])
+    const termAtHead = Number(term)
+    return {
+      termAtHead,
+      head: Number(head),
+      history: await readVerificationTermHistory(termAtHead, Number(head)),
+    }
+  })())
+
 /** Recent `AgentRegistered` logs, walking back in 200k-block windows until one is non-empty. */
 async function registrationsNear(from: bigint, attempts = 6) {
   for (let i = 0; i < attempts; i++) {
@@ -227,7 +262,7 @@ describe('World ID on World Chain', () => {
         t.skip('the sampled account re-verified between the log and the read')
         return
       }
-      const r = await worldIdOrbAdapter().probe(getAddress(first.args.account))
+      const r = await orb.probe(getAddress(first.args.account))
       assert.equal(r.held, true)
       assert.equal(r.issuedAt, Number(block.timestamp))
       assert.equal(r.provenance?.dateFrom, 'chain')
@@ -261,8 +296,7 @@ describe('World ID on World Chain', () => {
 
   test('the term and the group are the ones the contract was initialised with', async (t) => {
     await onChain(t, 'configuration', async () => {
-      // The single-block window the contract was deployed in. If `setVerificationLength` is ever
-      // used, this test goes red before any date we derive silently moves.
+      // The single-block window the contract was deployed in.
       const [init] = await c.getLogs({
         address: WORLD_ID_ADDRESS_BOOK,
         event: WORLD_ADDRESS_BOOK_ABI.find(
@@ -287,10 +321,106 @@ describe('World ID on World Chain', () => {
           functionName: 'groupId',
         }),
       ])
-      assert.equal(term, init.args.verificationLength, 'the term has not moved since deployment')
-      assert.equal(Number(term), WORLD_ADDRESS_BOOK_VERIFICATION_LENGTH)
+      assert.equal(Number(init.args.verificationLength), WORLD_ADDRESS_BOOK_VERIFICATION_LENGTH)
       assert.equal(groupId, init.args.groupId)
       assert.equal(groupId, WORLD_ID_ORB_GROUP_ID, 'group 1 is the Orb group')
+      // `term === init.args.verificationLength` used to be asserted here, and it was a tripwire:
+      // it fires the day the owner calls `setVerificationLength` and has nothing to offer in
+      // place of the date it invalidates. The timeline below replaces it — it holds whether or
+      // not the term has moved, and it keeps dating entries correctly when it does.
+      assert.ok(Number(term) > 0)
+    })
+  })
+
+  /**
+   * The term is not a constant, and the sweep that says so.
+   *
+   * Every World date is `verifiedUntil - verificationLength`, and `setVerificationLength` moves
+   * that field without touching a single stored expiry — one owner transaction re-dates the whole
+   * book at once, in the same direction, by the full size of the change. `world-term.ts` reads
+   * every such change as a timeline so each entry is dated with the term in force when it was
+   * written.
+   *
+   * These assertions are about the *mechanism* and stay true on the day a change lands: that the
+   * timeline explains head, that it opens at the deployment, that its eras are contiguous and
+   * half-open, and that every boundary is the header timestamp of its own block. Zero
+   * `VerificationLengthUpdated` logs exist today, so today it is one era — which is the finding,
+   * not the assumption.
+   */
+  test('the term timeline is swept from the chain and explains the value at head', async (t) => {
+    await onChain(t, 'term timeline', async () => {
+      const { termAtHead, history } = await termTimeline()
+      assert.ok(history, 'the governance sweep should answer from a keyless endpoint')
+      assert.equal(history.observed, true)
+
+      // Opens at the deployment, because the constructor's own log is what opens it — the guard
+      // that catches an endpoint dropping the old end of a range.
+      const deployBlock = await c.getBlock({
+        blockNumber: BigInt(WORLD_ADDRESS_BOOK_DEPLOYED_AT_BLOCK),
+      })
+      assert.equal(history.eras[0]!.from, Number(deployBlock.timestamp))
+
+      // Contiguous, half-open, and the running era is open at the top.
+      for (let i = 0; i < history.eras.length - 1; i++) {
+        assert.equal(history.eras[i]!.until, history.eras[i + 1]!.from)
+      }
+      assert.equal(history.eras[history.eras.length - 1]!.until, undefined)
+
+      // Every era has a published term — `WorldIDAddressBook`'s constructor emits its own, which
+      // PoH v2's `initialize` does not — and the newest one is the state at head.
+      assert.ok(history.eras.every((e) => e.seconds !== undefined && e.seconds > 0))
+      assert.equal(history.eras[history.eras.length - 1]!.seconds, termAtHead)
+
+      // Every boundary after the first is the timestamp of the block its change was mined in.
+      for (const era of history.eras.slice(1)) {
+        const b = await c.getBlock({ blockNumber: BigInt(era.block!) })
+        assert.equal(era.from, Number(b.timestamp))
+      }
+
+      // Today's answer, recorded rather than asserted so the test survives a real change.
+      t.diagnostic(
+        `verificationLength eras: ${history.eras.map((e) => `${e.from}:${e.seconds}`).join(' ')}`,
+      )
+    })
+  })
+
+  test('the sweep gives the same timeline at a second chunk size', async (t) => {
+    await onChain(t, 'term timeline, re-swept', async () => {
+      // `worldchain-mainnet.gateway.tenderly.co` answers an over-wide `eth_getLogs` with HTTP 200
+      // and a silently incomplete subset — measured 2026-07-26, and not the same subset twice. So
+      // a sweep is only worth believing if it is stable under the one parameter that governs
+      // truncation. Same check `scanAgentBook`'s live suite makes, for the same endpoint.
+      const { termAtHead, head, history: narrow } = await termTimeline()
+      // 16M is the largest chunk measured returning the complete set; the default is 8M. Only the
+      // second size is paid for here — two requests, against a shared sweep — because the endpoint
+      // is the same one the AgentBook scan runs on and it rate-limits a suite that leans on it.
+      const wide = await readVerificationTermHistory(termAtHead, head, { chunkSize: 16_000_000 })
+      assert.ok(wide && narrow)
+      assert.deepEqual(wide.eras, narrow.eras)
+    })
+  })
+
+  test('a live subject is dated by the timeline, to the second the verification was mined', async (t) => {
+    await onChain(t, 'timeline end to end', async () => {
+      // The whole chain of reasoning in one assertion, with no number written down: take a real
+      // verification out of the contract's own logs, ask the probe, and require the date it
+      // reports to be the timestamp of the block that log is in. It passes whichever era the
+      // entry belongs to, which an assertion against a fixed term does not.
+      const logs = await verificationsNear(await c.getBlockNumber())
+      assert.ok(logs.length > 0, 'World Chain should verify somebody near head')
+      const log = logs[0]!
+      const account = getAddress(log.args.account as string)
+      const [block, result] = await Promise.all([
+        c.getBlock({ blockNumber: log.blockNumber! }),
+        orb.probe(account),
+      ])
+      assert.equal(result.held, true)
+      assert.equal(result.issuedAt, Number(block.timestamp))
+      assert.equal(
+        result.provenance?.notes.includes('term-origin-unverified'),
+        false,
+        'the sweep answered, so the date is not resting on an unchecked term',
+      )
     })
   })
 
@@ -382,7 +512,7 @@ describe('World ID on World Chain', () => {
           args: [account],
         })
         if (current === 0n || current > BigInt(now)) continue // re-verified since; keep looking
-        const r = await worldIdOrbAdapter().probe(account)
+        const r = await orb.probe(account)
         assert.notEqual(current, 0n, 'the mapping still holds a number')
         assert.equal(r.held, false, 'and the probe still says not held')
         assert.equal(r.detail?.addressBookLapsedAt, Number(current))
@@ -422,7 +552,7 @@ describe('World ID on World Chain', () => {
           args: [account],
         })
         if (current === 0n || current > BigInt(now)) continue
-        const r = await worldIdOrbAdapter().probe(account)
+        const r = await orb.probe(account)
         if (r.issuedAt === undefined) continue // term changed under this entry; a different test
 
         const lapsedAt = Number(current)
@@ -457,7 +587,7 @@ describe('World ID on World Chain', () => {
 
   test('an address that never verified is not held, and is not an error', async (t) => {
     await onChain(t, 'negative', async () => {
-      const r = await worldIdOrbAdapter().probe(NEVER_VERIFIED)
+      const r = await orb.probe(NEVER_VERIFIED)
       assert.equal(r.held, false)
       assert.equal(r.error, undefined)
       assert.equal(r.provenance?.heldFrom, 'chain')
@@ -472,7 +602,7 @@ describe('World ID on World Chain', () => {
       assert.ok(logs.length, 'expected recent verifications')
       const adapter = entryFor('world-id-orb')
       const now = Number((await c.getBlock({ blockNumber: head })).timestamp)
-      const r = await worldIdOrbAdapter().probe(getAddress(logs[0]!.args.account))
+      const r = await orb.probe(getAddress(logs[0]!.args.account))
       assert.equal(r.held, true)
       assert.ok(r.issuedAt !== undefined, 'a live verification is always dated')
 
@@ -518,7 +648,7 @@ describe('World ID on World Chain', () => {
         assert.equal(state.toString(), log.args.humanId!.toString(), 'log and mapping must agree')
 
         const block = await c.getBlock({ blockNumber: log.blockNumber })
-        const r = await worldIdOrbAdapter().probe(agent)
+        const r = await orb.probe(agent)
         assert.equal(r.held, true)
         assert.equal(r.detail?.agentBookRegisteredAtBlock, Number(log.blockNumber))
         assert.equal(r.detail?.agentBookRegisteredAt, Number(block.timestamp))
@@ -553,7 +683,7 @@ describe('World ID on World Chain', () => {
         // would have supplied a date of its own and hidden the defect.
         if (verifiedUntil > BigInt(now)) continue
 
-        const r = await worldIdOrbAdapter().probe(agent)
+        const r = await orb.probe(agent)
         assert.equal(r.held, true, 'an agent registration is a held World credential')
         assert.equal(r.detail?.source, 'world-agentbook')
         assert.ok(r.issuedAt !== undefined, 'and it now carries a date')
@@ -661,7 +791,7 @@ describe('World ID on World Chain', () => {
                   : { status: lookup.status },
             }),
       })
-      const actual = await worldIdOrbAdapter().probe(account)
+      const actual = await orb.probe(account)
       assert.equal(actual.held, expected.held)
       assert.equal(actual.issuedAt, expected.issuedAt)
       assert.equal(actual.detail?.source, expected.detail?.source)

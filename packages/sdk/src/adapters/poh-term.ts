@@ -92,7 +92,27 @@
  */
 import { createPublicClient, fallback, http, parseAbi, type PublicClient } from 'viem'
 import { mainnet } from 'viem/chains'
+import {
+  assumedTermHistory,
+  buildTermEras,
+  termForLocalExpiry,
+  type TermHistory,
+} from '../term-history.ts'
 import { POH_V1_REGISTRY, POH_V1_RPCS } from './poh-v1.ts'
+
+/**
+ * The era shape, the solver and the no-sweep fallback are protocol-independent and live in
+ * `../term-history.ts`; `WorldIDAddressBook` reads its own term the same way. They are re-exported
+ * here because every caller reached them through this module before there was a second protocol
+ * with the same premise.
+ */
+export {
+  assumedTermHistory,
+  termForLocalExpiry,
+  type TermEra,
+  type TermHistory,
+  type TermResolution,
+} from '../term-history.ts'
 
 /** Proof of Humanity v2 on mainnet — the other side of the cross-chain bridge. */
 export const POH_V2_MAINNET = '0xbE9834097A4E97689d9B667441acafb456D0480A' as const
@@ -277,45 +297,6 @@ export async function readGrantedTerms(
 }
 
 /**
- * One stretch of the registry's life over which a single term was granted to every new claim.
- *
- * Eras are half-open in time — `[from, until)` — because that is exactly how the contract behaves:
- * `changeDurations` takes effect for the block it is mined in and every block after it, and a
- * claim resolved in the same block is written under the new value.
- */
-export interface TermEra {
-  /** First second of the era. The deployment for the first era, the change's block for the rest. */
-  from: number
-  /** First second *after* the era; absent for the era still running at head. */
-  until?: number
-  /**
-   * The term in force, in seconds. Absent only for the first era, whose value `initialize` wrote
-   * without emitting anything — recoverable in principle from the deployment calldata or from an
-   * archive `eth_call`, and deliberately not guessed at here.
-   */
-  seconds?: number
-  /** Block the `DurationsChanged` that opened this era was mined in; absent for the first era. */
-  block?: number
-}
-
-/** Every term the registry has granted, and when. */
-export interface TermHistory {
-  /** Chronological, contiguous, covering the deployment through head. Never empty. */
-  eras: TermEra[]
-  /**
-   * The eras came from a completed sweep of `DurationsChanged`, so they are what the chain says.
-   * `false` means nobody swept and head's term was *assumed* to have been in force all along —
-   * the assumption this module exists to stop making silently.
-   */
-  observed: boolean
-}
-
-/** The history a caller who cannot sweep has to work with: head's term, assumed to be eternal. */
-export function assumedTermHistory(lifespan: number, deployedAt: number): TermHistory {
-  return { eras: [{ from: deployedAt, ...(lifespan > 0 ? { seconds: lifespan } : {}) }], observed: false }
-}
-
-/**
  * Read every change the registry has made to `humanityLifespan`, and lay them out as a timeline.
  *
  * Returns `undefined` when the sweep did not answer — the same distinction `readGrantedTerms`
@@ -370,66 +351,20 @@ export async function readTermHistory(
         ),
       ),
     )
-    const eras: TermEra[] = [{ from: opts.deployedAt }]
-    for (const change of raw) {
-      const at = stamps.get(change.block)!
-      // Two changes in one block, or one that moved nothing: the later write is what applied.
-      if (eras[eras.length - 1]!.from === at) eras.pop()
-      eras[eras.length - 1]!.until = at
-      eras.push({ from: at, seconds: change.seconds, block: Number(change.block) })
-    }
+    // `initialize` writes `humanityLifespan` without emitting anything, so the first era opens
+    // with no term — the one value this timeline cannot recover.
+    const eras = buildTermEras(
+      { from: opts.deployedAt },
+      raw.map((change) => ({
+        seconds: change.seconds,
+        block: Number(change.block),
+        at: stamps.get(change.block)!,
+      })),
+    )
     return { eras, observed: true }
   } catch {
     return undefined
   }
-}
-
-/** Which term produced an expiry this contract wrote — or why that cannot be settled. */
-export type TermResolution =
-  /** Exactly one era can have produced it, so its term is the one to subtract. */
-  | { kind: 'settled'; term: number; era: TermEra }
-  /** No era can have: the expiry is not something a local write could have produced. */
-  | { kind: 'no-era' }
-  /** Two eras with different terms both explain it. Nothing distinguishes them; refuse. */
-  | { kind: 'ambiguous'; terms: number[] }
-  /** Only the first era — the one whose term `initialize` never published — can explain it. */
-  | { kind: 'era-unknown' }
-
-/**
- * Solve `expirationTime = claimedAt + term` for the era `claimedAt` falls in.
- *
- * Both local writers do `expirationTime = block.timestamp + humanityLifespan`, so a candidate era
- * explains an expiry exactly when subtracting *that era's* term lands the write inside *that era*.
- * With one era — today, on both instances — this reduces to the deployment-floor guard the probe
- * has always applied, which is why nothing at head moves.
- *
- * `now` is a ceiling on every era, not just the running one: no block has been mined in the future,
- * so no expiry can have been written after the block we read at.
- *
- * A known era wins over the unrecoverable first one rather than being called ambiguous against it.
- * The first era can be assigned a term to fit *any* expiry, so treating it as a rival would make
- * every date in the registry's history unrecoverable the moment governance touched the field once.
- * The cost is a coincidence — an expiry written in the first era that a later era's term also
- * happens to explain — and that is written down rather than traded silently.
- */
-export function termForLocalExpiry(h: TermHistory, expirationTime: number, now: number): TermResolution {
-  const fits: { term: number; era: TermEra }[] = []
-  let firstEraCouldFit = false
-  for (const era of h.eras) {
-    const until = Math.min(era.until ?? Number.POSITIVE_INFINITY, now + 1)
-    if (era.from >= until) continue
-    if (era.seconds === undefined) {
-      // Some term, we cannot say which, would place the write inside this era.
-      if (expirationTime > era.from) firstEraCouldFit = true
-      continue
-    }
-    const claimedAt = expirationTime - era.seconds
-    if (claimedAt >= era.from && claimedAt < until) fits.push({ term: era.seconds, era })
-  }
-  const terms = [...new Set(fits.map((f) => f.term))]
-  if (terms.length > 1) return { kind: 'ambiguous', terms }
-  if (fits.length > 0) return { kind: 'settled', term: fits[0]!.term, era: fits[0]!.era }
-  return firstEraCouldFit ? { kind: 'era-unknown' } : { kind: 'no-era' }
 }
 
 /** The instance an imported term was computed on, and the registration date it published. */

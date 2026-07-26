@@ -680,6 +680,26 @@ that only that era explains lose their date rather than getting a guessed one. C
 per process and nothing warm.
 [`research/protocols/poh-lifespan-timeline.md`](research/protocols/poh-lifespan-timeline.md).
 
+**16. World ID's term was read at head too, and its owner can never give up the power to move it.**
+Every World date is `addressVerifiedUntil − verificationLength()` — exact to the second, because
+`verify()` writes `block.timestamp + verificationLength`. `setVerificationLength` is `onlyOwner`,
+touches no stored entry, and `renounceOwnership` is overridden to revert, so one transaction from
+`0xc50b688E…4062` would re-date the entire book at once and a shortened term would make every World
+credential look uniformly fresher — the direction that pays an adversary. What was there before was
+a *tripwire*: a live assertion that the term still equalled the constructor's. It fires after the
+fact and offers nothing in place of the date it invalidates. The contract publishes
+`VerificationLengthUpdated`, and its constructor publishes the initial term, so the probe now sweeps
+the whole history and dates each entry with the era it was written in — **two governance logs in the
+contract's life and zero term changes, ever**, so nothing at head moves. Better than PoH's: every
+era of this timeline has a published term, so **no cohort can ever be lost to an unrecoverable first
+era**. What it does **not** close: World Chain's one keyless log endpoint answers a full-range query
+with HTTP 200 and a silently incomplete, non-deterministic subset — measured — so the sweep is
+chunked and refused unless the constructor's log is in it *and* its newest term explains head. A
+change dropped from the middle of a sweep that also holds a later one would still pass; a subgraph
+over these events would close that, and does not exist yet. Cost is ~230 ms once per process, and
+only for a subject who has an AddressBook entry at all.
+[`research/protocols/world-verification-term-timeline.md`](research/protocols/world-verification-term-timeline.md).
+
 Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 
 ---
