@@ -520,7 +520,6 @@ html.js .sl-in .sl-line {
 .picker button:active,
 .copy-btn:active,
 .threshold-clear:active,
-.sat-preset:active,
 .detail-btn:active {
   transform: scale(0.93, 0.88);
 }
@@ -1711,44 +1710,6 @@ html.js .sl-in .sl-line {
 
 .protocol-links a:hover {
   color: var(--bone);
-}
-
-/* --------------------------------------------------- research margin notes */
-
-/* Tufte margin: at reading widths the long-form instruments reserve a right margin
- * column, and their pull-quotes float into it — the section's best material (the
- * Ohlhaver record) fills what was dead paper, at its natural flow height. CSS-only;
- * the author's markup is untouched. Below 1280px the quotes keep their in-flow styling
- * from research.css. */
-@media (min-width: 1280px) {
-  .research .instrument {
-    --mcol: clamp(17rem, 24vw, 23rem);
-    padding-right: var(--mcol);
-  }
-
-  .research .instrument > blockquote.pull {
-    float: right;
-    clear: right;
-    width: calc(var(--mcol) - 3.2rem);
-    margin: 0.2rem calc(-1 * (var(--mcol) - 1rem)) 2.4rem 2.2rem;
-    padding-left: 1.1rem;
-    border-left: 2px solid var(--iron);
-    font-variation-settings: 'opsz' 40, 'SOFT' 75, 'WONK' 1;
-    font-size: 1.18rem;
-    line-height: 1.45;
-  }
-
-  .research .instrument > blockquote.pull cite {
-    margin-top: 0.7rem;
-    color: var(--ink-soft);
-  }
-
-  /* The instruments' own interactive blocks must not slide under floated notes. */
-  .research .instrument > .sat-wrap,
-  .research .instrument > .curves,
-  .research .instrument > .instrument-label {
-    clear: both;
-  }
 }
 
 /* -------------------------------------------------------------- hackathon */
