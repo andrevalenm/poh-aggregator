@@ -1,8 +1,14 @@
-import { Print, defaultAdapters, DEFAULT_REGISTRY } from '@printid/sdk'
+import { Print, defaultAdapters, DEFAULT_REGISTRY, Thresholds } from '@printid/sdk'
 import type { Address, AdapterProbe, AdapterProbeResult } from '@printid/sdk'
 import { knownIds, knownRoots } from './known.ts'
 
-export { DEFAULT_REGISTRY }
+/**
+ * Re-exported through here rather than imported directly by the views. The SDK and the ontology
+ * JSON are both load-on-demand — this module is the only dynamic-import boundary — so a view
+ * that reached for them statically would drag 116 KiB of viem onto the landing's critical path.
+ */
+export { DEFAULT_REGISTRY, Thresholds }
+export { rootDescriptions } from './known.ts'
 
 /**
  * Optional subgraph. Without it PoH and Circles report no issuance date, and the Ramp age

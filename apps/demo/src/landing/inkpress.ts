@@ -10,7 +10,8 @@
  * (native) but no blots; reduced-motion gets neither.
  */
 
-const CONTROL = '.cta, #lookup-submit, .example-chip, .picker button, .copy-btn, .threshold-clear, .ledger-details summary, .sat-preset, .sat-row button, .detail-btn'
+const CONTROL =
+  '.cta, #lookup-submit, .example-chip, .picker button, .copy-btn, .sat-preset, .sat-row button, .console-toggle, .rule-opt'
 
 function blotPath(rand: () => number): string {
   // An irregular blob: a wobbly circle as an SVG path (8 anchors, random radii).

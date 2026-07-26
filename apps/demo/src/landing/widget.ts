@@ -1,14 +1,16 @@
 /**
- * The landing's live lookup — the product working, not a screenshot of it. Reuses the
- * console's instrumented client so every probe row is a real RPC round-trip, and keeps the
- * presentation compact: score, roots, caveat count, and a door to the full console for the
- * complete evidence table. The one thing we surface that the console doesn't lead with is
- * elapsed time, because "it answered in three seconds from public chains" is the point a
- * first visitor can feel.
+ * The landing's live lookup — the product working, not a screenshot of it. This module owns the
+ * form, the probe stream and the wiring; `result.ts` owns how the answer reads. Reuses the
+ * console's instrumented client so every row is a real RPC round-trip.
+ *
+ * Note on imports: nothing here may import the SDK or the ontology JSON as a *value*. Both
+ * arrive through `clientModule()`, the one dynamic boundary, which keeps viem off the landing's
+ * critical path. `Thresholds` and the trust-root descriptions therefore travel as arguments
+ * into `resultView` rather than as imports of it.
  */
-import type { Evidence, PersonhoodResult } from '@printid/sdk'
 import type { ProbeEvent } from '../client.ts'
-import { clear, fmtCents, fmtScore, freshnessLabel, h, shortAddr } from '../ui.ts'
+import { clear, h, shortAddr } from '../ui.ts'
+import { resultView } from './result.ts'
 
 /** viem + SDK load on demand — at idle in the background, or at first resolve. */
 const clientModule = () => import('../client.ts')
@@ -46,212 +48,6 @@ function probeRows(events: Map<string, ProbeEvent>): HTMLElement {
     )
   }
   return wrap
-}
-
-/**
- * The score numeral counts up like a meter settling, then STAMPS — a squash-spring
- * settle with an iron blot blooming beneath, the seal pressed into the sheet. The most
- * important number on the page arrives under the same physical law as everything else.
- * Reduced motion gets the plain number.
- */
-function scoreNumeral(score: number): HTMLElement {
-  const el = h('span', { class: 'w-score' }, fmtScore(score))
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches || score <= 0) return el
-  const t0 = performance.now()
-  const DURATION = 700
-  const tick = (now: number) => {
-    const t = Math.min((now - t0) / DURATION, 1)
-    const eased = 1 - (1 - t) ** 3
-    el.textContent = fmtScore(score * eased)
-    if (t < 1) requestAnimationFrame(tick)
-    else el.classList.add('stamped')
-  }
-  requestAnimationFrame(tick)
-  return el
-}
-
-/**
- * The console, brought into the sheet: the threshold is the consumer's decision (no
- * verdict until the slider moves — isHuman() throws without an explicit cutoff, and the
- * UI honours the same rule), and the full evidence and caveats unfold in place.
- */
-function thresholdBlock(result: PersonhoodResult): HTMLElement {
-  const readout = h('span', { class: 'th-readout' }, 'not set')
-  const verdict = h(
-    'p',
-    { class: 'th-verdict is-unset' },
-    'No verdict yet — and none until you choose a cutoff. The decision, and its consequences for the person on the other side, belong to whoever is doing the admitting.',
-  )
-  const slider = h('input', {
-    type: 'range',
-    min: '0',
-    max: '4',
-    step: '0.05',
-    value: '0',
-    class: 'th-slider is-unset',
-    'aria-label': 'Your threshold',
-  }) as HTMLInputElement
-  const onMove = () => {
-    const v = Number(slider.value)
-    slider.classList.remove('is-unset')
-    readout.textContent = v.toFixed(2)
-    const pass = result.isHuman(v)
-    verdict.className = `th-verdict ${pass ? 'is-pass' : 'is-fail'}`
-    verdict.textContent = pass
-      ? `Above your ${v.toFixed(2)} cutoff — admitted by your rule, applied to our evidence.`
-      : `Below your ${v.toFixed(2)} cutoff — refused by your rule, applied to our evidence.`
-  }
-  slider.addEventListener('input', onMove)
-  // Scale marks at the SDK's exported Thresholds — the instrument matches the API.
-  const tick = (v: number, label: string) =>
-    h('span', { class: 'th-tick', style: `left: ${(v / 4) * 100}%` }, h('i'), label)
-  return h(
-    'div',
-    { class: 'th-block' },
-    h('span', { class: 'w-score-label' }, 'Your threshold'),
-    h(
-      'div',
-      { class: 'th-row' },
-      h(
-        'div',
-        { class: 'th-track' },
-        slider,
-        h('div', { class: 'th-ticks', 'aria-hidden': 'true' }, tick(1.5, 'lenient'), tick(2.5, 'standard'), tick(3.5, 'strict')),
-      ),
-      readout,
-    ),
-    verdict,
-  )
-}
-
-function evidenceRow(e: Evidence): HTMLElement {
-  const unavailable = e.detail?.['unavailable'] === true
-  return h(
-    'div',
-    { class: `evd-row${e.held ? ' is-held' : ''}` },
-    h(
-      'div',
-      { class: 'evd-head' },
-      h('span', { class: 'evd-name' }, e.adapterName),
-      h('span', { class: 'evd-verdict' }, unavailable ? 'unreachable' : e.held ? 'held' : 'not found'),
-      h('span', { class: 'evd-cost' }, e.held ? fmtCents(e.effectiveCostCents) : '—'),
-    ),
-    h(
-      'p',
-      { class: 'evd-meta' },
-      `${e.trustRoot} · ${freshnessLabel(e.freshness, e.issuedAt)} · on ${shortAddr(e.observedOn)} · forge ${fmtCents(e.forgeCostCents)} / rent ${fmtCents(e.rentCostCents)} — priced at the cheaper`,
-    ),
-  )
-}
-
-function evidenceDetails(result: PersonhoodResult): HTMLElement {
-  const rank = (e: Evidence) => (e.held ? 0 : e.detail?.['unavailable'] === true ? 1 : 2)
-  const sorted = [...result.evidence].sort(
-    (a, b) => rank(a) - rank(b) || b.effectiveCostCents - a.effectiveCostCents,
-  )
-  return h(
-    'details',
-    { class: 'ledger-details' },
-    h('summary', {}, `Full evidence — ${result.evidence.length} adapter reads`),
-    h('div', { class: 'evd-rows' }, ...sorted.map(evidenceRow)),
-  )
-}
-
-function caveatsDetails(result: PersonhoodResult): HTMLElement {
-  return h(
-    'details',
-    { class: 'ledger-details' },
-    h('summary', {}, `Caveats, in the SDK's own words — ${result.caveats.length}`),
-    h(
-      'ul',
-      { class: 'cv-list' },
-      ...result.caveats.map((c) => h('li', {}, h('code', {}, c.code), h('span', {}, c.message))),
-    ),
-  )
-}
-
-function resultView(result: PersonhoodResult, elapsedMs: number): HTMLElement {
-  const held = result.evidence.filter((e) => e.held).length
-  const seconds = (elapsedMs / 1000).toFixed(1)
-
-  return h(
-    'div',
-    { class: 'w-result' },
-    h(
-      'div',
-      { class: 'w-score-row' },
-      h(
-        'div',
-        {},
-        h('span', { class: 'w-score-label' }, 'Root-cost score'),
-        scoreNumeral(result.score),
-      ),
-      h(
-        'p',
-        { class: 'w-fact' },
-        h('b', {}, `${fmtCents(result.totalCostCents)} of adversary cost`),
-        ` across ${result.independentRoots} independent trust root${result.independentRoots === 1 ? '' : 's'} — ${held} credential${held === 1 ? '' : 's'} held, answered in ${seconds}s from public chains. No server involved.`,
-      ),
-    ),
-    h(
-      'div',
-      { class: 'w-roots' },
-      ...result.roots.map((r) =>
-        h(
-          'span',
-          { class: `w-root${r.contributionCents > 0 ? '' : ' is-zero'}` },
-          h('b', {}, r.trustRoot),
-          ` ${fmtCents(r.contributionCents)}`,
-          r.saturated ? ` · ${r.adapterIds.length}→1` : '',
-        ),
-      ),
-    ),
-    thresholdBlock(result),
-    fullDetailBlock(result),
-  )
-}
-
-/**
- * The console, absorbed: one button unfolds the complete technical record in place —
- * evidence first, caveats a beat later, then the view glides to it. No separate page.
- */
-function fullDetailBlock(result: PersonhoodResult): HTMLElement {
-  const evidence = evidenceDetails(result)
-  const caveats = caveatsDetails(result)
-  const wrap = h('div', { class: 'w-full-detail' }, evidence, caveats)
-
-  const btn = h(
-    'button',
-    { type: 'button', class: 'detail-btn', 'aria-expanded': 'false' },
-    'Show the full technical detail',
-  )
-  btn.addEventListener('click', () => {
-    const open = btn.getAttribute('aria-expanded') === 'true'
-    if (open) {
-      evidence.removeAttribute('open')
-      caveats.removeAttribute('open')
-      btn.setAttribute('aria-expanded', 'false')
-      btn.textContent = 'Show the full technical detail'
-      return
-    }
-    btn.setAttribute('aria-expanded', 'true')
-    btn.textContent = 'Fold the detail away'
-    evidence.setAttribute('open', '')
-    setTimeout(() => caveats.setAttribute('open', ''), 180)
-    setTimeout(() => evidence.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120)
-  })
-
-  return h(
-    'div',
-    {},
-    h(
-      'div',
-      { class: 'w-meta' },
-      h('span', {}, 'The caveats are the result, not small print. '),
-      btn,
-    ),
-    wrap,
-  )
 }
 
 export function mountWidget(): void {
@@ -298,7 +94,7 @@ export function mountWidget(): void {
     inFlight = true
     submit.disabled = true
     submit.textContent = 'Reading chains…'
-    const { makeClient, LIVE_ADAPTER_IDS } = await clientModule()
+    const { makeClient, LIVE_ADAPTER_IDS, Thresholds, rootDescriptions } = await clientModule()
     streamEl.append(
       h(
         'p',
@@ -316,29 +112,24 @@ export function mountWidget(): void {
       slot.append(probeRows(events))
     })
 
-    // With the full adapter roster a multi-wallet lookup streams dozens of rows — the
-    // drama is worth it live, the residue is not. On completion the receipt settles:
-    // credentials found stay line-by-line, the empties fold into one tally.
+    // With the full adapter roster a multi-wallet lookup streams dozens of rows. The drama is
+    // worth watching live; keeping the residue is not, because the answer below then has to
+    // compete with a wall of the working-out for the reader's eye. On completion the whole
+    // stream folds to one line of provenance and the answer takes the sheet.
     const settleReceipt = () => {
       const all = [...events.values()]
-      const held = all.filter((ev) => ev.state === 'held')
-      const unavailable = all.filter((ev) => ev.state === 'unavailable')
-      const absent = all.length - held.length - unavailable.length
-      const settled = new Map(
-        [...events].filter(([, ev]) => ev.state === 'held' || ev.state === 'unavailable'),
-      )
-      clear(slot)
-      slot.append(probeRows(settled))
-      slot.append(
+      const held = all.filter((ev) => ev.state === 'held').length
+      const unavailable = all.filter((ev) => ev.state === 'unavailable').length
+      const absent = all.length - held - unavailable
+      clear(streamEl)
+      streamEl.append(
         h(
-          'div',
-          { class: 'probe-row is-summary' },
-          h('span', { class: 'p-id' }, `${all.length} probes`),
-          h(
-            'span',
-            { class: 'p-state' },
-            `${held.length} found · ${absent} empty${unavailable.length ? ` · ${unavailable.length} unreachable` : ''}`,
-          ),
+          'p',
+          { class: 'probe-receipt' },
+          `${all.length} probes · ${held} found · ${absent} empty${
+            unavailable ? ` · ${unavailable} unreachable` : ''
+          }`,
+          h('span', { class: 'probe-receipt-note' }, 'every read is listed in the console below'),
         ),
       )
     }
@@ -347,7 +138,9 @@ export function mountWidget(): void {
     try {
       const result = await client.resolve(subjects)
       settleReceipt()
-      resultEl.append(resultView(result, performance.now() - started))
+      resultEl.append(
+        resultView(result, performance.now() - started, Thresholds, rootDescriptions),
+      )
     } catch (err) {
       resultEl.append(
         h(

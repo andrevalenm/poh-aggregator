@@ -8,23 +8,48 @@ import { mountCursor } from './cursor.ts'
 import { mountInkPress } from './inkpress.ts'
 import { mountWidget } from './widget.ts'
 
-// ------------------------------------------------------------- registry line
+// ------------------------------------------------------- registry line + counts
+
+/**
+ * Protocol counts, taken from the data instead of written into the prose.
+ *
+ * Three numbers used to be spelled out in words across this page — "forty protocols", "nine
+ * probes against thirty catalogued adapters" — and every one of them had already drifted from
+ * `ontology/adapters.json` by the time anyone checked. So every count in the copy is now a
+ * `[data-count]` span filled from the deployed registry: `integrated` is the adapters we
+ * actually probe, `catalogued` is what the registry prices, `roots` is the distinct trust roots
+ * it prices them under. The static text inside each span is the same figure derived from the
+ * ontology file at the time of writing, so the sentence still reads correctly before this lands
+ * (or if the RPC is down) — but the chain has the last word.
+ */
+function paintCounts(counts: Record<string, number>): void {
+  for (const el of document.querySelectorAll<HTMLElement>('[data-count]')) {
+    const n = counts[el.dataset['count'] ?? '']
+    if (typeof n === 'number') el.textContent = String(n)
+  }
+}
 
 async function paintRegistryLine(): Promise<void> {
   const el = document.getElementById('registry-line')
-  if (!el) return
   const pulse = h('span', { class: 'pulse', 'aria-hidden': 'true' })
   try {
     // The SDK (and viem underneath) is 116 KiB gz — off the critical path, on demand.
     const { DEFAULT_REGISTRY, makeClient, LIVE_ADAPTER_IDS } = await import('../client.ts')
     const { adapters, revision } = await makeClient().ontology()
     const roots = new Set([...adapters.values()].map((a) => a.trustRoot))
+    paintCounts({
+      integrated: LIVE_ADAPTER_IDS.length,
+      catalogued: adapters.size,
+      roots: roots.size,
+    })
+    if (!el) return
     el.textContent = ''
     el.append(
       pulse,
       `live — ${adapters.size} protocols catalogued, ${roots.size} trust roots, ${LIVE_ADAPTER_IDS.length} probed live · registry ${shortAddr(DEFAULT_REGISTRY)} rev ${revision}, read just now`,
     )
   } catch {
+    if (!el) return
     el.textContent = ''
     el.append(pulse, 'registry unreachable right now — the demo below will say so rather than guess')
   }

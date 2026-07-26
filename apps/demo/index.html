@@ -6,7 +6,7 @@
     <title>Print — are you real?</title>
     <meta
       name="description"
-      content="One API over forty proof-of-humanity protocols. Know a real person is there without holding their identity — no upload, no selfie, nothing to breach. Live on four chains, no server of ours."
+      content="One API over the proof-of-humanity credentials a wallet already holds. Know a real person is there without holding their identity — no upload, no selfie, nothing to breach. Live on four chains, no server of ours."
     />
     <meta property="og:title" content="Print — are you real?" />
     <meta
@@ -52,10 +52,19 @@
         <h1>
           <span class="sl-mask"><span class="sl-line">Are you <em>real?</em></span></span>
         </h1>
+        <!--
+          Every [data-count] below is overwritten at runtime from the deployed registry (see
+          paintCounts in src/landing/main.ts). The static values are the truth in
+          ontology/adapters.json at the time of writing — integrated = adapters with
+          implemented:true, catalogued = adapters.length, roots = trustRoots keys — and exist
+          only so the sentence reads correctly before the chain read lands, or if it fails.
+        -->
         <p class="hero-answer">
-          Forty protocols can vouch that someone is real. Each needs its own integration, and
-          most of them are quietly reading the same passport. Print reads all of them through
-          one API and returns a single answer. You never hold an identity.
+          Print reads the personhood credentials a wallet already holds —
+          <b><span data-count="integrated">10</span> protocols read live</b>, out of
+          <span data-count="catalogued">30</span> priced in one public registry — and returns a
+          single answer. Most of them are quietly reading the same passport; Print counts that
+          once. You never hold an identity.
         </p>
         <div class="hero-ctas">
           <a class="cta cta-primary" href="#try">Check an address</a>
@@ -77,8 +86,8 @@
         should not want it.
       </p>
       <p class="beat reveal">
-        Print reads forty proof of humanity protocols through one API and answers that
-        single question.
+        Print reads <span data-count="integrated">10</span> proof of humanity protocols through
+        one API and answers that single question.
       </p>
     </section>
 
@@ -206,8 +215,9 @@ person.isHuman(Thresholds.standard)</code></pre>
             holding their passport.
           </h2>
           <p>
-            Print reads the credentials they already carry across forty protocols, returns one
-            answer, and leaves you holding nothing.
+            Print reads the credentials they already carry across
+            <span data-count="integrated">10</span> protocols, returns one answer, and leaves you
+            holding nothing. <a class="coverage-ref" href="#coverage">What that number covers</a>.
           </p>
         </header>
 
@@ -683,16 +693,59 @@ person.isHuman(Thresholds.standard)</code></pre>
           </article>
         </div>
 
-        <div class="hackathon-honesty reveal">
+        <div class="hackathon-honesty reveal" id="coverage">
           <h3>What is finished, and what is not</h3>
           <p>
-            Working and live: the registry contract, nine credential probes reading World Chain,
-            Gnosis, Base, Optimism and Linea (plus Sepolia for the registry itself), both
-            subgraphs, the SDK, the MCP server, the agent flow, this page, and a test suite that
-            runs against real chains rather than mocks. Honest gaps: nine probes against thirty
-            catalogued adapters, so most of the ontology is priced but not yet readable; the
-            weights are judgments rather than measurements; and no amount of this proves the
-            human behind a credential is acting for themselves.
+            Working and live: the registry contract,
+            <span data-count="integrated">10</span> credential probes reading World Chain, Gnosis,
+            Base, Optimism and Linea (plus Sepolia for the registry itself), both subgraphs, the
+            SDK, the MCP server, the agent flow, this page, and a test suite that runs against
+            real chains rather than mocks. The weights are judgments rather than measurements,
+            and no amount of this proves the human behind a credential is acting for themselves.
+          </p>
+          <!--
+            The three numbers, in decreasing confidence. The first two are read from the
+            deployed registry at runtime (paintCounts, src/landing/main.ts); the static values
+            are ontology/adapters.json at the time of writing. The third is deliberately not a
+            protocol count — see the note under the table.
+          -->
+          <dl class="coverage">
+            <div class="coverage-row">
+              <dt><span data-count="integrated">10</span> integrated</dt>
+              <dd>
+                Protocols Print actually reads. A live RPC call per probe, no vendor API key, no
+                server of ours. These are the ones the number on this page means.
+              </dd>
+            </div>
+            <div class="coverage-row">
+              <dt><span data-count="catalogued">30</span> catalogued</dt>
+              <dd>
+                Priced and assigned a trust root in the on-chain registry, across
+                <span data-count="roots">18</span> distinct roots. Catalogued is not the same as
+                readable — but a root that is catalogued already does the work of stopping the
+                credential being double-counted, whether or not we can read it.
+              </dd>
+            </div>
+            <div class="coverage-row">
+              <dt>the wider field</dt>
+              <dd>
+                The research sweep tabulates 64 rows across two tables, dead projects and
+                duplicate listings included, so no single “how many exist” figure is honest and
+                we do not print one. Read it at
+                <code>research/landscape/poh-landscape-sweep.md</code>.
+              </dd>
+            </div>
+          </dl>
+          <p>
+            The gap between integrated and catalogued is the interesting part, not an
+            embarrassment. Most personhood credentials cannot be read without the issuing
+            vendor's cooperation, and some are unreadable <em>by design</em>: ZKPassport scopes
+            its nullifier per service and never publishes an unscoped value, so nobody — us
+            included — can look one up unsolicited. That is the privacy property working. It is
+            also why Print works at the level of the credential <em>class</em> rather than the
+            credential: we never need to know that <em>this</em> subject's two credentials came
+            from one passport, only that those two protocols read passports, which is a public
+            fact about the world.
           </p>
           <p>
             None of that is hidden in a footnote. It is in the API — as caveats you have to
