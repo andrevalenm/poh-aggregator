@@ -17,21 +17,23 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { readFileSync } from 'node:fs'
 import { Print, DEFAULT_REGISTRY, weightHistory, type PersonhoodResult } from '@printid/sdk'
+// Copied out of ontology/adapters.json by this package's build and shipped in the tarball.
+// It used to be read at run time from a path three levels above dist, which is the repo's own
+// ontology directory from packages/mcp/dist but node_modules/ontology from an installed
+// node_modules/@printid/mcp/dist. Installed, that read always failed, a silent catch left the
+// preimage lists empty, and every lookup came back score 0 with "no credentials found". The
+// data has to travel with the code, so it is imported: a missing file is a build error now,
+// not a wrong answer in the adversary's favour.
+import ontologyData from './ontology-data.json' with { type: 'json' }
 
-const ontologyPath = new URL('../../../ontology/adapters.json', import.meta.url)
-let knownIds: string[] = []
-let knownRoots: string[] = []
-try {
-  const o = JSON.parse(readFileSync(ontologyPath, 'utf8'))
-  knownIds = o.adapters.map((a: { id: string }) => a.id)
-  // Retired root names too: an as-of lookup reads revisions where they were still in force,
-  // and without their preimages the interesting part of the history prints as raw hashes.
-  knownRoots = [...Object.keys(o.trustRoots), ...Object.keys(o.retiredTrustRoots ?? {})]
-} catch {
-  // Hashes instead of names; degraded but correct.
-}
+const knownIds = ontologyData.adapters.map((a) => a.id)
+// Retired root names too: an as-of lookup reads revisions where they were still in force,
+// and without their preimages the interesting part of the history prints as raw hashes.
+const knownRoots = [
+  ...Object.keys(ontologyData.trustRoots),
+  ...Object.keys(ontologyData.retiredTrustRoots ?? {}),
+]
 
 const client = new Print({
   registryAddress: (process.env.PRINT_REGISTRY as `0x${string}`) ?? DEFAULT_REGISTRY,
@@ -47,22 +49,32 @@ const client = new Print({
   knownRoots,
 })
 
-const server = new McpServer({ name: 'print', version: '0.1.0' })
+const server = new McpServer({ name: 'print', version: '0.1.1' })
 
-/** Compact, agent-legible rendering. Full detail stays available via the raw result. */
+/**
+ * Compact, agent-legible rendering. Full detail stays available via the raw result.
+ *
+ * Root count leads and the score comes after it, because an agent that reads only the score
+ * can be misled in the adversary's favour. Costs saturate within a trust root and sum across
+ * roots, so on the deployed ontology four credentials derived from one passport chip
+ * (world-id-document, zkpassport, self-protocol, rarimo) score 3.30 off a single root, while
+ * four credentials from four different roots (World Orb, PoH, Circles, wallet history) score
+ * 2.85. The farm outscores the person; only the root count inverts. Ordering the output so the
+ * misleading number arrives first was an output-format bug, not a matter of taste.
+ */
 function render(r: PersonhoodResult): string {
   const lines: string[] = []
   lines.push(`subject: ${r.subjects.join(', ')}${r.name ? ` (${r.name})` : ''}`)
-  lines.push(`score: ${r.score.toFixed(2)}  (log10 of adversary cost in cents)`)
-  lines.push(`independent trust roots: ${r.independentRoots}`)
-  lines.push(`total adversary cost: $${(r.totalCostCents / 100).toFixed(2)}`)
+  lines.push(
+    `independent trust roots: ${r.independentRoots}   <- read this first: it is what separates a person from a farm`,
+  )
   lines.push('')
 
   const held = r.evidence.filter((e) => e.held)
   if (held.length === 0) {
     lines.push('credentials: none found')
   } else {
-    lines.push('credentials held:')
+    lines.push(`credentials held (${held.length}):`)
     for (const e of held) {
       const decay = e.freshness < 1 ? `, freshness ${(e.freshness * 100).toFixed(0)}%` : ''
       const dead = e.live ? '' : ' [DISCONTINUED — scored 0]'
@@ -82,6 +94,16 @@ function render(r: PersonhoodResult): string {
   }
 
   lines.push('')
+  lines.push(
+    `score: ${r.score.toFixed(2)}  (log10 of adversary cost in cents; cheapest attack costs $${(r.totalCostCents / 100).toFixed(2)})`,
+  )
+  lines.push(
+    '  Do not rank subjects on this alone. It prices the cheapest attack, and because costs',
+    '  saturate within a root, many credentials off one root can outscore few credentials off',
+    '  several — 3.30 for four proofs of one passport chip against 2.85 for four separate roots.',
+  )
+
+  lines.push('')
   lines.push('caveats:')
   for (const c of r.caveats) lines.push(`  - [${c.code}] ${c.message}`)
 
@@ -98,7 +120,7 @@ function render(r: PersonhoodResult): string {
 
 server.tool(
   'lookup_personhood',
-  'Gather every proof-of-personhood credential for an address or ENS name and score it by independent trust root. Returns the evidence and what was discounted as correlated, never a bare verdict. Pass several addresses when the same person controls more than one wallet — real users hold different credentials on different addresses.',
+  'Find which proof-of-personhood credentials an address or ENS name holds, and how many INDEPENDENT trust roots stand behind them. The root count is the number to read: credentials tracing to the same root — one passport chip presented to four protocols — are one piece of evidence, not four, and the response names the ones discounted as correlated. Returns the evidence and the caveats, never a bare verdict. Pass several addresses when the same person controls more than one wallet — real users hold different credentials on different addresses.',
   {
     subject: z
       .union([z.string(), z.array(z.string()).min(1)])
@@ -122,13 +144,13 @@ server.tool(
 
 server.tool(
   'check_personhood',
-  'Decide whether a subject clears a personhood threshold you specify. There is no default threshold on purpose: at a plausible sybil rate a strong classifier still misjudges most of the people it flags, so the choice to deny belongs to you. Prefer escalating (asking for another credential) over denying.',
+  'Decide whether the credentials a subject holds clear a threshold you specify. There is no default threshold on purpose: at a plausible sybil rate a strong classifier still misjudges most of the people it flags, so the choice to deny belongs to you. The full evidence and its independent-trust-root count come back with the verdict — check the root count before acting on PASS, because a threshold cannot see the difference between several independent roots and several credentials off one. Prefer escalating (asking for another credential) over denying.',
   {
     subject: z.union([z.string(), z.array(z.string()).min(1)]),
     threshold: z
       .number()
       .describe(
-        'Score to clear. From the deployed ontology: ~1.7 = one cheap-to-rent credential (World Orb resells from $0.50; Circles registration), ~2.7 = a PoH registration, ~3.5 = a KYC-rooted credential or several independent roots. Exported presets: lenient 1.5, standard 2.5, strict 3.5.',
+        'Score to clear. Calibration against the deployed ontology: ~1.7 is cleared by a single easily-rented credential, ~2.7 by a PoH registration, ~3.5 by a KYC-rooted credential OR by several independent roots — and those last two are not the same finding, which is why the root count in the result matters more than where you put this number. Exported presets: lenient 1.5, standard 2.5, strict 3.5.',
       ),
   },
   async ({ subject, threshold }) => {
@@ -147,7 +169,7 @@ server.tool(
 
 server.tool(
   'explain_trust_roots',
-  'List the trust-root ontology: every known personhood protocol, what it proves, which root it reads, and what it costs to forge or rent. Use this to understand why two credentials might not be independent evidence.',
+  'The map of which personhood protocols read which trust root — what you need to tell whether two credentials are independent evidence or the same evidence counted twice. Protocols sharing a root are marked SHARED. Each entry also carries what it proves and what it costs to forge or rent, but the sharing structure is the point of this tool.',
   {
     root: z.string().optional().describe('Filter to a single trust root, e.g. state-document:icao-9303'),
   },
@@ -181,7 +203,7 @@ server.tool(
 
 server.tool(
   'explain_weight_history',
-  'The full audit trail for one adapter: every weight the ontology has ever assigned it, each with the source it was derived from and the block it landed in. Weights here are curated judgments, so this history is what makes them accountable — if a score changed, this shows exactly when, why, and on whose evidence.',
+  'Whether one protocol\'s standing in the ontology has changed, and on whose evidence: the full audit trail for a single adapter, every revision it has ever been given, each with the source it was derived from and the block it landed in. The ontology\'s judgments are curated, and this history is what makes them accountable — if an adapter was re-rated or marked discontinued, this shows exactly when and why.',
   {
     adapter_id: z.string().describe('Adapter id, e.g. world-id-orb, poh-v2, circles-v2'),
   },

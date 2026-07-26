@@ -121,11 +121,27 @@ export class Print {
       this.#ontology = await loadOntology({
         registryAddress: this.#opts.registryAddress,
         ...(this.#opts.registryRpcUrl ? { rpcUrl: this.#opts.registryRpcUrl } : {}),
-        knownIds: this.#opts.knownIds ?? ontologyData.adapters.map((a) => a.id),
+        knownIds: this.#knownIds(),
         knownRoots: this.#knownRoots(),
       })
     }
     return this.#ontology
+  }
+
+  /**
+   * Adapter ids we can reverse a registry hash into.
+   *
+   * `?? bundled` was not enough: an *empty* array is not nullish, so a caller that built its
+   * preimage list from a file it failed to read passed `[]` and got the exact failure the
+   * defaults exist to prevent — every adapter keyed by hash, no probe matching any ontology
+   * entry, score 0 with a no-evidence caveat. @printid/mcp 0.1.0 shipped that way. An empty
+   * list is never a meaningful intent (nothing to reverse means nothing to score against),
+   * so it is read here as "unset" rather than honoured toward the adversary's answer.
+   */
+  #knownIds(): string[] {
+    return this.#opts.knownIds?.length
+      ? this.#opts.knownIds
+      : ontologyData.adapters.map((a) => a.id)
   }
 
   /**
@@ -136,14 +152,16 @@ export class Print {
    * registry until revision 34. Without their preimages a historical score would print raw
    * hashes for exactly the roots whose correction is the interesting part of the history.
    * They are harmless at head, where nothing carries them.
+   *
+   * Empty is treated as unset for the same reason as `#knownIds` — see there.
    */
   #knownRoots(): string[] {
-    return (
-      this.#opts.knownRoots ?? [
-        ...Object.keys(ontologyData.trustRoots),
-        ...Object.keys(ontologyData.retiredTrustRoots ?? {}),
-      ]
-    )
+    return this.#opts.knownRoots?.length
+      ? this.#opts.knownRoots
+      : [
+          ...Object.keys(ontologyData.trustRoots),
+          ...Object.keys(ontologyData.retiredTrustRoots ?? {}),
+        ]
   }
 
   /**
