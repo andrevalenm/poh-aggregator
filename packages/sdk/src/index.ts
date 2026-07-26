@@ -5,6 +5,7 @@ import { loadOntology } from './ontology.ts'
 import ontologyData from './ontology-data.json' with { type: 'json' }
 import { defaultAdapters } from './adapters/index.ts'
 import { score, freshnessOf, effectiveCost } from './scoring.ts'
+import { HUMAN_SUBJECTS_RECORD } from './ens-agents.ts'
 import {
   applyAsOfToEvidence,
   headRevisionOf,
@@ -208,7 +209,7 @@ export class Print {
 
   /**
    * Resolve an ENS name to an address — and, when the name carries a
-   * `print.subjects` text record, to the full address set it declares.
+   * `observer.print.subjects` text record, to the full address set it declares.
    *
    * The record is the product idea in one line: ENS is where a person asserts which
    * wallets are theirs. Real people hold different credentials on different addresses
@@ -239,7 +240,12 @@ export class Print {
     }
     const [address, subjectsRecord] = await Promise.all([
       client.getEnsAddress({ name }),
-      client.getEnsText({ name, key: 'print.subjects' }).catch(() => null),
+      // Canonical ENSIP-5 service key, with the pre-compliance name as a fallback so records
+      // already published against the old key keep resolving. See ens-agents.ts.
+      client
+        .getEnsText({ name, key: HUMAN_SUBJECTS_RECORD })
+        .then((v) => v ?? client.getEnsText({ name, key: 'print.subjects' }))
+        .catch(() => null),
     ])
     if (!address) throw new Error(`ENS name does not resolve to an address: "${trimmed}"`)
 
@@ -298,7 +304,7 @@ export class Print {
       historical ? historical.ontology : this.ontology(),
     ])
 
-    // A name's print.subjects record expands the set; dedupe again afterwards.
+    // A name's observer.print.subjects record expands the set; dedupe again afterwards.
     const expandedSeen = new Set<string>()
     const addresses: Address[] = []
     let subjectsDeclaredByName = false
@@ -399,7 +405,7 @@ export class Print {
       result.caveats.push({
         code: 'address-set-asserted-by-name-owner',
         message:
-          'Part of this address set comes from a print.subjects ENS text record. The name owner asserted it; the listed addresses have not countersigned, so ownership of every listed wallet is a claim, not a proof.',
+          'Part of this address set comes from an observer.print.subjects ENS text record. The name owner asserted it; the listed addresses have not countersigned, so ownership of every listed wallet is a claim, not a proof.',
       })
     }
     return result

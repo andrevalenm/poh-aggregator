@@ -48,7 +48,7 @@ saturate *across* the set — listing more wallets cannot inflate a score.
 await print.resolve([poHWallet, circlesAvatar, coldStorage])
 ```
 
-If the subject is an ENS name, its `print.subjects` text record expands the set
+If the subject is an ENS name, its `observer.print.subjects` text record expands the set
 automatically: a person declares their own wallets somewhere user-controlled, on-chain and
 revocable, and nobody has to hold that mapping on their behalf.
 

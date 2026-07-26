@@ -26,7 +26,7 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
 - [ ] **Domain + HTTPS** — point a (sub)domain at the host and wire TLS through the
       reverse proxy. Kills the "Not secure" bar and the http-clipboard class of
       bugs for good.
-- [ ] **ENS mainnet** — register the name (~5 min, ~$5/yr) + set `print.subjects`
+- [ ] **ENS mainnet** — register the name (~5 min, ~$5/yr) + set `observer.print.subjects`
       text record. **No longer blocking anything:** the whole ENS story is live on Sepolia
       (`print.eth` + agent subnames, `deployments/ens-sepolia.json`, `npm run ens`),
       because Sepolia registration turned out to be free and instant. Mainnet is now a

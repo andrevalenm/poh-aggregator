@@ -13,7 +13,7 @@ import type { FleetAgent, HumanBacking } from './fleet.ts'
  *   alpha.print.eth   addr                  → the agent's wallet
  *                           print.human     → print.eth
  *   print.eth         addr                  → the human's primary wallet
- *                           print.subjects  → every wallet the human declares
+ *                  observer.print.subjects  → every wallet the human declares
  *                           print.agents    → the agent names the human acknowledges
  *
  * A counterparty handed `alpha.print.eth` resolves the whole picture from public
@@ -60,12 +60,35 @@ import type { FleetAgent, HumanBacking } from './fleet.ts'
 /** The ENS registry. Same address on every network; `owner(namehash("eth"))` confirms it. */
 export const ENS_REGISTRY = '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e' as const
 
-/** Text record on an agent's name: the name or address of the human behind it. */
-export const AGENT_HUMAN_RECORD = 'print.human'
-/** Text record on a human's name: the agent names that human acknowledges. */
-export const HUMAN_AGENTS_RECORD = 'print.agents'
-/** Text record on a human's name: the wallets that human declares. Read by `resolveSubject`. */
-export const HUMAN_SUBJECTS_RECORD = 'print.subjects'
+/**
+ * Our ENS text-record keys, in the form ENSIP-5 actually requires.
+ *
+ * ENSIP-5 splits the namespace in two. A **Global Key** is "made up of lowercase letters,
+ * numbers and the hyphen" and carries no dot — those are the curated, standardised ones
+ * (`avatar`, `url`, `email`). A **Service Key** "must be made up of a reverse dot notation for
+ * a namespace which the service owns" and "must contain at least one dot".
+ *
+ * Our first keys were `print.human`, `print.agents`, `print.subjects`, which satisfy neither
+ * rule: they contain a dot, so they are Service Keys, but the notation is forward rather than
+ * reverse. Reversed against the domain we actually own — print.observer — the correct form is
+ * `observer.print.*`. Getting this right matters more than usual here, because we would like
+ * the human-binding record to become a Global Key in a future ENSIP, and it is hard to argue
+ * for a standard from a key that ignores the existing one.
+ *
+ * The legacy names are still read as a fallback: they are published in @printid/sdk and already
+ * set on live Sepolia names, so dropping them would silently stop resolving records that exist.
+ * Writes use the canonical key only.
+ */
+export const AGENT_HUMAN_RECORD = 'observer.print.human'
+export const HUMAN_AGENTS_RECORD = 'observer.print.agents'
+export const HUMAN_SUBJECTS_RECORD = 'observer.print.subjects'
+
+/** Pre-ENSIP-5-compliant keys, read-only, in the order they should be tried after the above. */
+export const LEGACY_RECORD_KEYS = {
+  [AGENT_HUMAN_RECORD]: 'print.human',
+  [HUMAN_AGENTS_RECORD]: 'print.agents',
+  [HUMAN_SUBJECTS_RECORD]: 'print.subjects',
+} as const
 
 export const ENS_REGISTRY_ABI = parseAbi([
   'function owner(bytes32 node) view returns (address)',
@@ -93,7 +116,7 @@ export interface EnsHuman {
   name?: string
   /** The address the human resolves to. */
   address?: Address
-  /** `print.subjects` — every wallet this human declares. Self-asserted. */
+  /** `observer.print.subjects` — every wallet this human declares. Self-asserted. */
   subjects: Address[]
   /** `print.agents` — the agent names this human acknowledges, normalized. */
   acknowledges: string[]
@@ -148,17 +171,34 @@ function safeNormalize(name: string): string | undefined {
 }
 
 /** Read a text record, treating any failure as absent-but-noted rather than as an exception. */
+/**
+ * Read a text record, falling back to its pre-ENSIP-5 name.
+ *
+ * The canonical key is tried first, so a name that has migrated resolves in one call. Only an
+ * *absent* record triggers the legacy read — an RPC failure is returned as an error rather than
+ * being retried against the old key, because a transport failure is not evidence that a record
+ * is missing, and silently degrading here would mean an unreachable resolver reads as
+ * "this agent names no human".
+ */
 async function readText(
   client: PublicClient,
   name: string,
   key: string,
 ): Promise<{ value?: string; error?: string }> {
-  try {
-    const value = await client.getEnsText({ name, key })
-    return value === null || value === undefined ? {} : { value }
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) }
+  const once = async (k: string): Promise<{ value?: string; error?: string }> => {
+    try {
+      const value = await client.getEnsText({ name, key: k })
+      return value === null || value === undefined ? {} : { value }
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) }
+    }
   }
+
+  const first = await once(key)
+  if (first.value !== undefined || first.error !== undefined) return first
+
+  const legacy = (LEGACY_RECORD_KEYS as Record<string, string | undefined>)[key]
+  return legacy ? once(legacy) : first
 }
 
 async function readAddr(client: PublicClient, name: string): Promise<{ value?: Address; error?: string }> {

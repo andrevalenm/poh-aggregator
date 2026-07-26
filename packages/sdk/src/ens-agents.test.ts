@@ -131,7 +131,7 @@ describe('resolving an agent name', () => {
   test('an unreadable resolver is unreadable, never unbound', async () => {
     const id = await resolveEnsAgent(fakeClient(TREE, { failText: ['alpha.print.eth'] }), 'alpha.print.eth')
     assert.equal(id.binding, 'unreadable')
-    assert.match(id.error!, /could not read print.human/)
+    assert.match(id.error!, /could not read observer.print.human/)
   })
 
   test('an unreadable human side is unreadable too — the agent is not judged on half a read', async () => {

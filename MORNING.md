@@ -393,7 +393,7 @@ cd ../agent && npm start                                   # live agent flow
    to exactly the airdrop-minted cohort. Vouching registries now *ramp* (weight rises with
    survival), liveness/KYC *decay*. Unknown age under Ramp gets 0.5, never 1.0 — otherwise
    subgraph downtime would be profitable for a farm.
-2. **ENS subjects record.** `resolveSubject()` reads `print.subjects` from any ENS
+2. **ENS subjects record.** `resolveSubject()` reads `observer.print.subjects` from any ENS
    name and expands the address set — ENS as the user-controlled home of "these wallets are
    me". Self-asserted → dedicated caveat; countersigning is documented roadmap.
 3. **The Graph is now load-bearing**, not decorative: claimedAt feeds the ramp,
@@ -690,7 +690,7 @@ name before the mainnet ENS name and the public repo go out.
    `research/protocols/ens-agent-identity.md`.
 
    What is left for you is optional and cosmetic-for-judging: **register `print.eth` on
-   mainnet** (~$5/yr) and set `print.subjects` to your wallet list, if you want the demo
+   mainnet** (~$5/yr) and set `observer.print.subjects` to your wallet list, if you want the demo
    to point at a mainnet name rather than a testnet one. Nothing depends on it — every ENS
    feature is live-tested against a real name today. Do it after the naming decision, since
    the Sepolia name is disposable and a mainnet one is not.
