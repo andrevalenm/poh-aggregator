@@ -7,7 +7,7 @@
  * *outscores* a real person holding four credentials from four different sources, because a
  * passport genuinely is expensive. Only one number inverts that, and it is the count of
  * independent trust roots. So the sheet leads with a plain verdict against a plain rule —
- * **at least two independent kinds of evidence** — and the score, the cost basis and every
+ * **at least one independent kind of evidence** — and the score, the cost basis and every
  * adapter read live on in the console, one keystroke down.
  *
  * Four rules this file will not break:
@@ -33,14 +33,22 @@ export interface ThresholdSet {
 }
 
 /**
- * The default rule: two independent trust roots.
+ * The default rule: one independent trust root.
  *
- * One short sentence explains it — two different kinds of evidence, not two copies of the same
- * one — and it is the only formulation that puts a real person above a credential farm. It is
- * ours, it is visible, and it is changeable; it is not the SDK's, which deliberately ships no
- * default at all.
+ * "Is there any independent evidence a person is here" is the question a product actually
+ * arrives with, and it is answerable in one clause. Two roots asks something stricter and
+ * genuinely useful — corroboration from an unrelated source — but as an opening default it made
+ * a wallet holding a real Proof of Humanity registration read "No", which is a confusing first
+ * impression of an aggregator whose job is to find that credential.
+ *
+ * Saturation still does its work at one: a farm presenting one passport chip to four protocols
+ * collapses to a single root, so it can make one account credible rather than four. What the
+ * threshold buys above one is corroboration, not the anti-multiplication property.
+ *
+ * It is ours, it is visible next to the verdict, and it is changeable. It is not the SDK's,
+ * which deliberately ships no default at all.
  */
-const DEFAULT_ROOTS_REQUIRED = 2
+const DEFAULT_ROOTS_REQUIRED = 1
 
 /** Offered alternatives. Small on purpose: a rule a visitor cannot restate is not a rule. */
 const ROOT_OPTIONS = [1, 2, 3]
@@ -216,7 +224,7 @@ function ruleBlock(onChange: (n: number) => void): HTMLElement {
     h(
       'p',
       { class: 'rule-why' },
-      'Two independent kinds means two different sources, not two copies of the same one. That is the distinction a credential farm cannot fake by presenting one passport to four protocols — and the reason we do not lead with a score, which the farm would win.',
+      'Independent means from a distinct source. Credentials tracing back to the same document or vendor are collapsed before this count, so a farm presenting one passport to four protocols gets one kind of evidence here, not four. Raise the number to demand corroboration from unrelated sources.',
     ),
   )
 }

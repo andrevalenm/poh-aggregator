@@ -6,7 +6,7 @@
     <title>Print — are you real?</title>
     <meta
       name="description"
-      content="One API over the proof-of-humanity credentials a wallet already holds. Know a real person is there without holding their identity — no upload, no selfie, nothing to breach. Live on four chains, no server of ours."
+      content="One call across every proof of humanity. Tinder, Zoom and Docusign added it this year; dozens of protocols now issue it. Print aggregates them so you integrate once — and never hold an identity."
     />
     <meta property="og:title" content="Print — are you real?" />
     <meta
@@ -60,11 +60,12 @@
           only so the sentence reads correctly before the chain read lands, or if it fails.
         -->
         <p class="hero-answer">
-          Print reads the personhood credentials a wallet already holds —
-          <b><span data-count="integrated">10</span> protocols read live</b>, out of
-          <span data-count="catalogued">30</span> priced in one public registry — and returns a
-          single answer. Most of them are quietly reading the same passport; Print counts that
-          once. You never hold an identity.
+          Proof of humanity is fragmenting across dozens of protocols, and nobody wants to
+          integrate them one at a time. Print reads
+          <b><span data-count="integrated">10</span> of them live</b> — out of
+          <span data-count="catalogued">30</span> catalogued in one public registry — through a
+          single call, and answers the only question a product actually asks: is a real person
+          there? You never hold an identity.
         </p>
         <div class="hero-ctas">
           <a class="cta cta-primary" href="#try">Check an address</a>
@@ -96,8 +97,9 @@
         <header class="band-head reveal">
           <h2>Ask it about a wallet. Right now.</h2>
           <p>
-            Everything below runs in your browser against live chains — World Chain, Gnosis,
-            Base, Sepolia.
+            Every read below happens in your browser, against eleven live chains — World Chain,
+            Gnosis, Base, Optimism, Linea, Celo, Polygon, Arbitrum, BNB, Lens and Ethereum — plus
+            Sepolia for the registry. No server of ours, no account, nothing precomputed.
           </p>
         </header>
         <div class="widget reveal" id="widget">
@@ -113,6 +115,24 @@
             <button type="submit" id="lookup-submit">Resolve</button>
           </form>
           <div class="examples-row" id="examples-row"><span>Try:</span></div>
+          <!--
+            Marginalia. The page is a printed sheet, so the invitation is a reader's own pencil
+            mark rather than a UI hint: an ink arrow curving up to the example chips. Drawn with
+            deliberately uneven control points so it reads as hand-made next to the letterpress
+            type. Hidden once a lookup has run — see .widget.has-run in landing.css — because an
+            instruction that outlives its usefulness is just clutter.
+          -->
+          <div class="nudge" aria-hidden="true">
+            <svg class="nudge-arrow" viewBox="0 0 132 58" fill="none" preserveAspectRatio="xMinYMin meet">
+              <path
+                d="M6 54C7.5 40.2 14.8 28.4 27.4 20.8 41.9 12.1 61.3 9.4 79.6 10.2c15.1.7 30.4 3.6 44.9 9.1"
+                stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <path
+                d="M117.4 12.4c3.1 2.4 5.3 4.6 7.6 7.3M112.9 25.4c4.2-1.9 7.6-3.7 11.6-6.1"
+                stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            <span class="nudge-note">no wallet to hand? borrow one of these</span>
+          </div>
           <div id="probe-stream" class="probe-stream" aria-live="polite"></div>
           <div id="widget-result"></div>
         </div>
@@ -503,13 +523,12 @@ person.isHuman(Thresholds.standard)</code></pre>
             we will not pretend otherwise.
           </p>
           <p>
-            But the problem is not a hackathon problem. Humanity verification is being wired into
-            airdrops, governance and agent permissions right now, and almost every deployed
-            scorer adds credentials together — which means a sybil farm holding one passport
-            read by four protocols outranks a real person holding four unrelated ones. That
-            failure is live, it is in production, and it fails in the attacker's favour. We
-            think it is worth getting right in public, with the weights on-chain and the sources
-            attached, whatever happens to us on Sunday.
+            But the problem is not a hackathon problem. Tinder, Zoom and Docusign added proof of
+            humanity to consumer products this year, and the protocols issuing it keep
+            multiplying — each with its own SDK, its own chain, its own idea of what it has
+            proved. Every product that needs a real person behind an account now faces the
+            same integration tax. That is worth solving in the open, with the registry on-chain
+            and its sources attached, whatever happens to us on Sunday.
           </p>
 
           <div class="built-at reveal">
@@ -575,13 +594,6 @@ person.isHuman(Thresholds.standard)</code></pre>
                 challenge, retry. Human backing is then read from AgentBook.
               </dd>
 
-              <dt>What we do not claim</dt>
-              <dd>
-                We prove a human exists behind the agent. We do not prove that human controls it
-                — on chain, puppeteering and voluntary delegation are the same signature. No
-                protocol can do this today, so it ships as a permanent caveat on every result
-                rather than being quietly implied away.
-              </dd>
             </dl>
 
             <details class="receipts">
@@ -834,7 +846,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             <div class="coverage-row">
               <dt><span data-count="catalogued">30</span> catalogued</dt>
               <dd>
-                Priced and assigned a trust root in the on-chain registry, across
+                Catalogued with a trust root in the on-chain registry, across
                 <span data-count="roots">18</span> distinct roots. Catalogued is not the same as
                 readable — but a root that is catalogued already does the work of stopping the
                 credential being double-counted, whether or not we can read it.
@@ -878,8 +890,8 @@ person.isHuman(Thresholds.standard)</code></pre>
           <div class="colophon-brand">
             <span class="wordmark">print</span>
             <p>
-              Every print a wallet leaves, priced. The registry stores protocols, never people —
-              scoring runs client-side, and nobody, including us, holds the join key.
+              One call across every proof of humanity. The registry stores protocols, never
+              people — scoring runs client-side, and nobody, including us, holds the join key.
             </p>
           </div>
           <div class="colophon-col">

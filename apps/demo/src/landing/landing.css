@@ -2496,3 +2496,69 @@ html.js .reveal.in {
 .receipts a:hover {
   text-decoration-color: var(--iron);
 }
+
+/* ------------------------------------------------------------------ nudge
+ *
+ * A pencil mark in the margin of a printed sheet, not a tooltip: an ink arrow curving up to
+ * the example chips, with the note set in the mono face at a slight tilt so it reads as
+ * added by hand after the page was printed. Fills the dead space under the chips that made
+ * the empty state look unfinished.
+ *
+ * It is decorative and duplicative — the chips are already labelled "Try:" and are reachable
+ * by keyboard — so the whole block is aria-hidden and vanishes the moment a lookup runs.
+ */
+.nudge {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0 1.6rem;
+  color: var(--iron);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.nudge-arrow {
+  width: 8.25rem;
+  height: 3.6rem;
+  flex: none;
+  /* Flip vertically so the curve sweeps up toward the chips above. */
+  transform: scaleY(-1);
+  overflow: visible;
+}
+
+.nudge-note {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  color: var(--iron-deep);
+  transform: rotate(-2.2deg);
+  transform-origin: left center;
+  margin-top: 1.5rem;
+  max-width: 20ch;
+}
+
+/* Once a real answer is on the sheet the invitation has done its job. */
+.widget.has-run .nudge {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  .nudge {
+    margin-left: 0.25rem;
+  }
+  .nudge-arrow {
+    width: 6rem;
+    height: 2.8rem;
+  }
+  .nudge-note {
+    font-size: 0.76rem;
+    margin-top: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nudge-note {
+    transform: none;
+  }
+}

@@ -94,6 +94,9 @@ export function mountWidget(): void {
     inFlight = true
     submit.disabled = true
     submit.textContent = 'Reading chains…'
+    // Retire the "borrow one of these" marginalia: the reader has clearly worked out how to
+    // use the field, so the pencil mark is now just something in the way.
+    document.getElementById('widget')?.classList.add('has-run')
     const { makeClient, LIVE_ADAPTER_IDS, Thresholds, rootDescriptions } = await clientModule()
     streamEl.append(
       h(

@@ -71,7 +71,7 @@ test.describe('Print landing', () => {
     // A visitor gets a binary answer without touching a control — the default rule is applied
     // on arrival — and the answer is a count of independent roots, never a log score.
     await expect(result.locator('.verdict-word')).toHaveText(/^(Yes|No)$/, { timeout: 180_000 })
-    await expect(result.locator('.verdict-rule')).toContainText(/The rule asks for 2 or more/)
+    await expect(result.locator('.verdict-rule')).toContainText(/The rule asks for 1 or more/)
     await expect(result.locator('.rule-line')).toContainText('By the rule: at least')
     await expect(result.locator('.rule-tag')).toHaveText('our default')
 
@@ -80,9 +80,10 @@ test.describe('Print landing', () => {
       /controls their own credentials/,
     )
 
-    // The rule is the viewer's to change, and the verdict follows it.
-    await result.locator('.rule-opt', { hasText: '1' }).click()
-    await expect(result.locator('.verdict-rule')).toContainText(/The rule asks for 1 or more/)
+    // The rule is the viewer's to change, and the verdict follows it. Tighten rather than
+    // loosen, since 1 is now the default and clicking it would be a no-op.
+    await result.locator('.rule-opt', { hasText: '2' }).click()
+    await expect(result.locator('.verdict-rule')).toContainText(/The rule asks for 2 or more/)
     await expect(result.locator('.rule-tag')).toHaveText('your choice')
 
     // The console is absorbed: one keyboard-operable disclosure unfolds the whole record in
