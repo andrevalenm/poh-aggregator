@@ -3,10 +3,10 @@
     "The trust-root ontology. Single source of truth, shared by the deploy script and the SDK.",
     "",
     "trustRoot is the correlation key. Adapters with an equal trustRoot are ONE piece of",
-    "evidence observed more than once and must saturate, never sum. The 30 adapters below sit",
-    "on 18 roots, and the collapse is concentrated where it matters: one passport chip is read",
+    "evidence observed more than once and must saturate, never sum. The 32 adapters below sit",
+    "on 19 roots, and the collapse is concentrated where it matters: one passport chip is read",
     "by four of them, five commercial KYC vendors carry eleven more, and the six largest roots",
-    "account for 18 of the 30. That is why additive",
+    "account for 19 of the 32. That is why additive",
     "scoring fails in the adversary's favour — a farm's credentials are maximally correlated,",
     "a real person's are diverse.",
     "",
@@ -43,6 +43,7 @@
     "social-vouching:brightid": "A BrightID verification party. Separate from Proof of Humanity: no vendor sits under either, and the two graphs share no members by construction, so counting them independently is sound.",
     "social-trust:circles": "A position in the Circles trust graph on Gnosis.",
     "social-account:farcaster": "A Farcaster id in the OP-Mainnet IdRegistry, with its rented storage. Account ownership, not personhood — priced at the published storage rent.",
+    "social-account:lens": "A Lens account on Lens Chain, or the v2 profile NFT on Polygon it migrated from. One root for both registries — migration copied rather than burned, so a subject holding both holds one credential. Account ownership, not personhood: creation is free to the user and gas-sponsored.",
     "ceremony:idena": "A synchronous flip-test validation ceremony.",
     "ceremony:encointer": "Physical attendance at an Encointer key-signing meetup.",
     "biometric-registry:humanode": "A 3D face enrolment binding one Humanode validator to one human.",
@@ -136,7 +137,7 @@
       "live": true,
       "sourceURI": "research/protocols/eas-and-disco.md",
       "implemented": true,
-      "notes": "Persona-rooted per Coinbase's own vendor disclosure. Binds a KYC'd account to an address, one-to-many, with no nullifier. 720,503 issued and 406,022 revoked — always check revocation, never presence alone.",
+      "notes": "Persona-rooted per Coinbase's own vendor disclosure. Binds a KYC'd account to an address, one-to-many, with no nullifier. 720,503 issued and 406,022 revoked — always check revocation, never presence alone. Read fully on-chain since 2026-07-25: Coinbase's AttestationIndexer + getAttestation, EASSCAN GraphQL no longer on the critical path.",
       "ageCurve": "Decay"
     },
     {
@@ -148,9 +149,9 @@
       "rentCostCents": 2000,
       "decayHalfLifeDays": 3650,
       "live": true,
-      "sourceURI": "research/protocols/zk-passport-and-eid.md",
+      "sourceURI": "research/protocols/zkpassport-onchain-read.md",
       "implemented": false,
-      "notes": "Scopes its nullifier per service and never publishes an unscoped value — good privacy, but it means we cannot detect that this and Self came from one chip. Hence saturation rather than dedup.",
+      "notes": "Scopes its nullifier per service and never publishes an unscoped value — good privacy, but it means we cannot detect that this and Self came from one chip. Hence saturation rather than dedup. Verified 2026-07-25 that no permissionless address-keyed read exists: the RootVerifier's verify() is a stateless view (19 logs ever per chain, all admin), and results live in per-integrator contracts under app-scoped nullifiers. See the research file for what would flip this.",
       "ageCurve": "Decay"
     },
     {
@@ -162,23 +163,23 @@
       "rentCostCents": 2000,
       "decayHalfLifeDays": 3650,
       "live": true,
-      "sourceURI": "research/protocols/zk-passport-and-eid.md",
-      "implemented": false,
-      "notes": "Publishes a global unscoped per-document nullifier on-chain. Same chip as ZKPassport and World's document tier.",
+      "sourceURI": "research/protocols/self-onchain-read.md",
+      "implemented": true,
+      "notes": "Read from Celo: five Sourcify-verified integrator registries by eth_call (hub-gated callbacks, no non-proof write path, EIP-712 receiver consent so it cannot be planted), then a bounded client-filtered scan of the hub's DisclosureVerified events, whose recipient is un-indexed. All dates are latest-re-attestation ceilings. Caveats that discount the root's figures: 39% of all 6,212 hub disclosures ever (measured 2026-07-25) are Aadhaar or KYC attestations, not ICAO documents, and the registry path cannot tell which document type minted a positive; the hub is an upgradeable proxy with an unverified implementation; and the global per-document nullifier still means one chip can also feed ZKPassport and World — saturate, never sum. Publishes a global unscoped per-document nullifier on-chain.",
       "ageCurve": "Decay"
     },
     {
       "id": "galxe-passport",
-      "name": "Galxe Passport v3",
+      "name": "Galxe Passport",
       "evidenceClass": "StateIdentity",
       "trustRoot": "kyc-vendor:sumsub",
       "forgeCostCents": 120000,
       "rentCostCents": 3000,
       "decayHalfLifeDays": 730,
       "live": true,
-      "sourceURI": "research/landscape/kyc-liveness-vendors.md",
-      "implemented": false,
-      "notes": "Sumsub underneath. Shares its root with Linea PoH.",
+      "sourceURI": "research/protocols/galxe-passport-onchain-read.md",
+      "implemented": true,
+      "notes": "Sumsub underneath (Persona in the v2 era); shares its root with Linea PoH. Read passively from the soulbound ERC-721 on BNB Chain (0xE840…3C012, still minting ~2/day as of 2026-07-25) — balanceOf decides held, the owner-keyed _passports storage slot names the token, and issuance is dated exactly by bisecting the contract's monotone mint counter over archive state, with measured anchor bounds as the degraded path. Non-transferability is enforced in code, so held is an act of the subject; burn and Galxe-side revoke both zero the read. The SBT does not disclose document class or credential version — a 'passport' here may be a municipal ID — so passive scoring cannot weight by document strength.",
       "ageCurve": "Decay"
     },
     {
@@ -232,10 +233,10 @@
       "rentCostCents": 400,
       "decayHalfLifeDays": 90,
       "live": false,
-      "sourceURI": "research/protocols/poh-kleros-brightid-idena.md",
-      "implemented": false,
-      "notes": "Marked not-live on scale grounds: 124 validated identities at epoch 214, down from 21,187 at peak. Its sublinear-staking fork killed the puppeteer pools and the network with them. Retained because it is the best-documented failure in the field.",
-      "ageCurve": "Ramp"
+      "sourceURI": "research/protocols/idena-onchain-read.md",
+      "implemented": true,
+      "notes": "Marked not-live on scale grounds: 124 validated identities at epoch 214, down from 21,187 at peak. Its sublinear-staking fork killed the puppeteer pools and the network with them. Retained because it is the best-documented failure in the field. Probed anyway since 2026-07-25 — a held identity is reported and scored 0 while live is false, which is the honest shape: checked, found, not counted. Read from restricted.idena.io (the node the official app uses; its API key is a public constant in the deployed bundle — permissionless but protocol-operated, no independent fallback). Decay, not Ramp: identity state expires on a missed validation ceremony, so recency is the whole signal.",
+      "ageCurve": "Decay"
     },
     {
       "id": "brightid",
@@ -246,9 +247,9 @@
       "rentCostCents": 300,
       "decayHalfLifeDays": 365,
       "live": false,
-      "sourceURI": "research/protocols/poh-kleros-brightid-idena.md",
-      "implemented": false,
-      "notes": "Not obtainable: the Aura verification hash is the SHA-256 of the empty string, i.e. zero verified users, and the app node returns 502.",
+      "sourceURI": "research/protocols/brightid-onchain-read.md",
+      "implemented": true,
+      "notes": "Readable, frozen. The one general address->verified surface is the BrightIDSnapshot registry on IDChain (0x81591DC4997A76A870c13D383F8491B288E09344, the contract Snapshot's official strategy reads): 233 unique addresses, first 2022-01-22, last write 2024-06-09, measured over full chain history 2026-07-25. held = a verifier-token signer attested the address met the snapshot app's graph verification; issuedAt = that attestation's timestamp (understates age -> conservative on the Ramp); re-linked addresses read superseded, not unregistered. live:false because the write path needs a BrightID node signature and every node endpoint 502s (probed 2026-07-25) - nobody, honest or adversary, can newly obtain this, so forge/rent are academic and effective cost is zeroed by liveness. IDChain is protocol-operated with a single public RPC: permissionless read, not infrastructure-independent. The prior not-obtainable verdict stands for every other BrightID app: contextIds are app-scoped UUIDs with no on-chain address linkage.",
       "ageCurve": "Ramp"
     },
     {
@@ -260,9 +261,9 @@
       "rentCostCents": 3000,
       "decayHalfLifeDays": 365,
       "live": false,
-      "sourceURI": "research/landscape/identity-infra-prior-art.md",
-      "implemented": false,
-      "notes": "Discontinued 2025-07-31. Root corrected 2026-07-25: FaceTec integrated directly, not Persona — the dedup table names Civic on the FaceTec (direct) row. Retained deliberately: a major competitor still assigns points to Civic stamps for a product that no longer exists, which is exactly the failure the live flag prevents.",
+      "sourceURI": "research/protocols/civic-pass-onchain-read.md",
+      "implemented": true,
+      "notes": "Discontinued 2025-07-31. Root corrected 2026-07-25: FaceTec integrated directly, not Persona — the dedup table names Civic on the FaceTec (direct) row. Retained deliberately: a major competitor still assigns points to Civic stamps for a product that no longer exists, which is exactly the failure the live flag prevents. Now read on-chain from the GatewayToken proxy (0xF65b…F22E, same address on every chain; ERC-3525, gatekeeper network 10 = uniqueness): tokens carry first-class expiry, and the chain confirms the retirement — the latest uniqueness expiry anywhere is 2025-10-27, zero mints since, so every probe honestly answers held:false with the lapse date. An expired biometric dedupe proves a face check happened once, not that the subject is currently unique; the probe refuses to resurrect it, and would notice — without a code change — if Civic ever resumed issuing.",
       "ageCurve": "Decay"
     },
     {
@@ -319,6 +320,20 @@
       "sourceURI": "research/protocols/passport-civic-fractal-zkme-galxe.md",
       "implemented": true,
       "notes": "Permissionlessly readable, and now read: GitcoinResolver.getCachedScore(address) on all seven mainnets, no vendor call. The scalar must never be imported at face value: ETHScore#50, a pure wallet-history model, is weighted 16.021, the same as a government ID. So it is rooted at wallet history and priced at the farmed-wallet market ($1–$20 per aged wallet, sybil-incidents table), not at KYC prices. Its high-weight state stamps (Coinbase→Persona, Holonym gov-id, Holonym biometrics, Civic, BrightID, Idena, TrustaLabs) are counted under their own roots; taking the scalar cheaply here is what stops that becoming a double count, and the probe names the restated roots in its detail so the collapse is visible rather than merely safe. Measured on-chain 2026-07-25: maxScoreAge is 7,776,000s (90 days) on every deployment and expiry is enforced, so a passport is a hard-expiring credential and the 180-day half-life only ever applies over the first 90 days of its life.",
+      "ageCurve": "Decay"
+    },
+    {
+      "id": "human-passport-eas",
+      "name": "Human Passport score (EAS attestation)",
+      "evidenceClass": "Behavioral",
+      "trustRoot": "behavioral:wallet-history",
+      "forgeCostCents": 2000,
+      "rentCostCents": 100,
+      "decayHalfLifeDays": 180,
+      "live": true,
+      "sourceURI": "research/protocols/gitcoin-passport.md",
+      "implemented": true,
+      "notes": "The same credential as human-passport, read from the EAS attestation itself (getUserAttestation -> getAttestation) instead of the resolver's cache: adds the attester check, EAS revocation state, and the inline score-v2 stamp list for root decomposition. Shares behavioral:wallet-history with human-passport on purpose - two reads of one credential must saturate, never sum.",
       "ageCurve": "Decay"
     },
     {
@@ -448,6 +463,20 @@
       "ageCurve": "Ramp"
     },
     {
+      "id": "lens-account",
+      "name": "Lens account (Lens Chain)",
+      "evidenceClass": "Behavioral",
+      "trustRoot": "social-account:lens",
+      "forgeCostCents": 1,
+      "rentCostCents": 1,
+      "decayHalfLifeDays": 730,
+      "live": true,
+      "sourceURI": "research/protocols/lens-onchain-read.md",
+      "implemented": true,
+      "ageCurve": "Ramp",
+      "notes": "Account ownership, never personhood, and cheaper than a Farcaster id: creation is gas-sponsored (0.0012 GHO ≈ 0.12¢ to the sponsor, $0 to the user, measured 2026-07-25) with auto-generated usernames minting at ~250/day, so forge is priced at the unsponsored gas path, and rent equals forge: nobody pays more to borrow an account than minting one costs, and the aged-handle premium the resale market charges is a premium on age — which the Ramp curve prices — not on the credential. Ramp for the same reason as farcaster-account: the only thing an adversary cannot mint today is survival — a claimed 2022-era v2 profile — and the probe dates acquisition, not creation, so bought accounts are priced from the sale. Read permissionlessly from Lens Chain ownership-transfer logs (both public RPCs are Lens-operated; permissionless but not infrastructure-independent), with a Polygon LensHub fallback for never-migrated v2 profiles date-bounded at the 2025-04 sunset block. Ownership transfer needs no recipient consent, so the credential can be planted; held must never be read as an act of the subject."
+    },
+    {
       "id": "encointer",
       "name": "Encointer",
       "evidenceClass": "Uniqueness",
@@ -456,9 +485,9 @@
       "rentCostCents": 400,
       "decayHalfLifeDays": 90,
       "live": false,
-      "sourceURI": "research/landscape/poh-landscape-sweep.md",
+      "sourceURI": "research/protocols/encointer-onchain-read.md",
       "implemented": false,
-      "notes": "Physical pseudonym parties on a Kusama common-good parachain — the strongest anonymity model in the field and the only one where forging requires a body in a room. Marked not-live on the same grounds as Idena: community-scale, and pivoted to financial inclusion, so the expected number of our subjects holding one is near zero. There is also no EVM read; the credential lives on Substrate accounts. Costs mirror the ceremony class and never bind while live is false.",
+      "notes": "Physical pseudonym parties on a Kusama common-good parachain — the strongest anonymity model in the field and the only one where forging requires a body in a room. Marked not-live on the same grounds as Idena: community-scale, and pivoted to financial inclusion, so the expected number of our subjects holding one is near zero. There is also no EVM read; the credential lives on Substrate accounts. Costs mirror the ceremony class and never bind while live is false. The no-EVM-read claim was verified 2026-07-25 against the full runtime metadata (no EVM binding pallet; accounts are sr25519/blake2 AccountId32, information-theoretically unmappable from an Ethereum address). Watch item: EncointerReputationRings ring proofs are the plausible future EVM export path.",
       "ageCurve": "Ramp"
     },
     {
@@ -470,9 +499,9 @@
       "rentCostCents": 1000,
       "decayHalfLifeDays": 365,
       "live": true,
-      "sourceURI": "research/landscape/poh-landscape-sweep.md",
-      "implemented": false,
-      "notes": "One node, one human, enforced by 3D face liveness at the consensus layer — a real mechanism, but the credential belongs to a validator rather than to an address a subject would hand us, so there is no per-subject read to build. Scale unverified. Costs mirror the face-liveness class and are a placeholder until that is priced.",
+      "sourceURI": "research/protocols/humanode-onchain-read.md",
+      "implemented": true,
+      "notes": "One node, one human, enforced by 3D face liveness at the consensus layer, re-proved every 7 days. Read permissionlessly from the chain's own EVM precompiles: address -> native account (0x..0801, a permanent dual-consent binding that cannot be planted) then isAuthenticated (0x..0800, the consensus layer's own membership test), dated exactly from ActiveAuthentications state (expiry minus the 7-day lifetime, re-verified live every test run). The decay curve is a formality: an active bioauth is never more than 7 days old. Honest population caveat: 82 humans were actively bioauthenticated on 2026-07-25 and zero had claimed an EVM mapping, so no EVM-addressed subject can currently hold this credential; the adapter re-measures that emptiness rather than assuming it. Single Humanode-operated RPC (permissionless, not infrastructure-independent); enrollment trust root is Humanode's robonode + FaceTec, not the chain. Costs remain the face-liveness-class placeholder until priced.",
       "ageCurve": "Decay"
     }
   ]

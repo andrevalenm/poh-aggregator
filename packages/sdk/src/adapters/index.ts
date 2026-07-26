@@ -8,18 +8,34 @@ import {
   type IndexView,
   type Reconciled,
 } from '../reconcile.ts'
+import { coinbaseVerificationOnchainAdapter, gitcoinPassportAdapter } from './eas.ts'
 import { humanPassportAdapter } from './human-passport.ts'
+import { lensAdapter } from './lens.ts'
 import { farcasterAdapter } from './farcaster.ts'
 import { holonymAdapters } from './holonym.ts'
 import { lineaPohAdapter } from './linea-poh.ts'
 import { pohV1Adapter } from './poh-v1.ts'
+import { brightIdAdapter } from './brightid.ts'
+import { civicPassAdapter } from './civic.ts'
+import { galxePassportAdapter } from './galxe.ts'
+import { humanodeAdapter } from './humanode.ts'
+import { idenaAdapter } from './idena.ts'
+import { selfAdapter } from './self.ts'
 import { worldIdOrbAdapter, WORLD_AGENT_BOOK, WORLD_ID_ADDRESS_BOOK, WORLD_RPC } from './world.ts'
 
+export * from './eas.ts'
 export * from './human-passport.ts'
+export * from './lens.ts'
 export * from './farcaster.ts'
 export * from './holonym.ts'
 export * from './linea-poh.ts'
 export * from './poh-v1.ts'
+export * from './brightid.ts'
+export * from './civic.ts'
+export * from './galxe.ts'
+export * from './humanode.ts'
+export * from './idena.ts'
+export * from './self.ts'
 export * from './world.ts'
 
 /**
@@ -450,11 +466,22 @@ export function defaultAdapters(opts?: { subgraphUrl?: string }): AdapterProbe[]
     worldIdOrbAdapter(),
     pohAdapter(RPC.gnosis, opts?.subgraphUrl),
     circlesAdapter(RPC.gnosis, undefined, opts?.subgraphUrl),
-    coinbaseVerificationAdapter(),
+    // On-chain read (Coinbase's own AttestationIndexer + getAttestation) replaced the
+    // easscan GraphQL read in defaultAdapters on 2026-07-25. Same adapterId, same
+    // credential; the GraphQL adapter remains exported for callers who want it.
+    coinbaseVerificationOnchainAdapter(),
     humanPassportAdapter(),
+    gitcoinPassportAdapter(),
     farcasterAdapter(),
+    lensAdapter(),
     ...holonymAdapters(),
     lineaPohAdapter(),
     pohV1Adapter(),
+    selfAdapter(),
+    idenaAdapter(),
+    humanodeAdapter(),
+    brightIdAdapter(),
+    galxePassportAdapter(),
+    civicPassAdapter(),
   ]
 }

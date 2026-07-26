@@ -1,0 +1,68 @@
+# Traefik route for print.observer -> the demo container on ax41.
+#
+# Deliberately a NEW file in traefik's watched dynamic directory rather than an edit to
+# traefik.yml or to any dokploy-managed app file. The file provider picks it up on write and
+# drops it on delete, so this is additive and reversible, and nothing about the production
+# ingress that serves peanut-split, wordle, payoff, findjuris or dokploy itself is touched.
+#
+# Copied from dokploy's own generated pattern (see robotichugo-txccgi.yml) so it behaves the
+# same way its apps do: plain HTTP redirects to HTTPS, and the websecure router asks the
+# existing letsencrypt resolver for a certificate. ACME uses an HTTP-01 challenge on the web
+# entrypoint, so DNS must already point at this host before a cert can issue.
+#
+# The apex and www are SEPARATE routers on purpose. When both hostnames shared one router they
+# shared one ACME order, and an order fails as a unit — the first attempt was made while the
+# domain still resolved to Namecheap's parking IP (216.227.142.170), so both identifiers failed
+# together and the whole certificate was blocked behind one stale failure. Split, each name
+# gets its own order and its own fate.
+#
+# Install:  rsync this to /etc/dokploy/traefik/dynamic/print-observer.yml
+# Remove:   rm /etc/dokploy/traefik/dynamic/print-observer.yml
+#
+# The service is addressed by container name, which requires the demo container to be attached
+# to dokploy-network (traefik's docker provider network):
+#   docker network connect dokploy-network corroborate-demo
+http:
+  routers:
+    print-apex-web:
+      rule: Host(`print.observer`)
+      service: print-observer-service
+      middlewares:
+        - redirect-to-https
+      entryPoints:
+        - web
+    print-apex-websecure:
+      rule: Host(`print.observer`)
+      service: print-observer-service
+      middlewares: []
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: print.observer
+
+    print-www-web:
+      rule: Host(`www.print.observer`)
+      service: print-observer-service
+      middlewares:
+        - redirect-to-https
+      entryPoints:
+        - web
+    print-www-websecure:
+      rule: Host(`www.print.observer`)
+      service: print-observer-service
+      middlewares: []
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: www.print.observer
+
+  services:
+    print-observer-service:
+      loadBalancer:
+        servers:
+          - url: http://corroborate-demo:80
+        passHostHeader: true
