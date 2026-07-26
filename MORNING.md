@@ -10,9 +10,11 @@ and the full sweep is green against it (`./apps/demo/test.sh` → forge 18, sdk 
 19/19 with no skips, Playwright 13). Four further reds in `npm test` at the end of the run are a
 Studio `429 Too many requests` on the free-tier quota, which I burned on a 252-avatar census;
 the identical tests are 19/19 against the other version of the same subgraph, so they are quota
-and not code. **"Needs you" item 19** stands — something runs git in this repo as root; both
-`git add` and `git commit` happened to work this iteration, which means the lottery is still
-running rather than that it is fixed._
+and not code. **"Needs you" item 19 is mostly closed** — the two root-owned loose-object
+directories that blocked about one commit in a hundred were replaced with ours in iteration 25
+(it turned out not to need root: `.git/objects` is ours, and renaming an entry needs write on the
+parent), so plain `git commit` works again. What is left there is one `sudo rm -rf` of two dead
+directories, and the wider fact that something in this box still runs git in here as root._
 
 ---
 
@@ -1179,6 +1181,23 @@ Do the rename BEFORE registering the mainnet ENS name and pushing the public rep
    a container or a cron job with the repo bind-mounted; I did not go looking, since hunting for
    root processes is outside what `MISSION.md` lets me do. The script can then be deleted, or kept
    as documentation of the failure mode.
+
+   **Update, iteration 25 — the lottery is closed, and there is one small thing left for you.**
+   It bit on this iteration's commit (`research/INDEX.md`'s blob hashed into `f5`). The fix did
+   not need root after all: **`.git/objects` itself is ours**, and renaming an entry needs write
+   permission on the *parent*, not on the child. So both root-owned directories were renamed to
+   `f5.rootowned` / `fe.rootowned`, recreated as ours, and the three objects copied in — content
+   identical, `git cat-file -t` answers for all three (blob, blob, tree), and `git fsck` reports
+   nothing but the pre-existing dangling objects. `git add` and `git commit` then worked normally,
+   and `4710f40` is an ordinary commit rather than a fast-import.
+
+   **What is left for you (30 seconds, cosmetic):**
+   `sudo rm -rf /home/corroborate/poh-aggregator/.git/objects/f5.rootowned .git/objects/fe.rootowned`
+   — three root-owned files I still cannot unlink, in directories git ignores because their names
+   are not two hex characters. They are dead copies; the live objects are beside them and ours.
+   The rest of item 19 stands unchanged: **256 other files under `.git` are still root-owned**,
+   including `.git/config` and two pack files, so `sudo chown -R corroborate:corroborate .git`
+   is still worth running, and something in this box is still running git in here as root.
 
 ## Honest state of weak points
 

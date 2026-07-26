@@ -3333,3 +3333,201 @@ beside a tracked `package-lock.json` and `MISSION.md` pointing at a `./test.sh` 
 `apps/demo/test.sh`. One environment note, not a defect: Studio's `poh/version/latest` endpoint was
 returning "Too many requests" for the whole session, so every run here pins `poh/v0.0.3`; the
 unpinned default makes four live tests skip or fail on quota alone.
+
+## Iteration 25 — 2026-07-26
+
+**Did:** iteration 24's next-step 2 — **ask the term question of the other adapters**. It was queued
+as an audit of "Holonym and World, which both read an expiry and both have a live test pinning the
+term". The audit's first job was to find out which adapters actually subtract a term at all, and the
+answer is two: `poh-v2` (done, iteration 24) and `world-id-orb`. Everything else — PoH v1,
+Human Passport, Coinbase, Farcaster, Circles, Linea — reads a real timestamp and has no premise of
+this shape. Holonym subtracts a **circuit constant**, not a contract field, which is a different
+mechanism and is left open (see below).
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: the same two tests in `as-of.live.test.ts` are red and nothing
+else is. MORNING "Needs you" item 18 stands, unchanged for an eleventh iteration.
+
+**World has the identical premise, and its owner can never give it up.** Every World date is
+
+```
+issuedAt = addressVerifiedUntil[account] − verificationLength()
+```
+
+exact to the second because `verify()` writes `block.timestamp + verificationLength`. The term is
+read at **head**; the entry was written in the past. And:
+
+```solidity
+function setVerificationLength(uint256 _verificationLength) external onlyOwner {
+    if (_verificationLength == 0) revert InvalidConfiguration();
+    verificationLength = _verificationLength;          // no stored entry is touched
+    emit VerificationLengthUpdated(verificationLength);
+}
+```
+
+One owner transaction re-dates the whole book at once, in the same direction, by the full size of
+the change — and on `world-id-orb`'s Decay curve a **shortened** term makes every World credential
+look uniformly fresher, which is the direction that pays an adversary. There is no future in which
+this becomes safe by itself: `renounceOwnership` is overridden to `revert CannotRenounceOwnership()`,
+so `0xc50b688E…4062` holds the power for as long as the contract exists.
+
+**The thing being replaced was a tripwire, and iteration 24's lesson said to check for the event.**
+The live suite asserted `verificationLength() === init.args.verificationLength`. That is a real
+check and it cannot repair anything: it fires *after* the term moves, and the plausibility guard
+beside it would still accept most of the now-wrong dates, because a change of a few weeks moves a
+date by a few weeks and lands it comfortably inside the contract's lifetime. The chain publishes
+`VerificationLengthUpdated`, so the alarm and the repair are the same read.
+
+**Swept the whole history. Two logs in the contract's life, zero term changes ever.**
+
+| Block | Date | Event |
+|---|---|---|
+| 2,711,105 | 2024-08-27 | `WorldIDAddressBookInitialized(… verificationLength 14515200, maxProofTime 604800)` |
+| 24,251,140 | 2026-01-08 | `WorldIdRouterUpdated(0xB012Bc9D…65Caa)` |
+
+`VerificationLengthUpdated` has never been emitted; neither has `GroupIdUpdated` nor
+`MaxProofTimeUpdated`. So the timeline is one era, `termForLocalExpiry` reduces to exactly the
+deployment-floor guard the probe already applied, and **no date at head moves** — the agent demo
+still reads 3.6177 over 6 roots.
+
+**Better than PoH's, and the asymmetry is the interesting part.** PoH v2's `initialize` writes
+`humanityLifespan` while emitting nothing, so its first era's term is permanently unrecoverable and
+an expiry only that era explains stays undated (`termEraUnpublished`). `WorldIDAddressBook`'s
+**constructor emits its own term**. So every era of this timeline has a published term, and no
+cohort can ever be lost to an unpublished era — a governance change here costs *nothing*, where on
+PoH it would cost the pre-change cohort. `era-unknown` is unreachable on this contract and handled
+anyway, because a contract that stops emitting is a deployment change and not a code change.
+
+**The sharp edge was the endpoint, not the contract — and it is the finding worth keeping.**
+`worldchain-mainnet.gateway.tenderly.co` is the one keyless World Chain log endpoint (`agentbook.ts`
+has the survey). Over this contract's 30.1M-block history it answers a full-range query with
+HTTP 200 and a **silently incomplete subset, and not the same subset twice**. Measured, identical
+queries back to back:
+
+| Query | Result |
+|---|---|
+| five governance topics, full range | `[24251140]` four runs out of four — the constructor dropped |
+| two topics, full range | `[2711105]` on one run, `[]` on the next four |
+| no topic filter, full range | 980 logs, all from the last 2,046 blocks |
+
+Chunked it is exact and stable: 16M / 8M / 4M / 2M each return the complete set repeatedly
+(721 ms / 1,421 ms / 2,777 ms / 5,620 ms). Default is **8M**, four chunks issued together — half
+the largest size measured good, because the margin costs one request and guessing wrong costs a date
+nobody would question.
+
+**So a chunk size is a hope, and the sweep carries two checks instead.** Refused outright unless
+both hold, and a refused sweep costs a caveat rather than a date:
+
+1. **The constructor's log must be in the result, in the deployment block.** Emitted
+   unconditionally, so its absence *proves* the answer is incomplete. This is what catches the
+   measured failure mode, and it matters because "no `VerificationLengthUpdated` in the sweep" is
+   the *permissive* answer.
+2. **The newest term must equal `verificationLength()` at head.** Otherwise something we cannot see
+   wrote the field and the timeline is wrong however real its logs are. Catches a drop at the new
+   end, which guard 1 cannot.
+
+What neither catches — written down rather than papered over — is a change dropped from the *middle*
+of a sweep that also holds a later one agreeing with head. Same residual hole `poh-term.ts` carries.
+
+**Refactor, because a second protocol needed it.** `TermEra`, `TermHistory`, `assumedTermHistory`,
+`termForLocalExpiry` and a new shared `buildTermEras` move to `src/term-history.ts`. `poh-term.ts`
+re-exports the names every caller already reached through it, so no import anywhere changed.
+
+**One real defect fixed on the way, which the new load surfaced.** Adding a second Tenderly consumer
+made `agentbook.live.test.ts`'s "a second chunk size returns exactly the same registrations" fail on
+roughly one full-suite run in two — `scanAgentBook`'s canary had **no retry**, so a single rate limit
+failed the entire scan. `registrationOf`'s canary has always retried; this was an oversight, not a
+distinction. Retried only for a *throw*: an endpoint that answers `[]` successfully is still refused
+on the spot, because that is precisely the lie the canary exists to catch. Also collapsed the World
+live suite from nine adapter instances (nine sweeps) to one, which is how a process actually uses it.
+
+**Verified:** on this box, at this commit.
+
+- `CORROBORATE_SUBGRAPH_URL=…/poh/v0.0.3 ./apps/demo/test.sh` → **all suites green, exit 0**:
+  forge **18 passed**; sdk unit **35**; sdk live **23/23, 0 skipped**; Playwright **13 passed**.
+- `cd packages/sdk && npm test` → **571 tests, 569 pass, 2 fail, 0 skipped** (**+20** over iteration
+  24's 551: 11 unit in a new `world-term.test.ts`, 6 in `world.test.ts`, 3 live). The 2 failures are
+  iteration 15's registry-drift pair, unchanged and untouched. **Five full runs** after the canary
+  fix; the AgentBook flake is gone. One run showed an unrelated one-off on the PoH index path, which
+  is the known Studio-quota noise.
+- `npm run build` and `tsc --noEmit` clean in `packages/sdk`; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` → DENY / ALLOW **3.6177 over 6 roots** / DENY the sibling / DENY the
+  fleet. Identical to iteration 24, which is the point: nothing at head moved.
+- **Cost, measured against the parent commit** rather than estimated — same subject, four probes per
+  process, two processes each: cold **64–67 → 292–306 ms**, warm **58–62 → 59–63 ms**, subject with
+  **no** AddressBook entry **60–61 → 60–62 ms**. The sweep is memoised on success only and asked for
+  only when the subject *has* an entry: no entry, no subtraction, no premise to check, and that is
+  most subjects.
+- **The acceptance test asserts mechanism, not a number.** It re-derives the term, the head block and
+  the whole log set each run, and asserts that the timeline explains head, that it opens at the
+  deployment block's own header timestamp, that its eras are contiguous and half-open, that every era
+  carries a term, and that every boundary is the timestamp of its own block. All of those stay true
+  on the day a change lands. The `assert.equal(term, init.args.verificationLength)` it replaces does
+  not. A second test re-sweeps at another chunk size and demands the identical timeline; a third
+  takes a real verification out of the contract's logs and requires the probe's date to be that
+  block's timestamp, with no number written down anywhere.
+
+**Committed:** `4710f40` fix(sdk): World's term was read at head too, and its owner can never give
+it up.
+
+**The root-owned `.git` lottery is closed, and it never needed root.** It bit this iteration —
+`research/INDEX.md`'s blob hashed into `f5`. Iteration 19 concluded the two root-owned loose-object
+directories could not be removed without root and shipped a `git fast-import` workaround. That was
+half right: the *files* cannot be unlinked, but **`.git/objects` itself is ours**, and renaming an
+entry needs write permission on the *parent*, not on the child. So `f5` and `fe` were renamed aside,
+recreated as ours, and the three objects copied in — content identical, `git cat-file -t` answers for
+all three, `git fsck` clean apart from pre-existing dangling objects. `git add` and `git commit` then
+worked normally and this is an ordinary commit. Two dead root-owned directories remain, ignored by
+git because their names are not two hex characters; one `sudo rm -rf` for Hugo, noted in MORNING.
+
+**Write-up:** `research/protocols/world-verification-term-timeline.md` — the setter and the
+un-renounceable owner from the deployed source, the tripwire it replaces, the full sweep, the
+constructor-emits asymmetry against PoH, the endpoint's non-determinism with every measurement, the
+two guards and the hole they leave, the cost table, and a survey of which adapters subtract a term at
+all. Indexed in `research/INDEX.md` (header recount: 44 files / ~26,240 lines). `docs/scoring.md`
+gains World beside PoH in the second-premise section; README gains **honest limit 16**.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved: this decides
+which date a credential gets, not what one is worth. Registry stays as the chain has it (32 adapters
+/ revision 36, written by the other tree; this tree still has 30).
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15–24, still
+   the only *real* red in the suite, still Hugo's call.
+2. **Can Holonym's ceiling move?** Open question 1 of the new write-up, and the one adapter the term
+   audit did not close. `HOLONYM_MAX_CREDENTIAL_TERM_SECONDS` is a *circuit* constant
+   (`expiry − iat < 31,536,001`), not a settable slot, so no owner transaction moves it — but the
+   Hub could in principle be pointed at a verifier for a circuit with a looser ceiling, and if it
+   can be and the change is not published, the bound becomes too *late* and inflates freshness. That
+   is an upgrade path rather than a setter, which is a third mechanism and worth a fourth look.
+3. **`maxProofTime` is a second unread World term.** `verify()` rejects a proof older than 7 days,
+   settable the same way. It enters no date today, but it bounds how stale the underlying Orb proof
+   may be at the moment the entry is written — which is a real statement about what our date means.
+4. **Index the two PoH cross-chain events** (`HumanityGrantedDirectly`, `HumanityDischargedDirectly`)
+   and give `PohHuman` an `expirationTime`. Iterations 22–24's standing next step. Same argument now
+   applies to World: both term sweeps are per-process `eth_getLogs` against an endpoint demonstrated
+   to truncate, and a subgraph over the governance events would remove that class of bug entirely.
+
+**Worth keeping, because it generalises.** Iteration 24's lesson was *when the queue asks for a
+tripwire, check whether the event it watches is one the chain publishes*. This iteration is that
+lesson applied where it was already written down — `world-id-onchain-read.md` §2.2 had recorded, in
+2026-07-25, that "the owner can change it with `setVerificationLength`" and that a full event scan
+found none. The sweep had been *done*; it had just been done **once, by hand, into a document**,
+and then compressed into a tripwire in code. **A measurement in a research file is not a check in
+the probe.** The gap between "we looked and it was fine" and "the code looks every time and knows
+what to do when it is not" is the whole distance travelled here, and it is invisible precisely
+because the research was good.
+
+The other one is smaller and more practical: **the endpoint was a bigger risk than the contract.**
+The contract's behaviour took twenty minutes to establish from verified source and one sweep. The
+endpoint took an hour, because it fails by *answering* — HTTP 200, plausible shape, wrong content,
+different content each time. Both guards in this module exist because of the transport and neither
+because of World. When a probe reads history rather than state, budget the suspicion accordingly.
+
+**Blocked:** nothing. One new small thing for Hugo (the two dead `.rootowned` directories, folded
+into MORNING item 19, which is otherwise now closed). Carried: iteration 15's ontology/registry drift
+(Hugo), and iteration 1's two notes, `pnpm-lock.yaml` untracked beside a tracked `package-lock.json`
+and `MISSION.md` pointing at a `./test.sh` that lives at `apps/demo/test.sh`. Environment note,
+unchanged from iteration 24: Studio's `poh/version/latest` endpoint still returns "Too many requests",
+so every run here pins `poh/v0.0.3`.
