@@ -2,6 +2,11 @@ import { createPublicClient, encodePacked, http, keccak256, parseAbi, type Publi
 import { optimism } from 'viem/chains'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
 import type { ProbeProvenance, ProvenanceNote } from '../reconcile.ts'
+import {
+  HOLONYM_HUB_SIGNER,
+  readHubSignerHistory,
+  type SignerHistory,
+} from './holonym-signer.ts'
 
 /**
  * Holonym / Human ID, read from `Hub` V3 on OP Mainnet.
@@ -48,6 +53,17 @@ import type { ProbeProvenance, ProvenanceNote } from '../reconcile.ts'
  * validation Holonym's own API performs: `[expiry, recipient, actionId, actionNullifier,
  * issuerAddress]`.
  *
+ * ## What the Hub actually checks, which is one signature
+ *
+ * `setSBT` runs no ZK verification. It `ecrecover`s a signature over its own arguments and
+ * requires the signer to equal one stored address — there is no verifier contract and no proving
+ * key bound on chain, and the contract's header says as much: *"This contract accepts a signed
+ * attestation from a certain Verifier that a ZKP has been recieved"*. So `circuitId`, the issuer
+ * in `publicValues[4]` and the expiry are all fields one off-chain service chose and signed, and
+ * every claim below rests on that key. `holonym-signer.ts` establishes which key, proves it by
+ * recovering it from real mints, and sweeps the slot's history for a rotation — the one part of
+ * this the chain will answer.
+ *
  * ## Dating a credential whose date is deliberately fuzzed
  *
  * The Hub stores no issuance timestamp — only an expiry the verifier sets — and the circuit is
@@ -56,13 +72,19 @@ import type { ProbeProvenance, ProvenanceNote } from '../reconcile.ts'
  * So the expiry is not the issuance date plus a constant. It is a value the holder picked to
  * blur exactly the question we are asking.
  *
- * What it does give us is a *proof*. `V3.circom` constrains `expiry - iat < 31,536,001` with a
- * 25-bit range check, so any SBT the Hub accepted carries a ZK guarantee that
+ * What it does give us is a *ceiling*. `V3.circom` constrains `expiry - iat < 31,536,001` with a
+ * 25-bit range check, so any SBT issued under that circuit carries the guarantee that
  *
  *     iat >= expiry - 31,536,000        (one year, in seconds)
  *
- * — the credential was issued no earlier than that. On a `Decay` curve, where weight falls with
- * age, the earliest possible issuance is the *oldest* the credential can be and therefore the
+ * — the credential was issued no earlier than that. It is a constraint the issuing service checks
+ * before it signs and not one the Hub enforces, so it is trusted exactly as far as the signature
+ * that makes the credential a credential at all, and no further: the same key that could sign a
+ * longer term could sign a credential for nobody. Every mint the chain publishes is checked
+ * against it in the live suite — `expiry - mintBlockTimestamp` is an observable lower bound on
+ * `expiry - iat`, so a term above the ceiling is falsifiable without knowing the issuance date.
+ * On a `Decay` curve, where weight falls with age, the earliest possible issuance is the *oldest*
+ * the credential can be and therefore the
  * *lowest* weight it can support. So the bound is used as the date: it can only understate
  * freshness, never inflate it, and every bit of that slack is a privacy purchase the holder made.
  * Measured against thirteen real mints on 2026-07-25, the bound sat 4–29 days before the mint for
@@ -73,9 +95,10 @@ import type { ProbeProvenance, ProvenanceNote } from '../reconcile.ts'
  * Two consequences the ontology did not record. A Holonym credential **hard-expires within a
  * year of the underlying check** — `getSBT` reverts the moment `expiry < block.timestamp` — so
  * the 730-day half-life on `holonym-gov-id` only ever applies over the first year of its life,
- * the same shape as Human Passport's 90-day expiry against a 180-day half-life. And nothing in
- * this probe touches an archive node: the whole read is two `eth_call`s at head, which leaves
- * the three keyless OP archive endpoints to the Farcaster adapter, which genuinely needs them.
+ * the same shape as Human Passport's 90-day expiry against a 180-day half-life. And the credential
+ * itself is read entirely at head: two `eth_call`s, no archive node, for every subject who does
+ * not hold one — which is almost all of them. Only a subject who *does* costs the signer sweep,
+ * because only then is there an authority to check.
  *
  * ## What the extra call buys
  *
@@ -274,9 +297,18 @@ export function interpretSbt(
 }
 
 export interface HolonymOptions {
-  /** OP Mainnet endpoint. Head-only reads, so no archive capability is required. */
+  /** OP Mainnet endpoint for the credential itself. Head-only, so no archive capability needed. */
   rpcUrl?: string
   timeoutMs?: number
+  /**
+   * Archive-capable OP Mainnet endpoints for the signing-authority sweep, which is the one read
+   * here that is about history. Defaults to `OP_ARCHIVE_RPCS`.
+   */
+  archiveRpcUrls?: readonly string[]
+  /** Interior sample points for that sweep. See `holonym-signer.ts`. */
+  signerSamples?: number
+  /** Skip the sweep entirely. The credential is still read; it carries the unverified note. */
+  checkSigner?: boolean
 }
 
 /**
@@ -309,6 +341,36 @@ export function holonymAdapters(opts: HolonymOptions = {}): AdapterProbe[] {
       })
     }
     return headInFlight
+  }
+
+  /**
+   * The signing-authority sweep, memoised **on success only** and shared by both credentials.
+   *
+   * Asked for at most once per process, and only when a subject actually holds something: a
+   * history read is the expensive part of this adapter and a subject with no SBT has no authority
+   * to check. A failed sweep is not cached, so a rate limit costs one subject its check rather
+   * than every subject in the process.
+   */
+  let sweptSigner: SignerHistory | undefined
+  let sweepInFlight: Promise<SignerHistory | undefined> | undefined
+  const signerHistory = (): Promise<SignerHistory | undefined> => {
+    if (sweptSigner) return Promise.resolve(sweptSigner)
+    if (opts.checkSigner === false) return Promise.resolve(undefined)
+    if (!sweepInFlight) {
+      sweepInFlight = readHubSignerHistory({
+        ...(opts.archiveRpcUrls ? { rpcUrls: opts.archiveRpcUrls } : {}),
+        ...(opts.signerSamples !== undefined ? { samples: opts.signerSamples } : {}),
+        ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+      })
+      sweepInFlight
+        .then((history) => {
+          if (history) sweptSigner = history
+        })
+        .finally(() => {
+          sweepInFlight = undefined
+        })
+    }
+    return sweepInFlight
   }
 
   /**
@@ -354,13 +416,15 @@ export function holonymAdapters(opts: HolonymOptions = {}): AdapterProbe[] {
       const detail: Record<string, unknown> = { ...verdict.detail }
       if (verdict.held) {
         if (verdict.issuedAt !== undefined) notes.push('date-from-expiry-and-max-term')
-        // Only meaningful for a credential we are actually counting, and it costs a call.
-        detail.uniquenessNullifierRegistered = await nullifierIsRegistered(
-          client,
-          subject,
-          credential,
-          record.publicValues![3]!,
-        )
+        // Both only meaningful for a credential we are actually counting, and both cost calls.
+        // Issued together: the nullifier read is one `eth_call` at head and the sweep is a
+        // handful of archive reads, so serialising them would add the slower one to the faster.
+        const [registered, signers] = await Promise.all([
+          nullifierIsRegistered(client, subject, credential, record.publicValues![3]!),
+          signerHistory(),
+        ])
+        detail.uniquenessNullifierRegistered = registered
+        applySignerHistory(signers, notes, detail)
       }
 
       const provenance: ProbeProvenance = {
@@ -385,6 +449,38 @@ export function holonymAdapters(opts: HolonymOptions = {}): AdapterProbe[] {
     adapterId,
     probe: (subject: Address) => probeOne(credential, subject),
   }))
+}
+
+/**
+ * Fold a completed (or failed) signer sweep into one credential's notes and detail.
+ *
+ * Pure, and exported, because the three outcomes are the whole point of the sweep and each of
+ * them is a different sentence to the person reading the score: the key has never moved, the key
+ * has moved, or we could not tell. Only the first is silent.
+ */
+export function applySignerHistory(
+  history: SignerHistory | undefined,
+  notes: ProvenanceNote[],
+  detail: Record<string, unknown>,
+): void {
+  if (!history) {
+    notes.push('attestation-authority-unverified')
+    return
+  }
+  const current = history.eras[history.eras.length - 1]!
+  detail.hubSigner = current.signer
+  detail.hubSignerSinceBlock = current.fromBlock
+  detail.hubSignerIsPinned = current.signer === HOLONYM_HUB_SIGNER
+  detail.hubSignerEras = history.eras.length
+  detail.hubSignerSampledBlocks = history.sampledBlocks.length
+  if (history.rotated) {
+    detail.hubSignerHistory = history.eras.map((e) => ({
+      signer: e.signer,
+      fromBlock: e.fromBlock,
+      ...(e.untilBlock !== undefined ? { untilBlock: e.untilBlock } : {}),
+    }))
+    notes.push('attestation-authority-rotated')
+  }
 }
 
 /**

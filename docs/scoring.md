@@ -250,6 +250,21 @@ Chain's one keyless log endpoint answers a full-range query with HTTP 200 and a 
 subset, so the sweep is chunked and refused outright unless the constructor's own log is in it and
 its newest term explains head. A sweep that did not answer costs a caveat, never a date.
 
+**Holonym's ceiling has a third shape of premise, and it turned out not to be on the chain at all.**
+A Holonym credential is dated `expiry − 31,536,000`, one year being the longest term the protocol's
+circuit permits, so the date is the earliest issuance the credential can have and its decay weight
+is a floor. The premise was that the Hub verified that constraint. It does not verify anything:
+`setSBT` `ecrecover`s a signature over its own arguments against one stored address, and stores
+whatever that key signed — the circuit id, the issuer we pin and the expiry are all fields the
+signing service chose. So the ceiling is checked *before* signing, off chain, and it stands on
+exactly the key the credential itself stands on, which is the honest sentence and is now what the
+caveat says. Two things follow that the chain *will* answer. The key lives in a storage slot with no
+getter that `changeVerifier` can replace **without emitting anything**, so it is swept from the
+constructor to head — never moved, across every block sampled — and a run that cannot sweep it says
+so rather than assuming. And the ceiling, unprovable on chain, is *falsifiable* on chain: a
+credential exists before it is minted, so `expiry − mintTimestamp` above one year would prove the
+ceiling exceeded. The largest of the 76 most recent mints is 364.969 days.
+
 Circles has no such slot, which is why the reconciler above exists.
 
 ## 5. Zero out dead protocols, then sum and take log₁₀

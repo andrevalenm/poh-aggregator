@@ -182,6 +182,24 @@ export type ProvenanceNote =
    * anything. The date stands on the assumption the check exists to test.
    */
   | 'term-origin-unverified'
+  /**
+   * The credential exists because one key signed for it, and the registry's record of which key
+   * that is has changed during its life. Nothing in the registry re-checks a stored credential, so
+   * one signed under a key that has since been rotated out reads as valid forever and the issuer
+   * pin cannot tell the difference — the issuer is a field the same signer supplied.
+   *
+   * It is the authority-side twin of `date-from-registry-import`: not a statement that this
+   * credential is wrong, a statement that the registry contains credentials attributable to more
+   * than one authority and this one is not distinguished from them without dating it.
+   */
+  | 'attestation-authority-rotated'
+  /**
+   * Whether the registry's signing authority has ever changed could not be established this run.
+   * The protocol keeps it in a storage slot with no getter and changes it without an event, so the
+   * check is a historical read that can simply fail — and a failed read is never reported as an
+   * unchanged key, for the same reason `freshness-check-unavailable` exists.
+   */
+  | 'attestation-authority-unverified'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {

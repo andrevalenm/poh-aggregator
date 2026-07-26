@@ -145,6 +145,14 @@ So the expiry is not issuance-plus-a-constant. It is a value the *holder* picked
 advised to pick it randomly, precisely to blur the question we are asking. Any adapter that
 subtracted a fixed term and called the result an issuance date would be inventing one.
 
+> **Corrected 2026-07-26.** This section says the bound is "enforced by a proof the Hub verified
+> before minting". The Hub verifies **no proof**: `setSBT` `ecrecover`s a signature against one
+> stored address and stores whatever that key signed. The constraint below is real and is checked by
+> Holonym's issuing service *before* it signs — so the bound holds exactly as far as the signature
+> that makes the credential a credential at all, and no further. See
+> [holonym-signed-not-proven.md](holonym-signed-not-proven.md), which also sweeps that key's history
+> and measures the ceiling against every mint the chain publishes.
+
 What the circuit *does* give up is a constraint, and constraints are provable:
 
 ```

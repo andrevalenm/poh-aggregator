@@ -10,6 +10,7 @@ import {
 import { optimism } from 'viem/chains'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
 import type { ProbeProvenance, ProvenanceNote } from '../reconcile.ts'
+import { OP_ARCHIVE_RPCS, rotatingArchive } from './op-archive.ts'
 
 /**
  * Farcaster account, read from the `IdRegistry` on OP Mainnet.
@@ -85,26 +86,16 @@ export const FARCASTER_ID_REGISTRY = '0x00000000Fc6c5F01Fc30151999387Bb99A9f489b
 export const FARCASTER_ID_REGISTRY_DEPLOY_BLOCK = 111_816_351n
 
 /**
- * Keyless OP Mainnet endpoints that serve archive `eth_call`, all three checked on 2026-07-25
- * and agreeing to the id on `idCounter` at historical blocks. `optimism-rpc.publicnode.com`,
- * `1rpc.io/op` and `op-pokt.nodies.app` answer at head and refuse historical state, which is
- * worse than useless here; `optimism.gateway.tenderly.co` has pruned everything past ~130 M;
- * `optimism.api.onfinality.io/public` does serve archive but rate-limits within a handful of
- * requests. None of them are listed.
+ * The keyless OP Mainnet archive endpoints, under the name this adapter has always used them by.
  *
- * Calls round-robin across the list and fail over on error, which is what makes the rate limits
- * survivable — a single search is a couple of dozen historical calls, and every one of these
- * endpoints will eventually say "your IP has exceeded its requests per second capacity".
- *
- * An endpoint that answers `0x` is not a failure: it means the registry had no code at that
- * block. An endpoint that has pruned the state *errors*, so a pruned node can never be mistaken
- * for an empty registry, which is the confusion that would silently misdate people.
+ * The list, the survey behind it and the rotation now live in `op-archive.ts`, because a second
+ * adapter reads OP history (`holonym-signer.ts`, sweeping a storage slot with no event) and which
+ * endpoints serve archive state without a key is a fact about the chain rather than about either
+ * protocol. One of the properties recorded there is what this search depends on: an endpoint that
+ * answers `0x` means the registry had no code at that block, while one that has pruned the state
+ * *errors* — so a pruned node can never be mistaken for an empty registry.
  */
-export const FARCASTER_ARCHIVE_RPCS = [
-  'https://mainnet.optimism.io',
-  'https://optimism.drpc.org',
-  'https://gateway.tenderly.co/public/optimism',
-] as const
+export const FARCASTER_ARCHIVE_RPCS = OP_ARCHIVE_RPCS
 
 /**
  * A measured ladder of `(block, idCounter)`, used only to bracket a search before it starts.
@@ -164,52 +155,16 @@ export interface FarcasterOptions {
  * subjects converges in a handful of calls rather than a dozen.
  */
 function archiveReader(rpcUrls: readonly string[], timeoutMs: number) {
-  const clients: PublicClient[] = rpcUrls.map(
-    (url) =>
-      createPublicClient({
-        chain: optimism,
-        // No transport-level retry: `tryEach` below already retries across every endpoint
-        // twice, and viem retrying underneath it would multiply the request count against
-        // exactly the rate limit the retry exists to survive.
-        transport: http(url, { timeout: timeoutMs, retryCount: 0 }),
-      }) as PublicClient,
-  )
-  if (clients.length === 0) throw new Error('farcasterAdapter needs at least one archive RPC endpoint')
+  // The rotation, the failover and the two-pass retry are `op-archive.ts`'s; the cache below is
+  // this search's, because `idCounter` at a block being immutable is a fact about this registry.
+  const { tryEach } = rotatingArchive('farcasterAdapter', rpcUrls, timeoutMs)
   /** Block -> idCounter. Immutable per block, so it is safe to keep for the process's life. */
   const counters = new Map<string, bigint>(FARCASTER_COUNTER_LANDMARKS.map(([b, c]) => [b.toString(), c]))
-  let next = 0
 
   /**
    * `null` means the registry had no code at that block. Every caller wants that as a fact
    * about the chain — "the registry did not exist yet" — and not as a failure.
    */
-  /**
-   * Try each endpoint in rotation, naming every one that failed. Naming them matters: the
-   * probe's only failure mode is "nobody answered", and a caller staring at a missing
-   * credential needs to see which endpoint let them down rather than a bare timeout.
-   */
-  async function tryEach<T>(what: string, fn: (client: PublicClient) => Promise<T>): Promise<T> {
-    const errors: string[] = []
-    // Two passes with a pause between them. The dominant failure on these endpoints is a
-    // per-second rate limit — one search is a dozen calls and `mainnet.optimism.io` does say
-    // "your IP has exceeded its requests per second capacity" — which clears in well under a
-    // second. Giving up on the first sweep would turn a hiccup into a missing credential.
-    for (let pass = 0; pass < 2; pass++) {
-      if (pass > 0) await new Promise((r) => setTimeout(r, 500))
-      for (let i = 0; i < clients.length; i++) {
-        const at = (next + i) % clients.length
-        try {
-          const result = await fn(clients[at]!)
-          next = (at + 1) % clients.length
-          return result
-        } catch (e) {
-          errors.push(`${rpcUrls[at]}: ${(e instanceof Error ? e.message : String(e)).split('\n')[0]}`)
-        }
-      }
-    }
-    throw new Error(`${what} unreadable — ${[...new Set(errors)].join('; ')}`)
-  }
-
   async function call(functionName: IdRegistryFn, args: readonly unknown[], block?: bigint): Promise<unknown | null> {
     const data = encodeFunctionData({ abi: ID_REGISTRY_ABI, functionName, args } as never)
     const at = block === undefined ? 'latest' : numberToHex(block)

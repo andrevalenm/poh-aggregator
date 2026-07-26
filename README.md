@@ -700,6 +700,26 @@ over these events would close that, and does not exist yet. Cost is ~230 ms once
 only for a subject who has an AddressBook entry at all.
 [`research/protocols/world-verification-term-timeline.md`](research/protocols/world-verification-term-timeline.md).
 
+**17. Holonym's Hub verifies a signature, not a proof — and we said otherwise.** Every Holonym
+credential is dated `expiry − 31,536,000`, the longest term the protocol's circuit permits, which
+makes the date the earliest issuance possible and the decay weight a floor. Both this file and the
+SDK's caveat said that ceiling was enforced by a proof the contract verified. It is not: `setSBT`
+`ecrecover`s a signature over its own arguments against one stored address and stores whatever that
+key signed, so the circuit id, the issuer we pin and the expiry are all fields one off-chain service
+chose. The circuits are real and their service checks them before signing; the chain records only
+the signature. **The credential is not worth less for it** — held-or-not rests on the same key, so
+the date is trusted exactly as far as the credential is — but the description was wrong and is
+fixed. Two things the chain *does* answer are now checked. The key sits in a storage slot with no
+getter, and `changeVerifier` replaces it **without emitting anything**, so no indexer can see a
+rotation: the probe sweeps the slot from the constructor's block to head and **it has never moved**
+across every block sampled. And the ceiling, unprovable on chain, is falsifiable on it — a
+credential exists before it is minted, so `expiry − mintTimestamp` above a year would prove the
+ceiling exceeded, and the largest of the 76 most recent mints is **364.969 days**. What this does
+**not** close: with no event, a key rotated in and back out *between two samples* leaves no trace at
+all, and no sampling density fixes that. Cost is ~360 ms once per process, and only for a subject
+who holds a Holonym credential.
+[`research/protocols/holonym-signed-not-proven.md`](research/protocols/holonym-signed-not-proven.md).
+
 Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 
 ---

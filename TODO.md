@@ -67,6 +67,18 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       incomplete, non-deterministic subset, so the sweep is chunked and refused unless the
       constructor's own log is in it and its newest term explains head.
       `research/protocols/world-verification-term-timeline.md`.
+- [x] **Holonym's ceiling, which was never on the chain** — shipped (iteration 26): iteration 25's
+      next step 2 asked whether the one-year ceiling every Holonym date is derived from could move.
+      Wrong shape of question — `Hub.setSBT` runs **no proof verification at all**. It `ecrecover`s
+      a signature over its own arguments against one stored address, so the circuit id, the issuer
+      we pin and the expiry are fields one off-chain service chose and signed; the ceiling is
+      checked before signing, off chain. Our write-up and our caveat both said a circuit on chain
+      enforced it. The key (`0x656D1dfb…Da01`) is established from storage slot 8 — layout proved
+      four ways — and **recovered from all 76 mints in 150,000 blocks**. `changeVerifier` is
+      `onlyOwner` with no getter and no event, so a rotation is invisible to every indexer: swept
+      constructor→head, never moved. The ceiling is falsifiable even though it is unprovable
+      (`expiry − mintTimestamp` ≤ 365 d; largest observed 364.969 d).
+      `research/protocols/holonym-signed-not-proven.md`.
 - [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.

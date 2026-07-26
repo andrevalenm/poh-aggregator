@@ -436,7 +436,7 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
   if (fromExpiry.length) {
     out.push({
       code: 'issuance-date-derived-from-expiry',
-      message: `${ids(fromExpiry)} publishes an expiry and no issuance date — deliberately, so that the expiry does not reveal when the holder was verified. The date used is the expiry minus the longest term the protocol's circuit permits, which is the earliest the credential can have been issued and therefore the oldest it can be. On a decay curve the weight here is a floor rather than an estimate.`,
+      message: `${ids(fromExpiry)} publishes an expiry and no issuance date — deliberately, so that the expiry does not reveal when the holder was verified. The date used is the expiry minus the longest term the protocol will issue a credential for, which is the earliest it can have been issued and therefore the oldest it can be. On a decay curve the weight here is a floor rather than an estimate. That ceiling is enforced by the protocol's own issuing service and not by the contract that stores the credential, so it is trusted on exactly the same footing as the credential itself.`,
     })
   }
 
@@ -471,6 +471,22 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     out.push({
       code: 'credential-issuer-unverified',
       message: `${ids(unpinned)} is counted here on a record whose issuer could not be checked this run. The protocol names the only issuer its registry accepts and we normally read the attestation behind the credential to confirm it — a credential attributed to anyone else is not counted at all. This is the case where that second read did not answer, so the credential stands on the registry's own say-so alone.`,
+    })
+  }
+
+  const rotatedAuthority = withNote('attestation-authority-rotated').filter((e) => e.held)
+  if (rotatedAuthority.length) {
+    out.push({
+      code: 'attestation-authority-rotated',
+      message: `${ids(rotatedAuthority)} exists because one key signed for it, and the registry has been set to accept a different key at some point in its life. The registry never re-checks a credential it has stored, so one signed under a key that was later replaced still reads as valid — and the issuer we pin is a field that same signer supplied, so pinning it cannot separate the two. Nothing here says this credential is one of them; it says the registry now holds credentials from more than one authority and this one has not been dated against the change.`,
+    })
+  }
+
+  const uncheckedAuthority = withNote('attestation-authority-unverified').filter((e) => e.held)
+  if (uncheckedAuthority.length) {
+    out.push({
+      code: 'attestation-authority-unverified',
+      message: `${ids(uncheckedAuthority)} is stored by a registry that accepts credentials from a single signing key, which its owner can replace without emitting anything — there is no getter and no event, so the only record of a change is the storage slot itself. We normally read that slot back through the registry's history to confirm the key has never moved, and this run could not. The credential stands; the check that the authority behind it is the one we pin did not happen.`,
     })
   }
 
