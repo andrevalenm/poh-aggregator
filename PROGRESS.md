@@ -3531,3 +3531,155 @@ into MORNING item 19, which is otherwise now closed). Carried: iteration 15's on
 and `MISSION.md` pointing at a `./test.sh` that lives at `apps/demo/test.sh`. Environment note,
 unchanged from iteration 24: Studio's `poh/version/latest` endpoint still returns "Too many requests",
 so every run here pins `poh/v0.0.3`.
+
+## Iteration 26 — 2026-07-26
+
+**Did:** iteration 25's next-step 2 — **can Holonym's ceiling move?** The queue's framing was that
+`HOLONYM_MAX_CREDENTIAL_TERM_SECONDS` is a *circuit* constant rather than a settable slot, so no
+owner transaction moves it, but the Hub could in principle be pointed at a verifier for a looser
+circuit. That is the wrong shape of question, and finding out why is the iteration.
+
+Iteration 15's #1 — reconcile the ontology with the deployed registry — was re-confirmed **still
+blocked on Hugo** before starting: the same two `as-of.live.test.ts` tests are red and nothing else
+is. MORNING "Needs you" item 18 stands, unchanged for a twelfth iteration.
+
+**The Hub verifies a signature, not a proof.** There is no verifier contract to point anywhere.
+`Hub.setSBT` is, in its entirety:
+
+```solidity
+bool success = keccak256(
+    abi.encodePacked(circuitId, sbtReciever, expiration, customFee, nullifier, publicValues, block.chainid)
+).toEthSignedMessageHash().recover(signature) == verifier;
+require(success, "The Verifier did not sign the provided arguments in the provided order");
+```
+
+`ecrecover`, against one stored address. No pairing check, no proving key bound to a circuit id, and
+`circuitId` is an opaque `bytes32` the signer chooses — as are `publicValues` and the expiry. The
+contract's own header says so in its second line (*"accepts a signed attestation from a certain
+Verifier that a ZKP has been recieved"*). Our write-up said the date rests on "a proof the Hub
+verified before minting" and the SDK's caveat said "the longest term the protocol's **circuit**
+permits". Both put the constraint on chain. It is checked off chain, before signing.
+
+**That is a correction, not a downgrade of the credential.** The same signature is the only thing
+behind held-or-not *and* behind `publicValues[4]`, the issuer we pin — that is data the signer
+supplied too. So the ceiling is trusted exactly as far as the credential itself, and the date stays:
+dropping it would leave a `Decay` credential undated, which scores it **higher**. What was wrong was
+the sentence we printed to users, and that is what changed.
+
+**Which key, established four ways and then proved.** `verifier` is `internal` — `verifier()` and
+`getVerifier()` both revert — so storage is the only read. Slot 8 by the `Ownable, ERC721URIStorage`
+layout, and every checkable consequence checked at head: slot 0 == `owner()`, slot 1 decodes to
+`"Holonym V3"` == `name()`, slot 9 == 238,713 == the token counter the live suite finds
+independently by bisecting `ownerOf`. Then the part that makes it a fact rather than a slot count:
+**every mint in the last 150,000 blocks — 76 of them — pulled from the chain's own `Transfer`
+logs, its transaction decoded, the digest rebuilt and the signer recovered. One key, 76/76**,
+`0x656D1dfb96dBd7620DE0e73FB16d2B169bb8Da01`. It has nonce 0; it only ever signs. Mints arrive via
+`HubBatch` `0xef59aC90…ee77` (unowned, permissionless, harmless because the Hub checks the
+signature), so a decoder that only knew `setSBT` would find nothing in recent history.
+
+**`changeVerifier` is `onlyOwner`, has no getter and emits nothing.** A rotation of the one key the
+whole read surface depends on leaves **no trace in any log** — no indexer can see it. It matters to
+stored credentials because the Hub never re-checks anything: an SBT signed under a key later rotated
+out reads as valid until it expires, and the issuer pin cannot separate the cases. Swept: slot 8 is
+`0x0` at 115,616,234, the code appears at 115,616,235 and the key is there in that same block and at
+every block sampled since. **Never moved**, so nothing at head changes — the third time in three
+iterations that an assumption becomes a check without a score moving.
+
+**The hole is bigger than the log sweeps' and is written down rather than papered over.** PoH's and
+World's timelines read *events*, so within a range they see every change. With no event, sampling
+proves only the blocks it reads: a change that **stuck** is caught by any straddling pair and
+bisected to the exact block, but one made and **reverted between two samples** leaves exactly the
+trace no change leaves. No density fixes that. Closing it needs a trace endpoint or a transaction
+index — both vendors.
+
+**The bisection had never run, so it is tested against the one slot here that did move.** Slot 0
+held the deployer at 115,616,235 and the operational owner from 115,616,238, six seconds later. A
+live test points the sweep at slot 0 and requires it to land on that exact block — checked against
+the `OwnershipTransferred` log sitting in it and against the slot still holding the old value one
+block earlier. Nothing written down: the block and both addresses come off the chain each run.
+
+**The ceiling is unprovable on chain and *falsifiable* on it.** A credential exists before it is
+minted, so `iat <= mint`, so `expiry - mintTimestamp <= expiry - iat` — any mint above the ceiling
+would prove the ceiling exceeded, with no knowledge of the issuance date the protocol deliberately
+hides. Over the same 76 mints the largest is **364.969 days** against a 365-day ceiling, 45 minutes
+below: the ceiling is the operative constraint, not a loose bound, so a change to it shows up here
+immediately. Now a live test over whatever mints the run finds. One mint in the sample was **already
+expired when it was minted** (by 6.5 days) — `setSBT` never compares `expiration` to
+`block.timestamp`, another place the contract does less than was assumed.
+
+**Verified:** on this box, at this commit.
+
+- `CORROBORATE_SUBGRAPH_URL=…/poh/v0.0.3 ./apps/demo/test.sh` → **all suites green, exit 0**: forge,
+  sdk unit, sdk live **23/23, 0 skipped**, Playwright **13 passed**.
+- `cd packages/sdk && npm test` → **595 tests, 593 pass, 2 fail, 0 skipped** (**+24** over iteration
+  25's 571: 18 unit in a new `holonym-signer.test.ts`, 6 live). The 2 failures are iteration 15's
+  registry-drift pair, unchanged and untouched.
+- `holonym.live.test.ts` alone: **13/13, 0 skipped**, twice.
+- `npm run build` and `tsc --noEmit` clean in `packages/sdk`; `packages/mcp` builds clean.
+- `cd apps/agent && npm start` → DENY / ALLOW **3.6151 over 5 roots** / DENY the sibling / DENY the
+  fleet. Iteration 25 recorded 3.6177 over 6; **that difference is not this change** — the parent
+  commit was run (stash, run, pop) and gives the identical 3.6151, so it is a day's decay drift plus
+  whatever moved upstream, and this change moves nothing.
+- **Cost, measured against the parent commit** — same held subject, both credentials, two processes
+  each: subject holding a credential **174 → 534 ms** cold and **132 → 141 ms** warm; subject with
+  **no** Holonym credential **56 → 56 ms**. The sweep is memoised on success only and asked for only
+  when a subject holds something: no credential, no authority to check, and that is most subjects.
+- **The acceptance tests assert mechanism.** The signer is recovered from real mints each run rather
+  than compared to a constant; the ceiling is checked against whatever mints the window holds; the
+  era boundary is checked against a log in the block it names. All stay true the day a rotation
+  lands — only the `rotated` flag changes.
+
+**Committed:** `39637cc` fix(sdk): Holonym's Hub verifies a signature, not a proof.
+
+**Write-up:** `research/protocols/holonym-signed-not-proven.md` — the deployed source, the four-way
+layout proof, the 76-mint recovery, the sweep with its guards and its hole, the ceiling measurement,
+the cost table and three open questions. `holonym-human-id-onchain-read.md` §4 gains a correction
+box. Indexed in `research/INDEX.md` (header recount: 45 files / ~26,530 lines). `docs/scoring.md`
+gains the third premise beside PoH's and World's; README gains **honest limit 17**.
+
+**Refactor, because a second adapter needed it.** `op-archive.ts` now holds the three keyless OP
+archive endpoints and the round-robin failover, moved out of `farcaster.ts` — which endpoints serve
+archive state without a key is a fact about the chain, not about either protocol.
+`FARCASTER_ARCHIVE_RPCS` still exports, so no caller changed.
+
+**No registry write, on purpose.** No weight, root, curve, half-life or cost moved: this decides what
+we *say* about a credential's authority, not what one is worth. Registry stays as the chain has it
+(32 adapters / revision 36, written by the other tree; this tree still has 30).
+
+**Next, in the order I would do it:**
+
+1. **Reconcile the ontology with the deployed registry** — unchanged from iterations 15–25, still
+   the only *real* red in the suite, still Hugo's call.
+2. **Is the issuer key itself rotatable?** Open question 2 of the new write-up. We pin two Poseidon
+   hashes transcribed from Holonym's repositories, and *nothing on chain says those are the
+   issuers* — the verifier signs whatever the circuit accepted. That is the same class of silent
+   change one level down, and the live suite's re-read off live credentials is a tripwire, not a
+   timeline. It is also the last unexamined pin in this adapter.
+3. **`maxProofTime` is a second unread World term.** Iteration 25's next-step 3, still standing:
+   `verify()` rejects a proof older than 7 days, settable the same way. It enters no date, but it
+   bounds how stale the underlying Orb proof may be when the entry is written.
+4. **Index the two PoH cross-chain events** and give `PohHuman` an `expirationTime`. Iterations
+   22–25's standing next step. Now three of the four term/authority sweeps are per-process reads
+   against public endpoints; a subgraph over them removes that whole class of fragility.
+
+**Worth keeping, because it generalises.** Iteration 25's lesson was *a measurement in a research
+file is not a check in the probe*. This one is a level underneath it: **the research file can be
+measuring the wrong thing entirely, and good research is what makes that invisible.** The Holonym
+write-up is careful, cites `V3.circom` by line, quotes the constraint, tabulates thirteen real mints
+against it — and it never asked whether the contract runs the circuit. Every check downstream
+inherited that. The tell was available for free the whole time: the deployed source is 146 lines and
+the answer is in its second comment line. **When a derivation cites a document, check that the thing
+enforcing the document is the thing you are reading.**
+
+The other one is about what to do when the answer is bad. The honest reading here could have been
+"the ceiling is unverifiable, drop the date" — and that would have been *worse*, because an undated
+`Decay` credential scores at full weight. A conservative-sounding move in the wrong direction is
+still the wrong direction; the useful question was not "can we still trust this?" but "what does the
+chain publish that would contradict it?", which turned out to be the mint block, sitting in a log.
+
+**Blocked:** nothing. Nothing new for Hugo this iteration; MORNING is untouched. Carried: iteration
+15's ontology/registry drift (Hugo), iteration 25's two dead `.rootowned` directories (one
+`sudo rm -rf`), and iteration 1's two notes, `pnpm-lock.yaml` untracked beside a tracked
+`package-lock.json` and `MISSION.md` pointing at a `./test.sh` that lives at `apps/demo/test.sh`.
+Environment note, unchanged from iterations 24–25: Studio's `poh/version/latest` still returns "Too
+many requests", so every run here pins `poh/v0.0.3`.
