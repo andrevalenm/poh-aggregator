@@ -720,6 +720,28 @@ all, and no sampling density fixes that. Cost is ~360 ms once per process, and o
 who holds a Holonym credential.
 [`research/protocols/holonym-signed-not-proven.md`](research/protocols/holonym-signed-not-proven.md).
 
+**18. We were refusing credentials without telling anyone.** Anyone can run a Holonym issuer key, so
+the issuer named inside the proof is the only thing separating a real credential from one somebody
+signed for themselves under the same circuit id — and we pin that issuer from a value transcribed
+out of Holonym's repositories, because nothing on chain declares it. The pin can be wrong in two
+directions. Too wide counts a forgery, and no read closes that. **Too narrow refuses real people**,
+one at a time: a subject holding an SBT under an issuer we do not recognise got `held: false`, no
+note, no caveat — from outside, indistinguishable from an address that holds nothing. And if the
+protocol rotates its issuing key, that refusal is *ours*, not the holder's. So the refusal is now
+audible (`credential-issuer-not-recognised`, the second caveat in the codebase deliberately **not**
+filtered on whether the credential is held), and the pin is now a measurement rather than a
+transcription: ten windows spanning the registry's whole life, every mint decoded from its calldata,
+and **every gov-id mint in every era carries the key we pin, as does every biometrics mint** — a
+denser 200,000-block sweep at head, 104 transactions, agrees exactly. The control is free and
+matters, because a pin that matched everything would be worth nothing: the two scored circuits carry
+different keys from each other, and the Hub's unscored `phone` circuit a third. At probe time a
+30,000-block census of *live* credentials says whether the pin is still the key in use, in ~450 ms,
+and only for a subject who holds or is refused something. Two transport traps found on the way and
+written down: viem's `getLogs` **silently drops a caller's `topics`** and answers with logs the
+filter excludes, and `multicall`'s `allowFailure` swallows a rate limit as per-call failures, so a
+throttled endpoint reads as a registry where nobody holds anything.
+[`research/protocols/holonym-issuer-pin.md`](research/protocols/holonym-issuer-pin.md).
+
 Full adversary analysis: [`docs/threat-model.md`](docs/threat-model.md).
 
 ---

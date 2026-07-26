@@ -200,6 +200,38 @@ export type ProvenanceNote =
    * unchanged key, for the same reason `freshness-check-unavailable` exists.
    */
   | 'attestation-authority-unverified'
+  /**
+   * The subject **does** hold a record of this credential class, and it is attributed to an issuer
+   * this package does not recognise — so it is refused rather than counted.
+   *
+   * It is the one note that describes evidence deliberately thrown away, and it exists because
+   * throwing it away silently is indistinguishable, from outside, from the subject holding nothing
+   * at all. A registry where anyone may run their own issuing key mints a self-signed credential
+   * and a real one under the same identifier, and only the issuer separates them; a subject whose
+   * credential is refused on that basis is owed the reason, and so is anyone reading the score.
+   */
+  | 'credential-issuer-not-recognised'
+  /**
+   * Live credentials of this class are being issued under a key this package does not pin.
+   *
+   * The pin is the only thing separating a real credential from a self-signed one, and it is a
+   * value copied from the protocol's own source rather than declared on chain. If the protocol
+   * rotates or adds an issuing key, the pin goes on matching nothing new and every subsequent
+   * holder is refused — quietly, one at a time. This says the chain's own live credentials no
+   * longer all agree with the pin, which is the only warning available before that happens.
+   */
+  | 'attestation-issuer-unpinned-in-use'
+  /**
+   * Whether the issuer this package pins is the one the protocol is currently issuing under could
+   * not be established this run — the sample held no live credential of this class, or the read
+   * did not answer.
+   *
+   * The credential still stands on its own issuer matching the pin; what did not happen is the
+   * check that the pin itself is still current. Reported for the same reason
+   * `attestation-authority-unverified` is: a check that did not run is never reported as a check
+   * that passed.
+   */
+  | 'attestation-issuer-uncorroborated'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {

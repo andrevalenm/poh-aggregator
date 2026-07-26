@@ -265,6 +265,20 @@ so rather than assuming. And the ceiling, unprovable on chain, is *falsifiable* 
 credential exists before it is minted, so `expiry − mintTimestamp` above one year would prove the
 ceiling exceeded. The largest of the 76 most recent mints is 364.969 days.
 
+**And one credential class can be excluded by a premise, which is the case nothing was saying out
+loud.** Holonym's issuer — `publicValues[4]`, the value that separates a real credential from one
+somebody signed for themselves under the same circuit id — is pinned from a constant transcribed out
+of the protocol's own repositories, because the chain does not declare it. A pin that is too *wide*
+counts a forgery and no read fixes that. A pin that is too *narrow* refuses a real person, and that
+was happening silently: the credential came back `held: false` with no note, so a subject whose
+evidence we discarded and a subject with no evidence produced the same result. Now the refusal
+carries `credential-issuer-not-recognised` — one of two caveats in the scorer deliberately not
+filtered on `held`, because a subject who loses a trust root to a decision of *ours* is owed the
+reason — and a census of the issuers live credentials actually carry says whether the pin is still
+the key the protocol issues under. Measured across ten windows spanning the registry's life: one
+issuer per circuit, never changed, and different keys per circuit, so a match is information rather
+than a constant everything satisfies.
+
 Circles has no such slot, which is why the reconciler above exists.
 
 ## 5. Zero out dead protocols, then sum and take log₁₀

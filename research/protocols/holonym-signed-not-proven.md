@@ -269,10 +269,14 @@ subject its check rather than every subject in the process.
    rotation is not. Whether that is worth a second sweep depends on whether an owner change should
    caveat credentials at all — the argument for is that it is the only published signal that
    anything about this authority has moved.
-2. **Is the issuer key in `publicValues[4]` itself rotatable?** We pin two Poseidon hashes
-   transcribed from Holonym's repositories. Nothing on chain says those are the issuers; the
-   verifier signs whatever the circuit accepted. A rotation there is the same class of silent change
-   one level down, and the live suite's re-read off live credentials is a tripwire, not a timeline.
+2. ~~**Is the issuer key in `publicValues[4]` itself rotatable?**~~ **Answered 2026-07-26 in
+   [holonym-issuer-pin.md](holonym-issuer-pin.md).** Yes, silently and at the protocol's discretion —
+   and the timeline the tripwire was missing now exists: ten windows from the deployment block to
+   head, every mint decoded from calldata, one issuer per circuit in every era. The larger finding
+   was not about the key. A subject holding an SBT under an *unrecognised* issuer was refused with
+   `held: false`, no note and no caveat, so a credential we threw away and a subject who had nothing
+   were the same result — and if the key ever does rotate, that refusal is ours rather than the
+   holder's.
 3. **`HubBatch` is unowned and permissionless** — anyone may call `setSBTBatch` — which is harmless
    because the Hub checks the signature, and is worth stating because it means "minted through the
    relayer" carries no authority of its own.

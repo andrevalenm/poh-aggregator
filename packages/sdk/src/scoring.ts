@@ -482,6 +482,33 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     })
   }
 
+  // Deliberately not filtered on `held`. This is the *only* note that describes evidence the
+  // aggregator threw away on purpose, and the subject it describes is holding a credential — from
+  // outside, that is indistinguishable from holding nothing unless we say so.
+  const refusedIssuer = withNote('credential-issuer-not-recognised')
+  if (refusedIssuer.length) {
+    out.push({
+      code: 'credential-issuer-not-recognised',
+      message: `This address does hold a record for ${ids(refusedIssuer)}, and it is not counted: the registry lets anyone run their own issuing key, so a credential someone signed for themselves and a real one are the same record under the same circuit identifier, and the only thing that separates them is the issuer named inside the proof. This one names an issuer we do not recognise. If the protocol has added or rotated an issuing key since we pinned it, the refusal is ours rather than the holder's — the issuers actually in use are reported alongside the credential.`,
+    })
+  }
+
+  const unpinnedIssuer = withNote('attestation-issuer-unpinned-in-use')
+  if (unpinnedIssuer.length) {
+    out.push({
+      code: 'attestation-issuer-unpinned-in-use',
+      message: `${ids(unpinnedIssuer)} is issued under a key we pin, and the registry's own recent credentials of that class are not all carrying it. The pin is copied from the protocol's source rather than declared on chain, so a protocol that adds or rotates an issuing key leaves it matching nothing new — and every holder after that is refused, one at a time, with nothing to say why. This is that warning: the chain is issuing this credential under at least one key we do not have.`,
+    })
+  }
+
+  const uncorroboratedIssuer = withNote('attestation-issuer-uncorroborated').filter((e) => e.held)
+  if (uncorroboratedIssuer.length) {
+    out.push({
+      code: 'attestation-issuer-uncorroborated',
+      message: `${ids(uncorroboratedIssuer)} names an issuer inside its proof, and this credential's issuer is the one we pin — what could not be confirmed this run is that the pin is still the key the protocol issues under. We normally read the issuer off the registry's own recent credentials to check, and this run found none of that class in the window or could not read them. The credential stands; the check that the pin has not gone stale did not happen.`,
+    })
+  }
+
   const uncheckedAuthority = withNote('attestation-authority-unverified').filter((e) => e.held)
   if (uncheckedAuthority.length) {
     out.push({

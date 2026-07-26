@@ -60,6 +60,7 @@ import {
   HOLONYM_HUB_VERIFIER_SLOT,
   readHubSignerHistory,
 } from './holonym-signer.ts'
+import { issuerHex, issuerPinVerdict, readIssuerCensus } from './holonym-issuer.ts'
 // The three keyless OP Mainnet endpoints that serve archive state. The credential read needs
 // none of them; confirming a date against history, and asking whether the Hub's signing key has
 // ever moved, both do.
@@ -567,12 +568,22 @@ describe('Holonym Hub V3 signing authority (live, OP Mainnet)', () => {
       assert.equal(before!.untilBlock, after!.fromBlock)
 
       // The boundary is a claim about one block, and the chain publishes the same claim as a log.
-      const transfers = await archive.getLogs({
-        address: HOLONYM_HUB_V3,
-        fromBlock: BigInt(after!.fromBlock),
-        toBlock: BigInt(after!.fromBlock),
-        topics: [OWNERSHIP_TRANSFERRED_TOPIC],
-      })
+      //
+      // `request` and not `getLogs`: viem's action takes its filter from `event`/`events`/`args`
+      // and silently drops a caller-supplied `topics` array (2.55.8), so this asked for one
+      // ownership transfer and was being handed every log the Hub emitted in the block. It passed
+      // because the block holds nothing else — an assertion resting on a coincidence.
+      const transfers = (await archive.request({
+        method: 'eth_getLogs',
+        params: [
+          {
+            address: HOLONYM_HUB_V3,
+            fromBlock: numberToHex(after!.fromBlock),
+            toBlock: numberToHex(after!.fromBlock),
+            topics: [OWNERSHIP_TRANSFERRED_TOPIC],
+          } as never,
+        ],
+      })) as Log[]
       assert.equal(transfers.length, 1, 'the block the sweep named holds no ownership transfer')
       assert.equal(`0x${transfers[0]!.topics[1]!.slice(26)}`, before!.signer)
       assert.equal(`0x${transfers[0]!.topics[2]!.slice(26)}`, after!.signer)
@@ -615,6 +626,188 @@ describe('Holonym Hub V3 signing authority (live, OP Mainnet)', () => {
   })
 })
 
+/**
+ * The issuer pin, held against the issuers the chain is actually using.
+ *
+ * `publicValues[4]` is the only thing separating a real credential from one somebody signed for
+ * themselves under the same circuit id, and the two values this package pins were *transcribed
+ * from Holonym's repositories* — nothing on chain declares them. So the pin can go stale silently:
+ * a protocol that rotates or adds an issuing key leaves it matching nothing new, and every holder
+ * after that is refused one at a time.
+ *
+ * These tests read the issuer off real credentials rather than compare it to a constant, in two
+ * populations that fail differently. The **timeline** decodes mints from the deployment block to
+ * head, which is the only way to see the issuer of a credential that has since expired — `getSBT`
+ * reverts once it has. The **census** is what the probe itself runs: live credentials at head,
+ * cheap enough to be a check rather than a research note. Neither writes down a number the run
+ * does not re-derive.
+ */
+describe('Holonym Hub V3 issuer pin (live, OP Mainnet)', () => {
+  /** Ten windows, evenly spread. Enough to put one in the Hub's first days and one at head. */
+  const TIMELINE_WINDOWS = 10
+  const TIMELINE_SPAN = 30_000
+
+  test('every mint in the registry’s life carries the issuer this package pins', async (t) => {
+    await onChain(t, 'issuer timeline', async () => {
+      const headBlock = Number(await head.getBlockNumber())
+      const span = headBlock - HOLONYM_HUB_DEPLOY_BLOCK - TIMELINE_SPAN
+      const byCircuit = new Map<string, Map<string, number>>()
+      const eras: { block: number; mints: number }[] = []
+
+      for (let i = 0; i < TIMELINE_WINDOWS; i++) {
+        const start = HOLONYM_HUB_DEPLOY_BLOCK + Math.round((span * i) / (TIMELINE_WINDOWS - 1))
+        const logs: Log[] = []
+        for (let off = 0; off < TIMELINE_SPAN; off += 10_000) {
+          try {
+            logs.push(...(await mintLogsIn(BigInt(start + off), BigInt(start + off + 9_999))))
+          } catch {
+            // One window failing is a throttled endpoint, not a finding. The assertions below
+            // require enough windows to have answered, so a sweep that mostly failed skips.
+          }
+        }
+        // Capped per window so a busy era does not turn into a thousand `getTransaction` calls;
+        // the cap is reported below rather than left implicit.
+        const mints = await decodeMints(logs.slice(0, 24))
+        if (mints.length === 0) continue
+        eras.push({ block: start, mints: mints.length })
+        for (const mint of mints) {
+          if (mint.publicValues.length < 5) continue
+          const forCircuit = byCircuit.get(mint.circuitId) ?? new Map<string, number>()
+          const issuer = issuerHex(mint.publicValues[4]!)
+          forCircuit.set(issuer, (forCircuit.get(issuer) ?? 0) + 1)
+          byCircuit.set(mint.circuitId, forCircuit)
+        }
+      }
+
+      if (eras.length < 4) {
+        t.skip(`only ${eras.length} of ${TIMELINE_WINDOWS} windows answered`)
+        return
+      }
+      // The oldest window must be the Hub's own first: an issuer timeline that does not reach the
+      // constructor cannot say the first era used the key we pin, only that some era did.
+      assert.equal(eras[0]!.block, HOLONYM_HUB_DEPLOY_BLOCK, 'the timeline must start where the Hub does')
+
+      for (const [adapterId, credential] of Object.entries(HOLONYM_CREDENTIALS)) {
+        const seen = byCircuit.get(credential.circuitId)
+        if (!seen) continue
+        const pin = issuerHex(credential.issuer)
+        const strangers = [...seen.keys()].filter((k) => k !== pin)
+        assert.deepEqual(
+          strangers,
+          [],
+          `${adapterId} was minted under ${strangers.join(', ')} as well as the pinned ${pin} — the pin is too narrow and real holders are being refused`,
+        )
+        assert.ok(seen.get(pin)! > 0)
+      }
+      assert.ok(byCircuit.size >= 2, `only ${byCircuit.size} circuit(s) seen across ${eras.length} windows`)
+
+      // The control. A pin that matched every circuit would prove nothing about any of them, so
+      // the run has to show that this field varies — `phone` and `clean-hands` are minted by the
+      // same Hub under keys of their own, and the two scored circuits differ from each other.
+      const keys = [...byCircuit.values()].flatMap((m) => [...m.keys()])
+      assert.equal(new Set(keys).size, keys.length, 'an issuer key appears on more than one circuit')
+    })
+  })
+
+  test('the census reads the issuers live credentials are carrying, and the pin is among them', async (t) => {
+    await onChain(t, 'issuer census', async () => {
+      const census = await readIssuerCensus()
+      if (!census) {
+        t.skip('no live credential of either scored class in the census window')
+        return
+      }
+      assert.ok(census.holders > 0)
+      assert.ok(census.credentials > 0)
+      assert.ok(census.fromBlock < census.headBlock)
+
+      for (const [adapterId, credential] of Object.entries(HOLONYM_CREDENTIALS)) {
+        const verdict = issuerPinVerdict(census, credential, adapterId)
+        // `uncorroborated` is allowed and means the window held none of this class — a sparse
+        // class must not be able to redden this. What may not happen is the chain issuing this
+        // credential under a key we do not have, which is `unpinned-issuer-in-use` either way.
+        assert.notEqual(
+          verdict.status,
+          'unpinned-issuer-in-use',
+          `${adapterId} live under ${JSON.stringify(verdict.unpinned)} as well as the pin`,
+        )
+        assert.notEqual(
+          verdict.status,
+          'pin-not-in-use',
+          `${adapterId} is live only under ${JSON.stringify(verdict.unpinned)} — the pin has gone stale`,
+        )
+      }
+      if (census.discriminates !== undefined) {
+        assert.equal(census.discriminates, true, 'the two scored classes share an issuer key')
+      }
+    })
+  })
+
+  test('a holder’s score carries the census, and an address holding nothing does not pay for one', async (t) => {
+    await onChain(t, 'census in the probe', async () => {
+      const top = await highestTokenId()
+      const holder = await findHolder(HOLONYM_CREDENTIALS['holonym-gov-id']!, top)
+      if (!holder) {
+        t.skip('no current gov-id holder found')
+        return
+      }
+      const r = await probeFor('holonym-gov-id').probe(holder.address)
+      assert.equal(r.held, true)
+      assert.equal(r.detail?.['issuerPin'], issuerHex(HOLONYM_CREDENTIALS['holonym-gov-id']!.issuer))
+      assert.ok(
+        r.detail?.['issuerPinStatus'] === 'corroborated' ||
+          r.detail?.['issuerPinStatus'] === 'uncorroborated',
+        `unexpected pin status ${String(r.detail?.['issuerPinStatus'])}`,
+      )
+      assert.ok(!r.provenance?.notes.includes('attestation-issuer-unpinned-in-use'))
+      assert.ok(!r.provenance?.notes.includes('credential-issuer-not-recognised'))
+
+      const absent = await probeFor('holonym-gov-id').probe(NO_CREDENTIAL)
+      assert.equal(absent.held, false)
+      assert.equal(absent.detail?.['issuerPin'], undefined)
+      assert.deepEqual(absent.provenance?.notes, [])
+    })
+  })
+
+  test('a refused credential says so — the same read, with the pin moved', async (t) => {
+    await onChain(t, 'refusal is audible', async () => {
+      const top = await highestTokenId()
+      const holder = await findHolder(HOLONYM_CREDENTIALS['holonym-gov-id']!, top)
+      if (!holder) {
+        t.skip('no current gov-id holder found')
+        return
+      }
+      // A real, live, held credential on the real chain, probed against a pin that is one bit
+      // away from the true issuer. This is what a rotation looks like from here — the same read,
+      // the same holder, and a key we do not have — and the point of the test is that the score
+      // stops being able to pass over it in silence.
+      const real = HOLONYM_CREDENTIALS['holonym-gov-id']!
+      const [refusing] = holonymAdapters({
+        credentials: { 'holonym-gov-id': { ...real, issuer: real.issuer ^ 1n } },
+      })
+      const r = await refusing!.probe(holder.address)
+
+      assert.equal(r.held, false)
+      assert.equal(r.error, undefined, 'a refusal is a verdict, not a failed read')
+      assert.equal(r.detail?.['sbt'], 'issuer-mismatch')
+      assert.equal(r.detail?.['issuerInProof'], issuerHex(real.issuer))
+      assert.ok(
+        r.provenance?.notes.includes('credential-issuer-not-recognised'),
+        `a refused credential must be reported: ${JSON.stringify(r.provenance?.notes)}`,
+      )
+      // And the census that ran alongside it names the key actually in use, which is the
+      // difference between "you hold nothing" and "we do not recognise who signed for you".
+      if (r.detail?.['issuerPinStatus'] !== 'uncorroborated') {
+        assert.equal(r.detail?.['issuerPinStatus'], 'pin-not-in-use')
+        const unpinned = r.detail?.['unpinnedIssuers'] as { issuer: string }[]
+        assert.ok(
+          unpinned.some((u) => u.issuer === issuerHex(real.issuer)),
+          `the census should name the real issuer as the one in use: ${JSON.stringify(unpinned)}`,
+        )
+      }
+    })
+  })
+})
+
 interface DecodedMint {
   txHash: string
   block: number
@@ -644,16 +837,40 @@ async function recentMints(): Promise<DecodedMint[]> {
   const logs: Log[] = []
   for (let chunk = 0; chunk < 6 && logs.length < 6; chunk++) {
     const to = headBlock - BigInt(chunk * 10_000)
-    logs.push(
-      ...(await archive.getLogs({
-        address: HOLONYM_HUB_V3,
-        fromBlock: to - 9_999n,
-        toBlock: to,
-        topics: [TRANSFER_TOPIC, `0x${'0'.repeat(64)}`],
-      })),
-    )
+    logs.push(...(await mintLogsIn(to - 9_999n, to)))
   }
+  mintCache = await decodeMints(logs)
+  return mintCache
+}
 
+/**
+ * Mint `Transfer`s in a block range, filtered by the node and re-checked here.
+ *
+ * `request` rather than viem's `getLogs` action: the action takes its filter from
+ * `event`/`events`/`args` and silently drops a caller-supplied `topics` array (2.55.8), so every
+ * call here was going out unfiltered and coming back with every log the Hub emitted — twice the
+ * rows and a `getTransaction` for each. The client-side re-check stays regardless, because an
+ * endpoint that loosens a filter fails by answering rather than by erroring.
+ */
+async function mintLogsIn(from: bigint, to: bigint): Promise<Log[]> {
+  const logs = (await archive.request({
+    method: 'eth_getLogs',
+    params: [
+      {
+        address: HOLONYM_HUB_V3,
+        fromBlock: numberToHex(from),
+        toBlock: numberToHex(to),
+        topics: [TRANSFER_TOPIC, `0x${'0'.repeat(64)}`],
+      } as never,
+    ],
+  })) as Log[]
+  return logs.filter(
+    (l) => l.topics.length === 4 && l.topics[0] === TRANSFER_TOPIC && /^0x0{64}$/.test(l.topics[1]!),
+  )
+}
+
+/** The arguments behind a set of mint logs, from the transactions that produced them. */
+async function decodeMints(logs: readonly Log[]): Promise<DecodedMint[]> {
   const timestamps = new Map<string, number>()
   const mints: DecodedMint[] = []
   const seen = new Set<string>()
@@ -700,6 +917,5 @@ async function recentMints(): Promise<DecodedMint[]> {
       })
     }
   }
-  mintCache = mints
   return mints
 }
