@@ -537,17 +537,17 @@ person.isHuman(Thresholds.standard)</code></pre>
           <svg><rect width="100%" height="32" fill="url(#calcada)" /></svg>
         </div>
 
-        <h3 class="reveal">One track each, and why we would win it</h3>
+        <h3 class="reveal">How each sponsor's product is used here</h3>
         <p class="reveal">
-          Three sponsors is the limit and one track per sponsor is the rule, so these are choices
-          rather than a spread. Each is the track where our integration is load-bearing — take
-          that sponsor's product out and the thing stops working, rather than losing a feature.
-          Every claim below opens into the artifact that proves it.
+          Three integrations, one per sponsor. The test we held ourselves to was whether the
+          product is load-bearing: remove it and this stops working, rather than losing a feature.
+          Each panel below opens into the contracts, endpoints and source files, so none of this
+          has to be taken on trust.
         </p>
 
         <div class="sponsor-tracks">
           <article class="sponsor-card reveal" id="track-world">
-            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/world.svg" alt="" width="18" height="18" /> World · $8,000</p>
+            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/world.svg" alt="" width="18" height="18" /> World</p>
             <h4>AgentKit — New Use Cases</h4>
 
             <p class="sponsor-claim">
@@ -585,34 +585,49 @@ person.isHuman(Thresholds.standard)</code></pre>
             </dl>
 
             <details class="receipts">
-              <summary>Technical detail and receipts</summary>
+              <summary>Open the implementation detail</summary>
               <ul>
                 <li>
-                  <code>lookupHuman(address)</code> on AgentBook, World Chain —
+                  <strong>The read.</strong> <code>lookupHuman(address)</code> on AgentBook,
+                  World Chain —
                   <a href="https://worldscan.org/address/0xA23aB2712eA7BBa896930544C7d6636a96b944dA" rel="noopener">0xA23aB271…b944dA</a>.
-                  A plain <code>eth_call</code>: no API key, no relying-party registration, no
-                  user interaction, nothing that can rate-limit us or be switched off. That
-                  permissionlessness is why World is in the roster — every adapter here has to be
-                  readable without the issuer's cooperation.
+                  A plain <code>eth_call</code> returning the Orb-verified human id for any
+                  address: no API key, no relying-party registration, no user interaction. That
+                  is why World is in the roster at all — every adapter here has to be readable
+                  without the issuer's cooperation, so that nothing we publish can be
+                  rate-limited or switched off later.
+                  <a href="https://github.com/andrevalenm/poh-aggregator/blob/main/packages/sdk/src/adapters/world.ts" rel="noopener">adapters/world.ts</a>
                 </li>
                 <li>
-                  Fleet detection indexes AgentBook's registration events chain-wide, so the cap
-                  is enforced against every agent a human has registered, not just the ones that
-                  happen to show up.
+                  <strong>The fleet cap.</strong> AgentBook registration events are indexed
+                  chain-wide, so the limit is enforced against every agent a human has ever
+                  registered — not only the ones that happen to appear in a session. Without
+                  that sweep a farm just presents a fresh agent each time.
+                  <a href="https://github.com/andrevalenm/poh-aggregator/blob/main/packages/sdk/src/fleet.ts" rel="noopener">fleet.ts</a>
                 </li>
                 <li>
-                  World appears three times in the ontology on three <em>different</em> trust
-                  roots — Orb (iris), document tier (passport chip), Selfie Check (liveness) — and
-                  the document tier deliberately shares its root with ZKPassport, Self and Rarimo,
-                  so holding several of them counts once.
+                  <strong>The handshake.</strong> A real AgentKit resource server, not a mock:
+                  request → HTTP 402 with the <code>agentkit</code> extension → signed CAIP-122
+                  challenge → retry. One implementation note worth passing back — AgentKit
+                  compares the SIWE <code>domain</code> against the URL hostname while the payload
+                  carries host:port, so a dev server on a non-80 port is rejected with "Domain
+                  mismatch" unless you follow its convention.
+                  <a href="https://github.com/andrevalenm/poh-aggregator/blob/main/apps/agent/src/counterparty/server.js" rel="noopener">counterparty/server.js</a>
                 </li>
-                <li>Run it: <code>cd apps/agent &amp;&amp; npm start</code> prints the full verdict trace.</li>
+                <li>
+                  <strong>Where World sits in the ontology.</strong> Three entries on three
+                  different trust roots — Orb (iris), document tier (passport chip), Selfie Check
+                  (liveness). The document tier deliberately shares its root with ZKPassport,
+                  Self and Rarimo, so a subject holding all four is counted once. That is the
+                  saturation rule applied to a sponsor's own product rather than around it.
+                </li>
+                <li>Reproduce: <code>cd apps/agent &amp;&amp; npm start</code> prints the verdict trace for all three agents.</li>
               </ul>
-            </details>
+              </details>
           </article>
 
           <article class="sponsor-card reveal" id="track-graph">
-            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/thegraph.svg" alt="" width="18" height="18" /> The Graph · $3,000</p>
+            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/thegraph.svg" alt="" width="18" height="18" /> The Graph</p>
             <h4>Best AI Use Case of The Graph</h4>
 
             <p class="sponsor-claim">
@@ -649,35 +664,60 @@ person.isHuman(Thresholds.standard)</code></pre>
             </dl>
 
             <details class="receipts">
-              <summary>Technical detail and receipts</summary>
+              <summary>Open the implementation detail</summary>
               <ul>
                 <li>
-                  <strong>Protocol subgraph</strong> (Subgraph Studio, Gnosis) —
+                  <strong>Protocol subgraph</strong> — Subgraph Studio, Gnosis:
                   <a href="https://api.studio.thegraph.com/query/77602/poh/version/latest" rel="noopener">api.studio.thegraph.com/query/77602/poh</a>.
-                  Supplies issuance dates, revocations and Circles trust-graph position.
+                  Supplies issuance dates, revocations, and Circles trust-graph position. Query
+                  <code>{ _meta { block { number } hasIndexingErrors } }</code> to see it live.
                 </li>
                 <li>
-                  <strong>Registry audit-trail subgraph</strong>, self-hosted <code>graph-node</code> —
+                  <strong>Registry audit-trail subgraph</strong> — a self-hosted
+                  <code>graph-node</code> indexing our own contract:
                   <a href="http://37.27.67.44:8100/subgraphs/name/corroborate-registry" rel="noopener">37.27.67.44:8100</a>.
-                  Every weight the ontology has ever assigned, each with its source and block. Two
-                  Graph products, one SDK.
+                  Every weight the ontology has ever assigned, each with the source it was derived
+                  from and the block it landed in. Two Graph products, consumed by one SDK.
                 </li>
                 <li>
-                  The registry it indexes is on Sepolia at
+                  <strong>What it indexes.</strong> The registry on Sepolia —
                   <a href="https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07" rel="noopener">0x977b028b…60aa07</a>,
-                  revision 44 — <span data-count="catalogued">32</span> adapters over
-                  <span data-count="roots">19</span> trust roots.
+                  revision 44, <span data-count="catalogued">32</span> adapters over
+                  <span data-count="roots">19</span> trust roots. The counts on this page are read
+                  from that contract at page load, not typed into the copy.
                 </li>
                 <li>
-                  Reusable, not a one-off: <code>npm i @printid/sdk</code> and
-                  <code>npx @printid/mcp</code>, both open source.
+                  <strong>Why an indexer and not an RPC.</strong> A contract answers whether a
+                  credential exists. It cannot say when it was issued, whether it has since been
+                  revoked, or where an account sits in a trust graph — and each of those changes
+                  the answer. Proof of Humanity
+                  (<a href="https://gnosisscan.io/address/0xa4AC94C4fa65Bb352eFa30e3408e64F72aC857bc" rel="noopener">Gnosis</a>)
+                  took roughly 95% of its lifetime registrations inside one four-month airdrop
+                  window, so on that registry age <em>is</em> the signal. Remove the subgraph and
+                  a vouched credential falls back to a flagged 0.5 midpoint — never to full
+                  weight, because otherwise making our indexer unreachable would be profitable.
+                  <a href="https://github.com/andrevalenm/poh-aggregator/blob/main/packages/sdk/src/scoring.ts" rel="noopener">scoring.ts</a>
+                </li>
+                <li>
+                  <strong>The query only an indexer makes possible.</strong> As-of scoring:
+                  reconstruct the ontology <em>and</em> credential state at a past block, so an
+                  audit trail becomes executable rather than merely published. It refuses to
+                  degrade — with no registry subgraph configured it throws instead of answering a
+                  question about the past using today's weights.
+                  <a href="https://github.com/andrevalenm/poh-aggregator/blob/main/packages/sdk/src/as-of.ts" rel="noopener">as-of.ts</a>
+                </li>
+                <li>
+                  <strong>The AI surface.</strong> An MCP server exposing this to any agent:
+                  look up a subject, test a policy, explain the trust roots, audit a weight's
+                  history. <code>npx @printid/mcp</code>.
+                  <a href="https://github.com/andrevalenm/poh-aggregator/blob/main/packages/mcp/src/server.ts" rel="noopener">mcp/src/server.ts</a>
                 </li>
               </ul>
-            </details>
+              </details>
           </article>
 
           <article class="sponsor-card reveal" id="track-ens">
-            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/ens.svg" alt="" width="18" height="18" /> ENS · $1,500</p>
+            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/ens.svg" alt="" width="18" height="18" /> ENS</p>
             <h4>Best ENS Integration for AI Agents</h4>
 
             <p class="sponsor-claim">
@@ -719,32 +759,51 @@ person.isHuman(Thresholds.standard)</code></pre>
             </dl>
 
             <details class="receipts">
-              <summary>Technical detail and receipts</summary>
+              <summary>Open the implementation detail</summary>
               <ul>
                 <li>
-                  <code>print.eth</code> on Sepolia, resolver
-                  <a href="https://sepolia.etherscan.io/address/0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5" rel="noopener">0xE99638b4…BBE49b5</a>,
-                  with live agent subnames <code>alpha.print.eth</code> and
-                  <code>beta.print.eth</code>. Nothing is hard-coded: every field resolves from
-                  Sepolia and can be opened in any ENS app.
+                  <strong>The name tree, live on Sepolia.</strong>
+                  <code>print.eth</code> with agent subnames <code>alpha.print.eth</code> and
+                  <code>beta.print.eth</code> —
+                  <a href="https://app.ens.domains/print.eth" rel="noopener">open it in the ENS app</a>.
+                  Resolver
+                  <a href="https://sepolia.etherscan.io/address/0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5" rel="noopener">0xE99638b4…BBE49b5</a>.
+                  Nothing is hard-coded: every field is read from the resolver at lookup time.
                 </li>
                 <li>
-                  Each agent subname records its backing human; the parent records the
-                  acknowledgement. The counterparty resolves the name, reads both directions, then
-                  scores the human before agreeing to anything.
+                  <strong>The binding is bidirectional, and that is the point.</strong> The
+                  agent's subname names its backing human; the human's name acknowledges that
+                  agent back. One direction alone would let anyone point a subname at a
+                  well-credentialled stranger and inherit their standing — so the counterparty
+                  reads both sides before it agrees to anything.
+                  <a href="https://github.com/andrevalenm/poh-aggregator/blob/main/packages/sdk/src/ens-agents.ts" rel="noopener">ens-agents.ts</a>
                 </li>
                 <li>
-                  ENSIP-26 (<a href="https://docs.ens.domains/ensip/26/" rel="noopener">agent text records</a>)
-                  and ENSIP-25 (<a href="https://docs.ens.domains/ensip/25/" rel="noopener">agent registry verification</a>)
-                  are both drafts. We would like the human-binding record to become the third in
-                  that series, and we have a proposal ready.
+                  <strong>The gap, in ENS's own drafts.</strong>
+                  <a href="https://docs.ens.domains/ensip/26/" rel="noopener">ENSIP-26</a>
+                  defines <code>agent-context</code> and
+                  <code>agent-endpoint[&lt;protocol&gt;]</code> — how to find an agent and how to
+                  talk to it — and specifies no human binding at all.
+                  <a href="https://docs.ens.domains/ensip/25/" rel="noopener">ENSIP-25</a> attests
+                  that a name controls a registry entry, which is name-to-registration, not
+                  name-to-person. Both are drafts; the record described above is the piece
+                  neither covers.
                 </li>
                 <li>
-                  Public source:
-                  <a href="https://github.com/andrevalenm/poh-aggregator" rel="noopener">github.com/andrevalenm/poh-aggregator</a>.
+                  <strong>Humans are plural too.</strong> A <code>print.subjects</code> text
+                  record lets a person declare their own wallet set — which real people need,
+                  since Proof of Humanity's own Circles proxy puts one person's credentials on two
+                  different addresses. It is self-asserted and the result says so; correlated
+                  credentials still saturate across the declared set, so naming more wallets
+                  cannot inflate anything.
+                </li>
+                <li>
+                  Source:
+                  <a href="https://github.com/andrevalenm/poh-aggregator" rel="noopener">github.com/andrevalenm/poh-aggregator</a>
+                  · packages on npm as <code>@printid/sdk</code> and <code>@printid/mcp</code>.
                 </li>
               </ul>
-            </details>
+              </details>
           </article>
         </div>
 
