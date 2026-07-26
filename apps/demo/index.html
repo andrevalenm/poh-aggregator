@@ -72,10 +72,13 @@
     <section class="manifesto" id="manifesto" aria-label="Why">
       <canvas class="contour-layer" data-contours="2" data-parallax="0.1" aria-hidden="true"></canvas>
       <div class="wash wash-sage" data-parallax="0.18" aria-hidden="true"></div>
-      <p class="beat reveal">Forty protocols will swear a wallet is human.</p>
       <p class="beat reveal">
-        Integrating one is a week. Integrating all of them is a quarter — and they still
-        disagree, because most of them are quietly reading the same passport.
+        You need to know a real person is there. You do not need their passport, and you
+        should not want it.
+      </p>
+      <p class="beat reveal">
+        Print reads forty proof of humanity protocols through one API and answers that
+        single question.
       </p>
       <p class="beat reveal">
         So you need a rule for combining them. Every rule that adds credentials up pays the
@@ -135,9 +138,9 @@
               public chains, scoring in your process.
             </p>
             <div class="command-block">
-              <pre><code id="sdk-install">npm install @print/sdk</code><button class="copy-btn" data-copy="npm install @print/sdk" aria-label="Copy install command">copy</button></pre>
+              <pre><code id="sdk-install">npm install @printid/sdk</code><button class="copy-btn" data-copy="npm install @printid/sdk" aria-label="Copy install command">copy</button></pre>
             </div>
-            <pre class="code-sample"><code><span class="tk">import</span> { Print, Thresholds } <span class="tk">from</span> <span class="ts">'@print/sdk'</span>
+            <pre class="code-sample"><code><span class="tk">import</span> { Print, Thresholds } <span class="tk">from</span> <span class="ts">'@printid/sdk'</span>
 
 <span class="tk">const</span> person = <span class="tk">await new</span> Print().resolve(<span class="ts">'name.eth'</span>)
 person.score            <span class="tc">// log₁₀ of adversary cost</span>
