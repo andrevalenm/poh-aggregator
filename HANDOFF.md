@@ -85,9 +85,12 @@ Ask for it again if needed.
 
 - Landing and console run locally: `pnpm -C <repo> --filter @print/demo dev`, port 5173.
 - **304 unit tests pass.**
-- **14 tests are RED** — all in `packages/sdk/src/ens-agents.live.test.ts`, purely because
-  `print.eth` does not exist on Sepolia. Not a regression; proven by running the same file
-  against a pristine worktree at the pre-rename HEAD, where it passed 14/14.
+- **302 pass / 2 fail.** The 2 are in `packages/sdk/src/live.test.ts`, read the Circles/PoH
+  subgraph, and are unrelated to ENS. Both assert an avatar registered *before* the subgraph's
+  indexing window, but the subgraph has since been redeployed or backfilled with earlier
+  coverage, so it now sees that event and the premise is stale. Fix is on the data side —
+  repoint the tests at an avatar genuinely outside the window, or narrow the subgraph's start
+  block. Do not "fix" the assertions.
 - Credentials: `.env.local` in the repo (gitignored, mode 600). Backup and the original
   `README-CREDS.md` are at `~/.corroborate-secrets/`. **Verified: none of the four real
   secrets appear anywhere in git history.** Deployer holds ~1.54 SepoliaETH.
@@ -96,16 +99,20 @@ Ask for it again if needed.
 
 ## Open items
 
-**1. ENS re-registration on Sepolia — do this first.** Turns the 12 red tests green, costs
-nothing, and a judge who clones the repo currently sees a failing suite. It is *three* things,
-not one:
-   - Register `print.eth` plus subnames `alpha.`, `beta.`, `unverified.`
-   - **Re-set the text records under the new keys** — the rename changed them from
-     `corroborate.{human,agents,subjects}` to `print.{human,agents,subjects}`
-     (`packages/sdk/src/ens-agents.ts:64-68`). Registering the names alone will not fix the tests.
-   - Regenerate `deployments/ens-sepolia.json` (namehashes were recomputed offline and are
-     correct, but `owner`/`expires` still describe the old registration).
-   Scripts live at `scripts/ens-*.mjs`. Nothing on-chain was run this session.
+**1. ENS — DONE.** `print.eth` plus `alpha.`, `beta.`, `unverified.` are registered on Sepolia
+with records under the `print.{human,agents,subjects}` keys, and `deployments/ens-sepolia.json`
+is regenerated from chain reads. `ens-agents.live.test.ts` is 14/14 green.
+
+Two things to know. Registration on Sepolia is **free and instant** — the `.eth` registrar
+authorises `TestnetV1PremigrationRegistrar` (`0xdF60…7078`), so there is no commit-reveal and no
+price oracle; `ens-register.mjs` and `ens-register2.mjs` target the ETH-priced controller and are
+now dead ends, use `scripts/ens-agents-setup.mjs`. And the agent keypairs were regenerated
+because `.env.local` no longer held the old ones, so the agent addresses differ from the
+`corroborate.eth` era and those old keys are unrecoverable.
+
+`unverified.print.eth` is deliberately absent from the parent's `print.agents` record. That
+asymmetry is what makes the agent-asserted vs mutual-acknowledgement test meaningful. Do not
+"correct" it.
 
 **2. npm — ALREADY PUBLISHED.** `@printid/sdk` is live at **0.1.0 and 0.1.1**, `@printid/mcp` at
 **0.1.0**, published as npm user `andreval`. **`@print` was not available** — that is why the
