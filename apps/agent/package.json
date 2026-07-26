@@ -11,7 +11,7 @@
     "ens": "node src/ens-demo.js"
   },
   "dependencies": {
-    "@print/sdk": "file:../../packages/sdk",
+    "@printid/sdk": "file:../../packages/sdk",
     "@worldcoin/agentkit": "^0.2.0",
     "@worldcoin/idkit-core": "^4.2.2",
     "dotenv": "^17.0.0",

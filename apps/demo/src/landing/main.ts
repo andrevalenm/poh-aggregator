@@ -43,7 +43,7 @@ const MCP_CLIENTS: ClientOption[] = [
   {
     id: 'claude-code',
     label: 'Claude Code',
-    command: 'claude mcp add print -- npx -y @print/mcp',
+    command: 'claude mcp add print -- npx -y @printid/mcp',
     note: 'Then ask: “is 0xd267…85fb a person? which evidence is correlated?”',
   },
   {
@@ -53,7 +53,7 @@ const MCP_CLIENTS: ClientOption[] = [
   "mcpServers": {
     "print": {
       "command": "npx",
-      "args": ["-y", "@print/mcp"]
+      "args": ["-y", "@printid/mcp"]
     }
   }
 }`,
@@ -62,13 +62,13 @@ const MCP_CLIENTS: ClientOption[] = [
   {
     id: 'codex',
     label: 'Codex',
-    command: 'codex mcp add print -- npx -y @print/mcp',
+    command: 'codex mcp add print -- npx -y @printid/mcp',
     note: 'Registers the four tools with the Codex CLI.',
   },
   {
     id: 'any',
     label: 'Any MCP client',
-    command: 'npx -y @print/mcp',
+    command: 'npx -y @printid/mcp',
     note: 'Plain stdio server. Optional: PRINT_SUBGRAPH_URL for issuance-date enrichment.',
   },
 ]

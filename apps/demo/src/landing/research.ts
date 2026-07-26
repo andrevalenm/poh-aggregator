@@ -15,8 +15,8 @@
  */
 
 import './research.css'
-import { suggestEnrollment } from '@print/sdk'
-import type { Adapter } from '@print/sdk'
+import { suggestEnrollment } from '@printid/sdk'
+import type { Adapter } from '@printid/sdk'
 import ontologyJson from '../../../../ontology/adapters.json'
 
 /**

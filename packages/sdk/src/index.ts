@@ -54,7 +54,7 @@ export const Thresholds = {
  */
 export const DEFAULT_REGISTRY = '0x977b028b900cce8ee89c46877e814eff3060aa07' as const
 
-export interface CorroborateOptions {
+export interface PrintOptions {
   registryAddress?: `0x${string}`
   registryRpcUrl?: string
   /**
@@ -98,11 +98,11 @@ export interface ResolveOptions {
  * because correlation is a property of the credential class, not of the person.
  */
 export class Print {
-  #opts: Required<Pick<CorroborateOptions, 'registryAddress'>> & CorroborateOptions
+  #opts: Required<Pick<PrintOptions, 'registryAddress'>> & PrintOptions
   #adapters: AdapterProbe[]
   #ontology?: Awaited<ReturnType<typeof loadOntology>>
 
-  constructor(opts: CorroborateOptions = {}) {
+  constructor(opts: PrintOptions = {}) {
     this.#opts = { registryAddress: opts.registryAddress ?? DEFAULT_REGISTRY, ...opts }
     this.#adapters =
       opts.adapters ?? defaultAdapters(opts.subgraphUrl ? { subgraphUrl: opts.subgraphUrl } : undefined)
@@ -391,7 +391,7 @@ export class Print {
 /** Convenience for one-off lookups. */
 export async function resolvePersonhood(
   nameOrAddress: string,
-  opts?: CorroborateOptions & ResolveOptions,
+  opts?: PrintOptions & ResolveOptions,
 ): Promise<PersonhoodResult> {
   return new Print(opts).resolve(
     nameOrAddress,

@@ -19,7 +19,7 @@ const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
 
 export default defineConfig({
   resolve: {
-    alias: { '@print/sdk': sdkSrc },
+    alias: { '@printid/sdk': sdkSrc },
   },
   // The ontology JSON lives at the repo root and is imported at build time.
   server: { fs: { allow: [repoRoot] } },

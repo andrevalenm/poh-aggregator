@@ -18,12 +18,12 @@
  * *operating* the agent rather than having been paid to register it once, which is why gate 4
  * records the caveat rather than resolving it.
  *
- * Gate 4 is not implemented here. It is `evaluateFleet()` from `@print/sdk`, fed the
+ * Gate 4 is not implemented here. It is `evaluateFleet()` from `@printid/sdk`, fed the
  * policy object from `policy.js` — the same function the SDK's unit tests exercise, so the
  * behaviour a judge sees on stage is the behaviour that is tested.
  */
 
-import { evaluateFleet, priceOfPolicy, costOfSlots, scanAgentBook } from '@print/sdk'
+import { evaluateFleet, priceOfPolicy, costOfSlots, scanAgentBook } from '@printid/sdk'
 import { lookupHumanBacking } from '../world/agentbook.js'
 import { resolveHumanBacking, readableAdapterIds, ontologyAdapters } from './print.js'
 import {
@@ -172,7 +172,7 @@ export async function decide({ agentName, agentAddress, operatorAddresses, ident
     name: 'Evidence',
     question: 'What independent evidence backs the human behind this agent?',
     pass: true,
-    how: `@print/sdk against registry revision ${result.registryRevision}${
+    how: `@printid/sdk against registry revision ${result.registryRevision}${
       cached ? ' (resolved once for this human, reused)' : ''
     }`,
     detail: {
@@ -244,7 +244,7 @@ export async function decide({ agentName, agentAddress, operatorAddresses, ident
     name: 'Fleet policy',
     question: `Does that clear the line ${counterparty.name} drew, and does this human have a slot left?`,
     pass: mine.verdict === 'allow' ? true : mine.verdict === 'deny' ? false : null,
-    how: `evaluateFleet() from @print/sdk against ${counterparty.name}'s declared policy — the SDK ships no default and isHuman() throws without an explicit threshold`,
+    how: `evaluateFleet() from @printid/sdk against ${counterparty.name}'s declared policy — the SDK ships no default and isHuman() throws without an explicit threshold`,
     detail: {
       ...Object.fromEntries(mine.rules.map((r) => [r.rule, `${r.pass === null ? 'n/a' : r.pass ? 'pass' : 'fail'} — ${r.detail}`])),
       agentsRegisteredByThisHuman: decision.summary.agents,

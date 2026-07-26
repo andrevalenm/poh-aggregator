@@ -12,7 +12,7 @@
  * protocols are built to keep apart.
  */
 
-import { Print, defaultAdapters } from '@print/sdk'
+import { Print, defaultAdapters } from '@printid/sdk'
 import { print as cfg } from '../config.js'
 
 let client

@@ -1,4 +1,4 @@
-# @print/mcp
+# @printid/mcp
 
 An MCP server that lets an AI agent ask whether a real human stands behind an address —
 and, more usefully, **why**. Built on [The Graph](https://thegraph.com): credential issuance

@@ -18,7 +18,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { readFileSync } from 'node:fs'
-import { Print, DEFAULT_REGISTRY, weightHistory, type PersonhoodResult } from '@print/sdk'
+import { Print, DEFAULT_REGISTRY, weightHistory, type PersonhoodResult } from '@printid/sdk'
 
 const ontologyPath = new URL('../../../ontology/adapters.json', import.meta.url)
 let knownIds: string[] = []

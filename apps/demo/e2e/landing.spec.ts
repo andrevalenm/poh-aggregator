@@ -83,7 +83,7 @@ test.describe('Print landing', () => {
     await page.getByRole('tab', { name: 'Cursor' }).click()
     await expect(page.locator('#mcp-command')).toContainText('mcpServers')
     await page.getByRole('tab', { name: 'Any MCP client' }).click()
-    await expect(page.locator('#mcp-command')).toContainText('npx -y @print/mcp')
+    await expect(page.locator('#mcp-command')).toContainText('npx -y @printid/mcp')
     await expect(page.locator('#mcp-command .copy-btn')).toBeVisible()
   })
 

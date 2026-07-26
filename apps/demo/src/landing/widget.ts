@@ -6,7 +6,7 @@
  * elapsed time, because "it answered in three seconds from public chains" is the point a
  * first visitor can feel.
  */
-import type { Evidence, PersonhoodResult } from '@print/sdk'
+import type { Evidence, PersonhoodResult } from '@printid/sdk'
 import type { ProbeEvent } from '../client.ts'
 import { clear, fmtCents, fmtScore, freshnessLabel, h, shortAddr } from '../ui.ts'
 

@@ -1,5 +1,5 @@
-import { score, freshnessOf, effectiveCost } from '@print/sdk'
-import type { Address, Adapter, Evidence, PersonhoodResult } from '@print/sdk'
+import { score, freshnessOf, effectiveCost } from '@printid/sdk'
+import type { Address, Adapter, Evidence, PersonhoodResult } from '@printid/sdk'
 import { makeClient, type ProbeEvent } from './client.ts'
 import { adapterNotes, rootDescriptions } from './known.ts'
 import { clear, fmtCents, fmtScore, h, rootChip, rootHue, shortAddr } from './ui.ts'

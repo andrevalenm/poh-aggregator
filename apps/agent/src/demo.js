@@ -12,7 +12,7 @@ import { Agent, ObservedAgent } from './agent.js'
 import { REGISTERED_AGENTS, OPERATOR_ADDRESS_SET } from './fixtures.js'
 import { banner, renderTrace, colour as C } from './trace.js'
 import { agentPrivateKey, world } from './config.js'
-import { scanAgentBook } from '@print/sdk'
+import { scanAgentBook } from '@printid/sdk'
 
 /** The human running the most agents, found by scanning rather than by being told. */
 function largestFleet(index) {

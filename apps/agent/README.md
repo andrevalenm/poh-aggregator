@@ -46,7 +46,7 @@ npm start
    ║                                                            └──────────┘ ║
    ╠═════════════════════════════════════════════════════════════════════════╣
    ║  GATE 3   Evidence — resolved once per HUMAN, not once per agent        ║
-   ║           operator's declared address set  ──►  @print/sdk        ║
+   ║           operator's declared address set  ──►  @printid/sdk        ║
    ║                                                     │                   ║
    ║      ┌──────────────────────────────────────────────┴───────────────┐   ║
    ║      │  world-id-orb    root iris-registry:world-orb    World Chain  │   ║
@@ -112,7 +112,7 @@ network calls.
 | Signature verification, message binding, freshness, nonce replay | **real**, `validateAgentkitMessage` + `verifyAgentkitSignature` |
 | AgentBook `lookupHuman` | **real**, `eth_call` on World Chain `0xA23aB…944dA` |
 | Print resolution: World ID + Proof of Humanity + Circles | **real**, Sepolia registry rev 15, Gnosis + World Chain reads |
-| Scoring, saturation, caveats | **real**, `@print/sdk` |
+| Scoring, saturation, caveats | **real**, `@printid/sdk` |
 | World ID 4.0 RP signature + proof request + `/api/v4/verify` | **real** — `npm run worldid`, needs a human to answer |
 
 **One gate cannot run for two of the three agents, and the trace says so rather than faking
@@ -261,7 +261,7 @@ src/
     server.js               the 402 challenge and the AgentKit verification
     policy.js               the counterparty's FleetPolicy — every number it owns
     decide.js               the four gates; gate 4 delegates to evaluateFleet()
-    print.js          @print/sdk lookup
+    print.js          @printid/sdk lookup
 ```
 
 ---
@@ -349,7 +349,7 @@ Reported rather than silently patched.
    resource server on a non-default port that follows the spec has every signature rejected
    with `Domain mismatch: expected "127.0.0.1", got "127.0.0.1:37411"`.
 
-**`@print/sdk`** — both of these were fixed upstream mid-build by the SDK author; noted
+**`@printid/sdk`** — both of these were fixed upstream mid-build by the SDK author; noted
 because they are the failure modes to watch for.
 
 4. **Omitting `knownIds`/`knownRoots` used to fail silently and catastrophically.** The

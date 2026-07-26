@@ -13,7 +13,7 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "paths": {
-      "@print/sdk": ["../../packages/sdk/src/index.ts"]
+      "@printid/sdk": ["../../packages/sdk/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "vite.config.ts"]

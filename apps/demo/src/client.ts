@@ -1,5 +1,5 @@
-import { Print, defaultAdapters, DEFAULT_REGISTRY } from '@print/sdk'
-import type { Address, AdapterProbe, AdapterProbeResult } from '@print/sdk'
+import { Print, defaultAdapters, DEFAULT_REGISTRY } from '@printid/sdk'
+import type { Address, AdapterProbe, AdapterProbeResult } from '@printid/sdk'
 import { knownIds, knownRoots } from './known.ts'
 
 export { DEFAULT_REGISTRY }

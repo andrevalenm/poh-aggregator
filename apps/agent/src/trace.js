@@ -55,7 +55,7 @@ export function renderTrace(trace) {
 
   if (trace.sdkCaveats?.length) {
     console.log(line())
-    console.log(C.bold('  Caveats returned by @print/sdk, verbatim'))
+    console.log(C.bold('  Caveats returned by @printid/sdk, verbatim'))
     for (const c of trace.sdkCaveats) {
       console.log(`    ${C.yellow('!')} ${C.bold(c.code)}`)
       console.log(wrap(c.message, 6))

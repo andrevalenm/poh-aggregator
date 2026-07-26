@@ -20,7 +20,7 @@
  * it holds is the realistic part.
  */
 
-/** @type {import('@print/sdk').FleetPolicy} */
+/** @type {import('@printid/sdk').FleetPolicy} */
 export const fleetPolicy = {
   name: 'Meridian Exchange',
 

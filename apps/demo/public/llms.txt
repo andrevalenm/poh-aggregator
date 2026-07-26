@@ -15,9 +15,9 @@ unless the caller chooses an explicit threshold.
 
 ## For agents
 
-- MCP server: `npx -y @print/mcp` — tools: lookup_personhood, check_personhood,
+- MCP server: `npx -y @printid/mcp` — tools: lookup_personhood, check_personhood,
   explain_trust_roots, explain_weight_history
-- SDK: `npm install @print/sdk` — `new Print().resolve('name.eth')`
+- SDK: `npm install @printid/sdk` — `new Print().resolve('name.eth')`
 - Registry (Sepolia): 0x977b028b900cce8ee89c46877e814eff3060aa07 — adapters, trust roots,
   forge/rent costs in cents, age curves; every weight change is an auditable event
 - Protocol subgraph: https://api.studio.thegraph.com/query/77602/poh/version/latest

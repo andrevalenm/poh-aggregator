@@ -1,5 +1,9 @@
 {
   "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:ethglobal.com)"
+    ],
     "deny": [
       "Bash(git push:*)",
       "Bash(git remote add:*)",

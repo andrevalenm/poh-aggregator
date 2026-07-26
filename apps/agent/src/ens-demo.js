@@ -35,7 +35,7 @@ import {
   resolveEnsAgents,
   scanNameTree,
   toFleetAgents,
-} from '@print/sdk'
+} from '@printid/sdk'
 import { print as corroborateConfig, REPO_ROOT } from './config.js'
 import { fleetPolicy } from './counterparty/policy.js'
 import { banner, colour as C } from './trace.js'

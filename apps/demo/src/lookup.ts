@@ -1,4 +1,4 @@
-import type { Evidence, PersonhoodResult } from '@print/sdk'
+import type { Evidence, PersonhoodResult } from '@printid/sdk'
 import { makeClient, type ProbeEvent, type ProbeState } from './client.ts'
 import { adapterNotes } from './known.ts'
 import { saturationBlock } from './compare.ts'

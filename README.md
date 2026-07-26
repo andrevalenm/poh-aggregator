@@ -325,7 +325,7 @@ npm install
 ### SDK
 
 ```ts
-import { Print, Thresholds } from '@print/sdk'
+import { Print, Thresholds } from '@printid/sdk'
 
 const print = new Print()
 
