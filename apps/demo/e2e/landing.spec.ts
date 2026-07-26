@@ -10,7 +10,10 @@ const BEACON = '0x58b849f60b0515871fcfa80c7907d097571f2a12'
 test.describe('Print landing', () => {
   test('hero loads with the live registry line', async ({ page }) => {
     await page.goto('/')
-    await expect(page.locator('h1')).toContainText(/to be human/i)
+    // Tracks the hero copy, which became "Are you real?" when the page stopped leading with
+    // the cost model. A regex on the question rather than the exact string, so punctuation
+    // tweaks in copy do not fail the suite.
+    await expect(page.locator('h1')).toContainText(/are you\s+real/i)
     // The headline must be VISIBLE, not merely present — the split-line masks hide the
     // text until a reveal class lands, and a missing CSS rule once shipped an invisible
     // hero. Assert the first line has actually risen into place.

@@ -1,3 +1,10 @@
 packages:
   - "packages/*"
   - "apps/*"
+
+# Resolve workspace packages from the workspace even when the dependency is a plain
+# semver range rather than the `workspace:` protocol. That protocol is pnpm-only and npm
+# rejects it outright (EUNSUPPORTEDPROTOCOL), which broke `npm install` at the repo root
+# and therefore the quickstart in every README. With a plain range plus this setting, npm
+# links the local package (its version satisfies the range) and so does pnpm.
+linkWorkspacePackages: true
