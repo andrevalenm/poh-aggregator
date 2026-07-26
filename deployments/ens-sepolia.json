@@ -2,7 +2,7 @@
   "chainId": 11155111,
   "parent": "print.eth",
   "parentNode": "0x68ea0cd0b322421153c0246aa2d55a734167aeeef309441e737544891920ab73",
-  "expires": "2027-07-25T16:44:36.000Z",
+  "expires": "2027-07-26T05:24:12.000Z",
   "owner": "0xE3C03709B2b8439Eb07Aac06CC4Fa9886CE5BF87",
   "ensRegistry": "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
   "baseRegistrar": "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85",
@@ -12,21 +12,21 @@
     {
       "name": "alpha.print.eth",
       "node": "0xfe1070cc26bcb058e9a190dfa23c773a0256aa30e874193fee428ac31a0039a4",
-      "address": "0xA83378d25942A989b0bfD7E6f3259b60Ed42C922",
+      "address": "0xf6b6bfE0e582977eAF72F0B02fFA62ef2eC29Fee",
       "human": "print.eth",
       "acknowledged": true
     },
     {
       "name": "beta.print.eth",
       "node": "0xfee612435c91f83cc043d8a415e1324c4c002cdcabcd5e47393f3d52e4d6e8a2",
-      "address": "0xBB7A6ffbEc6c18631960A5764080e6CB63d5723f",
+      "address": "0xe04e3dfc31ee5f21b419f644F1794b14ceeD23e5",
       "human": "print.eth",
       "acknowledged": true
     },
     {
       "name": "unverified.print.eth",
       "node": "0xda1ceaeb869c603410ff4ca5a488118f344dc34a87d562806498c48a69b485bb",
-      "address": "0x7DA031B84BbBCE90a811d71695D8480B22504e29",
+      "address": "0x489ae06535F4e2B6B7999AF25aB4576dE2Ed7227",
       "human": "0xA6b7471fe0338F8B45266734A1346E6f1D7267b1",
       "acknowledged": false
     }
