@@ -3,9 +3,9 @@
 # Deliberately a NEW file in traefik's watched dynamic directory rather than an edit to
 # traefik.yml or to any dokploy-managed app file. The file provider picks it up on write and
 # drops it on delete, so this is additive and reversible, and nothing about the production
-# ingress that serves peanut-split, wordle, payoff, findjuris or dokploy itself is touched.
+# ingress, or the unrelated applications it already serves, is touched.
 #
-# Copied from dokploy's own generated pattern (see robotichugo-txccgi.yml) so it behaves the
+# Copied from the shape dokploy generates for its own apps, so this behaves the
 # same way its apps do: plain HTTP redirects to HTTPS, and the websecure router asks the
 # existing letsencrypt resolver for a certificate. ACME uses an HTTP-01 challenge on the web
 # entrypoint, so DNS must already point at this host before a cert can issue.
