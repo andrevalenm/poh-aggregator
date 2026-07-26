@@ -58,23 +58,51 @@ test.describe('Print landing', () => {
     expect(after).not.toBe(before)
   })
 
-  test('widget resolves a live wallet and links to the console', async ({ page }) => {
+  test('widget answers a live wallet with an attributed verdict', async ({ page }) => {
     test.setTimeout(240_000)
     await page.goto('/')
     await page.fill('#lookup-input', BEACON)
     await page.click('#lookup-submit')
     const result = page.locator('#widget-result')
-    await expect(result).toContainText(/adversary cost/i, { timeout: 180_000 })
-    await expect(result).toContainText(/independent trust root/i)
-    // The caveats are surfaced, not hidden, and the console is one click away.
-    await expect(result).toContainText(/caveats/i)
-    // The console is absorbed: one button unfolds the full technical record in place.
-    const btn = result.locator('.detail-btn')
-    await expect(btn).toBeVisible()
-    await btn.click()
+
+    // A visitor gets a binary answer without touching a control — the default rule is applied
+    // on arrival — and the answer is a count of independent roots, never a log score.
+    await expect(result.locator('.verdict-word')).toHaveText(/^(Yes|No)$/, { timeout: 180_000 })
+    await expect(result.locator('.verdict-rule')).toContainText(/The rule asks for 2 or more/)
+    await expect(result.locator('.rule-line')).toContainText('By the rule: at least')
+    await expect(result.locator('.rule-tag')).toHaveText('our default')
+
+    // The permanent caveat is on the sheet, not behind the disclosure.
+    await expect(result.locator('.ans-note.is-permanent')).toContainText(
+      /controls their own credentials/,
+    )
+
+    // The rule is the viewer's to change, and the verdict follows it.
+    await result.locator('.rule-opt', { hasText: '1' }).click()
+    await expect(result.locator('.verdict-rule')).toContainText(/The rule asks for 1 or more/)
+    await expect(result.locator('.rule-tag')).toHaveText('your choice')
+
+    // The console is absorbed: one keyboard-operable disclosure unfolds the whole record in
+    // place, score included — demoted, never dropped.
+    const toggle = result.locator('.console-toggle')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(result.locator('#console-panel')).toBeHidden()
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(result.locator('.rec')).toContainText('Root-cost score')
     await expect(result.locator('.evd-rows')).toBeVisible()
     await expect(result.locator('.cv-list')).toBeVisible()
     await expect(result).toContainText('independent-control-not-attested')
+  })
+
+  test('protocol counts come from the registry, not from prose', async ({ page }) => {
+    await page.goto('/')
+    // The words "forty" and "thirty" used to be typed into the copy and had already drifted.
+    await expect(page.locator('body')).not.toContainText(/\bforty\b|\bthirty\b/i)
+    // Every count is painted from the live registry read.
+    const integrated = page.locator('[data-count="integrated"]').first()
+    await expect(integrated).toHaveText(/^\d+$/, { timeout: 60_000 })
+    await expect(page.locator('.coverage-row')).toHaveCount(3)
   })
 
   test('MCP picker switches clients and shows a copyable command', async ({ page }) => {
