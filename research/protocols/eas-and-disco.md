@@ -467,6 +467,80 @@ we should run our own indexer: options are the official
 — simplest and most robust — our own log-indexer over the four `Attested`/`Revoked`/`Timestamped`/
 `RevokedOffchain` events, all of which have indexed `attester`/`recipient`/`schemaUID` topics.
 
+### Resolution, 2026-07-25: the Coinbase read needs no indexer at all
+
+The caveat above ("do not put it in a synchronous user-facing path") was written about EASSCAN
+and then, for a while, ignored — `coinbaseVerificationAdapter` POSTed to `base.easscan.org` on
+every scoring request. It no longer does. What follows is what was measured to get off it.
+
+**The obvious replacement does not work.** Scanning `Attested` ourselves means a
+recipient-filtered `eth_getLogs` over Base's full history, and Base is at **49,106,135 blocks**
+(2026-07-25). Measured against every keyless Base endpoint:
+
+| Endpoint | Archive `eth_getLogs` |
+|---|---|
+| `base-rpc.publicnode.com` | refused: *"Archive requests require a personal token"* — any range |
+| `base.gateway.tenderly.co` | 1M blocks **197 ms**; 5M blocks **14.0 s**; 20M blocks **timeout at 120 s** |
+| `base.drpc.org` | free plan caps a range at 10,000 blocks |
+| `base.llamarpc.com`, `base.blockpi.network`, `1rpc.io/base`, `base.meowrpc.com` | non-JSON error, rate-limited, or plan-limited |
+
+So a full-history log scan is not a thing a scoring request can pay for on *any* keyless
+endpoint, and a probe that only scans the recent window reports `held: false` for everyone
+verified earlier. A subgraph would solve it, but the graph-node on this box would need a Base
+network added to its config — a container change the mission forbids — leaving Studio, and a
+49M-block sync, for a problem that turns out not to need one.
+
+**Coinbase maintains an on-chain index.** `coinbase/verifications` names an attestation indexer
+at **`0x2c7eE1E5f416dfF40054c27A62f7B357C4E8619C`** on Base, keyed by `(recipient, schemaUID)`.
+Verified live rather than taken from the README:
+
+- `eth_getCode` → 209 bytes (a proxy).
+- `getAttestationUid(0xcab9b479…7828, 0xf8b05c79…0de9)` →
+  `0x88a10ab440a6e5e0e365b9a59cc9843f67aa490cf6cce3b87961e010adc8a8b9`; the same call for
+  `0x…dEaD` returns zero.
+- `EAS.getAttestation(uid)` at the predeploy `0x4200…0021` then returns the record — `time`,
+  `expirationTime`, `revocationTime`, `recipient`, `schema`, `attester`.
+
+Two `eth_call`s, no key, no vendor endpoint, no rate limit. The probe treats the indexer as a
+**pointer only**: it is a proxy Coinbase can upgrade, so schema, recipient, date and revocation
+are all read from the EAS predeploy, and a record that does not match the uid, schema or subject
+asked for is reported as an error rather than as "not a human".
+
+**Coverage, measured.** 20 of 20 attestations sampled from `Attested` logs in windows at
+blocks ~9.1M (Jan 2024), ~29.1M (Apr 2025), ~46.1M and ~49.1M (2026) resolve through the
+indexer, every one at the uid the log named. Sampling further back: **zero** attestations under
+this schema below block ~3.6M, so the schema's history starts after that.
+
+**The index is written at attestation time, not backfilled.** Read at the attestation's own
+block the indexer returns the uid; read one block earlier it does not. That makes an archive
+read of this credential historically honest, which is what `as-of` scoring would need.
+
+**One uid per (recipient, schema), latest wins.** Sampling old windows turns up recipients whose
+indexed uid is *newer* than the logged one — a re-attestation superseding it. Not a fault, but
+it is why the live suite asserts `latest.time >= logged.time` rather than uid equality: an index
+pointing backwards would be one.
+
+**The schema id is load-bearing on its own.** `SchemaRegistry.getSchema(0xf8b05c79…0de9)` returns
+`bool verifiedAccount`, `revocable: true`, resolver **`0xD867CbEd445c37b0F95Cc956fe6B539BdEf7F32f`**
+(non-zero, has code) — the mechanism behind "only Coinbase-permitted attesters may use this
+schema". And across six 200k-block windows spanning the chain, **18,655 attestations carry
+exactly one attester**, `0x357458739F90461b99789350868CD7CF330Dd7EE`. So the probe filters on
+schema and does not pin an attester address it would have to chase through a rotation.
+
+**Revocation is not a footnote.** The same six windows contain **5,143 revocations** against
+those 18,655 issuances, and the indexer keeps pointing at an attestation after it is revoked.
+Presence of a non-zero uid is therefore not the credential; `revocationTime` is why the EAS
+record is fetched at all.
+
+**The residual limit.** An attestation Coinbase issued but never indexed would read as absent.
+No such case was found in any sampled window, and the failure direction is the safe one — a
+missing credential lowers a score and can never inflate one. It is also the issuer's own index
+for the issuer's own credential, so an unindexed attestation is a fault in Coinbase's pipeline,
+not something an adversary can arrange for somebody else.
+
+Implementation and the live suite that re-derives all of the above from the chain:
+`packages/sdk/src/adapters/coinbase.ts`, `coinbase.test.ts`, `coinbase.live.test.ts`.
+
 ### Who is actually using EAS for personhood/identity
 
 #### Coinbase Verifications (Base) — the flagship

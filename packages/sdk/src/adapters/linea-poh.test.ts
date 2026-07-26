@@ -44,6 +44,7 @@ function attestation(over: Partial<RawAttestation> = {}): RawAttestation {
     attestedDate,
     expirationDate,
     termSeconds: expirationDate - attestedDate,
+    revocationDate: 0,
     portal: SUMSUB_POH_PORTAL,
     attester: SUMSUB_SIGNER,
     version: 10,
@@ -246,5 +247,133 @@ describe('which attestations count as a live credential', () => {
     const s = selectLivePoh([attestation()], p, NOW)
     assert.equal(s.liveAttestations, 1)
     assert.equal(s.attesterNotPortalSigner, 0)
+  })
+})
+
+/**
+ * The other half of the same decision: a credential that has ended is a *closed window*, and a
+ * closed window is what puts a credential back into a historical score. Every branch here is a
+ * way to hand somebody time they did not have, which runs in the adversary's direction — so the
+ * refusals matter more than the acceptance.
+ */
+describe('which endings close a window an as-of score can use', () => {
+  const ended = (over: Partial<RawAttestation> = {}) =>
+    selectLivePoh([attestation(over)], portals(), NOW).endedBySubject.get(SUBJECT)?.[0]
+
+  test('an expired attestation keeps both of its dates: attested to expiry', () => {
+    const a = attestation({ attestedDate: NOW - 100 * 86_400, expirationDate: NOW - 10 * 86_400 })
+    const s = selectLivePoh([a], portals(), NOW)
+    assert.equal(s.endedAttestations, 1)
+    assert.equal(s.endedUndated, 0)
+    const w = s.endedBySubject.get(SUBJECT)![0]!
+    assert.equal(w.attestedDate, a.attestedDate)
+    assert.equal(w.endedAt, a.expirationDate)
+    assert.equal(w.revoked, false)
+    // And it is emphatically not held: the window exists precisely because the credential is gone.
+    assert.equal(s.liveAttestations, 0)
+    assert.equal(s.bySubject.size, 0)
+  })
+
+  test('a revocation before the term ends is the ending, because that is when it stopped counting', () => {
+    const w = ended({
+      attestedDate: NOW - 100 * 86_400,
+      revoked: true,
+      revocationDate: NOW - 40 * 86_400,
+      expirationDate: NOW - 10 * 86_400,
+    })
+    assert.equal(w?.endedAt, NOW - 40 * 86_400)
+    assert.equal(w?.revoked, true)
+  })
+
+  test('a revocation after the term ends does not extend the window past the expiry', () => {
+    // Verax lets an already-dead attestation be revoked. Taking the revocation date there would
+    // credit the subject with the weeks between, which they did not have.
+    const w = ended({
+      attestedDate: NOW - 120 * 86_400,
+      revoked: true,
+      revocationDate: NOW - 5 * 86_400,
+      expirationDate: NOW - 30 * 86_400,
+    })
+    assert.equal(w?.endedAt, NOW - 30 * 86_400)
+  })
+
+  test('a revocation with no date closes nothing — the expiry is only an upper bound on it', () => {
+    // Iteration 16's rule in the direction it bites: restoring against a bound would hand the
+    // subject every day between the real revocation and the expiry.
+    const s = selectLivePoh(
+      [attestation({ revoked: true, revocationDate: 0, expirationDate: NOW - 10 * 86_400 })],
+      portals(),
+      NOW,
+    )
+    assert.equal(s.endedBySubject.size, 0)
+    assert.equal(s.endedAttestations, 0)
+    assert.equal(s.endedUndated, 1)
+  })
+
+  test('a foreign portal gets no window either, because it never had a credential to end', () => {
+    const s = selectLivePoh(
+      [attestation({ portal: FOREIGN_PORTAL, expirationDate: NOW - 10 })],
+      portals(),
+      NOW,
+    )
+    assert.equal(s.endedBySubject.size, 0)
+    assert.equal(s.rejectedForPortalOwner, 1)
+  })
+
+  test('an inverted or empty window is refused rather than reported backwards', () => {
+    const s = selectLivePoh(
+      [attestation({ attestedDate: NOW - 10 * 86_400, expirationDate: NOW - 20 * 86_400 })],
+      portals(),
+      NOW,
+    )
+    assert.equal(s.endedBySubject.size, 0)
+    assert.equal(s.endedUndated, 1)
+  })
+
+  test('a revoked attestation whose revocation predates its own attestation closes nothing', () => {
+    const s = selectLivePoh(
+      [attestation({ attestedDate: NOW - 10 * 86_400, revoked: true, revocationDate: NOW - 20 * 86_400 })],
+      portals(),
+      NOW,
+    )
+    assert.equal(s.endedBySubject.size, 0)
+    assert.equal(s.endedUndated, 1)
+  })
+
+  test('a live attestation is never handed a window, whatever else the subject holds', () => {
+    const s = selectLivePoh([attestation()], portals(), NOW)
+    assert.equal(s.endedBySubject.size, 0)
+    assert.equal(s.endedAttestations, 0)
+  })
+
+  test('a subject who lapsed and renewed appears in both maps, and the ending is still true', () => {
+    const dead = attestation({
+      attestedDate: NOW - 200 * 86_400,
+      expirationDate: NOW - 110 * 86_400,
+      attestationId: idToBytes32(1),
+    })
+    const alive = attestation({ attestedDate: NOW - 5 * 86_400, attestationId: idToBytes32(2) })
+    const s = selectLivePoh([dead, alive], portals(), NOW)
+    assert.equal(s.bySubject.size, 1)
+    assert.equal(s.endedBySubject.size, 1)
+    assert.equal(s.endedBySubject.get(SUBJECT)![0]!.endedAt, dead.expirationDate)
+  })
+
+  test('several closed windows are ordered latest ending first', () => {
+    const older = attestation({
+      attestedDate: NOW - 300 * 86_400,
+      expirationDate: NOW - 210 * 86_400,
+      attestationId: idToBytes32(1),
+    })
+    const newer = attestation({
+      attestedDate: NOW - 150 * 86_400,
+      expirationDate: NOW - 60 * 86_400,
+      attestationId: idToBytes32(2),
+    })
+    for (const order of [[older, newer], [newer, older]]) {
+      const s = selectLivePoh(order, portals(), NOW)
+      assert.equal(s.endedBySubject.get(SUBJECT)!.length, 2)
+      assert.equal(s.endedBySubject.get(SUBJECT)![0]!.endedAt, newer.expirationDate)
+    }
   })
 })

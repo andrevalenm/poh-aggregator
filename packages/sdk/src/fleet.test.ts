@@ -334,10 +334,14 @@ describe('what the policy costs an adversary', () => {
       minScore: 1,
       minIndependentRoots: 1,
       readableAdapterIds: READABLE,
-      mustInclude: ['state-document:icao-9303'],
+      // `state-registry:aadhaar` is catalogued but has no implemented probe, so no readable
+      // credential sits on it. It used to be the ICAO root here — that stopped being true when
+      // self-protocol became readable, which is the right direction for the product and the
+      // wrong fixture for a test about detecting an unsatisfiable policy.
+      mustInclude: ['state-registry:aadhaar'],
     })
     assert.equal(price.feasible, false)
-    assert.match(price.reason, /state-document:icao-9303/)
+    assert.match(price.reason, /state-registry:aadhaar/)
     assert.match(price.reason, /including an honest subject/)
   })
 

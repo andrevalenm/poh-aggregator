@@ -1,5 +1,24 @@
 import { ethereum } from '@graphprotocol/graph-ts'
-import { ProtocolDay } from '../generated/schema'
+import { IndexCoverage, ProtocolDay } from '../generated/schema'
+
+/**
+ * Record the lower edge of this data source's knowledge, once.
+ *
+ * Every handler calls this because the first event a data source sees is whichever kind comes
+ * first, and the honest claim is "complete from here", not "complete from the block I happen to
+ * have a registration for". Created on the first event and never moved afterwards, so it is one
+ * store read per event and one write per data source per sync.
+ */
+export function observeCoverage(protocol: string, kind: string, event: ethereum.Event): void {
+  let c = IndexCoverage.load(protocol)
+  if (c != null) return
+  c = new IndexCoverage(protocol)
+  c.protocol = protocol
+  c.firstEventBlock = event.block.number
+  c.firstEventAt = event.block.timestamp
+  c.firstEventKind = kind
+  c.save()
+}
 
 /**
  * Daily rollups exist for one reason: registration rate over time is how you detect an

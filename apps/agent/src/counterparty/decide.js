@@ -206,9 +206,24 @@ export async function decide({ agentName, agentAddress, operatorAddresses, ident
   // The whole fleet, not just the requester: the cap is per human, and AgentBook says in
   // advance how many agents this human runs rather than making us wait to be asked.
   const index = await getFleetIndex()
-  const agents = index
+  const scanned = index
     ? index.fleetAround(agentAddress)
     : [{ agent: agentAddress.toLowerCase(), backing: { status: 'backed', humanId: backing.humanId } }]
+
+  // Gate 1's answer, carried into the engine rather than left implicit. Only the *requester*
+  // presented anything; its siblings were found by scanning AgentBook's log and are not asking
+  // for anything, so they carry no presenter and the engine's caveat says why that is expected.
+  const agents = scanned.map((a) =>
+    a.agent.toLowerCase() === agentAddress.toLowerCase() && identity?.verified
+      ? {
+          ...a,
+          presenter: {
+            status: 'authenticated',
+            detail: `CAIP-122 signature over this counterparty's challenge, recovered to ${identity.address}`,
+          },
+        }
+      : a,
+  )
 
   const decision = evaluateFleet({
     policy: fleetPolicy,

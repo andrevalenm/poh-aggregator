@@ -82,6 +82,25 @@ import type { ProbeProvenance } from '../reconcile.ts'
  * used as a filter: it is a key Sumsub may rotate, and a rotation must not retroactively
  * un-verify people.
  *
+ * ## The same enumeration answers about the past, for a small extra cost
+ *
+ * A window of exactly one term is the live population and nothing else. Reach one term further
+ * back and the scan also holds every attestation that *ended* inside the extra stretch — and a
+ * Verax attestation is immutable, so each of those still carries `attestedDate` and either an
+ * `expirationDate` or a `revocationDate`. That is a closed, dated window, which is precisely what
+ * `as-of.ts` needs to decide whether a subject held the credential at a past instant.
+ *
+ * It matters more here than anywhere else in the roster because of the ratio: 50,475 attestations
+ * ever issued against 500 alive. Almost everyone this protocol has ever verified is in the lapsed
+ * state, so without this an as-of score is blind to 99% of the population. Thirty days of reach
+ * costs three extra batched calls and yields 356 subjects with a dated window against 495 live
+ * (measured 2026-07-25) — none of whom holds a live attestation.
+ *
+ * The coverage that buys is stated rather than assumed: `endingsCompleteFrom` is computed from
+ * the earliest attestation the scan actually read plus the longest term it actually saw, so a
+ * narrower scan loses the claim by itself. Below that instant an observed ending is still a real
+ * window read off the registry; it is only the *absence* of one that stops meaning anything.
+ *
  * ## What the ontology did not record
  *
  * The 90-day term means the `decayHalfLifeDays: 90` on this entry only ever applies over the
@@ -151,6 +170,28 @@ export const LINEA_POH_MAX_TERM_SECONDS = 7_776_001
 /** Doubling ladder cap: 2^18 = 262,144 ids, ~340× the window measured on 2026-07-25. */
 export const LINEA_POH_LADDER_STEPS = 18
 
+/**
+ * How far past the live window the scan reaches, so that credentials which have *ended* are
+ * enumerated too.
+ *
+ * A window of exactly one term holds every attestation that is alive now, and nothing else: an
+ * attestation that ended at instant `E` was written no earlier than `E - term`, so it only falls
+ * inside a scan whose floor is at or below `E - term`. Reaching back one extra term-plus-`L`
+ * therefore buys endings over the last `L` — which is what an `asOf` score needs, because a
+ * credential this protocol has since expired is invisible to it otherwise, and here that is the
+ * overwhelming majority of the population: 50,475 attestations ever issued against 500 alive.
+ *
+ * 30 days measured on 2026-07-25: the scan grows from 758 ids to 1,211 (4 batches to 7, 3.5 s),
+ * and yields **356 subjects with a closed, dated window against 495 currently live** — nearly
+ * doubling the population this adapter can say anything about. None of the 356 holds a live
+ * attestation, so every one of them is a subject an as-of score could otherwise say nothing about.
+ *
+ * The number is a cost decision and not a correctness one. Whatever it is, the snapshot reports
+ * `endingsCompleteFrom` — derived from the scan's own floor rather than from this constant — and
+ * an ending observed below that instant is still a proof, just not an exhaustive one.
+ */
+export const LINEA_POH_ENDINGS_LOOKBACK_SECONDS = 30 * 86_400
+
 /** Multicall3, deployed at the canonical address on Linea. */
 const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11' as const
 
@@ -193,6 +234,18 @@ export interface LineaPohAttestation {
   replacedBy: `0x${string}`
 }
 
+/** An attestation that has ended, with both ends of its life dated by the registry. */
+export interface LineaPohEndedAttestation extends LineaPohAttestation {
+  /**
+   * The second the credential stopped counting: the revocation when there was one and it landed
+   * first, the expiry otherwise. Never later than `expirationDate`, because a revocation after
+   * the term ran out ends nothing that was not already over.
+   */
+  endedAt: number
+  /** True when a revocation ended it before its term did. */
+  revoked: boolean
+}
+
 /** A portal that wrote under our schema, and whether Verax still vouches for its owner. */
 export interface LineaPohPortalCheck {
   portal: Address
@@ -217,10 +270,28 @@ export interface LineaPohSnapshot {
   counter: number
   /** First id scanned. Everything below it is provably expired. */
   scannedFromId: number
+  /**
+   * `attestedDate` of the lowest id the scan actually read, across every schema — the registry
+   * hands ids out in order, so this is the instant the scan's coverage begins.
+   */
+  scannedFromDate: number
+  /**
+   * Earliest instant from which `endedBySubject` is *exhaustive*: `scannedFromDate + maxTerm`.
+   * A credential that ended at `E` was written no earlier than `E - maxTerm`, so every ending at
+   * or after this instant is inside the scan. Endings observed below it are still real windows
+   * read off the registry — they are just not all of them.
+   */
+  endingsCompleteFrom: number
   /** Live attestations by lowercased subject address, newest first. */
   bySubject: Map<string, LineaPohAttestation[]>
+  /** Closed, dated windows by lowercased subject address, latest ending first. */
+  endedBySubject: Map<string, LineaPohEndedAttestation[]>
   /** Total live attestations — more than `bySubject.size` when someone renewed early. */
   liveAttestations: number
+  /** Attestations in range that have ended with a dated ending. */
+  endedAttestations: number
+  /** Ended in range with no usable end date, so no window. */
+  endedUndated: number
   /** Attestations under our schema in the scanned range, live or not. */
   attestationsInRange: number
   /** Under our schema, in range, and revoked. */
@@ -291,12 +362,20 @@ export function floorFromLadder(
 export interface RawAttestation extends LineaPohAttestation {
   schemaId: `0x${string}`
   revoked: boolean
+  /** Verax's own timestamp for a revocation, and 0 when it recorded none. */
+  revocationDate: number
 }
 
 /** What `selectLivePoh` concluded, minus the things only the caller knows (block, counter). */
 export interface LivePohSelection {
   bySubject: Map<string, LineaPohAttestation[]>
+  /** Ended, dated windows by lowercased subject, latest ending first. */
+  endedBySubject: Map<string, LineaPohEndedAttestation[]>
   liveAttestations: number
+  /** Attestations in range that have ended and whose ending the registry dates. */
+  endedAttestations: number
+  /** Ended, but with no usable end date — a revocation Verax recorded without a timestamp. */
+  endedUndated: number
   attestationsInRange: number
   revokedInRange: number
   maxTermSeconds: number
@@ -314,6 +393,18 @@ export interface LivePohSelection {
  * `now` is the pinned block's timestamp rather than the local clock: expiry is what every
  * on-chain consumer compares against `block.timestamp`, and a skewed local clock must not be
  * what decides whether somebody is verified.
+ *
+ * An attestation that has *ended* is sorted into `endedBySubject` rather than dropped, because
+ * a Verax attestation is immutable: `attestedDate` is still the second it was written and the
+ * ending is still on the record, so the pair is a closed window an `asOf` score can decide
+ * membership of. The same provenance test the live path applies is applied first — a foreign
+ * portal's attestation is not evidence of anything at any instant — so a window can only be
+ * closed over a credential that would have counted while it was open.
+ *
+ * A revocation Verax recorded with no `revocationDate` is the one ending that does not produce a
+ * window. The expiry would be an *upper* bound on when the credential really stopped counting,
+ * and restoring against an upper bound hands the subject time they may not have had. Iteration
+ * 16's rule, in the direction it actually bites: a bound is not a date.
  */
 export function selectLivePoh(
   raw: RawAttestation[],
@@ -322,7 +413,10 @@ export function selectLivePoh(
 ): LivePohSelection {
   const ours = raw.filter((a) => a.schemaId === LINEA_POH_V2_SCHEMA)
   const bySubject = new Map<string, LineaPohAttestation[]>()
+  const endedBySubject = new Map<string, LineaPohEndedAttestation[]>()
   let liveAttestations = 0
+  let endedAttestations = 0
+  let endedUndated = 0
   let revokedInRange = 0
   let rejectedForPortalOwner = 0
   let attesterNotPortalSigner = 0
@@ -348,14 +442,36 @@ export function selectLivePoh(
       // Sumsub may rotate, so a rotation must not retroactively un-verify anybody.
       attesterNotPortalSigner++
     }
+    const key = a.subject.toLowerCase()
+    const { schemaId: _schemaId, revocationDate: _revocationDate, revoked, ...attestation } = a
+
     // Revoked *and* expired both mean not held. Verax sets `revoked` on `revoke` and on
     // `replace`, and the Sumsub portals are all registered `isRevocable`, so this is a live
     // path and not a theoretical one: one attestation in the window on 2026-07-25 was revoked.
-    if (a.revoked || a.expirationDate <= now) continue
+    if (revoked || a.expirationDate <= now) {
+      // A revocation with no timestamp leaves the ending undated: the expiry is only an upper
+      // bound on when it really stopped, and a window built on that is longer than the life it
+      // describes.
+      if (revoked && a.revocationDate <= 0) {
+        endedUndated++
+        continue
+      }
+      const endedAt = revoked ? Math.min(a.revocationDate, a.expirationDate) : a.expirationDate
+      // An empty or inverted window describes a credential that never counted for a second, and
+      // an ending in the future is not an ending at all.
+      if (endedAt <= a.attestedDate || endedAt > now) {
+        endedUndated++
+        continue
+      }
+      endedAttestations++
+      const ended: LineaPohEndedAttestation = { ...attestation, endedAt, revoked }
+      const endedList = endedBySubject.get(key)
+      if (endedList) endedList.push(ended)
+      else endedBySubject.set(key, [ended])
+      continue
+    }
 
     liveAttestations++
-    const key = a.subject.toLowerCase()
-    const { schemaId: _schemaId, revoked: _revoked, ...attestation } = a
     const list = bySubject.get(key)
     if (list) list.push(attestation)
     else bySubject.set(key, [attestation])
@@ -364,10 +480,16 @@ export function selectLivePoh(
   // Newest first: a renewal is a fresh Sumsub check, and on a decay curve the fresh one is the
   // credential the subject actually holds.
   for (const list of bySubject.values()) list.sort((x, y) => y.attestedDate - x.attestedDate)
+  // Latest ending first: of several closed windows the most recent is the one an as-of instant
+  // is likeliest to fall inside, and the probe reports one.
+  for (const list of endedBySubject.values()) list.sort((x, y) => y.endedAt - x.endedAt)
 
   return {
     bySubject,
+    endedBySubject,
     liveAttestations,
+    endedAttestations,
+    endedUndated,
     attestationsInRange: ours.length,
     revokedInRange,
     maxTermSeconds,
@@ -412,6 +534,7 @@ async function readAttestations(
         portal: Address
         attestedDate: bigint
         expirationDate: bigint
+        revocationDate: bigint
         version: number
         revoked: boolean
         subject: `0x${string}`
@@ -425,6 +548,7 @@ async function readAttestations(
         attestedDate: Number(a.attestedDate),
         expirationDate: Number(a.expirationDate),
         termSeconds: Number(a.expirationDate) - Number(a.attestedDate),
+        revocationDate: Number(a.revocationDate),
         portal: a.portal,
         attester: a.attester,
         version: Number(a.version),
@@ -552,6 +676,11 @@ async function checkPortals(
 export interface LineaPohSnapshotOptions {
   /** Widen the window beyond `LINEA_POH_MAX_TERM_SECONDS`. Set by the self-widening retry. */
   termSeconds?: number
+  /**
+   * How far past the live window to reach for credentials that have ended. Defaults to
+   * `LINEA_POH_ENDINGS_LOOKBACK_SECONDS`; 0 restores the live-only window.
+   */
+  endingsLookbackSeconds?: number
   /** Pin the snapshot to a past block. Used by the live test; archive state is not needed at head. */
   block?: bigint
 }
@@ -582,10 +711,11 @@ export async function lineaPohSnapshot(
     }),
   )
 
+  const lookback = opts.endingsLookbackSeconds ?? LINEA_POH_ENDINGS_LOOKBACK_SECONDS
   let term = opts.termSeconds ?? LINEA_POH_MAX_TERM_SECONDS
   let widened = false
   for (let attempt = 0; ; attempt++) {
-    const fromId = await ladderFloor(client, block, counter, now - term)
+    const fromId = await ladderFloor(client, block, counter, now - term - lookback)
     const raw = await readAttestations(client, block, fromId, counter)
     const ours = raw.filter((a) => a.schemaId === LINEA_POH_V2_SCHEMA)
     const maxTerm = ours.reduce((m, a) => Math.max(m, a.termSeconds), 0)
@@ -604,11 +734,21 @@ export async function lineaPohSnapshot(
     ])
     const selection = selectLivePoh(ours, portals, now)
 
+    // Coverage is derived from what the scan actually read, not from the constants that chose
+    // the range — the lesson of iteration 17, applied to an enumeration instead of an index.
+    // `raw` is ordered by id and `attestedDate` is monotone in id, so the first row is the
+    // earliest instant this scan has any view of. With nothing read at all there is no coverage
+    // to claim, and `now` says exactly that: no ending before this moment is accounted for.
+    const scannedFromDate = raw[0]?.attestedDate ?? now
+    const effectiveTerm = Math.max(term, selection.maxTermSeconds)
+
     return {
       block: Number(block),
       takenAt: now,
       counter,
       scannedFromId: fromId,
+      scannedFromDate,
+      endingsCompleteFrom: Math.min(now, scannedFromDate + effectiveTerm),
       windowWidened: widened,
       portals: [...portals.values()],
       ...selection,
@@ -685,6 +825,11 @@ export function lineaPohAdapter(opts: LineaPohOptions = {}): AdapterProbe {
         const population = {
           liveAttestations: snap.liveAttestations,
           liveSubjects: snap.bySubject.size,
+          endedAttestations: snap.endedAttestations,
+          endedSubjects: snap.endedBySubject.size,
+          /** See `LineaPohSnapshot.endingsCompleteFrom`: the reach of the *negative* on windows. */
+          endingsCompleteFrom: snap.endingsCompleteFrom,
+          ...(snap.endedUndated ? { endedUndated: snap.endedUndated } : {}),
           scannedIds: snap.counter - snap.scannedFromId,
           scannedFromId: snap.scannedFromId,
           attestationIdCounter: snap.counter,
@@ -699,7 +844,38 @@ export function lineaPohAdapter(opts: LineaPohOptions = {}): AdapterProbe {
             : {}),
         }
         if (!held || held.length === 0) {
-          return { held: false, provenance, detail: { ...population, revocationsInRange: snap.revokedInRange } }
+          // Not verified now — but a Verax attestation is immutable, so if this subject held one
+          // that has since ended, both ends of that life are still on the registry. Reported as a
+          // closed window: it weighs nothing today (the credential is absent) and it is what lets
+          // an as-of score decide whether a past instant fell inside it.
+          const ended = snap.endedBySubject.get(subject.toLowerCase())?.[0]
+          if (!ended) {
+            return {
+              held: false,
+              provenance,
+              detail: { ...population, revocationsInRange: snap.revokedInRange },
+            }
+          }
+          provenance.notes.push('date-from-lapsed-verification')
+          return {
+            held: false,
+            issuedAt: ended.attestedDate,
+            heldUntil: ended.endedAt,
+            provenance: { ...provenance, dateFrom: 'chain' },
+            detail: {
+              ...population,
+              revocationsInRange: snap.revokedInRange,
+              lapsedAttestationId: ended.attestationId,
+              lapsedFrom: ended.attestedDate,
+              lapsedAt: ended.endedAt,
+              lapsedByRevocation: ended.revoked,
+              lapsedDaysAgo: Math.round(((snap.takenAt - ended.endedAt) / 86_400) * 10) / 10,
+              lapsedPortal: ended.portal,
+              ...(snap.endedBySubject.get(subject.toLowerCase())!.length > 1
+                ? { lapsedWindowsForSubject: snap.endedBySubject.get(subject.toLowerCase())!.length }
+                : {}),
+            },
+          }
         }
         const current = held[0]!
         const portal = snap.portals.find(

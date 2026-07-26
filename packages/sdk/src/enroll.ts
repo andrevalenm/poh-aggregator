@@ -1,7 +1,4 @@
-// Copied into src/ by the build, exactly as adapters.json is. A relative path out of the
-// package resolves to the repo root in dev and to node_modules/ once published — which made
-// the published SDK unimportable at 0.1.0.
-import enrollmentData from './enrollment-data.json' with { type: 'json' }
+import enrollmentData from '../../../ontology/enrollment.json' with { type: 'json' }
 import type { Adapter, PersonhoodResult } from './types.ts'
 
 /**

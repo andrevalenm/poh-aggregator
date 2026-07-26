@@ -72,7 +72,7 @@ for (const [fn,args] of [
 
 const addr=await pub.getEnsAddress({name:NAME})
 const subjects=await pub.getEnsText({name:NAME,key:'print.subjects'})
-console.log(`\n${NAME} -> ${addr}\ncorroborate.subjects -> ${subjects}`)
+console.log(`\n${NAME} -> ${addr}\nobserver.print.subjects -> ${subjects}`)
 if(!addr||!subjects){console.error('resolution failed');process.exit(1)}
 writeFileSync('deployments/ens-sepolia.json',JSON.stringify({name:NAME,owner:account.address,node,
   resolver:resolver.address,controller:controller.address,textRecords:{'print.subjects':subjects}},null,2)+'\n')

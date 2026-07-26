@@ -381,6 +381,43 @@ describe('caveats', () => {
     )
     assert.ok(!absent.caveats.some((x) => x.code === 'credential-changed-hands'))
   })
+
+  /**
+   * The AgentBook shape: a registry with a binding and no expiry. The date is the registration,
+   * which is later than the enrolment, so on Decay the weight it produces is a ceiling — and the
+   * alternative is no date at all, which `freshnessOf` scores at 1 for ever.
+   */
+  test('a credential dated from its registration says the weight is a ceiling', () => {
+    const a = adapter({
+      id: 'world-id-orb',
+      trustRoot: 'iris-registry:world-orb',
+      decayHalfLifeDays: 1095,
+    })
+    const dated = ev(a, {
+      issuedAt: 1_700_000_000 - 200 * 86_400,
+      freshness: freshnessOf(a, 1_700_000_000 - 200 * 86_400, 1_700_000_000),
+      provenance: {
+        heldFrom: 'chain',
+        dateFrom: 'chain',
+        notes: ['date-from-agent-registration'],
+      },
+    })
+    const r = run([a], [dated])
+    const c = r.caveats.find((x) => x.code === 'issuance-date-is-registration')
+    assert.ok(c, 'the registration date must be disclosed for what it is')
+    assert.ok(c.message.includes('world-id-orb'))
+    assert.ok(c.message.includes('ceiling'), 'and must say which direction the error runs in')
+
+    // Having a date at all is the point: it removes the unknown-age caveat *and* the full weight
+    // that came with it. 200 days against a 1,095-day half-life is ~12% off the top.
+    assert.ok(!r.caveats.some((x) => x.code === 'issuance-date-unknown'))
+    const undated = run([a], [ev(a, { freshness: freshnessOf(a, undefined, 1_700_000_000) })])
+    assert.ok(undated.caveats.some((x) => x.code === 'issuance-date-unknown'))
+    assert.ok(
+      r.roots[0]!.contributionCents < undated.roots[0]!.contributionCents,
+      'an undated credential must not be worth more than a dated one of the same class',
+    )
+  })
 })
 
 describe('isHuman', () => {

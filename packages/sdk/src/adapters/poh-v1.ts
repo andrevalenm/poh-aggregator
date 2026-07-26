@@ -57,6 +57,17 @@ import type { ProbeProvenance, ProvenanceNote } from '../reconcile.ts'
  * matters here rather than being a hypothetical: both of the registrations alive today were made
  * *after* the fork, so `ForkModule.isRegistered` is false for the entire live population.
  *
+ * ## The flag that outlives the credential also dates its death
+ *
+ * `submission.registered` staying true after the term runs out is the defect this adapter was
+ * built to avoid — and read the other way round it is the only reason a lapsed v1 registration
+ * is legible at all. `registered && !isRegistered` says the credential ended *by arithmetic*
+ * and nothing else, so the registry still holds both ends of it: `submissionTime` and
+ * `submissionTime + submissionDuration`. That closed window is reported as `issuedAt` and
+ * `heldUntil` with `held: false`, so an as-of score can decide whether a past instant fell
+ * inside it without an archive node. A registration retired by the ForkModule, or one whose
+ * flag was cleared, ended at an instant nobody recorded, and gets no window.
+ *
  * ## What is actually left of v1
  *
  * Enumerated from the chain at block 25,610,404 (2026-07-25): **20,740 submissions in the
@@ -195,6 +206,41 @@ export function interpretPohV1Read(r: PohV1Read): AdapterProbeResult {
 
   const held = r.isRegistered && !r.forkRemoved
 
+  // ---- the credential this address no longer has, and whether the registry dates its end.
+  //
+  // `submission.registered` is never cleared by expiry, so `registered && !isRegistered` is an
+  // exact statement about *how* the credential ended: nothing was written, the term simply ran
+  // out. That end is `submissionTime + submissionDuration` — the same comparison the contract
+  // makes — and the start is the `submissionTime` beside it, so the window is closed by two
+  // numbers the registry still holds rather than by anything inferred from absence.
+  //
+  // The two ways it stays open are the informative ones. A registration the **ForkModule**
+  // retired ended when v2 said so, and that overlay is a bare boolean with no timestamp: the
+  // credential may have died long before its term did, so no window is reported. And a
+  // `registered` flag that is *false* means a governor removal or a lost revocation request
+  // cleared it, at an instant this contract does not keep either.
+  //
+  // One caveat rides along: `submissionDuration()` is governance-settable and has moved once
+  // already (365.25 → 730.5 days), and the window uses today's value. Every as-of instant this
+  // SDK will answer is after the registry deployment that made the term what it is, so the
+  // number is right for every question that can be asked of it — but a future change would
+  // move these windows, which is why the term used is reported beside them.
+  let heldUntil: number | undefined
+  if (!held && r.registeredFlag && !r.forkRemoved && r.submissionDuration !== undefined) {
+    const expiresAt = r.submissionTime + r.submissionDuration
+    if (
+      r.submissionTime >= POH_V1_FIRST_SUBMISSION_AT &&
+      r.submissionDuration > 0 &&
+      expiresAt <= r.now
+    ) {
+      heldUntil = expiresAt
+      notes.push('date-from-lapsed-verification')
+      if (r.numberOfRequests > 1) notes.push('date-from-latest-reattestation')
+    }
+  } else if (!held && r.forkRemoved && r.registeredFlag) {
+    detail.endUndated = 'retired by PoH v2, which records the removal without a timestamp'
+  }
+
   let issuedAt: number | undefined
   if (held) {
     // A date before the registry took its first submission, or after the block we read, means
@@ -210,6 +256,11 @@ export function interpretPohV1Read(r: PohV1Read): AdapterProbeResult {
     }
   }
 
+  // The start of a closed window is the same `submissionTime`, held to the same floor. It dates
+  // nothing about today — `held` is false — and exists only so an as-of instant inside the
+  // window can be decided.
+  if (heldUntil !== undefined && r.submissionTime <= r.now) issuedAt = r.submissionTime
+
   const provenance: ProbeProvenance = {
     heldFrom: 'chain',
     dateFrom: issuedAt === undefined ? 'none' : 'chain',
@@ -222,6 +273,7 @@ export function interpretPohV1Read(r: PohV1Read): AdapterProbeResult {
   return {
     held,
     ...(issuedAt === undefined ? {} : { issuedAt }),
+    ...(heldUntil === undefined ? {} : { heldUntil }),
     provenance,
     detail,
   }

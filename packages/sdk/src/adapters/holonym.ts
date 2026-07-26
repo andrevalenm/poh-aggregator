@@ -2,6 +2,17 @@ import { createPublicClient, encodePacked, http, keccak256, parseAbi, type Publi
 import { optimism } from 'viem/chains'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
 import type { ProbeProvenance, ProvenanceNote } from '../reconcile.ts'
+import {
+  HOLONYM_HUB_SIGNER,
+  readHubSignerHistory,
+  type SignerHistory,
+} from './holonym-signer.ts'
+import {
+  issuerHex,
+  issuerPinVerdict,
+  readIssuerCensus,
+  type IssuerCensus,
+} from './holonym-issuer.ts'
 
 /**
  * Holonym / Human ID, read from `Hub` V3 on OP Mainnet.
@@ -41,12 +52,31 @@ import type { ProbeProvenance, ProvenanceNote } from '../reconcile.ts'
  * e.g., by using a different issuer or actionId"*. The circuit proves that *some* issuer
  * signed the credential — anyone can run their own issuer key — so an SBT whose
  * `publicValues[4]` is not Holonym's issuer address is a self-issued credential wearing the
- * right circuit id. This probe pins the issuer per credential and returns `held: false` with
- * `detail.issuerMismatch` when it does not match. Presence alone would have been forgeable.
+ * right circuit id. This probe pins the issuer per credential and returns `held: false` when it
+ * does not match. Presence alone would have been forgeable.
  *
  * Layout of the five public values, from `V3SybilResistance.circom` and confirmed against the
  * validation Holonym's own API performs: `[expiry, recipient, actionId, actionNullifier,
  * issuerAddress]`.
+ *
+ * The pin cuts both ways, and until now only one edge was reported. The two issuer keys below are
+ * **transcribed from Holonym's repositories** and declared nowhere on chain, so a protocol that
+ * rotates or adds an issuing key leaves the pin matching nothing new — and every holder after that
+ * is refused, one at a time, with the probe saying exactly as much as it says about an address that
+ * holds nothing at all. Two things fix that, and neither changes a score today:
+ * `credential-issuer-not-recognised` makes the refusal audible, and `holonym-issuer.ts` reads the
+ * issuers live credentials are *actually* carrying and reports whether the pin is still among them.
+ *
+ * ## What the Hub actually checks, which is one signature
+ *
+ * `setSBT` runs no ZK verification. It `ecrecover`s a signature over its own arguments and
+ * requires the signer to equal one stored address — there is no verifier contract and no proving
+ * key bound on chain, and the contract's header says as much: *"This contract accepts a signed
+ * attestation from a certain Verifier that a ZKP has been recieved"*. So `circuitId`, the issuer
+ * in `publicValues[4]` and the expiry are all fields one off-chain service chose and signed, and
+ * every claim below rests on that key. `holonym-signer.ts` establishes which key, proves it by
+ * recovering it from real mints, and sweeps the slot's history for a rotation — the one part of
+ * this the chain will answer.
  *
  * ## Dating a credential whose date is deliberately fuzzed
  *
@@ -56,13 +86,19 @@ import type { ProbeProvenance, ProvenanceNote } from '../reconcile.ts'
  * So the expiry is not the issuance date plus a constant. It is a value the holder picked to
  * blur exactly the question we are asking.
  *
- * What it does give us is a *proof*. `V3.circom` constrains `expiry - iat < 31,536,001` with a
- * 25-bit range check, so any SBT the Hub accepted carries a ZK guarantee that
+ * What it does give us is a *ceiling*. `V3.circom` constrains `expiry - iat < 31,536,001` with a
+ * 25-bit range check, so any SBT issued under that circuit carries the guarantee that
  *
  *     iat >= expiry - 31,536,000        (one year, in seconds)
  *
- * — the credential was issued no earlier than that. On a `Decay` curve, where weight falls with
- * age, the earliest possible issuance is the *oldest* the credential can be and therefore the
+ * — the credential was issued no earlier than that. It is a constraint the issuing service checks
+ * before it signs and not one the Hub enforces, so it is trusted exactly as far as the signature
+ * that makes the credential a credential at all, and no further: the same key that could sign a
+ * longer term could sign a credential for nobody. Every mint the chain publishes is checked
+ * against it in the live suite — `expiry - mintBlockTimestamp` is an observable lower bound on
+ * `expiry - iat`, so a term above the ceiling is falsifiable without knowing the issuance date.
+ * On a `Decay` curve, where weight falls with age, the earliest possible issuance is the *oldest*
+ * the credential can be and therefore the
  * *lowest* weight it can support. So the bound is used as the date: it can only understate
  * freshness, never inflate it, and every bit of that slack is a privacy purchase the holder made.
  * Measured against thirteen real mints on 2026-07-25, the bound sat 4–29 days before the mint for
@@ -73,9 +109,10 @@ import type { ProbeProvenance, ProvenanceNote } from '../reconcile.ts'
  * Two consequences the ontology did not record. A Holonym credential **hard-expires within a
  * year of the underlying check** — `getSBT` reverts the moment `expiry < block.timestamp` — so
  * the 730-day half-life on `holonym-gov-id` only ever applies over the first year of its life,
- * the same shape as Human Passport's 90-day expiry against a 180-day half-life. And nothing in
- * this probe touches an archive node: the whole read is two `eth_call`s at head, which leaves
- * the three keyless OP archive endpoints to the Farcaster adapter, which genuinely needs them.
+ * the same shape as Human Passport's 90-day expiry against a 180-day half-life. And the credential
+ * itself is read entirely at head: two `eth_call`s, no archive node, for every subject who does
+ * not hold one — which is almost all of them. Only a subject who *does* costs the signer sweep,
+ * because only then is there an authority to check.
  *
  * ## What the extra call buys
  *
@@ -204,6 +241,13 @@ export interface SbtVerdict {
   held: boolean
   /** Proven lower bound on issuance: `expiry - HOLONYM_MAX_CREDENTIAL_TERM_SECONDS`. */
   issuedAt?: number
+  /**
+   * The subject holds a live SBT of this class and it is refused because its issuer is not the
+   * pinned one. Carried as its own flag rather than read back out of `detail`, because it is the
+   * one `held: false` the caller must say something about: the others mean the subject holds
+   * nothing, and this one means the subject holds something we would not count.
+   */
+  issuerMismatch?: true
   detail: Record<string, unknown>
 }
 
@@ -237,11 +281,13 @@ export function interpretSbt(
     // is evidence of nothing at all.
     return {
       held: false,
+      issuerMismatch: true,
       detail: {
         ...base,
         sbt: 'issuer-mismatch',
-        issuerInProof: `0x${pv[4]!.toString(16).padStart(64, '0')}`,
-        expectedIssuer: `0x${credential.issuer.toString(16).padStart(64, '0')}`,
+        issuerInProof: issuerHex(pv[4]!),
+        expectedIssuer: issuerHex(credential.issuer),
+        expiresAt: record.expiry,
       },
     }
   }
@@ -274,9 +320,34 @@ export function interpretSbt(
 }
 
 export interface HolonymOptions {
-  /** OP Mainnet endpoint. Head-only reads, so no archive capability is required. */
+  /** OP Mainnet endpoint for the credential itself. Head-only, so no archive capability needed. */
   rpcUrl?: string
   timeoutMs?: number
+  /**
+   * Archive-capable OP Mainnet endpoints for the signing-authority sweep, which is the one read
+   * here that is about history. Defaults to `OP_ARCHIVE_RPCS`.
+   */
+  archiveRpcUrls?: readonly string[]
+  /** Interior sample points for that sweep. See `holonym-signer.ts`. */
+  signerSamples?: number
+  /** Skip the sweep entirely. The credential is still read; it carries the unverified note. */
+  checkSigner?: boolean
+  /**
+   * Skip the issuer census. The credential is still read and its own issuer still pinned; what is
+   * lost is the check that the pin is the key the protocol currently issues under.
+   */
+  checkIssuer?: boolean
+  /** Blocks back from head the census takes mints from. See `holonym-issuer.ts`. */
+  issuerCensusBlocks?: number
+  /**
+   * The credential classes to probe, defaulting to `HOLONYM_CREDENTIALS`.
+   *
+   * It exists so the refusal path can be exercised against the real chain: point a real circuit
+   * id at an issuer key that is not the one the Hub's credentials carry, and a live holder becomes
+   * a live refusal. That is what a rotation upstream would look like from in here, and it is not
+   * otherwise reachable without one happening.
+   */
+  credentials?: Record<string, HolonymCredential>
 }
 
 /**
@@ -312,6 +383,68 @@ export function holonymAdapters(opts: HolonymOptions = {}): AdapterProbe[] {
   }
 
   /**
+   * The signing-authority sweep, memoised **on success only** and shared by both credentials.
+   *
+   * Asked for at most once per process, and only when a subject actually holds something: a
+   * history read is the expensive part of this adapter and a subject with no SBT has no authority
+   * to check. A failed sweep is not cached, so a rate limit costs one subject its check rather
+   * than every subject in the process.
+   */
+  let sweptSigner: SignerHistory | undefined
+  let sweepInFlight: Promise<SignerHistory | undefined> | undefined
+  const signerHistory = (): Promise<SignerHistory | undefined> => {
+    if (sweptSigner) return Promise.resolve(sweptSigner)
+    if (opts.checkSigner === false) return Promise.resolve(undefined)
+    if (!sweepInFlight) {
+      sweepInFlight = readHubSignerHistory({
+        ...(opts.archiveRpcUrls ? { rpcUrls: opts.archiveRpcUrls } : {}),
+        ...(opts.signerSamples !== undefined ? { samples: opts.signerSamples } : {}),
+        ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+      })
+      sweepInFlight
+        .then((history) => {
+          if (history) sweptSigner = history
+        })
+        .finally(() => {
+          sweepInFlight = undefined
+        })
+    }
+    return sweepInFlight
+  }
+
+  /**
+   * The issuer census, memoised on success and shared by both credentials, on the same terms as
+   * the sweep above: asked for at most once per process, and only when a subject holds — or is
+   * refused — a credential, because a subject with no SBT has no issuer to print.
+   *
+   * Both classes are censused in one read even when only one is being probed. They are one
+   * contract and one mint window, so the second costs a column in a `multicall` and nothing else,
+   * and reading both is what makes `discriminates` answerable.
+   */
+  let censused: IssuerCensus | undefined
+  let censusInFlight: Promise<IssuerCensus | undefined> | undefined
+  const issuerCensus = (): Promise<IssuerCensus | undefined> => {
+    if (censused) return Promise.resolve(censused)
+    if (opts.checkIssuer === false) return Promise.resolve(undefined)
+    if (!censusInFlight) {
+      censusInFlight = readIssuerCensus({
+        credentials: opts.credentials ?? HOLONYM_CREDENTIALS,
+        ...(opts.archiveRpcUrls ? { rpcUrls: opts.archiveRpcUrls } : {}),
+        ...(opts.issuerCensusBlocks !== undefined ? { blocks: opts.issuerCensusBlocks } : {}),
+        ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+      })
+      censusInFlight
+        .then((census) => {
+          if (census) censused = census
+        })
+        .finally(() => {
+          censusInFlight = undefined
+        })
+    }
+    return censusInFlight
+  }
+
+  /**
    * The mapping first, `getSBT` only when the mapping says the SBT is live.
    *
    * That order is not an optimisation. `getSBT` reverts for expired, revoked and absent alike,
@@ -343,6 +476,7 @@ export function holonymAdapters(opts: HolonymOptions = {}): AdapterProbe[] {
 
   const probeOne = async (
     credential: HolonymCredential,
+    adapterId: string,
     subject: Address,
   ): Promise<AdapterProbeResult> => {
     try {
@@ -354,13 +488,24 @@ export function holonymAdapters(opts: HolonymOptions = {}): AdapterProbe[] {
       const detail: Record<string, unknown> = { ...verdict.detail }
       if (verdict.held) {
         if (verdict.issuedAt !== undefined) notes.push('date-from-expiry-and-max-term')
-        // Only meaningful for a credential we are actually counting, and it costs a call.
-        detail.uniquenessNullifierRegistered = await nullifierIsRegistered(
-          client,
-          subject,
-          credential,
-          record.publicValues![3]!,
-        )
+        // All three only meaningful for a credential we are actually counting, and all three cost
+        // calls. Issued together: the nullifier read is one `eth_call` at head, the sweep is a
+        // handful of archive reads and the census is a log window plus a `multicall`, so
+        // serialising them would add the slower ones to the faster.
+        const [registered, signers, census] = await Promise.all([
+          nullifierIsRegistered(client, subject, credential, record.publicValues![3]!),
+          signerHistory(),
+          issuerCensus(),
+        ])
+        detail.uniquenessNullifierRegistered = registered
+        applySignerHistory(signers, notes, detail)
+        applyIssuerCensus(census, credential, adapterId, notes, detail)
+      } else if (verdict.issuerMismatch) {
+        // The subject holds something and we are refusing it. Silence here is the failure mode:
+        // from outside, a refused credential and no credential at all look identical, and if the
+        // protocol has rotated its issuing key the refusal is ours rather than theirs.
+        notes.push('credential-issuer-not-recognised')
+        applyIssuerCensus(await issuerCensus(), credential, adapterId, notes, detail)
       }
 
       const provenance: ProbeProvenance = {
@@ -381,10 +526,75 @@ export function holonymAdapters(opts: HolonymOptions = {}): AdapterProbe[] {
     }
   }
 
-  return Object.entries(HOLONYM_CREDENTIALS).map(([adapterId, credential]) => ({
+  return Object.entries(opts.credentials ?? HOLONYM_CREDENTIALS).map(([adapterId, credential]) => ({
     adapterId,
-    probe: (subject: Address) => probeOne(credential, subject),
+    probe: (subject: Address) => probeOne(credential, adapterId, subject),
   }))
+}
+
+/**
+ * Fold a completed (or failed) issuer census into one credential's notes and detail.
+ *
+ * Pure and exported for the same reason `applySignerHistory` is: the outcomes are the point of the
+ * census and each is a different sentence to the person reading the score. Only `corroborated` is
+ * silent — the pin matched the chain this run, which is what the check exists to establish.
+ */
+export function applyIssuerCensus(
+  census: IssuerCensus | undefined,
+  credential: HolonymCredential,
+  adapterId: string,
+  notes: ProvenanceNote[],
+  detail: Record<string, unknown>,
+): void {
+  const verdict = issuerPinVerdict(census, credential, adapterId)
+  detail.issuerPin = issuerHex(credential.issuer)
+  detail.issuerPinStatus = verdict.status
+  if (verdict.status === 'uncorroborated') {
+    notes.push('attestation-issuer-uncorroborated')
+    return
+  }
+  detail.issuerPinObserved = verdict.observed
+  detail.issuerPinMatching = verdict.matchingPin
+  detail.issuerCensusFromBlock = census!.fromBlock
+  detail.issuerCensusHolders = census!.holders
+  // The control travels with the result: a pin that matched every class would be worth nothing,
+  // and this is the run's own evidence that `publicValues[4]` varies by credential class.
+  if (census!.discriminates !== undefined) detail.issuerCensusDiscriminates = census!.discriminates
+  if (verdict.status === 'corroborated') return
+  detail.unpinnedIssuers = verdict.unpinned
+  notes.push('attestation-issuer-unpinned-in-use')
+}
+
+/**
+ * Fold a completed (or failed) signer sweep into one credential's notes and detail.
+ *
+ * Pure, and exported, because the three outcomes are the whole point of the sweep and each of
+ * them is a different sentence to the person reading the score: the key has never moved, the key
+ * has moved, or we could not tell. Only the first is silent.
+ */
+export function applySignerHistory(
+  history: SignerHistory | undefined,
+  notes: ProvenanceNote[],
+  detail: Record<string, unknown>,
+): void {
+  if (!history) {
+    notes.push('attestation-authority-unverified')
+    return
+  }
+  const current = history.eras[history.eras.length - 1]!
+  detail.hubSigner = current.signer
+  detail.hubSignerSinceBlock = current.fromBlock
+  detail.hubSignerIsPinned = current.signer === HOLONYM_HUB_SIGNER
+  detail.hubSignerEras = history.eras.length
+  detail.hubSignerSampledBlocks = history.sampledBlocks.length
+  if (history.rotated) {
+    detail.hubSignerHistory = history.eras.map((e) => ({
+      signer: e.signer,
+      fromBlock: e.fromBlock,
+      ...(e.untilBlock !== undefined ? { untilBlock: e.untilBlock } : {}),
+    }))
+    notes.push('attestation-authority-rotated')
+  }
 }
 
 /**

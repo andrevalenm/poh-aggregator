@@ -1,20 +1,21 @@
 import { getAddress, isAddress, keccak256, namehash, parseAbi, toBytes, type Hex, type PublicClient } from 'viem'
 import { normalize } from 'viem/ens'
 import type { Address, Caveat } from './types.ts'
-import type { FleetAgent, HumanBacking } from './fleet.ts'
+import type { FleetAgent, HumanBacking, PresenterAuthentication } from './fleet.ts'
+import type { EnsPresentationResult } from './ens-presentation.ts'
 
 /**
  * ENS as the carrier of *agent* identity.
  *
- * `resolveSubject()` already reads `print.subjects` — a human naming their wallets. This
+ * `resolveSubject()` already reads `observer.print.subjects` — a human naming their wallets. This
  * file is the other half: an agent's name naming the human behind it, and that human's name
  * naming the agents it accepts responsibility for.
  *
  *   alpha.print.eth   addr                  → the agent's wallet
- *                           print.human     → print.eth
+ *                           observer.print.human     → print.eth
  *   print.eth         addr                  → the human's primary wallet
- *                  observer.print.subjects  → every wallet the human declares
- *                           print.agents    → the agent names the human acknowledges
+ *                           observer.print.subjects  → every wallet the human declares
+ *                           observer.print.agents    → the agent names the human acknowledges
  *
  * A counterparty handed `alpha.print.eth` resolves the whole picture from public
  * infrastructure — no server of ours, no registration with us, and no API key. That is the
@@ -22,7 +23,7 @@ import type { FleetAgent, HumanBacking } from './fleet.ts'
  *
  * ## Why the acknowledgement record exists, and why the cap is worthless without it
  *
- * `print.human` alone is a claim an agent makes about a person. Two failure modes follow,
+ * `observer.print.human` alone is a claim an agent makes about a person. Two failure modes follow,
  * and only the second is usually noticed:
  *
  *   1. **Riding a stranger.** An agent can name any address, including one holding a strong
@@ -33,7 +34,7 @@ import type { FleetAgent, HumanBacking } from './fleet.ts'
  *      the cap binds nothing — while every individual answer stays true.
  *
  * The fix is not more cryptography, it is the other direction: the human's own name publishes
- * `print.agents`, and a binding both ends assert is `mutual`. Writing that record costs a
+ * `observer.print.agents`, and a binding both ends assert is `mutual`. Writing that record costs a
  * transaction from the key that controls the human's name, so an operator can still mint humans
  * — but each one must be a name they control and pay for, and each one is then visibly a
  * *separate* human with a separate (usually empty) credential set. The evasion becomes
@@ -60,30 +61,27 @@ import type { FleetAgent, HumanBacking } from './fleet.ts'
 /** The ENS registry. Same address on every network; `owner(namehash("eth"))` confirms it. */
 export const ENS_REGISTRY = '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e' as const
 
-/**
- * Our ENS text-record keys, in the form ENSIP-5 actually requires.
- *
- * ENSIP-5 splits the namespace in two. A **Global Key** is "made up of lowercase letters,
- * numbers and the hyphen" and carries no dot — those are the curated, standardised ones
- * (`avatar`, `url`, `email`). A **Service Key** "must be made up of a reverse dot notation for
- * a namespace which the service owns" and "must contain at least one dot".
- *
- * Our first keys were `print.human`, `print.agents`, `print.subjects`, which satisfy neither
- * rule: they contain a dot, so they are Service Keys, but the notation is forward rather than
- * reverse. Reversed against the domain we actually own — print.observer — the correct form is
- * `observer.print.*`. Getting this right matters more than usual here, because we would like
- * the human-binding record to become a Global Key in a future ENSIP, and it is hard to argue
- * for a standard from a key that ignores the existing one.
- *
- * The legacy names are still read as a fallback: they are published in @printid/sdk and already
- * set on live Sepolia names, so dropping them would silently stop resolving records that exist.
- * Writes use the canonical key only.
- */
+/** Text record on an agent's name: the name or address of the human behind it. */
 export const AGENT_HUMAN_RECORD = 'observer.print.human'
+/** Text record on a human's name: the agent names that human acknowledges. */
 export const HUMAN_AGENTS_RECORD = 'observer.print.agents'
+/** Text record on a human's name: the wallets that human declares. Read by `resolveSubject`. */
 export const HUMAN_SUBJECTS_RECORD = 'observer.print.subjects'
 
-/** Pre-ENSIP-5-compliant keys, read-only, in the order they should be tried after the above. */
+/**
+ * Pre-ENSIP-5 key names, read-only.
+ *
+ * ENSIP-5 splits the namespace: a Global Key is "made up of lowercase letters, numbers and the
+ * hyphen" and carries no dot, while a Service Key "must be made up of a reverse dot notation
+ * for a namespace which the service owns". Our first keys — `print.human`, `print.agents`,
+ * `print.subjects` — contained a dot, so they were Service Keys written in forward notation,
+ * which satisfies neither rule. Reversed against the domain we own, print.observer, the correct
+ * form is `observer.print.*`.
+ *
+ * The old names are still read as a fallback: they are published in @printid/sdk and already set
+ * on live Sepolia names, so dropping them would silently stop resolving records that exist.
+ * Writes use the canonical key only.
+ */
 export const LEGACY_RECORD_KEYS = {
   [AGENT_HUMAN_RECORD]: 'print.human',
   [HUMAN_AGENTS_RECORD]: 'print.agents',
@@ -104,7 +102,7 @@ export const NEW_OWNER_TOPIC = '0xce0457fe73731f824cc272376169235128c118b49d3448
  *
  *  - `mutual`         both names assert it: the agent names the human, the human lists the agent.
  *  - `agent-asserted` only the agent says so. Scores the human's evidence, but see the header.
- *  - `unbound`        the agent's name carries no `print.human` record at all.
+ *  - `unbound`        the agent's name carries no `observer.print.human` record at all.
  *  - `unreadable`     the record could not be read. Not a negative — see the header.
  */
 export type EnsBinding = 'mutual' | 'agent-asserted' | 'unbound' | 'unreadable'
@@ -118,7 +116,7 @@ export interface EnsHuman {
   address?: Address
   /** `observer.print.subjects` — every wallet this human declares. Self-asserted. */
   subjects: Address[]
-  /** `print.agents` — the agent names this human acknowledges, normalized. */
+  /** `observer.print.agents` — the agent names this human acknowledges, normalized. */
   acknowledges: string[]
   /**
    * Stable key for the fleet engine.
@@ -174,11 +172,10 @@ function safeNormalize(name: string): string | undefined {
 /**
  * Read a text record, falling back to its pre-ENSIP-5 name.
  *
- * The canonical key is tried first, so a name that has migrated resolves in one call. Only an
- * *absent* record triggers the legacy read — an RPC failure is returned as an error rather than
- * being retried against the old key, because a transport failure is not evidence that a record
- * is missing, and silently degrading here would mean an unreachable resolver reads as
- * "this agent names no human".
+ * Only an ABSENT record triggers the legacy read. An RPC failure is returned as an error and
+ * never retried against the old key, because a transport failure is not evidence that a record
+ * is missing — degrading there would let an unreachable resolver read as "this agent names no
+ * human", which is the one direction this module must never fail in.
  */
 async function readText(
   client: PublicClient,
@@ -238,7 +235,7 @@ export interface ResolveEnsAgentOptions {
 /**
  * Resolve one agent name into an identity, plus the human it names.
  *
- * Four reads on the agent side (addr, `print.human`, registry owner) and three on the
+ * Four reads on the agent side (addr, `observer.print.human`, registry owner) and three on the
  * human side (addr, subjects, acknowledgements), issued concurrently within each side. The
  * human side cannot start until the agent's record names it, which is the one unavoidable
  * round trip.
@@ -414,8 +411,18 @@ export async function resolveEnsAgents(
  * An agent whose name carries no `addr` record still needs an address to be keyed on. Its node
  * hash is used, prefixed, so two such agents remain distinguishable and neither is mistaken for
  * a wallet.
+ *
+ * `presentations` are the results of the presenter gate (`ens-presentation.ts`), keyed by the
+ * normalized name each was issued for. They attach **per wallet**, not per name: a signature
+ * proves control of a key, and every name in this batch resolving to that key designates the
+ * same key — so authenticating under one of a wallet's names authenticates the wallet. Omit them
+ * and every agent arrives with no presenter field, which is what a caller with no challenge
+ * channel should look like.
  */
-export function toFleetAgents(identities: readonly EnsAgentIdentity[]): FleetAgent[] {
+export function toFleetAgents(
+  identities: readonly EnsAgentIdentity[],
+  presentations?: ReadonlyMap<string, EnsPresentationResult>,
+): FleetAgent[] {
   // Several names can carry the same `addr` record, and in ENS that is ordinary rather than
   // exotic — a name is an identity, a wallet is a key, and one key can be named many times.
   // The fleet engine keys agents by address, so two names for one wallet must be collapsed
@@ -424,18 +431,57 @@ export function toFleetAgents(identities: readonly EnsAgentIdentity[]): FleetAge
   const out: FleetAgent[] = []
   for (const id of identities) {
     if (!id.agent) {
-      out.push(fleetAgentOf([id], `0xname:${id.node.slice(2, 42)}` as unknown as Address))
+      out.push(fleetAgentOf([id], `0xname:${id.node.slice(2, 42)}` as unknown as Address, presentations))
       continue
     }
     const key = lower(id.agent)
     if (!byWallet.has(key)) byWallet.set(key, [])
     byWallet.get(key)!.push(id)
   }
-  for (const group of byWallet.values()) out.push(fleetAgentOf(group, group[0]!.agent!))
+  for (const group of byWallet.values()) {
+    out.push(fleetAgentOf(group, group[0]!.agent!, presentations))
+  }
   return out
 }
 
-function fleetAgentOf(group: readonly EnsAgentIdentity[], agent: Address): FleetAgent {
+/**
+ * Collapse a wallet's presentations into one answer.
+ *
+ * Any authentication wins, because one is all the claim needs: this key answered a challenge.
+ * Failing that, a definite refusal outranks an unreadable one — if one name's signature came back
+ * signed by the wrong wallet, that is a fact, and it should not be softened into `unknown` by a
+ * second name whose ERC-1271 read timed out.
+ */
+function presenterOf(
+  group: readonly EnsAgentIdentity[],
+  presentations?: ReadonlyMap<string, EnsPresentationResult>,
+): PresenterAuthentication | undefined {
+  if (!presentations) return undefined
+  const results = group.map((g) => presentations.get(g.name)).filter((r): r is EnsPresentationResult => !!r)
+  if (!results.length) return undefined
+
+  const ok = results.find((r) => r.status === 'authenticated')
+  if (ok) {
+    return {
+      status: 'authenticated',
+      detail: `${ok.address} signed this counterparty's challenge for ${ok.name}${
+        ok.method === 'erc-1271' ? ', verified by that account’s own ERC-1271 check' : ''
+      }`,
+    }
+  }
+  const refused = results.find((r) => r.status === 'unauthenticated')
+  if (refused) {
+    return { status: 'unauthenticated', detail: refused.error ?? `presentation for ${refused.name} was refused` }
+  }
+  const unknown = results[0]!
+  return { status: 'unknown', error: unknown.error ?? `presentation for ${unknown.name} could not be checked` }
+}
+
+function fleetAgentOf(
+  group: readonly EnsAgentIdentity[],
+  agent: Address,
+  presentations?: ReadonlyMap<string, EnsPresentationResult>,
+): FleetAgent {
   const label = group.map((g) => g.name).join(' + ')
   const blocks = group.map((g) => g.createdAtBlock).filter((b): b is number => b !== undefined)
   const registeredAtBlock = blocks.length ? Math.min(...blocks) : undefined
@@ -472,11 +518,13 @@ function fleetAgentOf(group: readonly EnsAgentIdentity[], agent: Address): Fleet
     }
   }
 
+  const presenter = presenterOf(group, presentations)
   return {
     agent,
     label,
     backing,
     ...(registeredAtBlock !== undefined ? { registeredAtBlock } : {}),
+    ...(presenter ? { presenter } : {}),
   }
 }
 
@@ -521,14 +569,36 @@ export function sharedWalletHumans(
     .map((v) => ({ wallet: v.wallet, humanIds: [...v.humanIds] }))
 }
 
-/** Caveats about the batch as a whole, to sit beside the fleet decision's own. */
-export function ensBatchCaveats(identities: readonly EnsAgentIdentity[]): Caveat[] {
+/**
+ * Caveats about the batch as a whole, to sit beside the fleet decision's own.
+ *
+ * Pass the presenter-gate results to have the authentication caveat describe what actually
+ * happened. With none — a caller that has no challenge channel — it says the same thing it has
+ * always said: nothing here authenticates anybody.
+ */
+export function ensBatchCaveats(
+  identities: readonly EnsAgentIdentity[],
+  presentations?: ReadonlyMap<string, EnsPresentationResult>,
+): Caveat[] {
   const caveats: Caveat[] = []
-  caveats.push({
-    code: 'agent-presenter-not-authenticated',
-    message:
-      'An ENS name says which wallet an agent is; it does not establish that the party presenting the name controls that wallet. That is a signature check the counterparty runs itself — the World AgentKit flow in this repo does it with CAIP-122.',
-  })
+  const named = identities.map((id) => presentations?.get(id.name))
+  const authenticated = named.filter((r) => r?.status === 'authenticated').length
+  if (authenticated === 0) {
+    caveats.push({
+      code: 'agent-presenter-not-authenticated',
+      message:
+        'An ENS name says which wallet an agent is; it does not establish that the party presenting the name controls that wallet. That is a signature check the counterparty runs itself — the World AgentKit flow in this repo does it with CAIP-122, and `verifyEnsPresentation` does it for a name.',
+    })
+  } else {
+    const unproven = identities.length - authenticated
+    caveats.push({
+      code: 'agent-presenter-authenticated',
+      message:
+        `${authenticated} of ${identities.length} name(s) in this batch were presented by a party that signed this counterparty's challenge with the wallet the name resolves to${
+          unproven > 0 ? `; the other ${unproven} was not, and everything read about it is a statement about a public name rather than about whoever is asking` : ''
+        }. A signature proves control of that key at this moment for this request. It does not prove the presenter is the agent's operator, does not stand in for the human's acknowledgement, and does not survive the addr record being rewritten by whoever owns the node.`,
+    })
+  }
   const wallets = new Map<string, string[]>()
   for (const id of identities) {
     if (!id.agent) continue

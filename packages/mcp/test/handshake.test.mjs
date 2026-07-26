@@ -18,8 +18,8 @@ before(() => {
   // LIVE runs get the self-hosted audit-trail subgraph so explain_weight_history is
   // exercised for real; an explicit env var always wins.
   const env = { ...process.env }
-  if (LIVE && !env.CORROBORATE_REGISTRY_SUBGRAPH_URL) {
-    env.CORROBORATE_REGISTRY_SUBGRAPH_URL = 'http://37.27.67.44:8100/subgraphs/name/corroborate-registry'
+  if (LIVE && !env.PRINT_REGISTRY_SUBGRAPH_URL) {
+    env.PRINT_REGISTRY_SUBGRAPH_URL = 'http://37.27.67.44:8100/subgraphs/name/corroborate-registry'
   }
   server = spawn('node', [join(root, 'dist/server.js')], { stdio: ['pipe', 'pipe', 'inherit'], env })
   let buf = ''
@@ -56,7 +56,7 @@ test('initialize handshake', async () => {
     capabilities: {},
     clientInfo: { name: 'handshake-test', version: '0' },
   })
-  assert.equal(init.result.serverInfo.name, 'corroborate')
+  assert.equal(init.result.serverInfo.name, 'print')
   server.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n')
 })
 

@@ -45,8 +45,8 @@ oracle, no payment** — `_refund()` returns any ETH you send. Minimum 28 days a
 It registers in ENSv1 and simultaneously reserves the label in the ENSv2 `.eth` registry, which
 is what "premigration" means.
 
-So: `print.eth` on Sepolia, registered in one transaction, expires 2027-07-25. The mainnet
-name is still the owner's call and still costs money; nothing in the SDK depends on which network the
+So: `corroborate.eth` on Sepolia, registered in one transaction, expires 2027-07-25. The mainnet
+name is still the maintainer's call and still costs money; nothing in the SDK depends on which network the
 name lives on.
 
 ### 1.1 The controller cannot set your records, and the revert says nothing
@@ -65,21 +65,21 @@ Confirmed by simulation rather than by reading alone: `eth_call` of `setText` on
 succeeds `from` the node owner and reverts `from` the controller address.
 
 The consequence for anyone building on this is small but real: **a name is briefly live without
-its records**. `ens-agents.ts` therefore treats a missing `print.human` as "this is not an
+its records**. `ens-agents.ts` therefore treats a missing `corroborate.human` as "this is not an
 agent name" rather than as an error.
 
 ## 2. The records
 
 ```
-print.eth                addr                 → the human's primary wallet
-                               print.subjects → every wallet the human declares
-                               print.agents   → the agent names the human acknowledges
-alpha.print.eth          addr                 → that agent's wallet
-                               print.human    → print.eth
+corroborate.eth                addr                 → the human's primary wallet
+                               corroborate.subjects → every wallet the human declares
+                               corroborate.agents   → the agent names the human acknowledges
+alpha.corroborate.eth          addr                 → that agent's wallet
+                               corroborate.human    → corroborate.eth
 ```
 
-`print.subjects` already existed (`resolveSubject()`, iteration ~0). `print.human`
-is the agent→human direction the ENS-for-agents track asks for. **`print.agents` is the
+`corroborate.subjects` already existed (`resolveSubject()`, iteration ~0). `corroborate.human`
+is the agent→human direction the ENS-for-agents track asks for. **`corroborate.agents` is the
 one this work added, and §4 is the argument for why it is not optional.**
 
 ## 3. A tree can be counted, but not named
@@ -118,15 +118,15 @@ free. Name a different wallet per agent and every agent is its own human. **The 
 nothing, and every individual answer stays true.** Nothing looks wrong: no agent is refused, and
 no rule reports a failure.
 
-The live tree carries this attack run against ourselves. `unverified.print.eth` names
-`0xA6b7471f…67b1` as its human — an address that is *already in `print.eth`'s own
-`print.subjects` list*. One operator, two humans, two slots, and the second one also
+The live tree carries this attack run against ourselves. `unverified.corroborate.eth` names
+`0xA6b7471f…67b1` as its human — an address that is *already in `corroborate.eth`'s own
+`corroborate.subjects` list*. One operator, two humans, two slots, and the second one also
 inherits a credential set (Holonym gov-ID + FaceTec biometrics + Human Passport, score 3.6087)
 that it never had to acquire.
 
 Two things close it, and neither is cryptography:
 
-1. **The other direction.** The human's name publishes `print.agents`. A binding both ends
+1. **The other direction.** The human's name publishes `corroborate.agents`. A binding both ends
    assert is `mutual`; a binding only the agent asserts is `agent-asserted`. Writing the
    acknowledgement costs a transaction from the key controlling the human's name, so minting
    humans stops being free — each mint must be a name you control and pay for, and each is then
@@ -158,11 +158,58 @@ accusation when it is wrong. The counterparty gets the observation.
 
 It establishes that whoever controls the human's name accepts this agent. It does not establish
 that the human is a distinct person, that they are *operating* the agent, or that the wallets in
-`print.subjects` are theirs — that last one is the pre-existing
+`corroborate.subjects` are theirs — that last one is the pre-existing
 `address-set-asserted-by-name-owner` caveat and it is unchanged. Nor does resolving a name
-authenticate the party presenting it: `agent-presenter-not-authenticated` fires on every batch,
-and pointing at the CAIP-122 signature gate in the World flow is the answer, not a claim that
-ENS solved it.
+authenticate the party presenting it — see §5.1, which was open when this file was written and
+is now closed.
+
+### 5.1 The presenter gate (added 2026-07-25)
+
+A name is public and so is everything read from it, so until this was built, anyone could type
+`alpha.corroborate.eth` into a counterparty's form and be scored on the credentials of the human
+behind it — riding a stranger's evidence with no key, no transaction and no trace, while the
+counterparty's own log named a party that was never there. `agent-presenter-not-authenticated`
+reported the gap honestly on every batch for four iterations. `packages/sdk/src/ens-presentation.ts`
+closes it: an ERC-4361 challenge the counterparty issues, a signature the presenter returns, and
+one comparison against the `addr` record read in the same pass.
+
+Four decisions in it are worth more than the code:
+
+- **The wallet signs, not the node owner.** Both keys exist and prove different things. The
+  wallet proves the presenter is the party the name currently designates — the party about to be
+  transacted with, and the key the fleet slot is allocated to. The owner would prove only control
+  of the *name*, so an operator pointing a name at a wallet it does not hold could present as
+  that wallet, which is the impersonation the gate exists to stop. Whether the signer *also* owns
+  the node is reported (`signerIsNodeOwner`, `agent-signer-owns-the-name`) because it says whether
+  the key in front of you can rewrite the records you just read — never as a condition.
+- **The name is inside the signed message**, as `ens:<name>` in ERC-4361 `Resources`, and a
+  signature carrying any other name is refused. Without it one signature authenticates its signer
+  for every name in the tree pointing at that wallet, and a signature collected for one name can
+  be presented for another. A signature that does not name what it authorises is a bearer token.
+  Both the unit suite and the live suite prove this with the *same nonce* on both challenges, so
+  the refusal can only come from the name binding.
+- **The gate runs before the grouping, not merely before the slot allocation.** An impostor
+  presenting a stranger's name must not be counted as one of that human's agents: grouping first
+  would let it inflate a stranger's fleet size and then have the stranger refused by the cap for
+  agents they never ran. Everything counted per human is counted over the agents that survived
+  the gate.
+- **Failure is three-valued.** A wrong-key signature is a fact about the presenter and is a
+  denial. A smart-account signature (ERC-1271/6492) needs a chain read, and a failed read says
+  nothing about anybody, so it comes back `unknown` → `indeterminate`. An EOA never touches the
+  network at all: local recovery first, chain second.
+
+`requirePresenterAuthentication` is the policy flag, off by default for the same reason
+`requireAttestedBinding` is — the World AgentKit path authenticates at the HTTP layer before it
+ever reaches this engine, and a policy demanding proof from a caller with no channel to collect
+it refuses everybody. `npm run ens` runs both sides: run 5 has each agent answer with its own key
+(2 of 3 admitted, unchanged from run 1–3 — proof costs an honest agent nothing), and run 6
+presents the *same three names* from a wallet generated a second earlier (0 of 3, identical
+records, identical human, identical score).
+
+What a signature here still does not prove: that the presenter is the agent's operator (keys are
+shared and stolen), that the named human consents to anything (that is the acknowledgement
+record), or anything at all after the `addr` record is rewritten by whoever owns the node. All
+three ship as `agent-presenter-authenticated-for-this-wallet-only`.
 
 ## 6. Two implementation details worth keeping
 
@@ -175,7 +222,7 @@ names settle the binding. If the names disagree about **which human** owns the w
 backing becomes `unknown` → `indeterminate`: a contradiction is not a fact about a person, and
 the engine has no business picking a side.
 
-**Canonicalising the human.** `print.human` may hold a name or an address. Both are keyed
+**Canonicalising the human.** `corroborate.human` may hold a name or an address. Both are keyed
 on the *resolved address* where there is one, so naming a human by name and by address is one
 human rather than two — otherwise "name it twice" would itself be a way to hold two slots.
 
@@ -191,3 +238,7 @@ human rather than two — otherwise "name it twice" would itself be a way to hol
   11,348,926; every field read back and recorded in `deployments/ens-sepolia.json`.
 - Live suite: `packages/sdk/src/ens-agents.live.test.ts` (14 tests), unit suite
   `packages/sdk/src/ens-agents.test.ts` (24 tests).
+- Presenter gate: `packages/sdk/src/ens-presentation.ts`, unit suite `ens-presentation.test.ts`
+  (31 tests, every signature real), live suite `ens-presentation.live.test.ts` (7 tests against
+  the Sepolia tree). ERC-4361 message construction and parsing via `viem/siwe`; the ERC-1271
+  branch via viem's `verifyMessage`, exercised against a live Sepolia node in the live suite.

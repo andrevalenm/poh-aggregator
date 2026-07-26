@@ -310,10 +310,15 @@ All from this box, 2026-07-25, no API key anywhere:
 
 ## 8. Open questions
 
-1. **When did `changeDurations` fire, and what were the intermediate values?** The term was
-   365.25 days at block 12,012,815 and is 730.5 days now. Locating the change would let us say
-   which cohorts were scored against which term; it does not affect any answer today, because the
-   probe never applies a term itself. Cheap to close: bisect `submissionDuration()` over history.
+1. ~~**When did `changeDurations` fire, and what were the intermediate values?**~~ **CLOSED
+   2026-07-25.** Bisected over archive state on `gateway.tenderly.co/public/mainnet`: the term is
+   31,557,600 s at block **14,330,754** and 63,115,200 s at **14,330,755**, whose header timestamp
+   is **1,646,535,074** (2022-03-06T02:51:14Z), and it has been 730.5 days ever since. One
+   transition, found by bisection, so an earlier one between it and the deployment cannot be ruled
+   out by the search alone — the endpoints are pinned either way. It started to matter the moment
+   the adapter began reporting a lapsed registration's *window*, since the window is
+   `submissionTime + submissionDuration()`; see `poh-lapsed-credentials.md` §3.1, and the live
+   test that now pins all three readings.
 2. **What are the six unmatched `PUSH4` constants in the v1 bytecode?** `0x093225f1`,
    `0x1c3db16d`, `0x2e848506`, `0x49912f88`, `0x76390dc6`, `0x791f8b73`, `0xafe15cfb`,
    `0xb4dfe93d`, `0xc13517e1`, `0xdeb8f707`, `0xf23f16e6`, `0xf7434ea9` all revert on a bare

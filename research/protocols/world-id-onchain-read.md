@@ -26,6 +26,14 @@ Both halves of that were understatements in opposite directions.
 
 Both are fixed by a different contract on the same chain, which the earlier pass did not reach.
 
+*Amended 2026-07-25 (iteration 12):* the date half is also fixed **in AgentBook itself**. The
+mapping carries no timestamp, but the write emits `AgentRegistered`, so the registration's block is
+the second the contract accepted a group-1 proof for that address. A wallet held only through
+AgentBook is now dated from it —
+[`world-agentbook-fleets.md`](world-agentbook-fleets.md) §7 for the query, the canary that keeps a
+truncating endpoint from turning "no log" back into "no date", and what the two dates mean when
+both registries answer.
+
 ## 2. `WorldIDAddressBook` — the registry World populates
 
 `0x57b930D551e677CC36e2fA036Ae2fe8FdaE0330D`, World Chain mainnet. Verified source on Blockscout,

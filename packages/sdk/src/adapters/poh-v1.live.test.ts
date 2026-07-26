@@ -258,6 +258,119 @@ describe('Proof of Humanity v1 — live', () => {
     })
   })
 
+  test('a lapsed registration reports the window the contract itself honoured', async (t) => {
+    await onChain(t, 'lapsed window', async () => {
+      // Same discovery as the boundary test above, because the same state is what makes a
+      // window: `registered` still true, the term run out. What is asserted is different —
+      // that both ends the probe reports are the ends the registry actually enforced, checked
+      // against archive state on either side of them.
+      const term = Number(await AT<bigint>('submissionDuration', []))
+      const now = Math.floor(Date.now() / 1000)
+      const windowEnd = await blockAtTimestamp(now - 2 * term)
+      const candidates: Address[] = []
+      for (let step = 0; step < 12 && candidates.length === 0; step++) {
+        const to = windowEnd - step * 50_000
+        candidates.push(...(await submissionEventAddresses(to - 49_999, to)).keys())
+      }
+
+      let lapsed: { who: Address; submissionTime: number } | undefined
+      for (const who of candidates) {
+        const info = await AT<Info>('getSubmissionInfo', [who])
+        const submissionTime = Number(info[1])
+        const forkRemoved = await c.readContract({
+          address: POH_V1_FORK_MODULE,
+          abi: POH_V1_FORK_MODULE_ABI,
+          functionName: 'removed',
+          args: [who],
+        })
+        if (info[3] && !forkRemoved && submissionTime > 0 && submissionTime + term < now - 3600) {
+          lapsed = { who, submissionTime }
+          break
+        }
+      }
+      assert.ok(lapsed, 'no expired-but-flagged submission found in the sampled window')
+
+      const probe = await pohV1Adapter().probe(lapsed.who)
+      assert.equal(probe.held, false, 'a closed window is not a credential today')
+      assert.equal(probe.issuedAt, lapsed.submissionTime)
+      assert.equal(probe.heldUntil, lapsed.submissionTime + term)
+      assert.ok(probe.provenance?.notes.includes('date-from-lapsed-verification'))
+
+      // The registry's own answer, on both sides of each end of the reported window. This is
+      // the claim: the subject held this credential for exactly the interval we hand back.
+      const startBlock = await blockAtTimestamp(probe.issuedAt!)
+      const endBlock = await blockAtTimestamp(probe.heldUntil! + 1)
+      const [beforeStart, atStart, beforeEnd, afterEnd] = await Promise.all([
+        AT<boolean>('isRegistered', [lapsed.who], BigInt(startBlock - 1)),
+        AT<boolean>('isRegistered', [lapsed.who], BigInt(startBlock)),
+        AT<boolean>('isRegistered', [lapsed.who], BigInt(endBlock - 1)),
+        AT<boolean>('isRegistered', [lapsed.who], BigInt(endBlock)),
+      ])
+      assert.equal(beforeStart, false, 'the registry did not honour this address before the window')
+      assert.equal(atStart, true, 'and did from the block the window opens in')
+      assert.equal(beforeEnd, true, 'still honoured one block before the window closes')
+      assert.equal(afterEnd, false, 'and not after')
+
+      // Which is what `asOf` consumes: an instant inside the window is a credential, the
+      // instant it ended is not, and the restore is priced at what it was worth then.
+      const { applyAsOfToEvidence } = await import('../as-of.ts')
+      const entry = entryFor('poh-v1') as Adapter
+      const adapters = new Map<string, Adapter>([[entry.id, entry]])
+      const evidence = [
+        {
+          adapterId: 'poh-v1',
+          adapterName: entry.name,
+          evidenceClass: entry.evidenceClass,
+          trustRoot: entry.trustRoot,
+          observedOn: lapsed.who,
+          forgeCostCents: entry.forgeCostCents,
+          rentCostCents: entry.rentCostCents,
+          live: entry.live,
+          sourceURI: entry.sourceURI,
+          held: false,
+          issuedAt: probe.issuedAt,
+          heldUntil: probe.heldUntil,
+          freshness: 0.5,
+          effectiveCostCents: 0,
+        },
+      ]
+      const midpoint = Math.floor((probe.issuedAt! + probe.heldUntil!) / 2)
+      const inside = applyAsOfToEvidence(evidence, midpoint, adapters)
+      assert.equal(inside.evidence[0]!.held, true)
+      assert.deepEqual(inside.ceasedAfterAsOf, ['poh-v1'])
+      assert.ok(inside.evidence[0]!.effectiveCostCents > 0)
+      assert.equal(applyAsOfToEvidence(evidence, probe.heldUntil!, adapters).evidence[0]!.held, false)
+
+      t.diagnostic(
+        `${lapsed.who}: held ${new Date(probe.issuedAt! * 1000).toISOString()} → ${new Date(probe.heldUntil! * 1000).toISOString()}, honoured by the registry across exactly that range`,
+      )
+    })
+  })
+
+  test('the term these windows are computed from has not moved since 2022-03-06', async (t) => {
+    await onChain(t, 'term history', async () => {
+      // A window is `submissionTime + submissionDuration()`, and `submissionDuration` is
+      // governance-settable — so a change would move every window this adapter reports,
+      // including into the past. It has changed exactly once that a bisection over archive
+      // state can find: 365.25 days until block 14,330,754 and 730.5 days from 14,330,755.
+      // Every as-of instant this SDK can be asked about is after the registry's own genesis
+      // (2026-07-25), four years the other side of that, so today's term is the term that
+      // governed every window we can be asked to decide. This test is what tells us the day
+      // that stops being true.
+      const CHANGED_AT_BLOCK = 14_330_755
+      const [before, at, head] = await Promise.all([
+        AT<bigint>('submissionDuration', [], BigInt(CHANGED_AT_BLOCK - 1)),
+        AT<bigint>('submissionDuration', [], BigInt(CHANGED_AT_BLOCK)),
+        AT<bigint>('submissionDuration', []),
+      ])
+      assert.equal(Number(before), 31_557_600, 'the term before the change was 365.25 days')
+      assert.equal(Number(at), POH_V1_SUBMISSION_DURATION, 'and 730.5 days from that block on')
+      assert.equal(Number(head), POH_V1_SUBMISSION_DURATION, 'and has been ever since')
+      const block = await c.getBlock({ blockNumber: BigInt(CHANGED_AT_BLOCK) })
+      assert.equal(Number(block.timestamp), 1_646_535_074)
+    })
+  })
+
   test('the probe’s answer is the contract’s answer, on whoever the chain hands us', async (t) => {
     await onChain(t, 'probe agreement', async () => {
       const head = Number(await c.getBlockNumber())
@@ -291,7 +404,19 @@ describe('Proof of Humanity v1 — live', () => {
           `${who}: probe says ${r.held}, chain says isRegistered=${onChainAnswer} removed=${retired}`,
         )
         if (!r.held) {
-          assert.equal(r.issuedAt, undefined, `${who} is not held and yet carries a date`)
+          // A date on an unheld credential is only ever the open end of a *closed* window: the
+          // registry dated the ending too. Anything else would be a live credential's date on a
+          // dead credential, which is the confusion this adapter exists to avoid.
+          if (r.issuedAt !== undefined) {
+            assert.ok(
+              r.heldUntil !== undefined && r.heldUntil > r.issuedAt,
+              `${who} is not held and carries a date with no ending`,
+            )
+            assert.ok(
+              r.heldUntil! <= Math.floor(Date.now() / 1000),
+              `${who}: a credential that ended in the future is not a credential that ended`,
+            )
+          }
           continue
         }
         held++

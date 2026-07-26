@@ -20,3 +20,10 @@ contracts/out/
 contracts/forge-out/
 contracts/lib/
 cache/
+
+# Internal build-harness and scratch files — never part of the published project.
+MISSION.md
+PROGRESS.md
+go.sh
+scripts/ax41-agent-*.sh
+.scratch-*.mjs

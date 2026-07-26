@@ -45,6 +45,7 @@ import {
   VERAX_PORTAL_REGISTRY,
   type LineaPohSnapshot,
 } from './linea-poh.ts'
+import { applyAsOfToEvidence } from '../as-of.ts'
 import type { Address } from '../types.ts'
 
 /** Nobody holds the key to this address, so nobody has ever verified with it. */
@@ -426,6 +427,156 @@ describe('the enumeration', () => {
       assert.equal(snap.bySubject.get(subject)![0]!.attestedDate, attestedDate, subject)
     }
   })
+
+  test('every closed window is inside the scan, non-empty, and already over', async () => {
+    const snap = await snapshot()
+    assert.ok(snap.endedBySubject.size > 0, 'no ended windows at all, so nothing below proved anything')
+    for (const [key, list] of snap.endedBySubject) {
+      assert.match(key, /^0x[0-9a-f]{40}$/)
+      for (const w of list) {
+        assert.equal(w.subject, key)
+        assert.ok(w.endedAt > w.attestedDate, `${key}: window ends before it starts`)
+        assert.ok(w.endedAt <= snap.takenAt, `${key}: a window that has not closed is not an ending`)
+        assert.ok(w.endedAt <= w.expirationDate, `${key}: ended after its own term ran out`)
+        assert.ok(
+          w.attestedDate >= snap.scannedFromDate,
+          `${key}: attested before the scan's own floor, which cannot happen`,
+        )
+      }
+      for (let i = 1; i < list.length; i++) assert.ok(list[i - 1]!.endedAt >= list[i]!.endedAt)
+    }
+    // The two maps answer different questions and a subject in both is a renewal, not a fault —
+    // but a *live* attestation must never be the thing that produced a window.
+    for (const [key, live] of snap.bySubject) {
+      for (const w of snap.endedBySubject.get(key) ?? []) {
+        assert.ok(
+          live.every((a) => a.attestationId !== w.attestationId),
+          `${key}: one attestation is reported both live and ended`,
+        )
+      }
+    }
+  })
+
+  test('nothing below the window ended after the instant we claim endings from — chain alone', async () => {
+    // The coverage claim, proved the same way the live population's lower edge is: with no
+    // second party in it. `endingsCompleteFrom` says every ending at or after that instant is
+    // inside the scan. Monotonicity says everything below `scannedFromId` was attested earlier;
+    // this reads those ids and requires each one to have *finished* before the claim starts. An
+    // ending sitting above the line down here would mean we report an exhaustive absence over a
+    // period we did not actually read.
+    const snap = await snapshot()
+    const below = 600
+    const from = Math.max(1, snap.scannedFromId - below)
+    const ids: number[] = []
+    for (let id = from; id < snap.scannedFromId; id++) ids.push(id)
+
+    let ours = 0
+    for (let i = 0; i < ids.length; i += 200) {
+      const results = await client.multicall({
+        contracts: ids.slice(i, i + 200).map((id) => ({
+          address: VERAX_ATTESTATION_REGISTRY,
+          abi: ATTESTATION_REGISTRY_ABI,
+          functionName: 'getAttestation' as const,
+          args: [idToBytes32(id)] as const,
+        })),
+        allowFailure: true,
+        blockNumber: BigInt(snap.block),
+      })
+      for (const r of results) {
+        if (r.status !== 'success') continue
+        const a = r.result as {
+          schemaId: `0x${string}`
+          expirationDate: bigint
+          revocationDate: bigint
+          revoked: boolean
+          subject: `0x${string}`
+        }
+        if (a.schemaId !== LINEA_POH_V2_SCHEMA) continue
+        ours++
+        const ended = a.revoked && Number(a.revocationDate) > 0
+          ? Math.min(Number(a.revocationDate), Number(a.expirationDate))
+          : Number(a.expirationDate)
+        assert.ok(
+          ended < snap.endingsCompleteFrom,
+          `an attestation below the scan ended at ${ended}, after endingsCompleteFrom ${snap.endingsCompleteFrom} (subject ${a.subject}) — the coverage claim is too wide`,
+        )
+      }
+    }
+    assert.ok(ours > 0, 'no PoH attestations below the window at all, so this proved nothing')
+    // And the claim is worth something: it has to reach back past the live window, or the extra
+    // ids we paid for bought no history at all.
+    assert.ok(
+      snap.endingsCompleteFrom < snap.takenAt,
+      'endings are complete only from this instant, which means no window is exhaustively known',
+    )
+  })
+
+  test('the endings the chain gives us are the endings an independent indexer gives us', async (t) => {
+    // The live-population test's twin, over the other half of the scan. Set equality again, so a
+    // single window we failed to close fails this — and pinned to the same block and the same id
+    // range, so the two sources are answering exactly the same question.
+    const snap = await snapshot()
+    type Row = {
+      id: string
+      subject: string
+      attestedDate: string
+      expirationDate: string
+      revocationDate: string
+      revoked: boolean
+    }
+    // Paged by id, because the lapsed half of this window is larger than the live half by
+    // design — a page cap here would silently compare a prefix and call it set equality.
+    const rows: Row[] = []
+    let cursor = BigInt(snap.scannedFromId) - 1n
+    try {
+      for (let page = 0; page < 20; page++) {
+        const data = await graphql(`{
+          attestations(first: 1000, orderBy: id, orderDirection: asc, block: {number: ${snap.block}}, where: {
+            schema: "${LINEA_POH_V2_SCHEMA}",
+            id_gt: "${`0x${cursor.toString(16).padStart(64, '0')}`}",
+            attestedDate_gte: ${snap.scannedFromDate},
+            expirationDate_lte: ${snap.takenAt}
+          }) { id subject attestedDate expirationDate revocationDate revoked }
+        }`)
+        const page_ = data['attestations'] as Row[]
+        rows.push(...page_)
+        if (page_.length < 1000) break
+        cursor = BigInt(page_[page_.length - 1]!.id)
+      }
+    } catch (e) {
+      skipUnreachable(t, 'the Verax subgraph', e)
+      return
+    }
+
+    // The indexer is asked only for *expired* attestations, because a revocation date is not a
+    // filterable ordering there. Ours is restricted the same way, so the comparison is exact
+    // rather than nearly — a revoked-before-expiry window is a different set on both sides.
+    const ourExpired = new Map<string, number>()
+    for (const [subject, list] of snap.endedBySubject) {
+      for (const w of list) {
+        if (w.revoked) continue
+        if (Number(BigInt(w.attestationId)) >= snap.counter) continue
+        ourExpired.set(subject, Math.max(ourExpired.get(subject) ?? 0, w.endedAt))
+      }
+    }
+    const indexed = new Map<string, number>()
+    for (const r of rows) {
+      if (r.revoked) continue
+      if (Number(BigInt(r.id)) >= snap.counter) continue
+      if (Number(BigInt(r.id)) < snap.scannedFromId) continue
+      const key = r.subject.toLowerCase()
+      indexed.set(key, Math.max(indexed.get(key) ?? 0, Number(r.expirationDate)))
+    }
+
+    const missing = [...indexed.keys()].filter((s) => !ourExpired.has(s))
+    const extra = [...ourExpired.keys()].filter((s) => !indexed.has(s))
+    assert.deepEqual(missing, [], `the enumeration missed ${missing.length} lapsed subjects`)
+    assert.deepEqual(extra, [], `the enumeration invented ${extra.length} lapsed subjects`)
+    assert.ok(indexed.size > 0, 'the indexer reports no lapsed subjects in range, so this proved nothing')
+    for (const [subject, endedAt] of indexed) {
+      assert.equal(ourExpired.get(subject), endedAt, `${subject}: the two sources date the ending differently`)
+    }
+  })
 })
 
 describe('the probe', () => {
@@ -460,6 +611,109 @@ describe('the probe', () => {
     assert.ok(Number(result.detail?.['liveSubjects']) > 0)
     assert.ok(Number(result.detail?.['scannedIds']) > 0)
     assert.equal(Number(result.detail?.['attestationIdCounter']) > 6_000_000, true)
+  })
+
+  /**
+   * The acceptance test for the lapsed window: *the window we hand back is a window the subject
+   * really had, and an as-of score can only see them inside it.*
+   *
+   * A subject is sampled out of the ended population at run time — nothing is pinned — and the
+   * window the probe reports is then held against the registry's own record for that attestation
+   * re-read at head, and against `applyAsOfToEvidence`, which is the only consumer of `heldUntil`
+   * that exists. Restored at the midpoint of a life that really happened; absent one second after
+   * it ended, and one second before it began.
+   */
+  test('a lapsed subject is a closed window, restorable inside it and nowhere else', async () => {
+    const snap = await snapshot()
+    // Someone with no live attestation: a renewal would be reported as held, and this is about
+    // the credential that ended.
+    const entry = [...snap.endedBySubject.entries()].find(([s]) => !snap.bySubject.has(s))
+    assert.ok(entry, 'no subject with only a lapsed attestation, so this proved nothing')
+    const [subject, windows] = entry
+    const window = windows[0]!
+
+    const result = await lineaPohAdapter().probe(subject as Address)
+    assert.equal(result.error, undefined)
+    assert.equal(result.held, false, 'a lapsed credential is not held')
+    assert.equal(result.issuedAt, window.attestedDate)
+    assert.equal(result.heldUntil, window.endedAt)
+    assert.ok(result.provenance?.notes.includes('date-from-lapsed-verification'))
+    assert.equal(result.provenance?.dateFrom, 'chain')
+
+    // The registry, re-read at head rather than out of the snapshot: both ends of the window
+    // have to still be the numbers Verax holds.
+    const onChain = (await client.readContract({
+      address: VERAX_ATTESTATION_REGISTRY,
+      abi: ATTESTATION_REGISTRY_ABI,
+      functionName: 'getAttestation',
+      args: [window.attestationId],
+    })) as {
+      subject: `0x${string}`
+      attestedDate: bigint
+      expirationDate: bigint
+      revocationDate: bigint
+      revoked: boolean
+    }
+    assert.equal(onChain.subject.toLowerCase(), subject)
+    assert.equal(Number(onChain.attestedDate), result.issuedAt)
+    assert.equal(
+      Number(onChain.revoked && Number(onChain.revocationDate) > 0
+        ? Math.min(Number(onChain.revocationDate), Number(onChain.expirationDate))
+        : Number(onChain.expirationDate)),
+      result.heldUntil,
+    )
+
+    // And the thing the window is *for*. `applyAsOfToEvidence` is what a historical score runs,
+    // and it must put this credential back inside the life it had and nowhere else.
+    const ontology = (await import('../ontology-data.json', { with: { type: 'json' } })).default
+    const entryFor = ontology.adapters.find((a: { id: string }) => a.id === 'linea-poh')!
+    const adapters = new Map([
+      [
+        'linea-poh',
+        {
+          id: 'linea-poh',
+          name: entryFor.name,
+          evidenceClass: entryFor.evidenceClass,
+          trustRoot: entryFor.trustRoot,
+          forgeCostCents: entryFor.forgeCostCents,
+          rentCostCents: entryFor.rentCostCents,
+          decayHalfLifeDays: entryFor.decayHalfLifeDays,
+          ageCurve: entryFor.ageCurve,
+          live: entryFor.live,
+          sourceURI: entryFor.sourceURI,
+        } as never,
+      ],
+    ])
+    const evidence = [
+      {
+        adapterId: 'linea-poh',
+        adapterName: entryFor.name,
+        evidenceClass: entryFor.evidenceClass,
+        trustRoot: entryFor.trustRoot,
+        observedOn: subject as Address,
+        forgeCostCents: entryFor.forgeCostCents,
+        rentCostCents: entryFor.rentCostCents,
+        live: entryFor.live,
+        sourceURI: entryFor.sourceURI,
+        held: false,
+        issuedAt: result.issuedAt!,
+        heldUntil: result.heldUntil!,
+        freshness: 0.5,
+        effectiveCostCents: 0,
+      } as never,
+    ]
+    const midpoint = Math.floor((result.issuedAt! + result.heldUntil!) / 2)
+    const inside = applyAsOfToEvidence(evidence, midpoint, adapters)
+    assert.deepEqual(inside.ceasedAfterAsOf, ['linea-poh'], 'not restored at the middle of its own life')
+    assert.equal(inside.evidence[0]!.held, true)
+    assert.ok((inside.evidence[0]!.effectiveCostCents ?? 0) > 0, 'restored and priced at nothing')
+
+    const atEnd = applyAsOfToEvidence(evidence, result.heldUntil!, adapters)
+    assert.deepEqual(atEnd.ceasedAfterAsOf, [], 'still held at the second it stopped counting')
+    assert.equal(atEnd.evidence[0]!.held, false)
+
+    const before = applyAsOfToEvidence(evidence, result.issuedAt! - 1, adapters)
+    assert.deepEqual(before.ceasedAfterAsOf, [], 'held before it was ever attested')
   })
 
   test('an unreachable endpoint is an error, never a person who failed a liveness check', async () => {

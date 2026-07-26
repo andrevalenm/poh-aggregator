@@ -22,6 +22,10 @@
  *
  *   - the chain decides whether a credential is held *now* (a revocation must not be
  *     invisible for as long as the index lags)
+ *   - when the chain cannot be read at all, the index answers alone only for a credential
+ *     class whose every ending it observes. Otherwise the credential is *unreadable* — not
+ *     absent, not present — because "the index has it and has not seen it end" is then a fact
+ *     about which events the mapping handles rather than about the subject
  *   - the date comes from the most authoritative source available: the contract when the
  *     protocol exposes one, else the index at its named block, else a bound derived from
  *     the index's own absence, else nothing — and which one it was is always reported
@@ -33,11 +37,13 @@ export interface ProbeProvenance {
   /** Which source decided `held`. */
   heldFrom: 'chain' | 'index'
   /**
-   * Which source dated the credential. 'index-absence-bound' means the date is not known but
-   * is bounded: the credential was absent from a complete index at `indexedBlock`, so it was
-   * issued after that block's timestamp.
+   * Which source dated the credential. The two `-bound` values mean the date is not known but
+   * is bounded from below: `index-absence-bound` because the credential was absent from a
+   * complete index at `indexedBlock`, so it was issued after that block's timestamp;
+   * `index-side-event-bound` because the index holds the credential only through an event that
+   * provably preceded its issuance, so it was issued after *that*.
    */
-  dateFrom: 'chain' | 'index' | 'index-absence-bound' | 'none'
+  dateFrom: 'chain' | 'index' | 'index-absence-bound' | 'index-side-event-bound' | 'none'
   /** Block the index had reached. Present whenever the index answered at all. */
   indexedBlock?: number
   /** Timestamp of `indexedBlock`, when it could be established. */
@@ -64,12 +70,30 @@ export type ProvenanceNote =
   | 'index-unreachable'
   /** The index answered but cannot see this credential's history (windowed data source). */
   | 'index-outside-coverage'
+  /**
+   * The contract read failed *and* the index does not observe every way this credential class
+   * can end, so the index can say the credential once existed and cannot say it still does.
+   * The credential is excluded as unreadable rather than counted on the index's say-so.
+   *
+   * This is the mirror of `credential-ceased-since-index`. There the chain answered and
+   * overruled a stale index; here nothing can, so the only honest answer is that we could not
+   * read the credential — in *either* direction. An index that has seen a revocation may have
+   * missed the re-grant that undid it just as easily.
+   */
+  | 'index-cannot-see-endings'
   /** Held on chain, absent from an index with complete history: age is bounded, not unknown. */
   | 'credential-not-yet-indexed'
   /** The index has it, the chain does not: revoked, expired or transferred since the index. */
   | 'credential-ceased-since-index'
   /** The index's date came from a side-event, so it is a lower bound on age, not the date. */
   | 'index-date-is-lower-bound'
+  /**
+   * The index's date came from a side-event that provably happened *before* issuance (a vouch is
+   * cast on a claim that has not resolved yet), so it does not date the credential at all — it
+   * bounds it. Using it as the date would make the credential look older than it is, and on a
+   * survival ramp older is worth more, so this is the one direction that pays an adversary.
+   */
+  | 'index-date-precedes-issuance'
   /** Index and contract disagree about the issuance date by more than the tolerance. */
   | 'index-date-disagrees-with-chain'
   /** The contract read failed, so nothing confirms the index's state is still current. */
@@ -97,6 +121,117 @@ export type ProvenanceNote =
    * direction the curve runs: a ceiling under `Decay`, a floor under `Ramp`.
    */
   | 'date-from-latest-reattestation'
+  /**
+   * The credential is held through a registry that records a binding and never an expiry, so the
+   * date is the block that registration was mined in — the moment the protocol last accepted a
+   * proof for this address. The enrolment behind it is older and is not published, so the weight
+   * is a ceiling under `Decay` and a floor under `Ramp`, exactly as for a re-attestation.
+   */
+  | 'date-from-agent-registration'
+  /**
+   * The credential is not held now and the registry keeps the term of the binding that ended, so
+   * the date is the start of a *closed window* — `heldUntil` is its other end. It dates nothing
+   * about today, and exists so an as-of score can decide whether an instant falls inside a
+   * credential the subject has since lost. Nothing at head weighs it: the credential is absent.
+   *
+   * Three registries produce it, and every one of them is a registry that declines to delete:
+   * `WorldIDAddressBook` keeps a lapsed `addressVerifiedUntil` forever, PoH v1 never clears
+   * `submission.registered` when a term runs out, and PoH v2 leaves `owner` and `expirationTime`
+   * on an expired humanity. A protocol that erases the ending instead cannot produce this note,
+   * and its credentials stay invisible to an as-of score — which is the honest outcome, not a
+   * gap to paper over.
+   */
+  | 'date-from-lapsed-verification'
+  /**
+   * The credential has a dated ending and no usable start, so the window cannot be closed and
+   * an as-of score can prove nothing about it. Reported rather than absorbed: a subject whose
+   * evidence is excluded for want of a date should be told which credential and why.
+   */
+  | 'lapsed-credential-start-undated'
+  /**
+   * The holder has irreversibly given up the *economic* half of the credential while keeping the
+   * registration — a Circles avatar that called `stop()`. It is emphatically not an ending: the
+   * protocol's own personhood predicate still returns true, so the credential is held and
+   * scored, and this says the address is one a human has probably walked away from. It exists
+   * because the alternative was to read it as a revocation, which made the same subject held at
+   * head and not-held whenever the chain read failed.
+   */
+  | 'credential-minting-stopped'
+  /**
+   * The credential is held on the strength of a record whose issuer we could not check this run.
+   * The protocol publishes an issuer and the probe normally pins it — a mismatch is a statement
+   * and returns the credential as not held — so this says the *check* did not happen, not that it
+   * failed. It is the authority-side twin of `freshness-check-unavailable`: an unreadable source
+   * may never be turned into a claim about a person, in either direction.
+   */
+  | 'issuer-check-unavailable'
+  /**
+   * The credential's term was set by another instance of the same protocol on another chain, and
+   * the date here is the registration *that* instance publishes — read from its own state, and
+   * required to reproduce this credential's expiry to the second before it is believed.
+   *
+   * It is the correct date rather than a conservative one, and usually the older of the two: PoH
+   * v2 on Gnosis imports humanities whose term was set by PoH v1 on mainnet, whose term is twice
+   * as long, so subtracting the local term reported a two-year-old credential as one year old.
+   */
+  | 'date-from-origin-instance'
+  /**
+   * The credential's date was derived from a term this run could not attribute. The protocol lets
+   * another instance write an expiry it did not compute, the probe normally reads the log that
+   * says which credentials those are, and this says that read did not answer — not that it found
+   * anything. The date stands on the assumption the check exists to test.
+   */
+  | 'term-origin-unverified'
+  /**
+   * The credential exists because one key signed for it, and the registry's record of which key
+   * that is has changed during its life. Nothing in the registry re-checks a stored credential, so
+   * one signed under a key that has since been rotated out reads as valid forever and the issuer
+   * pin cannot tell the difference — the issuer is a field the same signer supplied.
+   *
+   * It is the authority-side twin of `date-from-registry-import`: not a statement that this
+   * credential is wrong, a statement that the registry contains credentials attributable to more
+   * than one authority and this one is not distinguished from them without dating it.
+   */
+  | 'attestation-authority-rotated'
+  /**
+   * Whether the registry's signing authority has ever changed could not be established this run.
+   * The protocol keeps it in a storage slot with no getter and changes it without an event, so the
+   * check is a historical read that can simply fail — and a failed read is never reported as an
+   * unchanged key, for the same reason `freshness-check-unavailable` exists.
+   */
+  | 'attestation-authority-unverified'
+  /**
+   * The subject **does** hold a record of this credential class, and it is attributed to an issuer
+   * this package does not recognise — so it is refused rather than counted.
+   *
+   * It is the one note that describes evidence deliberately thrown away, and it exists because
+   * throwing it away silently is indistinguishable, from outside, from the subject holding nothing
+   * at all. A registry where anyone may run their own issuing key mints a self-signed credential
+   * and a real one under the same identifier, and only the issuer separates them; a subject whose
+   * credential is refused on that basis is owed the reason, and so is anyone reading the score.
+   */
+  | 'credential-issuer-not-recognised'
+  /**
+   * Live credentials of this class are being issued under a key this package does not pin.
+   *
+   * The pin is the only thing separating a real credential from a self-signed one, and it is a
+   * value copied from the protocol's own source rather than declared on chain. If the protocol
+   * rotates or adds an issuing key, the pin goes on matching nothing new and every subsequent
+   * holder is refused — quietly, one at a time. This says the chain's own live credentials no
+   * longer all agree with the pin, which is the only warning available before that happens.
+   */
+  | 'attestation-issuer-unpinned-in-use'
+  /**
+   * Whether the issuer this package pins is the one the protocol is currently issuing under could
+   * not be established this run — the sample held no live credential of this class, or the read
+   * did not answer.
+   *
+   * The credential still stands on its own issuer matching the pin; what did not happen is the
+   * check that the pin itself is still current. Reported for the same reason
+   * `attestation-authority-unverified` is: a check that did not run is never reported as a check
+   * that passed.
+   */
+  | 'attestation-issuer-uncorroborated'
 
 /** What the index says about one credential, as of the block it names. */
 export interface IndexView {
@@ -116,6 +251,26 @@ export interface IndexView {
    * windowed data source, where absence means nothing at all.
    */
   completeHistory: boolean
+  /**
+   * True when the index observes **every transition that can end this credential class**, so
+   * an entity it holds with `ended: false` is a credential that is still held.
+   *
+   * This is a different question from `completeHistory`, which is only about how far *back*
+   * the index reaches. An index can start at the protocol's first block and still be blind to
+   * an ending: a term that runs out emits no event at all, and a mapping that handles some of
+   * a contract's ending events is blind to the rest. Absence of an ending in such an index is
+   * not evidence that nothing ended, so it may not decide `held` when the chain cannot be read.
+   *
+   * It is a claim about the *mapping*, not about the protocol, and the producer of the view has
+   * to justify it — vacuously for a protocol with no endings (Circles, whose personhood
+   * predicate is monotonic), by handling every ending event otherwise. Measured on our own PoH
+   * v2 index, which is why this field exists: the mapping handles `HumanityRevoked` and nothing
+   * else, while a humanity also ends by simply expiring — no event — and by leaving the chain
+   * (`ccDischargeHumanity` → `HumanityDischargedDirectly`, **33 of them, 25 since 2026-05**).
+   * Eight of those subjects were checked on 2026-07-26: chain `isHuman` false and `owner`
+   * cleared, index entity present with `ended: false`, expiries running to 2027.
+   */
+  observesEveryEnding: boolean
 }
 
 export interface IndexedCredential {
@@ -124,10 +279,28 @@ export interface IndexedCredential {
   /**
    * True when the index observed the issuance event itself. False when the entity was
    * materialised as a side effect of another event (a vouch, a trust edge), in which case
-   * `issuedAt` is that event's timestamp — later than the real issuance, so it understates
-   * the credential's age rather than inventing one.
+   * `issuedAt` is that event's timestamp rather than the issuance.
    */
   issuanceObserved: boolean
+  /**
+   * Which side of the real issuance an unobserved `issuedAt` falls on. Only meaningful when
+   * `issuanceObserved` is false, and the index that produced the view must be able to *prove*
+   * it, because the two directions are handled oppositely:
+   *
+   * - `after-issuance` — the side-event cannot precede issuance. A Circles trust edge on an
+   *   avatar whose registration was never indexed is one: the registration handler overwrites
+   *   the date, so an unobserved registration is necessarily older than the indexed range.
+   *   The date understates age, which understates weight on a ramp, so it is usable as a floor.
+   * - `before-issuance` — the side-event cannot follow issuance. A PoH vouch is cast on a
+   *   request that has not resolved, so with complete history an unobserved claim is one that
+   *   had not happened yet. The date would *overstate* age, so it is not used as a date at all;
+   *   it becomes a lower bound on issuance (`issuedAfter`), which caps ramp weight instead of
+   *   granting it.
+   *
+   * Absent means the direction is unknown, which is treated as `before-issuance`: the safe
+   * reading of a date nobody can place is the one that cannot inflate a score.
+   */
+  sideEventOrder?: 'after-issuance' | 'before-issuance'
   /** The index believes the credential has ended: revoked, stopped, expired. */
   ended: boolean
 }
@@ -140,6 +313,13 @@ export interface ChainView {
    * and needs no indexer. PoH v2 gives this up as `expirationTime - humanityLifespan`.
    */
   issuedAt?: number
+  /**
+   * The instant the contract says this credential stopped counting, for a credential it says is
+   * *not* held now — a term that ran out, an expiry that passed. Only ever a number the protocol
+   * stores; never inferred from absence. Together with `issuedAt` it closes a window an as-of
+   * score can decide membership of, which is the only thing that reads it.
+   */
+  heldUntil?: number
   block?: number
   /** Set when the contract read itself failed. */
   unavailable?: boolean
@@ -148,6 +328,8 @@ export interface ChainView {
 export interface Reconciled {
   held: boolean
   issuedAt?: number
+  /** See `ChainView.heldUntil`. Passed through untouched: nothing here infers an ending. */
+  heldUntil?: number
   /**
    * Lower bound on issuance: the credential provably did not exist at this time. Set only
    * when the exact date is unknown. Scoring uses it as an upper bound on age, which on a
@@ -166,6 +348,20 @@ export interface Reconciled {
  * shortest half-life is 90 days) and far above block-time jitter.
  */
 export const DATE_AGREEMENT_TOLERANCE_SECONDS = 3600
+
+/**
+ * True when an unobserved index date cannot be used as a date, because it sits *below* the real
+ * issuance and would therefore overstate the credential's age.
+ *
+ * The default matters: a missing `sideEventOrder` means nobody established the direction, and an
+ * unplaced date is treated as the unsafe one. Only an index that can prove its side-events follow
+ * issuance gets to have its date used, which is the reverse of the old behaviour — that assumed
+ * `after-issuance` for every protocol, on an argument that happens to hold for Circles trust
+ * edges and is false for PoH vouches.
+ */
+function datesFromBelow(entity: IndexedCredential): boolean {
+  return entity.sideEventOrder !== 'after-issuance'
+}
 
 export function reconcileIndexAndChain(input: {
   chain: ChainView
@@ -200,10 +396,34 @@ export function reconcileIndexAndChain(input: {
         error: 'contract read failed and the index has no record to fall back on',
       }
     }
+    // The index holds an entity, and nothing can check it. It may only answer for a credential
+    // class whose every ending it sees — otherwise "the index has it and has not seen it end"
+    // is a statement about the index's event handlers, not about the subject. Excluding the
+    // credential as unreadable is the same rule as everywhere else in this codebase applied in
+    // both directions: an unreadable source is never turned into a claim about a person.
+    if (!index.observesEveryEnding) {
+      notes.push('index-cannot-see-endings')
+      return {
+        held: false,
+        provenance: { heldFrom: 'index', dateFrom: 'none', ...base, notes },
+        error:
+          'contract read failed and the index does not observe every way this credential can end',
+      }
+    }
     if (index.entity.ended) {
       return { held: false, provenance: { heldFrom: 'index', dateFrom: 'none', ...base, notes } }
     }
-    if (!index.entity.issuanceObserved) notes.push('index-date-is-lower-bound')
+    if (!index.entity.issuanceObserved) {
+      if (datesFromBelow(index.entity)) {
+        notes.push('index-date-precedes-issuance')
+        return {
+          held: true,
+          issuedAfter: index.entity.issuedAt,
+          provenance: { heldFrom: 'index', dateFrom: 'index-side-event-bound', ...base, notes },
+        }
+      }
+      notes.push('index-date-is-lower-bound')
+    }
     return {
       held: true,
       issuedAt: index.entity.issuedAt,
@@ -212,10 +432,37 @@ export function reconcileIndexAndChain(input: {
   }
 
   // ---- no index answered: contract only, exactly as before, and it says so.
+  if (!index) notes.push('index-unavailable')
+
+  // ---- the credential is gone at head. The index, if it answered, may not know that yet.
+  if (!chain.held) {
+    if (index?.entity && !index.entity.ended) notes.push('credential-ceased-since-index')
+    // A protocol that keeps the ending of a credential it no longer honours hands us a closed
+    // window. It changes nothing today — `held` stays false and nothing at head weighs it —
+    // and it is the only way an as-of score can see a credential the subject has since lost.
+    if (chain.heldUntil !== undefined) {
+      if (chain.issuedAt === undefined) {
+        notes.push('lapsed-credential-start-undated')
+        return {
+          held: false,
+          heldUntil: chain.heldUntil,
+          provenance: { heldFrom: 'chain', dateFrom: 'none', ...base, notes },
+        }
+      }
+      notes.push('date-from-lapsed-verification')
+      return {
+        held: false,
+        issuedAt: chain.issuedAt,
+        heldUntil: chain.heldUntil,
+        provenance: { heldFrom: 'chain', dateFrom: 'chain', ...base, notes },
+      }
+    }
+    return { held: false, provenance: { heldFrom: 'chain', dateFrom: 'none', ...base, notes } }
+  }
+
   if (!index) {
-    notes.push('index-unavailable')
     return {
-      held: chain.held,
+      held: true,
       ...(chain.issuedAt !== undefined ? { issuedAt: chain.issuedAt } : {}),
       provenance: {
         heldFrom: 'chain',
@@ -226,12 +473,6 @@ export function reconcileIndexAndChain(input: {
     }
   }
 
-  // ---- the credential is gone at head but the index still lists it as live.
-  if (!chain.held) {
-    if (index.entity && !index.entity.ended) notes.push('credential-ceased-since-index')
-    return { held: false, provenance: { heldFrom: 'chain', dateFrom: 'none', ...base, notes } }
-  }
-
   // ---- held at head. Date it as precisely as the evidence allows.
   if (chain.issuedAt !== undefined) {
     // The contract dates it itself, so index lag cannot move this score at all. The index
@@ -240,7 +481,13 @@ export function reconcileIndexAndChain(input: {
       index.entity &&
       Math.abs(index.entity.issuedAt - chain.issuedAt) > DATE_AGREEMENT_TOLERANCE_SECONDS
     ) {
-      notes.push(index.entity.issuanceObserved ? 'index-date-disagrees-with-chain' : 'index-date-is-lower-bound')
+      notes.push(
+        index.entity.issuanceObserved
+          ? 'index-date-disagrees-with-chain'
+          : datesFromBelow(index.entity)
+            ? 'index-date-precedes-issuance'
+            : 'index-date-is-lower-bound',
+      )
     }
     return {
       held: true,
@@ -250,10 +497,23 @@ export function reconcileIndexAndChain(input: {
   }
 
   if (index.entity && !index.entity.issuanceObserved) {
-    // The entity exists because something else touched it (a vouch, a trust edge), and that
-    // event happened after issuance. Using its timestamp understates the credential's age,
-    // which on a survival ramp understates its weight — wrong, but wrong in the subject's
-    // disfavour rather than the adversary's, so we keep it and flag it.
+    if (datesFromBelow(index.entity)) {
+      // The side-event provably precedes issuance, so its timestamp would make the credential
+      // look *older* than it is — the direction that pays an adversary on a survival ramp. It
+      // bounds issuance from below instead, which caps ramp weight exactly as an absence bound
+      // does. This is the whole reason the index reports which events it actually saw.
+      notes.push('index-date-precedes-issuance')
+      return {
+        held: true,
+        issuedAfter: index.entity.issuedAt,
+        provenance: { heldFrom: 'chain', dateFrom: 'index-side-event-bound', ...base, notes },
+      }
+    }
+    // The entity exists because something else touched it (a trust edge on an avatar registered
+    // before the indexed range), and that event cannot precede issuance. Using its timestamp
+    // understates the credential's age, which on a survival ramp understates its weight —
+    // wrong, but wrong in the subject's disfavour rather than the adversary's, so we keep it
+    // and flag it.
     notes.push('index-date-is-lower-bound')
     return {
       held: true,

@@ -2,6 +2,12 @@ import { createPublicClient, http, parseAbi, type PublicClient } from 'viem'
 import { worldchain } from 'viem/chains'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
 import type { ProbeProvenance } from '../reconcile.ts'
+import { AGENT_BOOK_DEPLOYED_AT, registrationOf, type RegistrationOfOptions } from '../agentbook.ts'
+import { assumedTermHistory, termForLocalExpiry, type TermHistory } from '../term-history.ts'
+import {
+  readVerificationTermHistory,
+  type ReadVerificationTermsOptions,
+} from './world-term.ts'
 
 /**
  * World ID (Orb tier), read from World Chain.
@@ -36,11 +42,19 @@ import type { ProbeProvenance } from '../reconcile.ts'
  *   block the verification was mined in. Confirmed on 24 sampled verifications spanning
  *   2025-04-18 to 2026-07-25, every one to the second, and asserted every run by the live suite
  *   against a fresh sample. `verificationLength` is 14,515,200 s (168 days) and has been since the
- *   contract's `WorldIDAddressBookInitialized` event; it is read at runtime rather than pinned, so
- *   a governance change is visible instead of silently re-dating everybody.
+ *   contract's `WorldIDAddressBookInitialized` event; it is read at runtime rather than pinned, and
+ *   `world-term.ts` sweeps every change the owner has ever made to it so the entry is dated with
+ *   the term that was in force when *it* was written, rather than with the one at head.
  *
  * Coverage is not comparable to AgentBook's: sampled 100-block windows give ~28,000 verifications
  * a day at head and 60,000–80,000 a day through 2025, against a 168-day term.
+ *
+ * Because the mapping is never cleared, a lapsed entry is a *dated window* rather than an
+ * absence: `[verifiedUntil - verificationLength, verifiedUntil)` is exactly when this address was
+ * bound, and both ends are readable at head. That is what `heldUntil` reports, and it is the
+ * whole reason an as-of score can say "held then, lapsed since" for this credential without an
+ * archive node. It is set only when nothing else holds the credential up — a lapsed AddressBook
+ * entry beside a live AgentBook binding has not ended anything.
  *
  * ## What the date means, and why it is honest to use it
  *
@@ -50,6 +64,27 @@ import type { ProbeProvenance } from '../reconcile.ts'
  * thing the contract actually attests, and says so through the `date-from-latest-reattestation`
  * note. On a decay curve that is the conservative reading of what the chain knows: the human's
  * iris capture is older than the date we use, and the binding it proves is exactly this fresh.
+ *
+ * ## The AgentBook half, dated from its own log
+ *
+ * `AgentBook.lookupHuman` is the other way this credential is held, and until now it was the last
+ * undated credential in the roster — the same defect in the other registry. It stores a mapping
+ * and nothing else: no term, no expiry, no timestamp. But the write emits `AgentRegistered`, and
+ * that log has a block, so the date exists on chain and was simply not being read. It is fetched
+ * (`registrationOf`, `agentbook.ts`) only for wallets the mapping says are registered — a filtered
+ * query costing two calls, not the six-call fleet scan — and it is refused unless the log's
+ * `humanId` is the one state just returned, so a truncated or stale log cannot date a binding it
+ * has not actually seen.
+ *
+ * What that date means is narrower than an enrolment and wider than nothing: at that block the
+ * operator proved a live group-1 Orb credential to this contract, because `register` verifies the
+ * proof before it writes. Registration never expires and cannot be undone, so it is the only
+ * freshness signal the contract has, and the note `date-from-agent-registration` says exactly that.
+ *
+ * When both registries answer, the date used is **the later of the two** — each is a moment the
+ * chain accepted an Orb proof for this address, and the most recent one is the freshest thing
+ * known. Neither can be manufactured without a real proof, so there is no cheap way to move it.
+ * Both dates are reported in `detail` so a consumer can check the choice rather than trust it.
  *
  * ## One live verification per human, enforced on chain
  *
@@ -102,9 +137,9 @@ export const WORLD_ID_ORB_GROUP_ID = 1n
 export const WORLD_ADDRESS_BOOK_DEPLOYED_AT_BLOCK = 2_711_105
 export const WORLD_ADDRESS_BOOK_DEPLOYED_AT = 1_724_757_849
 /**
- * The term set at initialisation, 168 days. Never used to date anything — the probe reads the
- * live value — but the live suite holds the chain to it, because every date we derive is only
- * exact while it is unchanged.
+ * The term the constructor announced, 168 days. Never used to date anything — the probe reads the
+ * live value, and `world-term.ts` reads every value the field has ever held — but the live suite
+ * holds the chain to it, because it is what the deployment's own event says.
  */
 export const WORLD_ADDRESS_BOOK_VERIFICATION_LENGTH = 14_515_200
 
@@ -136,8 +171,31 @@ export interface WorldChainRead {
   verifiedUntil: number
   /** `verificationLength()` at the same block. */
   verificationLength: number
+  /**
+   * Every term the contract has ever been set to, from `world-term.ts`. Absent means nobody swept
+   * — the pre-existing contract, which subtracts head's term and says nothing about it. Present
+   * with `observed: false` means a sweep was attempted and failed, which is a different claim and
+   * gets `term-origin-unverified`.
+   */
+  terms?: TermHistory
   /** `AgentBook.lookupHuman(subject)` as a decimal string, or undefined when that read failed. */
   agentBookHumanId?: string
+  /**
+   * The `AgentRegistered` log behind that mapping entry, when it was looked up. Absent means the
+   * lookup was not attempted, because the mapping is empty and there is nothing to date.
+   */
+  agentBookRegistration?: AgentBookRegistrationRead
+}
+
+/** What the registration log said, or why it said nothing. Mirrors `AgentRegistrationLookup`. */
+export interface AgentBookRegistrationRead {
+  status: 'found' | 'not-found' | 'unavailable'
+  /** Block the `AgentRegistered` event was mined in. */
+  block?: number
+  /** Timestamp of that block. */
+  timestamp?: number
+  /** The `humanId` the event carried. Must match state, or the date is refused. */
+  humanId?: string
 }
 
 /**
@@ -173,39 +231,161 @@ export function interpretWorldRead(r: WorldChainRead): AdapterProbeResult {
     }
   }
 
-  let issuedAt: number | undefined
-  if (addressBookHeld && r.verificationLength > 0) {
-    const derived = r.verifiedUntil - r.verificationLength
-    // A date before the registry existed, or in the future, means `verificationLength` is not the
-    // term this entry was written under. Better no date than a fabricated one — and on a decay
-    // curve an over-fresh date is the expensive direction to be wrong in.
-    if (derived >= WORLD_ADDRESS_BOOK_DEPLOYED_AT && derived <= r.now) {
-      issuedAt = derived
-      notes.push('date-from-latest-reattestation')
+  // The same derivation, run for a lapsed entry as well as a live one. On a live entry it dates
+  // the credential. On a lapsed one it dates the *start* of a window whose end `verifiedUntil`
+  // already gives, and a window with both ends is the only thing that lets an as-of score say
+  // this address held an Orb binding at an instant inside it — the AddressBook keeps the lapsed
+  // number forever, so this history is readable at head and needs no archive node.
+  let addressBookIssuedAt: number | undefined
+  let lapsedIssuedAt: number | undefined
+  if (r.verificationLength > 0 && r.verifiedUntil > 0) {
+    // Which of the contract's terms wrote this entry. `setVerificationLength` moves the field
+    // without touching a single stored expiry, so subtracting head's term from an entry written
+    // under a different one shifts the date by the whole size of the change — for every entry in
+    // the book at once. `world-term.ts` reads that history; with no change ever emitted the
+    // timeline is one era and this is exactly the deployment-floor guard it replaces.
+    const history = r.terms ?? assumedTermHistory(r.verificationLength, WORLD_ADDRESS_BOOK_DEPLOYED_AT)
+    const solved = termForLocalExpiry(history, r.verifiedUntil, r.now)
+    if (solved.kind === 'settled') {
+      const derived = r.verifiedUntil - solved.term
+      detail.addressBookIssuedAt = derived
+      if (solved.term !== r.verificationLength) detail.termAtVerification = solved.term
+      if (addressBookHeld) addressBookIssuedAt = derived
+      else lapsedIssuedAt = derived
+    } else if (solved.kind === 'ambiguous') {
+      // Two terms the contract really did set both place the write inside their own era. Nothing
+      // in the entry distinguishes them, so there is no date here — only a choice of two.
+      detail.termAmbiguous = solved.terms
+    } else if (solved.kind === 'era-unknown') {
+      // Unreachable on this contract — the constructor publishes the first era's term — and kept
+      // because the timeline type allows it and a silent fall-through would be a wrong date.
+      detail.termEraUnpublished = true
     } else {
-      detail.dateRejected = derived
+      // A date before the registry existed, or in the future, means no term this contract has
+      // ever set wrote this entry. Better no date than a fabricated one — and on a decay curve an
+      // over-fresh date is the expensive direction to be wrong in.
+      detail.dateRejected = r.verifiedUntil - r.verificationLength
     }
+  }
+
+  const agentBookIssuedAt = agentHeld ? dateFromRegistration(agentHumanId!, r, detail) : undefined
+
+  // Each date is a moment the chain accepted an Orb proof for this address, so the later one is
+  // the freshest evidence there is. Both notes fire when the two land on the same second, which
+  // happens: an operator typically registers an agent minutes after verifying the wallet.
+  const dates = [addressBookIssuedAt, agentBookIssuedAt].filter((d) => d !== undefined)
+  const issuedAt = dates.length ? Math.max(...dates) : undefined
+  if (issuedAt !== undefined) {
+    if (addressBookIssuedAt === issuedAt) notes.push('date-from-latest-reattestation')
+    if (agentBookIssuedAt === issuedAt) notes.push('date-from-agent-registration')
   }
 
   if (sources.length) detail.source = sources.join('+')
 
+  const held = sources.length > 0
+  // A lapsed AddressBook entry only ends this credential when nothing else holds it up. An
+  // address whose term ran out but whose AgentBook binding stands still holds a World ID today,
+  // and dating an end for it would be a lie about a credential the subject has.
+  const ended = !held && r.verifiedUntil > 0
+  if (ended && lapsedIssuedAt !== undefined) notes.push('date-from-lapsed-verification')
+
+  const reportedIssuedAt = issuedAt ?? (ended ? lapsedIssuedAt : undefined)
+
+  // The AddressBook date rests on the premise the sweep exists to test, so when the sweep was
+  // attempted and did not answer, the date is the old assumed one and says so. A caller who
+  // supplied no history at all is not in this case: nobody asked, so no check was skipped — the
+  // same asymmetry `dateHumanityFromTerm` draws.
+  const fromAddressBook =
+    reportedIssuedAt !== undefined &&
+    (reportedIssuedAt === addressBookIssuedAt || reportedIssuedAt === lapsedIssuedAt)
+  if (fromAddressBook && r.terms !== undefined && !r.terms.observed) {
+    notes.push('term-origin-unverified')
+  }
+
   const provenance: ProbeProvenance = {
     heldFrom: 'chain',
-    dateFrom: issuedAt === undefined ? 'none' : 'chain',
+    dateFrom: reportedIssuedAt === undefined ? 'none' : 'chain',
     headBlock: r.block,
     notes,
   }
 
   return {
-    held: sources.length > 0,
-    ...(issuedAt === undefined ? {} : { issuedAt }),
+    held,
+    ...(reportedIssuedAt === undefined ? {} : { issuedAt: reportedIssuedAt }),
+    ...(ended ? { heldUntil: r.verifiedUntil } : {}),
     provenance,
     detail,
   }
 }
 
+/**
+ * The registration date, or nothing — with the reason recorded either way.
+ *
+ * Four ways this returns undefined, and every one of them would otherwise be a silent scoring
+ * change, so each lands in `detail`: the log endpoint failed, the log has no registration for a
+ * wallet the mapping says is registered, the log names a different human than state does, or the
+ * timestamp falls outside the contract's own lifetime. In each case the credential stays undated,
+ * which on a `Decay` curve means full weight — so the caller is told rather than left to assume.
+ */
+function dateFromRegistration(
+  stateHumanId: string,
+  r: WorldChainRead,
+  detail: Record<string, unknown>,
+): number | undefined {
+  const reg = r.agentBookRegistration
+  if (reg === undefined || reg.status === 'unavailable') {
+    detail.agentBookDateUnavailable = true
+    return undefined
+  }
+  if (reg.status === 'not-found') {
+    // State says this wallet is registered and the log does not. A registration cannot be
+    // withdrawn, so this is our read being incomplete, not the registry changing its mind.
+    detail.agentBookRegistrationNotInLog = true
+    return undefined
+  }
+  if (reg.block !== undefined) detail.agentBookRegisteredAtBlock = reg.block
+  if (reg.humanId !== undefined && reg.humanId !== stateHumanId) {
+    // The log found belongs to a different binding than the one state holds — a re-registration
+    // seen only half, or a truncated answer. Dating from it would date the wrong event.
+    detail.agentBookDateRejected = 'registration-log-disagrees-with-state'
+    return undefined
+  }
+  if (reg.timestamp === undefined) {
+    detail.agentBookDateUnavailable = true
+    return undefined
+  }
+  if (reg.timestamp < AGENT_BOOK_DEPLOYED_AT || reg.timestamp > r.now) {
+    detail.agentBookDateRejected = reg.timestamp
+    return undefined
+  }
+  detail.agentBookRegisteredAt = reg.timestamp
+  return reg.timestamp
+}
+
 const client = (rpcUrl: string) =>
   createPublicClient({ chain: worldchain, transport: http(rpcUrl) }) as PublicClient
+
+/** `registrationOf` narrowed to what the interpreter needs, and unable to throw. */
+async function registrationRead(
+  subject: Address,
+  logOptions: RegistrationOfOptions,
+): Promise<AgentBookRegistrationRead> {
+  try {
+    const lookup = await registrationOf(subject, logOptions)
+    return lookup.status === 'found'
+      ? {
+          status: 'found',
+          block: lookup.registration.block,
+          humanId: lookup.registration.humanId,
+          ...(lookup.registration.timestamp === undefined
+            ? {}
+            : { timestamp: lookup.registration.timestamp }),
+        }
+      : { status: lookup.status }
+  } catch {
+    return { status: 'unavailable' }
+  }
+}
 
 /**
  * World ID (Orb tier), read permissionlessly from World Chain.
@@ -216,12 +396,42 @@ const client = (rpcUrl: string) =>
  * compared against a `now` from another is a torn read in miniature, and here it would decide
  * whether somebody is verified at all.
  *
+ * A fifth value, the AgentBook registration's date, costs a second round trip and is therefore
+ * fetched only when the mapping says there is a registration to date — a thousand wallets on
+ * World Chain, not every subject. Its failure is never the probe's failure: an undated World
+ * credential is still a held World credential.
+ *
  * The AgentBook read is allowed to fail on its own: it is a second, narrower source, and losing
  * it must not turn an AddressBook positive into an error. Losing the AddressBook read *is* an
  * error, because a network failure must never read as "not a human".
+ *
+ * A sixth value, the history of `verificationLength` itself, is swept once per process and only
+ * for a subject who actually has an AddressBook entry — no entry, no subtraction, no premise to
+ * check, and that is most subjects. See `world-term.ts` for why the term is not a constant and
+ * why the sweep is chunked.
  */
-export function worldIdOrbAdapter(rpcUrl: string = WORLD_RPC): AdapterProbe {
+export function worldIdOrbAdapter(
+  rpcUrl: string = WORLD_RPC,
+  logOptions: RegistrationOfOptions = {},
+  termOptions: ReadVerificationTermsOptions = {},
+): AdapterProbe {
   const c = client(rpcUrl)
+  /**
+   * Every term the AddressBook has ever been set to, read once and shared.
+   *
+   * Memoised on success only, exactly as PoH's two sweeps are and for the same reason: a rate
+   * limit is a moment, not a property of the registry, and one failed sweep must not mark every
+   * later probe in the process `term-origin-unverified`. The pin is the *first* head reached, so
+   * a change mined during a long-lived process is missed until it restarts — one owner
+   * transaction that has never happened, against a four-call sweep per subject.
+   */
+  let terms: Promise<TermHistory | undefined> | undefined
+  const termsFor = async (termAtHead: number, head: number): Promise<TermHistory | undefined> => {
+    const read = await (terms ??= readVerificationTermHistory(termAtHead, head, termOptions))
+    if (!read) terms = undefined
+    return read
+  }
+
   return {
     adapterId: 'world-id-orb',
     probe: async (subject: Address): Promise<AdapterProbeResult> => {
@@ -260,14 +470,31 @@ export function worldIdOrbAdapter(rpcUrl: string = WORLD_RPC): AdapterProbe {
           }
         }
 
+        const humanId =
+          agentHumanId.status === 'success' ? agentHumanId.result.toString() : undefined
+        const term = Number(verificationLength.result)
+        const entry = Number(verifiedUntil.result)
+        // Both extra reads are conditional and independent, so they cost one round trip together
+        // and nothing at all for a subject neither registry knows.
+        const [registration, history] = await Promise.all([
+          humanId !== undefined && humanId !== '0'
+            ? registrationRead(subject, logOptions)
+            : undefined,
+          entry > 0 ? termsFor(term, Number(block.number)) : undefined,
+        ])
+
         return interpretWorldRead({
           block: Number(block.number),
           now: Number(block.timestamp),
-          verifiedUntil: Number(verifiedUntil.result),
-          verificationLength: Number(verificationLength.result),
-          ...(agentHumanId.status === 'success'
-            ? { agentBookHumanId: agentHumanId.result.toString() }
+          verifiedUntil: entry,
+          verificationLength: term,
+          // Only when the sweep was actually asked for: an unasked question and an unanswered one
+          // license different confidence, and `interpretWorldRead` distinguishes them.
+          ...(entry > 0
+            ? { terms: history ?? assumedTermHistory(term, WORLD_ADDRESS_BOOK_DEPLOYED_AT) }
             : {}),
+          ...(humanId === undefined ? {} : { agentBookHumanId: humanId }),
+          ...(registration === undefined ? {} : { agentBookRegistration: registration }),
         })
       } catch (e) {
         return { held: false, error: e instanceof Error ? e.message : String(e) }

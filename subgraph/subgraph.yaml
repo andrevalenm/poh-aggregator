@@ -38,16 +38,25 @@ dataSources:
         - event: VouchRegistered(indexed bytes20,indexed bytes20,uint256)
           handler: handleVouchRegistered
 
-  # Windowed: Circles emits ~7,200 Trust events per 60k blocks, so full history would take
-  # hours to sync. A ~2-month window covers every address used in the demo and keeps the
-  # subgraph deployable inside a hackathon. Widen startBlock for a production index.
+  # Full history, from the Hub's deployment block. This was a ~2-month window (startBlock
+  # 46300000) on the assumption that full history would not sync inside a hackathon; measured
+  # on 2026-07-25, that assumption was wrong by ~4x. RegisterHuman + Trust across the Hub's
+  # whole life is ~317,000 events (mean 582 per 20k-block window, sampled every 1M blocks from
+  # deployment to head 47,388,288), and the PoH data source already forces a sync from
+  # 35,846,827 anyway — so the extra blocks were already being scanned and only the events were
+  # being thrown away. Windowing also cost correctness twice over: an avatar's absence proved
+  # nothing (so no age bound could be derived), and the oldest, most legitimate avatars were
+  # dated from whichever trust edge happened to fall inside the window.
+  #
+  # 36486014 is the block the Hub's code first appears at (eth_getCode is 0x at 36486013),
+  # 2024-10-13T15:09:10Z. Its first RegisterHuman is 36501311.
   - kind: ethereum
     name: CirclesHub
     network: gnosis
     source:
       address: "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8"
       abi: CirclesHub
-      startBlock: 46300000
+      startBlock: 36486014
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

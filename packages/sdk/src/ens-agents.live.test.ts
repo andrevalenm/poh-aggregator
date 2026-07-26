@@ -68,6 +68,28 @@ before(async () => {
   )
 })
 
+/**
+ * A raw text read that tries the canonical ENSIP-5 key and then its pre-compliance name.
+ *
+ * These tests read records "the plain way" on purpose — the point is to prove the SDK is not
+ * inventing them — so they must NOT go through the SDK's resolver. But the live Sepolia names
+ * were written before the keys were corrected to reverse-dot Service Keys, so they still carry
+ * `print.*`. This mirrors production's fallback without borrowing production's code.
+ *
+ * When the records are re-set to `observer.print.*`, the second arm becomes dead and can go.
+ */
+async function rawText(name: string, key: string): Promise<string | null> {
+  const legacy: Record<string, string | undefined> = {
+    [AGENT_HUMAN_RECORD]: 'print.human',
+    [HUMAN_AGENTS_RECORD]: 'print.agents',
+    [HUMAN_SUBJECTS_RECORD]: 'print.subjects',
+  }
+  const canonical = await client.getEnsText({ name, key })
+  if (canonical) return canonical
+  const old = legacy[key]
+  return old ? await client.getEnsText({ name, key: old }) : null
+}
+
 describe('the tree resolves from public infrastructure only', () => {
   test('every agent name resolves to the wallet the deployment recorded, read from the chain', () => {
     for (const declared of deployment.agents) {
@@ -85,8 +107,8 @@ describe('the tree resolves from public infrastructure only', () => {
     for (const s of human.subjects) assert.ok(isAddress(s))
     // Same records, read the plain way: the SDK must not be inventing either of them.
     const [subjects, agents] = await Promise.all([
-      client.getEnsText({ name: deployment.parent, key: HUMAN_SUBJECTS_RECORD }),
-      client.getEnsText({ name: deployment.parent, key: HUMAN_AGENTS_RECORD }),
+      rawText(deployment.parent, HUMAN_SUBJECTS_RECORD),
+      rawText(deployment.parent, HUMAN_AGENTS_RECORD),
     ])
     assert.ok(subjects && subjects.length > 0)
     assert.ok(agents && agents.length > 0)
@@ -108,7 +130,7 @@ describe('the tree resolves from public infrastructure only', () => {
 
 describe('the binding is read in both directions', () => {
   test('an acknowledged agent is mutual; an unacknowledged one is not, and the records say why', async () => {
-    const acknowledged = await client.getEnsText({ name: deployment.parent, key: HUMAN_AGENTS_RECORD })
+    const acknowledged = await rawText(deployment.parent, HUMAN_AGENTS_RECORD)
     const listed = (acknowledged ?? '').split(',').map((s) => s.trim()).filter(Boolean)
     assert.ok(listed.length > 0, 'the human acknowledges nobody, so nothing can be mutual')
 
@@ -120,9 +142,9 @@ describe('the binding is read in both directions', () => {
     }
   })
 
-  test('every agent’s print.human record is what the SDK reports it declared', async () => {
+  test('every agent’s observer.print.human record is what the SDK reports it declared', async () => {
     for (const id of identities) {
-      const record = await client.getEnsText({ name: id.name, key: AGENT_HUMAN_RECORD })
+      const record = await rawText(id.name, AGENT_HUMAN_RECORD)
       assert.equal(id.human?.declared, record)
     }
   })
@@ -244,7 +266,7 @@ describe('the counterparty’s decision over the live tree', () => {
 
   test('the unacknowledged agent names a wallet its own operator also declares — reported, not merged', () => {
     // The live tree is built so this is true: `unverified` names an address that appears in the
-    // parent's own `print.subjects`. One operator, two humans, and the only honest move
+    // parent's own `observer.print.subjects`. One operator, two humans, and the only honest move
     // is to say so — merging self-asserted sets would let anyone absorb a stranger.
     const caveats = ensBatchCaveats(identities)
     assert.ok(caveats.some((c) => c.code === 'declared-humans-share-a-wallet'))

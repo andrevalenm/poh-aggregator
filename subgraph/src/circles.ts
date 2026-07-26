@@ -1,7 +1,7 @@
 import { BigInt, Bytes } from '@graphprotocol/graph-ts'
 import { RegisterHuman, Trust, Stopped } from '../generated/CirclesHub/CirclesHub'
 import { CirclesAvatar, CirclesTrust } from '../generated/schema'
-import { bumpDay } from './shared'
+import { bumpDay, observeCoverage } from './shared'
 
 function loadOrCreateAvatar(address: Bytes, timestamp: BigInt, block: BigInt): CirclesAvatar {
   let id = address.toHexString()
@@ -12,15 +12,21 @@ function loadOrCreateAvatar(address: Bytes, timestamp: BigInt, block: BigInt): C
     a.registeredAt = timestamp
     a.registeredAtBlock = block
     a.trustedByCount = 0
+    a.registrationObserved = false
     a.stopped = false
   }
   return a as CirclesAvatar
 }
 
 export function handleRegisterHuman(event: RegisterHuman): void {
+  observeCoverage('circles', 'RegisterHuman', event)
   let a = loadOrCreateAvatar(event.params.avatar, event.block.timestamp, event.block.number)
+  // The registration itself, so the date is the date. It overwrites any trust-edge timestamp
+  // the trust handler had stamped: an avatar can be trusted before it registers, and that edge
+  // must not be allowed to date the registration.
   a.registeredAt = event.block.timestamp
   a.registeredAtBlock = event.block.number
+  a.registrationObserved = true
   a.inviter = event.params.inviter
   a.save()
   bumpDay('circles', event, 1, 0, 0)
@@ -32,6 +38,7 @@ export function handleRegisterHuman(event: RegisterHuman): void {
  * invite-gated registries like PoH where a tree is the intended topology.
  */
 export function handleTrust(event: Trust): void {
+  observeCoverage('circles', 'Trust', event)
   // Registration emits a self-trust edge; counting it would gift every avatar in-degree 1.
   if (event.params.truster.equals(event.params.trustee)) return
 
@@ -66,6 +73,7 @@ export function handleTrust(event: Trust): void {
 }
 
 export function handleStopped(event: Stopped): void {
+  observeCoverage('circles', 'Stopped', event)
   let a = CirclesAvatar.load(event.params.avatar.toHexString())
   if (a == null) return
   a.stopped = true

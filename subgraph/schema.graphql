@@ -12,6 +12,18 @@ type PohHuman @entity(immutable: false) {
   humanityId: Bytes!
   claimedAt: BigInt!
   claimedAtBlock: BigInt!
+  """
+  True when `claimedAt` is the timestamp of a `HumanityClaimed` event this index actually saw.
+
+  False when the entity was materialised by `handleVouchRegistered` so a vouch edge could
+  resolve, in which case `claimedAt` is the *vouch's* timestamp. A vouch is cast on a request
+  that has not yet resolved, so that timestamp **precedes** the claim: reading it as an
+  issuance date makes the credential look older than it is, which on a survival ramp is the
+  one direction that pays an adversary. Consumers must treat it as a lower bound on issuance,
+  not as the issuance. `requestId` cannot be used for this — it is the index of the request
+  within the humanity, so 0 is the ordinary first claim rather than a sentinel.
+  """
+  claimObserved: Boolean!
   requestId: BigInt!
   revoked: Boolean!
   revokedAt: BigInt
@@ -46,6 +58,18 @@ type CirclesAvatar @entity(immutable: false) {
   address: Bytes!
   registeredAt: BigInt!
   registeredAtBlock: BigInt!
+  """
+  True when `registeredAt` is the timestamp of a `RegisterHuman` event this index actually saw.
+
+  False when the entity was materialised by `handleTrust` for the trustee of an edge, in which
+  case `registeredAt` is that edge's timestamp. `handleRegisterHuman` overwrites the date, so a
+  false flag means no registration was ever indexed for this avatar — the registration is
+  older than the indexed range, and the edge timestamp therefore *understates* the avatar's
+  age. Consumers may use it as a floor. Before this field the discriminator was a null
+  `inviter`, which happens to work but is incidental: it depends on the registration handler
+  being the only writer of an unrelated field.
+  """
+  registrationObserved: Boolean!
   inviter: Bytes
   "Distinct avatars currently trusting this one."
   trustedByCount: Int!
@@ -65,6 +89,33 @@ type CirclesTrust @entity(immutable: false) {
   expiryTime: BigInt!
   updatedAt: BigInt!
   active: Boolean!
+}
+
+"""
+How far back this index can see, per data source, written by the index itself.
+
+A consumer's most dangerous question is not "what does the index say" but "is the index's
+silence evidence?" — absence only means *did not exist yet* where the index covers the
+protocol's whole history. That coverage used to be a constant compiled into the SDK, kept in
+step with this manifest by hand; a redeploy with a narrower window would have left the SDK
+claiming complete history it did not have, and claiming it silently.
+
+So each data source records the earliest event it indexed. `firstEventBlock` is the lower edge
+of the index's knowledge, and a consumer compares it against the protocol's first
+credential-creating block to decide whether absence is evidence. It is conservative by
+construction: it can only ever be at or after the configured `startBlock`, so this can
+understate coverage and never overstate it. The upper edge needs no entity — `_meta.block`
+is it, and every read here already reports it.
+"""
+type IndexCoverage @entity(immutable: false) {
+  "'poh' | 'circles'"
+  id: ID!
+  protocol: String!
+  "Block of the earliest event this data source indexed."
+  firstEventBlock: BigInt!
+  firstEventAt: BigInt!
+  "Which event established that edge — 'HumanityClaimed', 'VouchRegistered', 'RegisterHuman', 'Trust', 'Stopped'."
+  firstEventKind: String!
 }
 
 "Daily rollups. Registration rate over time is how you detect an airdrop-inflated credential."

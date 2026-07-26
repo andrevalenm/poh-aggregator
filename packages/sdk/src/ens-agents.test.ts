@@ -120,7 +120,7 @@ describe('resolving an agent name', () => {
     assert.equal(byName.humanId, byAddress.humanId)
   })
 
-  test('an agent with no print.human record names nobody, and says so', async () => {
+  test('an agent with no observer.print.human record names nobody, and says so', async () => {
     const id = await resolveEnsAgent(fakeClient(TREE), 'orphan.print.eth')
     assert.equal(id.binding, 'unbound')
     assert.equal(id.human, undefined)

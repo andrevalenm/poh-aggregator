@@ -157,9 +157,12 @@ describe('decoding a historical adapter record', () => {
 describe('credentials at a past instant', () => {
   const a = adapter({ id: 'poh-v1', trustRoot: 'social-vouching:poh' })
   const AS_OF = 1_700_000_000
+  const known = new Map([[a.id, a]])
+  const apply = (evidence: Evidence[], adapters = known) =>
+    applyAsOfToEvidence(evidence, AS_OF, adapters)
 
   test('a credential dated after the instant is excluded, not counted', () => {
-    const r = applyAsOfToEvidence([ev(a, { issuedAt: AS_OF + 86_400 })], AS_OF)
+    const r = apply([ev(a, { issuedAt: AS_OF + 86_400 })])
     assert.deepEqual(r.issuedAfterAsOf, ['poh-v1'])
     assert.equal(r.evidence[0]!.held, false)
     assert.equal(r.evidence[0]!.effectiveCostCents, 0)
@@ -168,7 +171,7 @@ describe('credentials at a past instant', () => {
 
   test('a credential dated before the instant is kept untouched', () => {
     const before = ev(a, { issuedAt: AS_OF - 86_400 })
-    const r = applyAsOfToEvidence([before], AS_OF)
+    const r = apply([before])
     assert.deepEqual(r.issuedAfterAsOf, [])
     assert.equal(r.evidence[0], before, 'kept by reference — nothing to correct')
   })
@@ -176,7 +179,7 @@ describe('credentials at a past instant', () => {
   test('an issuedAfter bound past the instant excludes it too', () => {
     // issuedAfter is a proven lower bound on issuance, so a bound later than the as-of instant
     // proves the credential is younger than the question.
-    const r = applyAsOfToEvidence([ev(a, { issuedAfter: AS_OF + 1 })], AS_OF)
+    const r = apply([ev(a, { issuedAfter: AS_OF + 1 })])
     assert.deepEqual(r.issuedAfterAsOf, ['poh-v1'])
     assert.equal(r.evidence[0]!.held, false)
   })
@@ -184,17 +187,175 @@ describe('credentials at a past instant', () => {
   test('an undated credential is counted and named, not dropped', () => {
     // Dropping it would penalise a subject for a field their protocol does not store; counting
     // it silently would let a credential minted this morning support a score from last week.
-    const r = applyAsOfToEvidence([ev(a)], AS_OF)
+    const r = apply([ev(a)])
     assert.deepEqual(r.existenceUnverified, ['poh-v1'])
     assert.equal(r.evidence[0]!.held, true)
   })
 
   test('evidence that was never held is left alone', () => {
     const absent = ev(a, { held: false, effectiveCostCents: 0 })
-    const r = applyAsOfToEvidence([absent], AS_OF)
+    const r = apply([absent])
     assert.deepEqual(r.issuedAfterAsOf, [])
     assert.deepEqual(r.existenceUnverified, [])
     assert.equal(r.evidence[0], absent)
+  })
+})
+
+/**
+ * The backward correction. Probes read at head, so a credential the subject held at the as-of
+ * instant and has since lost reads as absent — and every one of those silently understated a
+ * historical score. Where the chain dates the *end* (an EAS revocation, an expiry, a World
+ * verification term that ran out), the window is closed at both ends and the question "was this
+ * held at t" has an answer rather than an estimate.
+ */
+describe('a credential held then and ended since', () => {
+  const a = adapter({
+    id: 'coinbase-verification',
+    trustRoot: 'kyc-vendor:persona',
+    forgeCostCents: 40_000,
+    rentCostCents: 12_000,
+  })
+  const known = new Map([[a.id, a]])
+  const AS_OF = 1_700_000_000
+  const YEAR = 31_536_000
+
+  /** Absent at head with both ends of its life dated — what a revoked probe result looks like. */
+  const ended = (over: Partial<Evidence> = {}) =>
+    ev(a, {
+      held: false,
+      effectiveCostCents: 0,
+      issuedAt: AS_OF - YEAR,
+      heldUntil: AS_OF + 86_400,
+      detail: { revoked: true },
+      ...over,
+    })
+
+  test('an instant inside the window restores the credential and prices it', () => {
+    const r = applyAsOfToEvidence([ended()], AS_OF, known)
+    assert.deepEqual(r.ceasedAfterAsOf, ['coinbase-verification'])
+    assert.equal(r.evidence[0]!.held, true)
+    // min(forge, rent) — protocols harden against sale and never against rental.
+    assert.equal(r.evidence[0]!.effectiveCostCents, 12_000)
+    assert.match(String(r.evidence[0]!.detail?.restoredByAsOf), /contains the as-of instant/)
+    assert.equal(r.evidence[0]!.detail?.revoked, true, 'the reason it ended survives the restore')
+  })
+
+  test('an instant after the credential ended leaves it absent', () => {
+    // The revocation is the point. A subject revoked before the block asked about did not hold
+    // this then, and restoring on the strength of a date alone would invert the whole feature.
+    const r = applyAsOfToEvidence([ended({ heldUntil: AS_OF - 1 })], AS_OF, known)
+    assert.deepEqual(r.ceasedAfterAsOf, [])
+    assert.equal(r.evidence[0]!.held, false)
+    assert.equal(r.evidence[0]!.effectiveCostCents, 0)
+  })
+
+  test('an end exactly at the instant is an end, not a hold', () => {
+    // `heldUntil` is exclusive: at the second the revocation landed the credential is gone.
+    const r = applyAsOfToEvidence([ended({ heldUntil: AS_OF })], AS_OF, known)
+    assert.deepEqual(r.ceasedAfterAsOf, [])
+    assert.equal(r.evidence[0]!.held, false)
+  })
+
+  test('a whole life in the future of the instant is not restored', () => {
+    const r = applyAsOfToEvidence(
+      [ended({ issuedAt: AS_OF + 60, heldUntil: AS_OF + 120 })],
+      AS_OF,
+      known,
+    )
+    assert.deepEqual(r.ceasedAfterAsOf, [])
+    assert.equal(r.evidence[0]!.held, false)
+  })
+
+  test('a lower bound on issuance is not a proof of it, so the credential is named and left out', () => {
+    // issuedAfter says the credential is younger than some instant; it never says the credential
+    // already existed at one. Treating it as a start would turn a bound into a credential.
+    const withoutStart = ended({ issuedAt: undefined, issuedAfter: AS_OF - YEAR })
+    delete (withoutStart as { issuedAt?: number }).issuedAt
+    const r = applyAsOfToEvidence([withoutStart], AS_OF, known)
+    assert.deepEqual(r.ceasedStartUndated, ['coinbase-verification'])
+    assert.deepEqual(r.ceasedAfterAsOf, [])
+    assert.equal(r.evidence[0]!.held, false)
+  })
+
+  test('an ordinary negative carries no end date and is never restored', () => {
+    // Every not-held result in the SDK reaches this branch. Only the ones that read a real end
+    // date off a contract may come back, which is what keeps a failed probe out of the score.
+    const r = applyAsOfToEvidence([ev(a, { held: false, effectiveCostCents: 0 })], AS_OF, known)
+    assert.deepEqual(r.ceasedAfterAsOf, [])
+    assert.deepEqual(r.ceasedStartUndated, [])
+    assert.equal(r.evidence[0]!.held, false)
+  })
+
+  test('an adapter the registry did not have yet stays out, rather than counting for zero', () => {
+    const r = applyAsOfToEvidence([ended()], AS_OF, new Map())
+    assert.deepEqual(r.ceasedAfterAsOf, [])
+    assert.equal(r.evidence[0]!.held, false)
+  })
+
+  test('the restored credential is worth what it was worth then, not what it is worth now', () => {
+    // Freshness is evaluated by the caller at the as-of instant, so a credential restored at a
+    // moment it was half-decayed is priced half-decayed. Restoring at full weight would make an
+    // expired credential the most valuable thing a subject could own.
+    const decaying = adapter({
+      id: 'coinbase-verification',
+      trustRoot: 'kyc-vendor:persona',
+      forgeCostCents: 40_000,
+      rentCostCents: 12_000,
+      decayHalfLifeDays: 730,
+      ageCurve: 'Decay',
+    })
+    const half = ended({ freshness: 0.5 })
+    const r = applyAsOfToEvidence([half], AS_OF, new Map([[decaying.id, decaying]]))
+    assert.equal(r.evidence[0]!.held, true)
+    assert.equal(r.evidence[0]!.effectiveCostCents, 6_000)
+  })
+
+  test('the whole score moves: a revoked credential is a trust root the subject had then', () => {
+    const other = adapter({ id: 'poh-v1', trustRoot: 'social-vouching:poh', forgeCostCents: 5_000, rentCostCents: 5_000 })
+    const adapters = new Map([
+      [a.id, a],
+      [other.id, other],
+    ])
+    const evidence = [ended(), ev(other, { issuedAt: AS_OF - YEAR })]
+
+    const atHead = score({
+      subjects: [SUBJECT],
+      adapters,
+      evidence,
+      now: AS_OF,
+      registryRevision: 34,
+    })
+    const applied = applyAsOfToEvidence(evidence, AS_OF, adapters)
+    const then = score({
+      subjects: [SUBJECT],
+      adapters,
+      evidence: applied.evidence,
+      now: AS_OF,
+      registryRevision: 34,
+      asOf: {
+        block: 11_345_000,
+        timestamp: AS_OF,
+        registryRevision: 34,
+        adapterCount: 2,
+        indexedBlock: 11_348_000,
+        auditTrailComplete: true,
+        recordsLivenessChanges: true,
+        adaptersNotYetInRegistry: [],
+        issuedAfterAsOf: [],
+        existenceUnverified: [],
+        ceasedAfterAsOf: applied.ceasedAfterAsOf,
+        ceasedStartUndated: applied.ceasedStartUndated,
+      },
+    })
+
+    assert.equal(atHead.independentRoots, 1, 'today the subject has lost the Persona root')
+    assert.equal(then.independentRoots, 2, 'at that block they still had it')
+    assert.ok(then.score > atHead.score, `${then.score} should exceed ${atHead.score}`)
+
+    const c = then.caveats.find((x) => x.code === 'credential-ceased-after-asof')
+    assert.ok(c, 'a restored credential always says it is not held today')
+    assert.match(c.message, /coinbase-verification/)
+    assert.match(c.message, /not held today/)
   })
 })
 
@@ -211,6 +372,8 @@ describe('the same subject, two registry revisions', () => {
     adaptersNotYetInRegistry: [],
     issuedAfterAsOf: [],
     existenceUnverified: [],
+    ceasedAfterAsOf: [],
+    ceasedStartUndated: [],
   }
 
   /**
@@ -253,6 +416,15 @@ describe('the same subject, two registry revisions', () => {
     assert.ok(c, 'an as-of score always says it is one')
     assert.match(c.message, /read from their chains at head/)
     assert.match(c.message, /understate the subject and never the adversary/)
+    assert.match(c.message, /whose end the chain dates after it has been restored/)
+  })
+
+  test('a credential whose end is dated but whose start is not is named as the residual', () => {
+    const r = run([anima, civicThen], { ...context, ceasedStartUndated: ['holonym-gov-id'] })
+    const c = r.caveats.find((x) => x.code === 'asof-ceased-start-undated')
+    assert.ok(c)
+    assert.match(c.message, /holonym-gov-id/)
+    assert.match(c.message, /against the subject rather than for them/)
   })
 
   test('a score computed for now carries no as-of claim at all', () => {

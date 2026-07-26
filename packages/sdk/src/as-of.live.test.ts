@@ -34,7 +34,7 @@ const knownRoots: string[] = [
 
 const REGISTRY_SUBGRAPH =
   process.env.PRINT_REGISTRY_SUBGRAPH_URL ??
-  'http://localhost:8100/subgraphs/name/print-registry'
+  'http://localhost:8100/subgraphs/name/corroborate-registry'
 
 /**
  * A Sepolia block inside revision 15 — after the first seed and before the landscape

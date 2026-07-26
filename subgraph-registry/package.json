@@ -1,5 +1,5 @@
 {
-  "name": "@print/subgraph-registry",
+  "name": "@corroborate/subgraph-registry",
   "version": "0.1.0",
   "private": true,
   "scripts": { "codegen": "graph codegen", "build": "graph build" },

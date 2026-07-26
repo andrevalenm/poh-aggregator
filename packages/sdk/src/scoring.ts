@@ -295,7 +295,7 @@ function asOfCaveats(asOf: AsOfScoring): Caveat[] {
   const out: Caveat[] = [
     {
       code: 'scored-as-of-past-block',
-      message: `Scored against the ontology as it stood at Sepolia block ${asOf.block} (${new Date(asOf.timestamp * 1000).toISOString()}), registry revision ${asOf.registryRevision} with ${asOf.adapterCount} adapters. The weights and trust roots are reconstructed exactly from the registry's own event history. Credentials, though, were read from their chains at head: a credential dated after that instant has been excluded, but one held then and revoked since cannot be seen, so this can understate the subject and never the adversary.`,
+      message: `Scored against the ontology as it stood at Sepolia block ${asOf.block} (${new Date(asOf.timestamp * 1000).toISOString()}), registry revision ${asOf.registryRevision} with ${asOf.adapterCount} adapters. The weights and trust roots are reconstructed exactly from the registry's own event history. Credentials, though, were read from their chains at head: one dated after that instant has been excluded, and one whose end the chain dates after it has been restored, but a credential held then and ended since without a date on the ending cannot be seen, so what remains can understate the subject and never the adversary.`,
     },
   ]
 
@@ -310,6 +310,20 @@ function asOfCaveats(asOf: AsOfScoring): Caveat[] {
     out.push({
       code: 'credential-issued-after-asof',
       message: `Excluded as not yet existing at this block: ${asOf.issuedAfterAsOf.join(', ')}. Each is held today and dated after ${new Date(asOf.timestamp * 1000).toISOString()}.`,
+    })
+  }
+
+  if (asOf.ceasedAfterAsOf.length) {
+    out.push({
+      code: 'credential-ceased-after-asof',
+      message: `Counted although not held today: ${asOf.ceasedAfterAsOf.join(', ')}. The chain dates both the issuance and the ending of each — a revocation, an expiry, or a verification term that ran out — and ${new Date(asOf.timestamp * 1000).toISOString()} falls between them, so the subject held them at this block whatever the position is now.`,
+    })
+  }
+
+  if (asOf.ceasedStartUndated.length) {
+    out.push({
+      code: 'asof-ceased-start-undated',
+      message: `${asOf.ceasedStartUndated.join(', ')} ended after this block, but the protocol does not date the issuance, so nothing proves the subject already held them at it. They are left out. That is the one direction this score can still be wrong in, and it is against the subject rather than for them.`,
     })
   }
 
@@ -366,7 +380,15 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
   if (lowerBound.length) {
     out.push({
       code: 'issuance-date-lower-bound',
-      message: `The index dated ${ids(lowerBound)} from a side-event (a vouch or a trust edge) rather than from the issuance event itself, because the issuance falls outside its indexed window. The real credential is therefore older than the date used, and on a survival ramp its weight here is a floor rather than an estimate.`,
+      message: `The index dated ${ids(lowerBound)} from a side-event (a trust edge) rather than from the issuance event itself, because the issuance falls outside its indexed window. The real credential is therefore older than the date used, and on a survival ramp its weight here is a floor rather than an estimate.`,
+    })
+  }
+
+  const precedes = withNote('index-date-precedes-issuance').filter((e) => e.held)
+  if (precedes.length) {
+    out.push({
+      code: 'index-date-precedes-issuance',
+      message: `The index holds ${ids(precedes)} only through an event that happened before the credential was issued — a vouch is cast on a claim that has not resolved yet — so that timestamp does not date the credential, it bounds it. Used as a lower bound on issuance, which caps the age this credential can be credited with rather than granting it. Reading it as the issuance date would have made the credential look older than it is, and on a survival ramp that is worth more.`,
     })
   }
 
@@ -414,7 +436,7 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
   if (fromExpiry.length) {
     out.push({
       code: 'issuance-date-derived-from-expiry',
-      message: `${ids(fromExpiry)} publishes an expiry and no issuance date — deliberately, so that the expiry does not reveal when the holder was verified. The date used is the expiry minus the longest term the protocol's circuit permits, which is the earliest the credential can have been issued and therefore the oldest it can be. On a decay curve the weight here is a floor rather than an estimate.`,
+      message: `${ids(fromExpiry)} publishes an expiry and no issuance date — deliberately, so that the expiry does not reveal when the holder was verified. The date used is the expiry minus the longest term the protocol will issue a credential for, which is the earliest it can have been issued and therefore the oldest it can be. On a decay curve the weight here is a floor rather than an estimate. That ceiling is enforced by the protocol's own issuing service and not by the contract that stores the credential, so it is trusted on exactly the same footing as the credential itself.`,
     })
   }
 
@@ -423,6 +445,102 @@ function indexCaveats(evidence: Evidence[]): Caveat[] {
     out.push({
       code: 'issuance-date-is-latest-renewal',
       message: `${ids(reattested)} is a renewable on-chain attestation with a fixed term, and the date used is the last renewal — the enrolment behind it is older and the protocol does not publish it. So this measures how recently the address re-proved the credential, not how long ago the human was verified.`,
+    })
+  }
+
+  const registered = withNote('date-from-agent-registration').filter((e) => e.held)
+  if (registered.length) {
+    out.push({
+      code: 'issuance-date-is-registration',
+      message: `${ids(registered)} is held here through a registry that records a binding and never an expiry, so the date used is the block that registration was mined in — the moment the protocol last accepted a proof for this address, not when the human was enrolled. The enrolment is older and is not published on chain, so on a decay curve the weight here is a ceiling rather than an estimate. Without this date the credential would carry full weight indefinitely.`,
+    })
+  }
+
+  const mintingStopped = withNote('credential-minting-stopped').filter((e) => e.held)
+  if (mintingStopped.length) {
+    out.push({
+      code: 'credential-minting-stopped',
+      message: `The holder has irreversibly stopped minting on ${ids(mintingStopped)}, usually because they moved to a new address. It is not a revocation and is not scored as one: the protocol's own personhood predicate still returns true for this address, since the sentinel that marks a stopped avatar is written to the very slot that predicate reads as "greater than zero". So the credential is held and counted, and this is the caveat that says the address behind it may be abandoned. Read from contract storage — the protocol's own getter for this validates the address you pass and then answers about the caller, so it reports false for every address ever asked about.`,
+    })
+  }
+
+  // Filtered on `held` like the rest: a lapsed window carries the note too, and there it only
+  // becomes a claim about the subject once an as-of instant puts the credential back in the score.
+  const unpinned = withNote('issuer-check-unavailable').filter((e) => e.held)
+  if (unpinned.length) {
+    out.push({
+      code: 'credential-issuer-unverified',
+      message: `${ids(unpinned)} is counted here on a record whose issuer could not be checked this run. The protocol names the only issuer its registry accepts and we normally read the attestation behind the credential to confirm it — a credential attributed to anyone else is not counted at all. This is the case where that second read did not answer, so the credential stands on the registry's own say-so alone.`,
+    })
+  }
+
+  const rotatedAuthority = withNote('attestation-authority-rotated').filter((e) => e.held)
+  if (rotatedAuthority.length) {
+    out.push({
+      code: 'attestation-authority-rotated',
+      message: `${ids(rotatedAuthority)} exists because one key signed for it, and the registry has been set to accept a different key at some point in its life. The registry never re-checks a credential it has stored, so one signed under a key that was later replaced still reads as valid — and the issuer we pin is a field that same signer supplied, so pinning it cannot separate the two. Nothing here says this credential is one of them; it says the registry now holds credentials from more than one authority and this one has not been dated against the change.`,
+    })
+  }
+
+  // Deliberately not filtered on `held`. This is the *only* note that describes evidence the
+  // aggregator threw away on purpose, and the subject it describes is holding a credential — from
+  // outside, that is indistinguishable from holding nothing unless we say so.
+  const refusedIssuer = withNote('credential-issuer-not-recognised')
+  if (refusedIssuer.length) {
+    out.push({
+      code: 'credential-issuer-not-recognised',
+      message: `This address does hold a record for ${ids(refusedIssuer)}, and it is not counted: the registry lets anyone run their own issuing key, so a credential someone signed for themselves and a real one are the same record under the same circuit identifier, and the only thing that separates them is the issuer named inside the proof. This one names an issuer we do not recognise. If the protocol has added or rotated an issuing key since we pinned it, the refusal is ours rather than the holder's — the issuers actually in use are reported alongside the credential.`,
+    })
+  }
+
+  const unpinnedIssuer = withNote('attestation-issuer-unpinned-in-use')
+  if (unpinnedIssuer.length) {
+    out.push({
+      code: 'attestation-issuer-unpinned-in-use',
+      message: `${ids(unpinnedIssuer)} is issued under a key we pin, and the registry's own recent credentials of that class are not all carrying it. The pin is copied from the protocol's source rather than declared on chain, so a protocol that adds or rotates an issuing key leaves it matching nothing new — and every holder after that is refused, one at a time, with nothing to say why. This is that warning: the chain is issuing this credential under at least one key we do not have.`,
+    })
+  }
+
+  const uncorroboratedIssuer = withNote('attestation-issuer-uncorroborated').filter((e) => e.held)
+  if (uncorroboratedIssuer.length) {
+    out.push({
+      code: 'attestation-issuer-uncorroborated',
+      message: `${ids(uncorroboratedIssuer)} names an issuer inside its proof, and this credential's issuer is the one we pin — what could not be confirmed this run is that the pin is still the key the protocol issues under. We normally read the issuer off the registry's own recent credentials to check, and this run found none of that class in the window or could not read them. The credential stands; the check that the pin has not gone stale did not happen.`,
+    })
+  }
+
+  const uncheckedAuthority = withNote('attestation-authority-unverified').filter((e) => e.held)
+  if (uncheckedAuthority.length) {
+    out.push({
+      code: 'attestation-authority-unverified',
+      message: `${ids(uncheckedAuthority)} is stored by a registry that accepts credentials from a single signing key, which its owner can replace without emitting anything — there is no getter and no event, so the only record of a change is the storage slot itself. We normally read that slot back through the registry's history to confirm the key has never moved, and this run could not. The credential stands; the check that the authority behind it is the one we pin did not happen.`,
+    })
+  }
+
+  // Deliberately not filtered on `held`: this evidence is never held. The whole point is that
+  // the credential was excluded as unreadable rather than counted, and a subject who loses a
+  // trust root to our own RPC failing is owed the reason.
+  const blind = withNote('index-cannot-see-endings')
+  if (blind.length) {
+    out.push({
+      code: 'index-cannot-see-endings',
+      message: `The contract read failed for ${ids(blind)} and the index at block ${blocks(blind)} does not observe every way this credential can end — a term running out emits no event at all, and a humanity that leaves the chain emits one this index does not handle. So the index can say the credential existed and cannot say it still does. Excluded as unreadable rather than counted, which is the same rule that stops a failed probe reading as "not a human", applied in the other direction.`,
+    })
+  }
+
+  const crossInstance = withNote('date-from-origin-instance')
+  if (crossInstance.length) {
+    out.push({
+      code: 'date-from-origin-instance',
+      message: `${ids(crossInstance)} was moved here from another deployment of the same protocol, which means the expiry it is dated from was computed by that deployment and not this one. Subtracting this chain's term from another chain's expiry is arithmetic about a contract we did not read — and the two terms differ, by a factor of two in the case that supplies most of these credentials — so the date here is the registration the origin deployment still publishes, taken from its own state and required to reproduce this expiry exactly before it is used. It is normally the older of the two dates, and older is worth more.`,
+    })
+  }
+
+  const unattributed = withNote('term-origin-unverified')
+  if (unattributed.length) {
+    out.push({
+      code: 'term-origin-unverified',
+      message: `The date for ${ids(unattributed)} assumes this chain's contract set the credential's term, and this run could not confirm that. The protocol lets another deployment write an expiry it did not compute, we normally read the registry's own log of exactly which credentials arrived that way, and that read did not answer here. Nothing suggests this credential is one of them — a handful in the registry's whole history are — but the check that would rule it out did not happen.`,
     })
   }
 

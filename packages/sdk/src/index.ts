@@ -28,6 +28,7 @@ export * from './as-of.ts'
 export * from './fleet.ts'
 export * from './agentbook.ts'
 export * from './ens-agents.ts'
+export * from './ens-presentation.ts'
 
 /**
  * Named thresholds for `isHuman(threshold)`, exported as documented constants rather than
@@ -382,13 +383,24 @@ export class Print {
     let scored = evidence
     let asOf: AsOfScoring | undefined
     if (historical) {
-      const applied = applyAsOfToEvidence(evidence, historical.context.timestamp)
+      // The adapter map is required now: deciding whether a credential had already CEASED by
+      // the as-of block needs each adapter's term/expiry semantics, not just its issuance date.
+      const applied = applyAsOfToEvidence(
+        evidence,
+        historical.context.timestamp,
+        historical.ontology.adapters,
+      )
       scored = applied.evidence
       asOf = {
         ...historical.context,
         adaptersNotYetInRegistry: [...notYetInRegistry].sort(),
         issuedAfterAsOf: [...new Set(applied.issuedAfterAsOf)].sort(),
         existenceUnverified: [...new Set(applied.existenceUnverified)].sort(),
+        // A credential the subject has since lost must not be reported as held at the as-of
+        // block, and one whose term start is undated cannot be placed either way — both are
+        // surfaced rather than silently resolved.
+        ceasedAfterAsOf: [...new Set(applied.ceasedAfterAsOf)].sort(),
+        ceasedStartUndated: [...new Set(applied.ceasedStartUndated)].sort(),
       }
     }
 
