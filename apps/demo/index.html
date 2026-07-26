@@ -537,159 +537,214 @@ person.isHuman(Thresholds.standard)</code></pre>
           <svg><rect width="100%" height="32" fill="url(#calcada)" /></svg>
         </div>
 
-        <h3 class="reveal">The three sponsors we are submitting to</h3>
+        <h3 class="reveal">One track each, and why we would win it</h3>
         <p class="reveal">
-          Three is the limit, and we chose the three whose products are load-bearing here — take
-          any one of them out and this stops working, rather than losing a feature.
+          Three sponsors is the limit and one track per sponsor is the rule, so these are choices
+          rather than a spread. Each is the track where our integration is load-bearing — take
+          that sponsor's product out and the thing stops working, rather than losing a feature.
+          Every claim below opens into the artifact that proves it.
         </p>
 
         <div class="sponsor-tracks">
           <article class="sponsor-card reveal" id="track-world">
-            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/world.svg" alt="" width="18" height="18" /> World</p>
+            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/world.svg" alt="" width="18" height="18" /> World · $8,000</p>
             <h4>AgentKit — New Use Cases</h4>
 
             <p class="sponsor-claim">
-              A counterparty that refuses to trade with an agent unless a real human stands
-              behind it — and refuses the <em>second</em> agent backed by that same human.
+              A counterparty that refuses to trade with an agent unless a real human stands behind
+              it — and refuses the <em>second</em> agent backed by that same human.
             </p>
 
             <dl class="sponsor-detail">
-              <dt>Why we qualify</dt>
+              <dt>The new trust model</dt>
               <dd>
-                AgentKit runs on both sides of the flow, not as a decorative import: the agent
-                uses <code>createAgentkitClient</code>, the counterparty is a real AgentKit
-                resource server, and the full handshake executes live — request, HTTP 402, a
-                signed CAIP-122 challenge, retry. Human backing is then read from AgentBook.
-                Three agents, three outcomes: unregistered is denied, human-backed with
-                independent evidence is allowed, and a third is denied
-                <strong>because it is registered to the same human as the second</strong>. A
-                fleet of agents is still one person.
+                The brief asks where human-backed agents change access, authorization or rate
+                limits. Our answer is a limit that cannot be expressed without personhood at all:
+                <strong>a cap per human, not per key</strong>. Rate limits count requests; wallets
+                are free; a bot farm simply brings more of them. Counting distinct
+                <em>humans</em> behind the agents is the one budget an attacker cannot mint. Three
+                agents, three outcomes — unregistered denied, human-backed allowed, and a third
+                denied because it resolves to the same human as the second.
               </dd>
 
-              <dt>Why World is load-bearing</dt>
+              <dt>Meaningful use, not a wrapper</dt>
               <dd>
-                AgentBook is the only permissionless read of Orb-verified humanity that
-                exists. <code>lookupHuman</code> is a plain <code>eth_call</code> — no API key,
-                no relying-party registration, no user interaction, nothing that can rate-limit
-                us or be switched off. That is the whole reason World is in our roster: we can
-                read it without World's cooperation, which is the constraint every adapter here
-                has to satisfy.
+                AgentKit runs on both sides. The agent uses
+                <code>createAgentkitClient</code>; the counterparty is a real AgentKit resource
+                server; the whole handshake executes live — request, HTTP 402, a signed CAIP-122
+                challenge, retry. Human backing is then read from AgentBook.
               </dd>
 
               <dt>What we do not claim</dt>
               <dd>
-                We prove a human exists behind the agent. We do not prove that human controls
-                it — on-chain, puppeteering and voluntary delegation are the same signature. No
-                protocol can do this today, so we ship it as a permanent caveat on every result
-                instead of quietly implying otherwise.
+                We prove a human exists behind the agent. We do not prove that human controls it
+                — on chain, puppeteering and voluntary delegation are the same signature. No
+                protocol can do this today, so it ships as a permanent caveat on every result
+                rather than being quietly implied away.
               </dd>
             </dl>
+
+            <details class="receipts">
+              <summary>Technical detail and receipts</summary>
+              <ul>
+                <li>
+                  <code>lookupHuman(address)</code> on AgentBook, World Chain —
+                  <a href="https://worldscan.org/address/0xA23aB2712eA7BBa896930544C7d6636a96b944dA" rel="noopener">0xA23aB271…b944dA</a>.
+                  A plain <code>eth_call</code>: no API key, no relying-party registration, no
+                  user interaction, nothing that can rate-limit us or be switched off. That
+                  permissionlessness is why World is in the roster — every adapter here has to be
+                  readable without the issuer's cooperation.
+                </li>
+                <li>
+                  Fleet detection indexes AgentBook's registration events chain-wide, so the cap
+                  is enforced against every agent a human has registered, not just the ones that
+                  happen to show up.
+                </li>
+                <li>
+                  World appears three times in the ontology on three <em>different</em> trust
+                  roots — Orb (iris), document tier (passport chip), Selfie Check (liveness) — and
+                  the document tier deliberately shares its root with ZKPassport, Self and Rarimo,
+                  so holding several of them counts once.
+                </li>
+                <li>Run it: <code>cd apps/agent &amp;&amp; npm start</code> prints the full verdict trace.</li>
+              </ul>
+            </details>
           </article>
 
           <article class="sponsor-card reveal" id="track-graph">
-            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/thegraph.svg" alt="" width="18" height="18" /> The Graph</p>
-            <h4>Best AI Tooling for The Graph</h4>
-            <p class="sponsor-alt">
-              Also a direct fit for <em>Best Use of Composable or Standardized Graph
-              Products</em> — we compose two Graph products across four chains.
-            </p>
+            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/thegraph.svg" alt="" width="18" height="18" /> The Graph · $3,000</p>
+            <h4>Best AI Use Case of The Graph</h4>
 
             <p class="sponsor-claim">
-              Reusable proof-of-humanity infrastructure any agent can call: an MCP server, a typed
-              SDK, and subgraphs that answer the questions a contract call cannot.
+              An agent that reasons about whether a person is real — over data no contract call
+              can return.
             </p>
 
             <dl class="sponsor-detail">
-              <dt>Why we qualify</dt>
+              <dt>Why an indexer is load-bearing, not decorative</dt>
               <dd>
-                An MCP server with four tools — look up a subject, test a threshold, explain the
-                trust roots, audit any weight's full history — so an agent can reason about
-                whether a human is there, conversationally, over live chain data. Underneath it, an
-                open-source SDK anyone can install. Two Graph products in one stack: a protocol
-                subgraph on Subgraph Studio, and a self-hosted <code>graph-node</code> indexing
-                our own registry.
+                A contract answers “does this credential exist”. It cannot answer
+                <strong>when it was issued</strong>, <strong>whether it has since been lost</strong>,
+                or <strong>where this account sits in a trust graph</strong> — and all three change
+                the answer. Proof of Humanity took roughly 95% of its lifetime registrations
+                inside one four-month airdrop window, so age <em>is</em> the signal there. Pull
+                the subgraph and a vouched credential falls back to a flagged midpoint: we show
+                that degradation on purpose rather than hiding it.
               </dd>
 
-              <dt>Why an indexer, and not just an RPC</dt>
+              <dt>The AI half</dt>
               <dd>
-                Three questions an <code>eth_call</code> cannot answer, all of which change the
-                score. <strong>When</strong> was this credential issued — a contract boolean has
-                no timestamp, and for a registry where roughly 95% of lifetime registrations
-                arrived in one four-month airdrop window, age <em>is</em> the signal.
-                <strong>Where</strong> does this account sit in a trust graph — a traversal over
-                a large event history, not a storage slot. And <strong>what did it look like
-                then</strong> — the history that lets us re-score a subject by the rules as they
-                stood at a past block.
+                An MCP server puts this in front of any agent as conversation: look up a subject,
+                test a policy, explain the trust roots, and audit any weight's full history. The
+                agent reasons over live indexed data; it is not reading a cached number.
               </dd>
 
-              <dt>Circles: the clearest case for indexing</dt>
+              <dt>The query only an indexer makes possible</dt>
               <dd>
-                In Circles, the signal is the graph, not the registration. A new node costs about
-                two days of freely-minted CRC, and the project's own public indexer carries event
-                namespaces named <code>BotCreated</code> and <code>FarmGrown</code> — the farms
-                are not hypothetical, they are a documented schema the team indexes deliberately.
-                So the boolean "is registered" is the least informative thing you can read. What
-                carries signal is <em>position in the trust graph</em>: who vouched for this account, how
-                long ago, and how far the edges reach. That is a question about a large volume of
-                historical events and their relationships — exactly and only what an indexer can
-                answer. Circles is where The Graph stops being convenience and becomes the
-                difference between a number that means something and a number that does not.
-              </dd>
-
-              <dt>Accountability, as a query</dt>
-              <dd>
-                Our weights are curated human judgments, so the least a subject is owed is the
-                full history of those judgments. Every registry mutation emits an immutable
-                record with its source URI, block and transaction. "Why did my score change?" is
-                a GraphQL query with a block number in the answer.
+                <strong>As-of scoring.</strong> Score a subject by the rules <em>and</em> the
+                credential state as they stood at a past block. That is what turns an audit trail
+                from something you publish into something you can execute — “why did my score
+                change” becomes a query with a block number in the answer.
               </dd>
             </dl>
+
+            <details class="receipts">
+              <summary>Technical detail and receipts</summary>
+              <ul>
+                <li>
+                  <strong>Protocol subgraph</strong> (Subgraph Studio, Gnosis) —
+                  <a href="https://api.studio.thegraph.com/query/77602/poh/version/latest" rel="noopener">api.studio.thegraph.com/query/77602/poh</a>.
+                  Supplies issuance dates, revocations and Circles trust-graph position.
+                </li>
+                <li>
+                  <strong>Registry audit-trail subgraph</strong>, self-hosted <code>graph-node</code> —
+                  <a href="http://37.27.67.44:8100/subgraphs/name/corroborate-registry" rel="noopener">37.27.67.44:8100</a>.
+                  Every weight the ontology has ever assigned, each with its source and block. Two
+                  Graph products, one SDK.
+                </li>
+                <li>
+                  The registry it indexes is on Sepolia at
+                  <a href="https://sepolia.etherscan.io/address/0x977b028b900cce8ee89c46877e814eff3060aa07" rel="noopener">0x977b028b…60aa07</a>,
+                  revision 44 — <span data-count="catalogued">32</span> adapters over
+                  <span data-count="roots">19</span> trust roots.
+                </li>
+                <li>
+                  Reusable, not a one-off: <code>npm i @printid/sdk</code> and
+                  <code>npx @printid/mcp</code>, both open source.
+                </li>
+              </ul>
+            </details>
           </article>
 
           <article class="sponsor-card reveal" id="track-ens">
-            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/ens.svg" alt="" width="18" height="18" /> ENS</p>
+            <p class="sponsor-name"><img class="sponsor-mark" src="/sponsors/ens.svg" alt="" width="18" height="18" /> ENS · $1,500</p>
             <h4>Best ENS Integration for AI Agents</h4>
-            <p class="sponsor-alt">
-              Also submitted against <em>Most Creative Use of ENS</em>, if the sponsor reads it
-              that way.
-            </p>
 
             <p class="sponsor-claim">
-              An ENS name is where an agent declares which human stands behind it — and where a
-              human declares which wallets are theirs.
+              ENS as the place an agent says which human stands behind it — and the human says
+              yes.
             </p>
 
             <dl class="sponsor-detail">
-              <dt>Why we qualify</dt>
+              <dt>The gap we fill, in ENS's own drafts</dt>
               <dd>
-                Agent identity and discoverability, resolved rather than configured. A
-                counterparty is handed an agent's ENS name, resolves the records that name the
-                backing human, and verifies that human before agreeing to anything —
-                no registry of ours, no API, no allowlist. The same mechanism serves people: the
-                <code>print.subjects</code> text record lets someone declare their own set
-                of wallets, and the SDK reads it live from any name.
+                ENS links two agent ENSIPs from this prize page.
+                <strong>ENSIP-26</strong> defines <code>agent-context</code> and
+                <code>agent-endpoint[mcp]</code> — how to find an agent and how to talk to it.
+                <strong>ENSIP-25</strong> defines <code>agent-registration</code> — that a name
+                controls a registry entry. Neither defines a binding between an agent and the
+                <em>human</em> behind it. That is the record we added, and it is
+                <strong>bidirectional</strong>: the agent's subname names its human, and the
+                human's name acknowledges the agent back. One-directional would let anyone claim
+                any human.
               </dd>
 
-              <dt>Why ENS is load-bearing</dt>
+              <dt>Why it is not cosmetic</dt>
               <dd>
-                Real people are plural. Proof of Humanity v2's own Circles proxy puts a person's PoH
-                registration on one address and their Circles avatar on another, so a
-                single-address lookup systematically undercounts actual humans while
-                undercounting no farms at all. Fixing that needs somewhere a person can say
-                "these wallets are mine" that is user-controlled, on-chain, revocable, readable
-                by anyone, and hosted by nobody. ENS is the only thing that is all five. The
-                alternative is a server of ours holding the mapping — which is precisely the
-                correlation this entire design exists to avoid.
+                Delete the records and the per-human fleet cap cannot be computed — there is
+                nothing left that maps an agent to a person. ENS is the only place that mapping
+                can live and still be user-controlled, on-chain, revocable, publicly readable and
+                hosted by nobody. The alternative is a server of ours holding it, which is exactly
+                the correlation this design exists to avoid.
               </dd>
 
-              <dt>What we do not claim</dt>
+              <dt>Humans are plural too</dt>
               <dd>
-                The record is self-asserted. A name owner can list any address they like and the
-                listed addresses have not countersigned, so every result built from one carries a
-                caveat saying exactly that. Correlated credentials still saturate <em>across</em>
-                the declared set, so listing more wallets cannot inflate a score.
+                A <code>print.subjects</code> text record lets a person declare their own set of
+                wallets, which real people need: Proof of Humanity's own Circles proxy puts one
+                person's credentials on two different addresses. Self-asserted, and the result
+                says so — correlated credentials still saturate across the declared set, so
+                listing more wallets cannot inflate anything.
               </dd>
             </dl>
+
+            <details class="receipts">
+              <summary>Technical detail and receipts</summary>
+              <ul>
+                <li>
+                  <code>print.eth</code> on Sepolia, resolver
+                  <a href="https://sepolia.etherscan.io/address/0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5" rel="noopener">0xE99638b4…BBE49b5</a>,
+                  with live agent subnames <code>alpha.print.eth</code> and
+                  <code>beta.print.eth</code>. Nothing is hard-coded: every field resolves from
+                  Sepolia and can be opened in any ENS app.
+                </li>
+                <li>
+                  Each agent subname records its backing human; the parent records the
+                  acknowledgement. The counterparty resolves the name, reads both directions, then
+                  scores the human before agreeing to anything.
+                </li>
+                <li>
+                  ENSIP-26 (<a href="https://docs.ens.domains/ensip/26/" rel="noopener">agent text records</a>)
+                  and ENSIP-25 (<a href="https://docs.ens.domains/ensip/25/" rel="noopener">agent registry verification</a>)
+                  are both drafts. We would like the human-binding record to become the third in
+                  that series, and we have a proposal ready.
+                </li>
+                <li>
+                  Public source:
+                  <a href="https://github.com/andrevalenm/poh-aggregator" rel="noopener">github.com/andrevalenm/poh-aggregator</a>.
+                </li>
+              </ul>
+            </details>
           </article>
         </div>
 

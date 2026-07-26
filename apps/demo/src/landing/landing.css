@@ -2416,3 +2416,83 @@ html.js .reveal.in {
   opacity: 0.88;
 }
 /* --- end sponsor marks (agent) --- */
+
+/* ---------------------------------------------------- sponsor receipts
+ *
+ * Each track card opens into the artifacts that prove its claims. A native <details>
+ * because a sponsor reading this on a phone at a booth should not need JS, and the
+ * disclosure triangle is a control everyone already knows. Same ledger idiom as the rest:
+ * a hairline rule, the mono face carrying evidence, no new palette.
+ */
+.receipts {
+  margin-top: 1.4rem;
+  border-top: 1px solid var(--hairline);
+  padding-top: 0.9rem;
+}
+
+.receipts > summary {
+  font-family: var(--body);
+  font-size: 0.74rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--iron-deep);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.receipts > summary::-webkit-details-marker {
+  display: none;
+}
+
+.receipts > summary::before {
+  content: '+';
+  font-family: var(--mono);
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--iron);
+}
+
+.receipts[open] > summary::before {
+  content: '−';
+}
+
+.receipts > summary:focus-visible {
+  outline: 2px solid var(--iron);
+  outline-offset: 3px;
+}
+
+.receipts ul {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.receipts li {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--hairline);
+  padding: 0.7rem 0;
+}
+
+.receipts li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.receipts a {
+  font-family: var(--mono);
+  font-size: 0.94em;
+  color: var(--iron-deep);
+  text-decoration-color: var(--hairline-strong);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.receipts a:hover {
+  text-decoration-color: var(--iron);
+}
