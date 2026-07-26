@@ -8,6 +8,15 @@ Every number in this document is either read from the ontology or produced by th
 `cd packages/sdk && npm test` to check the model; the worked examples below are arithmetic
 over the deployed weights.
 
+**This is the machinery, not the claim.** Print's claim is one sentence — *one passport read by
+four protocols is one credential, not four* — and the output that carries it is
+`independentRoots`. What follows is how much a root is worth once its credentials have collapsed
+into it, which is the part that has to be principled for the root count to mean anything. It is
+deliberately not the pitch: it asks a reader to accept three unfamiliar ideas (forge-versus-rent,
+saturation, a log scale) before anything pays off, and as [the score is not the
+verdict](#the-score-is-not-the-verdict) shows, the payoff a cost story seems to promise is not one
+this model delivers.
+
 ---
 
 ## The rule
@@ -216,6 +225,42 @@ so. That is the point of reporting `roots` alongside the score.
 
 ---
 
+## The score is not the verdict
+
+The example above shows saturation removing inflation from a subject. It does not show the score
+separating a farm from a person, and it is worth being blunt about why: **usually it does not.**
+
+Two subjects, four credentials each, arithmetic over the deployed weights at revision 34, every
+credential at full weight:
+
+| | Farm — one passport, four protocols | Person — four unrelated credentials |
+|---|---|---|
+| Credentials | World ID (document), ZKPassport, Self, Rarimo | World ID (Orb), Human Passport, Proof of Humanity v2, Circles v2 |
+| Per credential, `min(forge, rent)` | $20.00 × 4 | $0.50 + $1.00 + $5.00 + $0.50 |
+| **Independent trust roots** | **1** | **4** |
+| Score, credentials added up | **3.90** | 2.85 |
+| Score, roots saturated | **3.30** | 2.85 |
+
+Saturation deletes $60 of double-counted evidence from the farm, and the farm still scores a full
+0.45 above the person. That is not a bug in the weights. A passport chip signed by a national CSCA
+really is harder to obtain than an Orb session, a wallet history and two social registrations, and
+a model that priced it otherwise would be lying to make a demo land. If the person's PoH and
+Circles credentials are fresh rather than mature, the ramp discounts them further and the gap gets
+wider.
+
+**The quantity that inverts is the root count: 1 against 4.** So the score answers "how much is
+this evidence worth" and `independentRoots` answers "how many separate things had to be true", and
+only the second one distinguishes these two subjects. A consumer gating on two independent roots
+admits the person and refuses the farm; a consumer gating on the score alone does the opposite of
+what it intended.
+
+The test named *"the whole thesis in one test"* asserts the narrower version — give the person a
+KYC-rooted credential worth $30 and root-cost aggregation does reverse a ranking addition got
+backwards. Both facts are true and the weaker one is the one that generalises, which is why
+`independentRoots` is a top-level field rather than a line in `roots`.
+
+---
+
 ## The World ID wrinkle
 
 Here is the number our own model produces that we like least.
@@ -278,6 +323,14 @@ published approaches
 Therefore: **a score may escalate; it must not silently deny.** Ask for another credential
 rather than refusing. Named presets exist as constants you have to reach for —
 `Thresholds.lenient` 1.5, `.standard` 2.5, `.strict` 3.5 — and never as a default.
+
+**And consider not gating on the score at all.** `result.independentRoots >= 2` is a policy in one
+comparison, it is the one that separates the two subjects in [the score is not the
+verdict](#the-score-is-not-the-verdict), and it is legible to the person it refuses: *bring
+evidence that does not come from the document you already showed us.* A score threshold cannot say
+that. [print.observer](https://print.observer) applies the two-root rule as its default and prints
+the rule beside the answer; two roots is still somebody's choice, and the point of disclosing it is
+that it can be argued with.
 
 Rough calibration against the deployed ontology:
 
