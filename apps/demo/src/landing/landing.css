@@ -88,6 +88,11 @@
   --hairline-strong: rgb(42 35 27 / 0.55);
   --sage: #77816e;
   --sage-deep: #57604f;
+  /* Slate ground for the hero. Desaturated and slightly warm so it sits with the ochre and
+     iron rather than fighting them; --slate-lift is for type that should read as quiet
+     against it without dropping to the body's dimmed bone. */
+  --slate: #67757f;
+  --slate-lift: #a9b4bb;
   --iron: #a6431f;
   --iron-deep: #833317;
   --ochre: #c9a25e;
@@ -231,6 +236,16 @@ a {
   left: -10rem;
 }
 
+/* The washes are pigment soaking into paper. On the hero's slate they read as haze rather
+   than pigment, so they come down to a suggestion instead of being removed outright. */
+.hero .wash-sage {
+  background: radial-gradient(closest-side, rgb(140 155 165 / 0.18), transparent 72%);
+}
+
+.hero .wash-ochre {
+  background: radial-gradient(closest-side, rgb(201 162 94 / 0.12), transparent 72%);
+}
+
 /* ---------------------------------------------------------------- cursor */
 
 .cursor-ring {
@@ -334,6 +349,50 @@ a {
   padding: clamp(5rem, 12vh, 8rem) var(--gutter) 4rem;
   isolation: isolate;
   overflow: hidden;
+  /* Slate ground. `isolation: isolate` already makes the hero its own stacking context, so
+     the whorl, contours and washes at negative z-index still paint above this rather than
+     being hidden by it. The fixed .grain overlay keeps the sheet's texture on top. */
+  background: var(--slate);
+  color: var(--bone);
+}
+
+/* Everything inside the hero is now ink-on-dark rather than ink-on-paper. Scoped to .hero
+   so the rest of the page, which is still paper, is untouched. The h1's own colour is set
+   on its rule further down, since an override here would lose to it on source order. */
+.hero .cta-ghost {
+  color: var(--bone);
+}
+
+.hero .eyebrow {
+  color: var(--slate-lift);
+}
+
+.hero .hero-answer,
+.hero .hero-live {
+  color: var(--bone-dim);
+}
+
+.hero .hero-answer b,
+.hero .hero-answer .hero-q {
+  color: var(--bone);
+}
+
+.hero .scroll-hint {
+  color: var(--bone-dim);
+}
+
+/* The nav is a sibling of the hero, not a child, but it is absolutely positioned at the top
+   of the page and scrolls away with it, so it only ever sits over the slate. */
+.nav-links a {
+  color: var(--bone-dim);
+}
+
+.wordmark {
+  color: var(--bone);
+}
+
+.hero .cta-ghost::after {
+  background: var(--bone-dim);
 }
 
 #print {
@@ -386,7 +445,11 @@ a {
     position: absolute;
     inset: -3rem -5rem -3rem -6rem;
     z-index: -1;
-    background: radial-gradient(closest-side, rgb(237 231 218 / 0.9) 55%, transparent 100%);
+    /* A pool of the ground itself, to keep the copy legible where the whorl runs behind it.
+       It has to match whatever the hero is sitting on: on paper it was cream, on slate a
+       cream pool reads as a glowing blob. Slightly darker than the ground so the type gains
+       contrast rather than losing it. */
+    background: radial-gradient(closest-side, rgb(88 100 109 / 0.92) 55%, transparent 100%);
     filter: blur(14px);
     pointer-events: none;
   }
@@ -443,7 +506,7 @@ a {
   line-height: 0.99;
   letter-spacing: -0.018em;
   margin: 0 0 2rem;
-  color: var(--ink);
+  color: var(--bone);
   text-wrap: balance;
 }
 

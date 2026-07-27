@@ -323,12 +323,13 @@ requestAnimationFrame(() => {
 const idle: (cb: () => void) => void =
   'requestIdleCallback' in window ? (cb) => requestIdleCallback(cb, { timeout: 900 }) : (cb) => setTimeout(cb, 120)
 idle(() => {
-  // The print is ink on paper now. Narrow screens get the finished print instantly —
-  // at 0.16 alpha behind text, a 2.6s stroke animation is pure main-thread waste.
+  // The print is bone on slate now that the hero is a dark ground. Narrow screens get the
+  // finished print instantly — at 0.16 alpha behind text, a 2.6s stroke animation is pure
+  // main-thread waste.
   mountFingerprint(document.getElementById('print') as HTMLCanvasElement, {
-    rgb: '42 35 27',
-    wideAlpha: 0.78,
-    narrowAlpha: 0.16,
+    rgb: '232 224 210',
+    wideAlpha: 0.5,
+    narrowAlpha: 0.14,
   })
 })
 idle(() => {
