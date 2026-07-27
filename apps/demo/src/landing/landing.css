@@ -88,11 +88,9 @@
   --hairline-strong: rgb(42 35 27 / 0.55);
   --sage: #77816e;
   --sage-deep: #57604f;
-  /* Slate ground for the hero. Desaturated and slightly warm so it sits with the ochre and
-     iron rather than fighting them; --slate-lift is for type that should read as quiet
-     against it without dropping to the body's dimmed bone. */
-  --slate: #67757f;
-  --slate-lift: #a9b4bb;
+  /* Quiet type on the night ground: dimmer than --bone-dim so an eyebrow reads as a label
+     rather than as body copy, without going so dark it disappears into the umber. */
+  --bone-quiet: #8f8271;
   --iron: #a6431f;
   --iron-deep: #833317;
   --ochre: #c9a25e;
@@ -236,14 +234,15 @@ a {
   left: -10rem;
 }
 
-/* The washes are pigment soaking into paper. On the hero's slate they read as haze rather
-   than pigment, so they come down to a suggestion instead of being removed outright. */
+/* The washes are pigment soaking into paper. On a dark ground they have to add light rather
+   than pigment, so they become a warm lift in the ochre and umber the night already carries
+   rather than the sage and gold they are on the sheet. */
 .hero .wash-sage {
-  background: radial-gradient(closest-side, rgb(140 155 165 / 0.18), transparent 72%);
+  background: radial-gradient(closest-side, rgb(122 104 78 / 0.22), transparent 72%);
 }
 
 .hero .wash-ochre {
-  background: radial-gradient(closest-side, rgb(201 162 94 / 0.12), transparent 72%);
+  background: radial-gradient(closest-side, rgb(201 162 94 / 0.14), transparent 72%);
 }
 
 /* ---------------------------------------------------------------- cursor */
@@ -349,11 +348,27 @@ a {
   padding: clamp(5rem, 12vh, 8rem) var(--gutter) 4rem;
   isolation: isolate;
   overflow: hidden;
-  /* Slate ground. `isolation: isolate` already makes the hero its own stacking context, so
-     the whorl, contours and washes at negative z-index still paint above this rather than
-     being hidden by it. The fixed .grain overlay keeps the sheet's texture on top. */
-  background: var(--slate);
+  /* Night ground, the same surface the install band uses, so the page has two materials
+     rather than three. `isolation: isolate` already makes the hero its own stacking
+     context, so the whorl, contours and washes at negative z-index still paint above this
+     rather than being hidden by it. */
+  background:
+    radial-gradient(80rem 50rem at 50% 0%, rgb(74 58 42 / 0.5) 0%, transparent 60%),
+    var(--night);
   color: var(--bone);
+}
+
+/* The same fine grain the install band carries, so both dark surfaces read as one
+   material. Sits above the background and below everything else in the hero. */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--clouds);
+  opacity: 0.045;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: -4;
 }
 
 /* Everything inside the hero is now ink-on-dark rather than ink-on-paper. Scoped to .hero
@@ -364,7 +379,7 @@ a {
 }
 
 .hero .eyebrow {
-  color: var(--slate-lift);
+  color: var(--bone-quiet);
 }
 
 .hero .hero-answer,
@@ -382,7 +397,7 @@ a {
 }
 
 /* The nav is a sibling of the hero, not a child, but it is absolutely positioned at the top
-   of the page and scrolls away with it, so it only ever sits over the slate. */
+   of the page and scrolls away with it, so it only ever sits over the hero's night ground. */
 .nav-links a {
   color: var(--bone-dim);
 }
@@ -446,10 +461,10 @@ a {
     inset: -3rem -5rem -3rem -6rem;
     z-index: -1;
     /* A pool of the ground itself, to keep the copy legible where the whorl runs behind it.
-       It has to match whatever the hero is sitting on: on paper it was cream, on slate a
-       cream pool reads as a glowing blob. Slightly darker than the ground so the type gains
+       It has to match whatever the hero sits on: on paper it was cream, and on a dark ground
+       a cream pool reads as a light leak. Slightly deeper than the night so the type gains
        contrast rather than losing it. */
-    background: radial-gradient(closest-side, rgb(88 100 109 / 0.92) 55%, transparent 100%);
+    background: radial-gradient(closest-side, rgb(26 21 17 / 0.9) 55%, transparent 100%);
     filter: blur(14px);
     pointer-events: none;
   }
