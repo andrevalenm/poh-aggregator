@@ -494,12 +494,11 @@ html.js .sl-in .sl-line {
   margin: 0 0 2.4rem;
 }
 
-/* The question the whole paragraph runs into. Same size as the body around it, carried
-   by weight and full ink instead, so it reads as the sentence landing rather than as a
-   second heading competing with the h1 above. */
+/* The question the whole paragraph runs into. Deliberately identical to the <b> on the
+   live count: same size, same weight, same inherited colour, so the two emphases in this
+   paragraph read as one system rather than two competing levels. */
 .hero-answer .hero-q {
   font-weight: 700;
-  color: var(--ink);
 }
 
 .hero-ctas {
