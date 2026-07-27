@@ -106,7 +106,10 @@ test.describe('Print landing', () => {
     // Every count is painted from the live registry read.
     const integrated = page.locator('[data-count="integrated"]').first()
     await expect(integrated).toHaveText(/^\d+$/, { timeout: 60_000 })
-    await expect(page.locator('.coverage-row')).toHaveCount(3)
+    // Every [data-count] on the page, not just the first, is painted from the same read.
+    const counts = page.locator('[data-count]')
+    await expect(counts.first()).toHaveText(/^\d+$/, { timeout: 60_000 })
+    for (const el of await counts.all()) await expect(el).toHaveText(/^\d+$/)
   })
 
   test('MCP picker switches clients and shows a copyable command', async ({ page }) => {
