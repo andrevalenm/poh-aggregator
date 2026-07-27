@@ -518,8 +518,7 @@ person.isHuman(Thresholds.standard)</code></pre>
           <h2 id="hackathon-title">Built in Lisbon, over one weekend</h2>
           <p>
             Every line of this was written at ETHGlobal Lisbon 2026 — the contracts, the
-            subgraphs, the SDK, the MCP server, the agent flow. It is a hackathon project and
-            we will not pretend otherwise.
+            subgraphs, the SDK, the MCP server, the agent flow.
           </p>
           <p>
             But the problem is not a hackathon problem. Tinder, Zoom and Docusign added proof of
@@ -527,7 +526,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             multiplying — each with its own SDK, its own chain, its own idea of what it has
             proved. Every product that needs a real person behind an account now faces the
             same integration tax. That is worth solving in the open, with the registry on-chain
-            and its sources attached, whatever happens to us on Sunday.
+            and its sources attached.
           </p>
 
           <div class="built-at reveal">
@@ -546,7 +545,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             </a>
             <p class="built-at-note">
               The azulejo tilework and the calçada wave in these pages are drawn, not
-              photographed — like the fingerprint they sit beside.
+              photographed.
             </p>
           </div>
         </header>
@@ -824,66 +823,6 @@ person.isHuman(Thresholds.standard)</code></pre>
           </article>
         </div>
 
-        <div class="hackathon-honesty reveal" id="coverage">
-          <h3>What is finished, and what is not</h3>
-          <p>
-            Working and live: the registry contract,
-            <span data-count="integrated">10</span> credential probes reading World Chain, Gnosis,
-            Base, Optimism and Linea (plus Sepolia for the registry itself), both subgraphs, the
-            SDK, the MCP server, the agent flow, this page, and a test suite that runs against
-            real chains rather than mocks. The weights are judgments rather than measurements,
-            and no amount of this proves the human behind a credential is acting for themselves.
-          </p>
-          <!--
-            The three numbers, in decreasing confidence. The first two are read from the
-            deployed registry at runtime (paintCounts, src/landing/main.ts); the static values
-            are ontology/adapters.json at the time of writing. The third is deliberately not a
-            protocol count — see the note under the table.
-          -->
-          <dl class="coverage">
-            <div class="coverage-row">
-              <dt><span data-count="integrated">10</span> integrated</dt>
-              <dd>
-                Protocols Print actually reads. A live RPC call per probe, no vendor API key, no
-                server of ours. These are the ones the number on this page means.
-              </dd>
-            </div>
-            <div class="coverage-row">
-              <dt><span data-count="catalogued">30</span> catalogued</dt>
-              <dd>
-                Catalogued with a trust root in the on-chain registry, across
-                <span data-count="roots">18</span> distinct roots. Catalogued is not the same as
-                readable — but a root that is catalogued already does the work of stopping the
-                credential being double-counted, whether or not we can read it.
-              </dd>
-            </div>
-            <div class="coverage-row">
-              <dt>the wider field</dt>
-              <dd>
-                The research sweep tabulates 64 rows across two tables, dead projects and
-                duplicate listings included, so no single “how many exist” figure is honest and
-                we do not print one. Read it at
-                <code>research/landscape/poh-landscape-sweep.md</code>.
-              </dd>
-            </div>
-          </dl>
-          <p>
-            The gap between integrated and catalogued is the interesting part, not an
-            embarrassment. Most personhood credentials cannot be read without the issuing
-            vendor's cooperation, and some are unreadable <em>by design</em>: ZKPassport scopes
-            its nullifier per service and never publishes an unscoped value, so nobody — us
-            included — can look one up unsolicited. That is the privacy property working. It is
-            also why Print works at the level of the credential <em>class</em> rather than the
-            credential: we never need to know that <em>this</em> subject's two credentials came
-            from one passport, only that those two protocols read passports, which is a public
-            fact about the world.
-          </p>
-          <p>
-            None of that is hidden in a footnote. It is in the API — as caveats you have to
-            receive before you get a verdict, and a <code>isHuman(threshold)</code> that throws
-            unless you choose the threshold yourself.
-          </p>
-        </div>
       </div>
     </section>
 
@@ -896,7 +835,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             <span class="wordmark">print</span>
             <p>
               One call across every proof of humanity. The registry stores protocols, never
-              people — scoring runs client-side, and nobody, including us, holds the join key.
+              people.
             </p>
           </div>
           <div class="colophon-col">
