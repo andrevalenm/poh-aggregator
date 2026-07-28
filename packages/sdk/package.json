@@ -1,6 +1,6 @@
 {
   "name": "@printid/sdk",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Aggregate proof-of-personhood credentials across protocols, scored by independent trust root.",
   "type": "module",
   "main": "./dist/index.js",
