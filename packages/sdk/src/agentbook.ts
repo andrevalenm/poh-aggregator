@@ -1,4 +1,4 @@
-import { createPublicClient, http, parseAbi, type PublicClient } from 'viem'
+import { createPublicClient, fallback, http, parseAbi, type PublicClient } from 'viem'
 import { worldchain } from 'viem/chains'
 import type { Address } from './types.ts'
 import type { FleetAgent, HumanBacking } from './fleet.ts'
@@ -119,6 +119,19 @@ export const AGENT_BOOK_LOG_ENDPOINTS = [
 
 /** Keyless World Chain endpoint for state reads. */
 export const WORLD_STATE_RPC = 'https://worldchain-mainnet.g.alchemy.com/public'
+
+/**
+ * State-read fallbacks, tried in order (all answered eth_chainId 0x1e0, 2026-07-25).
+ * An explicit rpcUrl disables the fallback — a caller who chose an endpoint chose it.
+ */
+export const WORLD_STATE_RPCS = [
+  WORLD_STATE_RPC,
+  'https://worldchain.drpc.org',
+  'https://480.rpc.thirdweb.com',
+] as const
+
+const worldTransport = (rpcUrl?: string) =>
+  rpcUrl ? http(rpcUrl) : fallback(WORLD_STATE_RPCS.map((u) => http(u)))
 
 export interface AgentRegistration {
   agent: Address
@@ -258,7 +271,7 @@ export async function scanAgentBook(opts: ScanAgentBookOptions = {}): Promise<Ag
   const endpoints = opts.endpoints ?? AGENT_BOOK_LOG_ENDPOINTS
   const client = createPublicClient({
     chain: worldchain,
-    transport: http(opts.stateRpcUrl ?? WORLD_STATE_RPC),
+    transport: worldTransport(opts.stateRpcUrl),
   }) as PublicClient
   const head = opts.toBlock ?? Number(await client.getBlockNumber())
 
@@ -398,11 +411,11 @@ export function buildIndex(
  */
 export async function lookupHumans(
   agents: readonly Address[],
-  rpcUrl: string = WORLD_STATE_RPC,
+  rpcUrl?: string,
 ): Promise<Map<Address, HumanBacking>> {
   const out = new Map<Address, HumanBacking>()
   if (agents.length === 0) return out
-  const client = createPublicClient({ chain: worldchain, transport: http(rpcUrl) }) as PublicClient
+  const client = createPublicClient({ chain: worldchain, transport: worldTransport(rpcUrl) }) as PublicClient
   try {
     const results = await client.multicall({
       allowFailure: true,
@@ -511,7 +524,7 @@ export async function registrationOf(
         // endpoint sends it. One header read is cheaper than losing the date.
         const client = createPublicClient({
           chain: worldchain,
-          transport: http(opts.stateRpcUrl ?? WORLD_STATE_RPC),
+          transport: worldTransport(opts.stateRpcUrl),
         }) as PublicClient
         timestamp = Number((await client.getBlock({ blockNumber: BigInt(block) })).timestamp)
       }

@@ -51,30 +51,32 @@ is why Civic and Sismo are in the file at all.
 | World ID (Orb) | `iris-registry:world-orb` | ✔ | ✔ | `protocols/world-id-onchain-read.md` |
 | World ID (document/NFC) | `state-document:icao-9303` | ✔ | — (no permissionless read, §6) | `protocols/world-id-onchain-read.md` |
 | World ID (Selfie Check) | `liveness:world-selfie` | ✔ | — (no permissionless read, §6) | `protocols/world-id-onchain-read.md` |
-| ZKPassport | `state-document:icao-9303` | ✔ | — | `protocols/zk-passport-and-eid.md` |
-| Self Protocol | `state-document:icao-9303` | ✔ | — | `protocols/zk-passport-and-eid.md` |
+| ZKPassport | `state-document:icao-9303` | ✔ | — (refusal verified: stateless verifier, `protocols/zkpassport-onchain-read.md`) | `protocols/zk-passport-and-eid.md` |
+| Self Protocol | `state-document:icao-9303` | ✔ | ✔ | `protocols/zk-passport-and-eid.md` (costs); `protocols/self-onchain-read.md` (the read) |
 | **Rarimo** | `state-document:icao-9303` | ✔ | — | `protocols/zk-passport-and-eid.md` |
 | **Anon Aadhaar** | `state-registry:aadhaar` | — | — | `protocols/zk-passport-and-eid.md` |
-| Coinbase Verification | `kyc-vendor:persona` | ✔ | ✔ | `protocols/eas-and-disco.md` |
-| Galxe Passport v3 | `kyc-vendor:sumsub` | ✔ | — | `landscape/kyc-liveness-vendors.md` |
+| Coinbase Verification | `kyc-vendor:persona` | ✔ | ✔ | `protocols/eas-and-disco.md` (costs); on-chain read via Coinbase's AttestationIndexer since 2026-07-25 (`adapters/eas.ts`) |
+| Galxe Passport | `kyc-vendor:sumsub` | ✔ | ✔ | `landscape/kyc-liveness-vendors.md` (costs); `protocols/galxe-passport-onchain-read.md` (the read) |
 | Linea Proof of Humanity V2 | `kyc-vendor:sumsub` | ✔ | ✔ | `protocols/privado-id-and-verax.md` (costs); `protocols/linea-poh-onchain-read.md` (the read) |
 | Anima Proof of Uniqueness | `kyc-vendor:facetec` | ✔ | — | `landscape/kyc-liveness-vendors.md` |
 | **Billions (ex-Privado)** | `kyc-vendor:facetec` | ✔ | — | `protocols/billions-…-intuition.md` |
 | **Holonym / Human ID (biometrics)** | `kyc-vendor:facetec` | ✔ | — | `protocols/billions-…-intuition.md` |
-| Civic Pass | `kyc-vendor:facetec` | — | — | `landscape/identity-infra-prior-art.md` |
+| Civic Pass | `kyc-vendor:facetec` | — | ✔ (probed dead: reports the lapse date) | `protocols/civic-pass-onchain-read.md` |
 | **Holonym / Human ID (gov-id)** | `kyc-vendor:unattributed` | ✔ | — | `protocols/billions-…-intuition.md` |
 | **zkMe MeID** | `kyc-vendor:unattributed` | ✔ | — | `protocols/passport-civic-…-galxe.md` |
 | Humanity Protocol | `kyc-vendor:unattributed` | — | — | `protocols/humanity-protocol.md` |
 | **Fractal ID** | `kyc-vendor:fractal` | ✔ | — | `landscape/kyc-liveness-vendors.md` |
 | Proof of Humanity v2 | `social-vouching:poh` | ✔ | ✔ | `protocols/poh-kleros-brightid-idena.md` |
 | **Proof of Humanity v1** | `social-vouching:poh` | ✔ | ✔ | `protocols/poh-kleros-brightid-idena.md` (costs); `protocols/poh-v1-onchain-read.md` (the read) |
-| BrightID | `social-vouching:brightid` | — | — | `protocols/poh-kleros-brightid-idena.md` |
+| BrightID | `social-vouching:brightid` | — | ✔ (probed frozen registry) | `protocols/poh-kleros-brightid-idena.md` (costs); `protocols/brightid-onchain-read.md` (the read) |
 | Circles v2 | `social-trust:circles` | ✔ | ✔ | `protocols/circles.md` |
-| **Farcaster account** | `social-account:farcaster` | ✔ | — | `landscape/social-and-zktls-signals.md` |
-| Idena | `ceremony:idena` | — | — | `protocols/poh-kleros-brightid-idena.md` |
-| **Encointer** | `ceremony:encointer` | — | — | `landscape/poh-landscape-sweep.md` |
-| **Humanode** | `biometric-registry:humanode` | ✔ | — | `landscape/poh-landscape-sweep.md` |
+| **Farcaster account** | `social-account:farcaster` | ✔ | ✔ | `landscape/social-and-zktls-signals.md` (costs); `protocols/farcaster-onchain-read.md` (the read) |
+| **Lens account** | `social-account:lens` | ✔ | ✔ | `protocols/lens-onchain-read.md` |
+| Idena | `ceremony:idena` | — | ✔ (probed while not-live) | `protocols/poh-kleros-brightid-idena.md` (costs); `protocols/idena-onchain-read.md` (the read) |
+| **Encointer** | `ceremony:encointer` | — | — (refusal verified against runtime metadata, `protocols/encointer-onchain-read.md`) | `landscape/poh-landscape-sweep.md` |
+| **Humanode** | `biometric-registry:humanode` | ✔ | ✔ | `landscape/poh-landscape-sweep.md` (costs); `protocols/humanode-onchain-read.md` (the read) |
 | **Human Passport** | `behavioral:wallet-history` | ✔ | ✔ | `protocols/passport-civic-…-galxe.md` (costs, and the `sourceURI`); `protocols/human-passport-onchain-read.md` (the read) |
+| **Human Passport (EAS attestation)** | `behavioral:wallet-history` | ✔ | ✔ | `protocols/gitcoin-passport.md` — same credential as Human Passport, read from the attestation itself; shares the root so the two reads saturate |
 | **Nomis** | `behavioral:wallet-history` | ✔ | — | `landscape/reputation-scoring-products.md` |
 | **Trusta.AI** | `behavioral:wallet-history` | ✔ | — | `landscape/reputation-scoring-products.md` |
 | **Sismo** | `aggregate:republished` | — | — | `protocols/billions-…-intuition.md` |
@@ -199,6 +201,23 @@ asserts all three properties, so the next one gets caught before it ships.
 The product principle is at the top of `packages/sdk/src/adapters/index.ts`: no API key on the
 critical path, nothing that can rate-limit or revoke us. Ranked by (coverage gained) × (how clean
 the read is):
+
+Tranche 3 (2026-07-25 night): **six more probes** — Self (Celo integrator registries +
+hub scan), Idena (probed while not-live), Humanode (consensus-layer precompiles), BrightID
+(the frozen Snapshot registry), Galxe Passport (BNB SBT with bisection dating), Civic Pass
+(probed dead; reports the lapse date) — and **two evidence-backed refusals**: zkPassport
+(stateless verifier, no state to read) and Encointer (no EVM binding pallet in the runtime
+metadata). 18 of 32 adapters now probe live. The queue below is exhausted: every remaining
+unimplemented entry is either gated behind a vendor, provably unlinkable to an EVM address,
+or dead with nothing to read.
+
+Landed since the ranking below was written (2026-07-25 evening, `adapters/eas.ts` and
+`adapters/lens.ts`): **Coinbase Verification moved fully on-chain** (Coinbase's own
+AttestationIndexer + `getAttestation`, easscan GraphQL off the critical path); **Human
+Passport gained a second read** from the EAS attestation itself on OP + Arbitrum (attester
+check, revocation state, inline stamp list — same root as the resolver-cache read, so they
+saturate); **Lens** was researched and implemented on Lens Chain ownership-transfer logs with
+a Polygon sunset-bounded fallback, priced at 1¢ under the independence floor on purpose.
 
 1. ~~**Human Passport**~~ — **DONE 2026-07-25.** Implemented across all seven deployments, but not
    as `Decoder.getScore`: that call is revert-driven and discards the issuance date, so the probe

@@ -1,4 +1,4 @@
-import { createPublicClient, http, parseAbi, type PublicClient } from 'viem'
+import { createPublicClient, fallback, http, parseAbi, type PublicClient } from 'viem'
 import { worldchain } from 'viem/chains'
 import type { Address, AdapterProbe, AdapterProbeResult } from '../types.ts'
 import type { ProbeProvenance } from '../reconcile.ts'
@@ -362,8 +362,17 @@ function dateFromRegistration(
   return reg.timestamp
 }
 
+// Same fallback posture as agentbook.ts: an explicitly chosen endpoint is used alone,
+// the default rides the verified public list. A network failure on the AddressBook read
+// must never read as "not a human", and two more endpoints make that failure rarer.
 const client = (rpcUrl: string) =>
-  createPublicClient({ chain: worldchain, transport: http(rpcUrl) }) as PublicClient
+  createPublicClient({
+    chain: worldchain,
+    transport:
+      rpcUrl === WORLD_RPC
+        ? fallback([http(WORLD_RPC), http('https://worldchain.drpc.org'), http('https://480.rpc.thirdweb.com')])
+        : http(rpcUrl),
+  }) as PublicClient
 
 /** `registrationOf` narrowed to what the interpreter needs, and unable to throw. */
 async function registrationRead(

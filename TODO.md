@@ -12,6 +12,17 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
 - [x] **9-probe SDK consolidation** — landed in-tree; all page counts self-updated via
       the dynamic derivation. Design absorbed the new density: the probe receipt settles
       on completion (found rows + one tally line) and full evidence sorts held-first.
+- [x] **Infra run, Jul 25 evening** (overnight autonomous, log in MORNING.md):
+      **12 probes / 32 adapters / 19 roots / registry rev 36.** New: Gitcoin Passport
+      via EAS (OP+Arbitrum), Lens (Lens Chain + Polygon fallback), Coinbase read moved
+      fully on-chain, Farcaster custody-dating bug fixed. MCP grew 4 → 8 tools
+      (suggest_enrollment, check_fleet, wallet_signals, price_policy) with a real stdio
+      handshake test suite. SDK: wallet-forensics signals module (permanent
+      not-personhood caveat), probe timeout/retry/cache layer, registry reads on a
+      3-endpoint fallback transport. READMEs + coverage audit current. A second
+      provider tranche (Self/zkPassport, Galxe/Civic, Humanode/BrightID) is being
+      researched by builder agents — honest-refusal allowed, so some may land as
+      research files documenting why no permissionless read exists.
 
 ## Blocked on decisions (each unlocks a chunk)
 
@@ -32,6 +43,9 @@ The working plan, ranked. (MORNING.md is the log; this is the queue.)
       because Sepolia registration turned out to be free and instant. Mainnet is now a
       presentation choice — and one to make *after* the name decision.
 - [ ] **Demo video** — script is current (docs/demo-script.md), beat-timed at 3:00.
+- [ ] **ENS booth, Sunday MORNING (required)** — both ENS prizes require in-person
+      presentation at the ENS booth. Talking points + prize mapping now in
+      docs/demo-script.md §ENS booth. Video OR live demo link also required.
 - [ ] **World on-device beta checklist** — Selfie Check + Identity Check need a phone
       (~20 min); written half already in docs/world-beta-feedback.md.
 - [ ] **Manifesto copy decision** — "pays the sybil farm" vs the stricter independence

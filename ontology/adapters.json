@@ -149,7 +149,7 @@
       "rentCostCents": 2000,
       "decayHalfLifeDays": 3650,
       "live": true,
-      "sourceURI": "research/landscape/ontology-coverage.md",
+      "sourceURI": "research/protocols/zkpassport-onchain-read.md",
       "implemented": false,
       "notes": "Scopes its nullifier per service and never publishes an unscoped value — good privacy, but it means we cannot detect that this and Self came from one chip. Hence saturation rather than dedup. Verified 2026-07-25 that no permissionless address-keyed read exists: the RootVerifier's verify() is a stateless view (19 logs ever per chain, all admin), and results live in per-integrator contracts under app-scoped nullifiers. See the research file for what would flip this.",
       "ageCurve": "Decay"
@@ -163,7 +163,7 @@
       "rentCostCents": 2000,
       "decayHalfLifeDays": 3650,
       "live": true,
-      "sourceURI": "research/landscape/ontology-coverage.md",
+      "sourceURI": "research/protocols/self-onchain-read.md",
       "implemented": true,
       "notes": "Read from Celo: five Sourcify-verified integrator registries by eth_call (hub-gated callbacks, no non-proof write path, EIP-712 receiver consent so it cannot be planted), then a bounded client-filtered scan of the hub's DisclosureVerified events, whose recipient is un-indexed. All dates are latest-re-attestation ceilings. Caveats that discount the root's figures: 39% of all 6,212 hub disclosures ever (measured 2026-07-25) are Aadhaar or KYC attestations, not ICAO documents, and the registry path cannot tell which document type minted a positive; the hub is an upgradeable proxy with an unverified implementation; and the global per-document nullifier still means one chip can also feed ZKPassport and World — saturate, never sum. Publishes a global unscoped per-document nullifier on-chain.",
       "ageCurve": "Decay"
@@ -177,7 +177,7 @@
       "rentCostCents": 3000,
       "decayHalfLifeDays": 730,
       "live": true,
-      "sourceURI": "research/landscape/ontology-coverage.md",
+      "sourceURI": "research/protocols/galxe-passport-onchain-read.md",
       "implemented": true,
       "notes": "Sumsub underneath (Persona in the v2 era); shares its root with Linea PoH. Read passively from the soulbound ERC-721 on BNB Chain (0xE840…3C012, still minting ~2/day as of 2026-07-25) — balanceOf decides held, the owner-keyed _passports storage slot names the token, and issuance is dated exactly by bisecting the contract's monotone mint counter over archive state, with measured anchor bounds as the degraded path. Non-transferability is enforced in code, so held is an act of the subject; burn and Galxe-side revoke both zero the read. The SBT does not disclose document class or credential version — a 'passport' here may be a municipal ID — so passive scoring cannot weight by document strength.",
       "ageCurve": "Decay"
@@ -233,9 +233,9 @@
       "rentCostCents": 400,
       "decayHalfLifeDays": 90,
       "live": false,
-      "sourceURI": "research/landscape/ontology-coverage.md",
+      "sourceURI": "research/protocols/idena-onchain-read.md",
       "implemented": false,
-      "notes": "Not probed by default: the probe exists in adapters/idena.ts but is left out of defaultAdapters, because a read against a not-live protocol spends a round-trip on evidence scoring already zeroes. Marked not-live on scale grounds: 124 validated identities at epoch 214, down from 21,187 at peak. Its sublinear-staking fork killed the puppeteer pools and the network with them. Retained because it is the best-documented failure in the field. Probed anyway since 2026-07-25 — a held identity is reported and scored 0 while live is false, which is the honest shape: checked, found, not counted. Read from restricted.idena.io (the node the official app uses; its API key is a public constant in the deployed bundle — permissionless but protocol-operated, no independent fallback). Decay, not Ramp: identity state expires on a missed validation ceremony, so recency is the whole signal.",
+      "notes": "Not probed by default: the probe exists in adapters/idena.ts but is left out of defaultAdapters, because a read against a not-live protocol spends a round-trip on evidence scoring already zeroes. Marked not-live on scale grounds: 124 validated identities at epoch 214, down from 21,187 at peak. Its sublinear-staking fork killed the puppeteer pools and the network with them. Retained because it is the best-documented failure in the field. Left out of defaultAdapters as of this revision, so it is not probed unless a caller asks for it explicitly; when it is asked for, a held identity is reported and scored 0 while live is false — checked, found, not counted. Read from restricted.idena.io (the node the official app uses; its API key is a public constant in the deployed bundle — permissionless but protocol-operated, no independent fallback). Decay, not Ramp: identity state expires on a missed validation ceremony, so recency is the whole signal.",
       "ageCurve": "Decay"
     },
     {
@@ -331,7 +331,7 @@
       "rentCostCents": 100,
       "decayHalfLifeDays": 180,
       "live": true,
-      "sourceURI": "research/landscape/ontology-coverage.md",
+      "sourceURI": "research/protocols/gitcoin-passport.md",
       "implemented": true,
       "notes": "The same credential as human-passport, read from the EAS attestation itself (getUserAttestation -> getAttestation) instead of the resolver's cache: adds the attester check, EAS revocation state, and the inline score-v2 stamp list for root decomposition. Shares behavioral:wallet-history with human-passport on purpose - two reads of one credential must saturate, never sum.",
       "ageCurve": "Decay"
@@ -499,7 +499,7 @@
       "rentCostCents": 1000,
       "decayHalfLifeDays": 365,
       "live": true,
-      "sourceURI": "research/landscape/ontology-coverage.md",
+      "sourceURI": "research/protocols/humanode-onchain-read.md",
       "implemented": true,
       "notes": "One node, one human, enforced by 3D face liveness at the consensus layer, re-proved every 7 days. Read permissionlessly from the chain's own EVM precompiles: address -> native account (0x..0801, a permanent dual-consent binding that cannot be planted) then isAuthenticated (0x..0800, the consensus layer's own membership test), dated exactly from ActiveAuthentications state (expiry minus the 7-day lifetime, re-verified live every test run). The decay curve is a formality: an active bioauth is never more than 7 days old. Honest population caveat: 82 humans were actively bioauthenticated on 2026-07-25 and zero had claimed an EVM mapping, so no EVM-addressed subject can currently hold this credential; the adapter re-measures that emptiness rather than assuming it. Single Humanode-operated RPC (permissionless, not infrastructure-independent); enrollment trust root is Humanode's robonode + FaceTec, not the chain. Costs remain the face-liveness-class placeholder until priced.",
       "ageCurve": "Decay"

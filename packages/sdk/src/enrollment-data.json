@@ -109,6 +109,44 @@
         "youGive": "Face biometrics to a private registry.",
         "note": "Uniqueness is enforced inside Humanode's own set only."
       }
+    ],
+    "social-account:lens": [
+      {
+        "name": "Lens account",
+        "url": "https://lens.xyz/",
+        "effort": "Minutes",
+        "price": "Free — account creation is gas-sponsored",
+        "youGive": "A public social account. Ownership transfers need no recipient consent, so an account can also be planted on an address that never asked for it.",
+        "note": "Priced at 1¢ — below the independence floor by design. It never moves a score; what it adds is texture: a username, an acquisition date, and someday graph position."
+      }
+    ],
+    "kyc-vendor:sumsub": [
+      {
+        "name": "Galxe Passport",
+        "url": "https://app.galxe.com/passport",
+        "effort": "Government ID plus a liveness check, minutes",
+        "price": "Free to mint",
+        "youGive": "A full KYC file to Sumsub, Galxe's vendor. The soulbound token itself is public on BNB Chain.",
+        "note": "Shares its trust root with Linea PoH — holding both counts once."
+      },
+      {
+        "name": "Linea Proof of Humanity",
+        "url": "https://poh.linea.build/",
+        "effort": "Government ID plus a liveness check via a partner, minutes",
+        "price": "Free",
+        "youGive": "A KYC file to Sumsub via one of Linea's attestation partners.",
+        "note": "Shares its trust root with Galxe Passport — holding both counts once."
+      }
+    ],
+    "kyc-vendor:unattributed": [
+      {
+        "name": "Holonym / Human Network — government ID",
+        "url": "https://human.tech/",
+        "effort": "Government document scan, minutes",
+        "price": "Free tier available",
+        "youGive": "A government document to a vendor whose downstream KYC processor is not publicly attributed — which is why this root is priced separately from the named vendors.",
+        "note": "Distinct root from Holonym's biometric path (FaceTec); holding both is two roots."
+      }
     ]
   }
 }

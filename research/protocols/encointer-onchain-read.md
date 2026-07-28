@@ -2,7 +2,7 @@
 
 **Status: honest refusal.** No `encointer.ts` is shipped. The chain read itself is fully
 implementable — I demonstrate it below with raw storage queries against public RPC — but a
-Corroborate subject is an **Ethereum address**, and there is no permissionless way to map an
+Print subject is an **Ethereum address**, and there is no permissionless way to map an
 Ethereum address to an Encointer identity in either direction. An adapter would have to fake
 that mapping or require the subject to hand over material we do not model (their Substrate
 account or public key). Everything below was measured by me on **2026-07-25** unless a source
@@ -43,7 +43,7 @@ independent operator. The read was never the problem.
 
 ## 2. The refusal: an Ethereum address cannot name an Encointer identity
 
-Corroborate subjects are Ethereum addresses: `address = last20(keccak256(uncompressed
+Print subjects are Ethereum addresses: `address = last20(keccak256(uncompressed
 secp256k1 pubkey))`. Encointer accounts are `AccountId32`, and the app-created accounts are
 **sr25519** — a different curve entirely; no correspondence can exist. The one hypothetical
 bridge, Substrate's ecdsa account type, does not help either: an ecdsa `AccountId32` is
@@ -89,7 +89,7 @@ Any one of these, verified on chain, reopens the adapter:
   research file's "planting" caveat shows is necessary, not just sufficient.
 - **Reputation-ring proofs verifiable on an EVM chain** (the Bandersnatch ring work is the
   live candidate — watch `EncointerReputationRings` and the personhood-oracle repo).
-- A change in Corroborate's subject model that lets callers assert control of Substrate
+- A change in Print's subject model that lets callers assert control of Substrate
   accounts the way they assert control of multiple Ethereum addresses today
   (`PersonhoodResult.subjects`). That is a protocol-design decision above any adapter's pay
   grade, and it would make Encointer implementable in an afternoon using §1's reads.

@@ -64,6 +64,10 @@ const client = new Print({
     : {}),
   knownIds,
   knownRoots,
+  // A model asking about a wallet tends to ask again within the minute — lookup, then
+  // check, then enrollment advice. 60s of probe reuse serves that conversation without
+  // letting an answer outlive the block times it was read from by anything that matters.
+  probeCacheTtlMs: 60_000,
 })
 
 const server = new McpServer({ name: 'print', version: '0.1.1' })

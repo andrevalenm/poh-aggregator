@@ -142,8 +142,15 @@ describe('ontology', () => {
       assert.ok(a, `probe ${id} has no ontology entry, so its evidence would be dropped`)
       assert.ok(a.implemented, `probe ${id} exists but the ontology says implemented:false`)
       // A probe against a dead protocol returns evidence worth zero. That is legal, but it
-      // should be a decision, not a leftover.
-      assert.ok(a.live, `probe ${id} runs against an adapter marked not live`)
+      // must be a decision, not a leftover — decisions are recorded here, with their grounds
+      // in each adapter's notes: checked, found, reported, not counted.
+      const DELIBERATELY_PROBED_DEAD = new Set(['idena', 'brightid', 'civic-pass'])
+      if (!a.live) {
+        assert.ok(
+          DELIBERATELY_PROBED_DEAD.has(id),
+          `probe ${id} runs against an adapter marked not live, and no decision is recorded for it`,
+        )
+      }
     }
   })
 

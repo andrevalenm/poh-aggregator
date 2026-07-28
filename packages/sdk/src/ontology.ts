@@ -1,4 +1,4 @@
-import { createPublicClient, http, keccak256, toHex } from 'viem'
+import { createPublicClient, fallback, http, keccak256, toHex } from 'viem'
 import { sepolia } from 'viem/chains'
 import type { Adapter, AgeCurve, EvidenceClass } from './types.ts'
 
@@ -94,10 +94,22 @@ export interface Ontology {
  * dropped — silently discarding an adapter would understate correlation, which fails in the
  * adversary's favour.
  */
+/**
+ * Default Sepolia endpoints for the registry read, tried in order. This is the single most
+ * load-bearing call in the SDK — no ontology, no weights, no answer — so it does not get to
+ * depend on one public endpoint's uptime. An explicit `rpcUrl` disables the fallback: a
+ * caller who chose an endpoint chose it for a reason.
+ */
+export const REGISTRY_RPCS = [
+  'https://ethereum-sepolia-rpc.publicnode.com',
+  'https://sepolia.drpc.org',
+  'https://1rpc.io/sepolia',
+] as const
+
 export async function loadOntology(opts: OntologyOptions): Promise<Ontology> {
   const client = createPublicClient({
     chain: sepolia,
-    transport: http(opts.rpcUrl ?? 'https://ethereum-sepolia-rpc.publicnode.com'),
+    transport: opts.rpcUrl ? http(opts.rpcUrl) : fallback(REGISTRY_RPCS.map((u) => http(u))),
   })
 
   const [[ids, rows], revision] = await Promise.all([

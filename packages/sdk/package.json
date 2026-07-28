@@ -32,7 +32,7 @@
   "scripts": {
     "build": "cp ../../ontology/adapters.json src/ontology-data.json && cp ../../ontology/enrollment.json src/enrollment-data.json && tsc -p tsconfig.json && cp src/ontology-data.json src/enrollment-data.json dist/ && node scripts/fix-dts.mjs",
     "test": "node --test --experimental-strip-types 'src/**/*.test.ts'",
-    "test:live": "LIVE=1 node --test --experimental-strip-types 'src/**/*.live.test.ts'"
+    "test:live": "LIVE=1 node --test --experimental-strip-types 'src/**/*.test.ts'"
   },
   "dependencies": {
     "viem": "^2.21.0"

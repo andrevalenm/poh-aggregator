@@ -34,7 +34,7 @@ test.describe('Print landing', () => {
     await expect(page.locator('#registry-line')).toContainText(/rev \d+/, { timeout: 60_000 })
     await expect(page.locator('#registry-line')).toContainText('trust roots')
     // A first-time visitor never faces an empty input.
-    await expect(page.locator('.example-chip')).toHaveCount(3)
+    await expect(page.locator('.example-chip')).toHaveCount(4)
   })
 
   test('the print deforms under the pointer — the signature interaction', async ({ page }) => {

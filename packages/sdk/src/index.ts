@@ -15,7 +15,7 @@ import {
   type AsOf,
   type AsOfScoring,
 } from './as-of.ts'
-import type { Address, AdapterProbe, Evidence, PersonhoodResult } from './types.ts'
+import type { Address, AdapterProbe, AdapterProbeResult, Evidence, PersonhoodResult } from './types.ts'
 
 export * from './types.ts'
 export { score, freshnessOf, effectiveCost } from './scoring.ts'
@@ -27,6 +27,7 @@ export * from './reconcile.ts'
 export * from './as-of.ts'
 export * from './fleet.ts'
 export * from './agentbook.ts'
+export * from './signals/wallet.ts'
 export * from './ens-agents.ts'
 export * from './ens-presentation.ts'
 export * from './signals/wallet.ts'
@@ -79,6 +80,23 @@ export interface PrintOptions {
   adapters?: AdapterProbe[]
   knownIds?: string[]
   knownRoots?: string[]
+  /**
+   * Per-probe timeout in milliseconds. A hung public RPC becomes unreachable-evidence for
+   * that one adapter instead of hanging the whole `resolve()`. Default 20s; 0 disables.
+   */
+  probeTimeoutMs?: number
+  /**
+   * Re-issues for a probe that errored or timed out — never for one that answered, in either
+   * direction. Transient failures are the normal weather on public endpoints. Default 1.
+   */
+  probeRetries?: number
+  /**
+   * Cache successful probe results for this many milliseconds, keyed by adapter + address.
+   * Off by default: how stale an answer may be is a correctness decision that belongs to the
+   * caller, not a library default. Error results are never cached — an outage should not
+   * outlive itself.
+   */
+  probeCacheTtlMs?: number
 }
 
 export interface ResolveOptions {
@@ -104,6 +122,7 @@ export class Print {
   #opts: Required<Pick<PrintOptions, 'registryAddress'>> & PrintOptions
   #adapters: AdapterProbe[]
   #ontology?: Awaited<ReturnType<typeof loadOntology>>
+  #probeCache = new Map<string, { at: number; result: AdapterProbeResult }>
 
   constructor(opts: PrintOptions = {}) {
     this.#opts = { registryAddress: opts.registryAddress ?? DEFAULT_REGISTRY, ...opts }
@@ -282,6 +301,55 @@ export class Print {
    * against today's — the audit trail applied rather than merely printed. It changes what the
    * result may claim, so read the header of `as-of.ts` before using it.
    */
+  /**
+   * One probe, made survivable: bounded by a timeout, retried once on transient failure,
+   * optionally cached. The three failure modes this closes, in the order they were met in
+   * the wild: a hung public RPC stalling all thirty probes of a lookup behind it; a single
+   * dropped connection reported as "unreachable" evidence when asking again would have
+   * answered; and a demo re-probing an identical wallet seconds after the last time.
+   */
+  async #probe(probe: AdapterProbe, address: Address): Promise<AdapterProbeResult> {
+    const ttl = this.#opts.probeCacheTtlMs ?? 0
+    const key = `${probe.adapterId}:${address.toLowerCase()}`
+    if (ttl > 0) {
+      const hit = this.#probeCache.get(key)
+      if (hit && Date.now() - hit.at < ttl) return hit.result
+    }
+
+    const timeoutMs = this.#opts.probeTimeoutMs ?? 20_000
+    const attempts = 1 + Math.max(0, this.#opts.probeRetries ?? 1)
+    let last: AdapterProbeResult = { held: false, error: 'probe never ran' }
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      try {
+        // Adapters promise never to throw, but a probe wrapped in a timeout can still lose
+        // the race; either way the answer must degrade to error-evidence, not an exception.
+        // The timer stays referenced (it may be the only thing keeping the loop alive while
+        // a truly hung probe holds nothing) and is cleared the moment the probe settles.
+        if (timeoutMs > 0) {
+          let timer: ReturnType<typeof setTimeout> | undefined
+          try {
+            last = await Promise.race([
+              probe.probe(address),
+              new Promise<AdapterProbeResult>((resolve) => {
+                timer = setTimeout(() => resolve({ held: false, error: `probe timed out after ${timeoutMs}ms` }), timeoutMs)
+              }),
+            ])
+          } finally {
+            clearTimeout(timer)
+          }
+        } else {
+          last = await probe.probe(address)
+        }
+      } catch (e) {
+        last = { held: false, error: e instanceof Error ? e.message : String(e) }
+      }
+      if (!last.error) break
+    }
+
+    if (ttl > 0 && !last.error) this.#probeCache.set(key, { at: Date.now(), result: last })
+    return last
+  }
+
   async resolve(
     subject: string | readonly string[],
     opts: ResolveOptions = {},
@@ -327,7 +395,7 @@ export class Print {
     const now = historical ? historical.context.timestamp : Math.floor(Date.now() / 1000)
 
     const probes = addresses.flatMap((address) =>
-      this.#adapters.map(async (probe) => ({ address, probe, result: await probe.probe(address) })),
+      this.#adapters.map(async (probe) => ({ address, probe, result: await this.#probe(probe, address) })),
     )
     const results = await Promise.all(probes)
 

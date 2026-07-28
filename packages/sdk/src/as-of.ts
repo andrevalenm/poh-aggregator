@@ -47,9 +47,9 @@
  *    exact at every block. When that fails, `auditTrailComplete` is false and the gap is named.
  */
 
-import { createPublicClient, http, type PublicClient } from 'viem'
+import { createPublicClient, fallback, http, type PublicClient } from 'viem'
 import { sepolia } from 'viem/chains'
-import { REGISTRY_ABI, decodeAgeCurve, decodeEvidenceClass, rootKey } from './ontology.ts'
+import { REGISTRY_ABI, REGISTRY_RPCS, decodeAgeCurve, decodeEvidenceClass, rootKey } from './ontology.ts'
 import type { Ontology } from './ontology.ts'
 import { effectiveCost } from './scoring.ts'
 import type { Adapter, Evidence } from './types.ts'
@@ -492,11 +492,11 @@ function restoreIfHeldThen(
   }
 }
 
-/** A Sepolia client for the registry, matching what `loadOntology` uses. */
+/** A Sepolia client for the registry, matching what `loadOntology` uses — same fallback list. */
 export function registryClient(rpcUrl?: string): PublicClient {
   return createPublicClient({
     chain: sepolia,
-    transport: http(rpcUrl ?? 'https://ethereum-sepolia-rpc.publicnode.com'),
+    transport: rpcUrl ? http(rpcUrl) : fallback(REGISTRY_RPCS.map((u) => http(u))),
   }) as PublicClient
 }
 
