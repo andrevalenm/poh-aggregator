@@ -60,12 +60,9 @@
           only so the sentence reads correctly before the chain read lands, or if it fails.
         -->
         <p class="hero-answer">
-          Proof of humanity is fragmenting across dozens of protocols, and nobody wants to
-          integrate them one at a time. Print reads
-          <b><span data-count="integrated">10</span> of them live</b> — out of
-          <span data-count="catalogued">30</span> catalogued in one public registry — through a
-          single call, and answers the only question a product actually asks: is a real person
-          there? You never hold an identity.
+          We read <b><span data-count="integrated">18</span> protocols</b> and by calling one
+          API you get the answer that matters more and more every day:
+          <span class="hero-q">Is this user a real human?</span>
         </p>
         <div class="hero-ctas">
           <a class="cta cta-primary" href="#try">Check an address</a>
@@ -185,11 +182,11 @@ person.isHuman(Thresholds.standard)</code></pre>
     <section class="daylight how" id="how">
       <div class="band-inner">
         <header class="band-head reveal">
-          <h2>Three places this already hurts</h2>
+          <h2>Three places this is needed</h2>
         </header>
         <div class="tablets">
           <article class="tablet reveal">
-            <h3>One human, one account</h3>
+            <h3>Keeping bots out of social apps</h3>
             <p>
               Reddit, Discord, Bluesky, every forum with a comment box. They need to know an
               account is a distinct person, and they need pseudonymity to survive the check.
@@ -198,7 +195,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             </p>
           </article>
           <article class="tablet reveal">
-            <h3>One human, one allocation</h3>
+            <h3>Stopping scalpers on ticket drops</h3>
             <p>
               Ticketmaster presales, sneaker drops, anything scarce and first-come. Professional
               operators run thousands of accounts against the queue, and every second of
@@ -207,7 +204,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             </p>
           </article>
           <article class="tablet reveal">
-            <h3>One human, how many agents?</h3>
+            <h3>Knowing who is behind an AI agent</h3>
             <p>
               Agents already transact on their own. Before you deal with one you need to know a
               person stands behind it, and whether it is that person's fourth. On World's
@@ -236,8 +233,8 @@ person.isHuman(Thresholds.standard)</code></pre>
           </h2>
           <p>
             Print reads the credentials they already carry across
-            <span data-count="integrated">10</span> protocols, returns one answer, and leaves you
-            holding nothing. <a class="coverage-ref" href="#coverage">What that number covers</a>.
+            <span data-count="integrated">18</span> protocols, returns one answer, and leaves you
+            holding nothing.
           </p>
         </header>
 
@@ -519,8 +516,7 @@ person.isHuman(Thresholds.standard)</code></pre>
           <h2 id="hackathon-title">Built in Lisbon, over one weekend</h2>
           <p>
             Every line of this was written at ETHGlobal Lisbon 2026 — the contracts, the
-            subgraphs, the SDK, the MCP server, the agent flow. It is a hackathon project and
-            we will not pretend otherwise.
+            subgraphs, the SDK, the MCP server, the agent flow.
           </p>
           <p>
             But the problem is not a hackathon problem. Tinder, Zoom and Docusign added proof of
@@ -528,7 +524,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             multiplying — each with its own SDK, its own chain, its own idea of what it has
             proved. Every product that needs a real person behind an account now faces the
             same integration tax. That is worth solving in the open, with the registry on-chain
-            and its sources attached, whatever happens to us on Sunday.
+            and its sources attached.
           </p>
 
           <div class="built-at reveal">
@@ -547,7 +543,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             </a>
             <p class="built-at-note">
               The azulejo tilework and the calçada wave in these pages are drawn, not
-              photographed — like the fingerprint they sit beside.
+              photographed.
             </p>
           </div>
         </header>
@@ -825,66 +821,6 @@ person.isHuman(Thresholds.standard)</code></pre>
           </article>
         </div>
 
-        <div class="hackathon-honesty reveal" id="coverage">
-          <h3>What is finished, and what is not</h3>
-          <p>
-            Working and live: the registry contract,
-            <span data-count="integrated">10</span> credential probes reading World Chain, Gnosis,
-            Base, Optimism and Linea (plus Sepolia for the registry itself), both subgraphs, the
-            SDK, the MCP server, the agent flow, this page, and a test suite that runs against
-            real chains rather than mocks. The weights are judgments rather than measurements,
-            and no amount of this proves the human behind a credential is acting for themselves.
-          </p>
-          <!--
-            The three numbers, in decreasing confidence. The first two are read from the
-            deployed registry at runtime (paintCounts, src/landing/main.ts); the static values
-            are ontology/adapters.json at the time of writing. The third is deliberately not a
-            protocol count — see the note under the table.
-          -->
-          <dl class="coverage">
-            <div class="coverage-row">
-              <dt><span data-count="integrated">10</span> integrated</dt>
-              <dd>
-                Protocols Print actually reads. A live RPC call per probe, no vendor API key, no
-                server of ours. These are the ones the number on this page means.
-              </dd>
-            </div>
-            <div class="coverage-row">
-              <dt><span data-count="catalogued">30</span> catalogued</dt>
-              <dd>
-                Catalogued with a trust root in the on-chain registry, across
-                <span data-count="roots">18</span> distinct roots. Catalogued is not the same as
-                readable — but a root that is catalogued already does the work of stopping the
-                credential being double-counted, whether or not we can read it.
-              </dd>
-            </div>
-            <div class="coverage-row">
-              <dt>the wider field</dt>
-              <dd>
-                The research sweep tabulates 64 rows across two tables, dead projects and
-                duplicate listings included, so no single “how many exist” figure is honest and
-                we do not print one. Read it at
-                <code>research/landscape/poh-landscape-sweep.md</code>.
-              </dd>
-            </div>
-          </dl>
-          <p>
-            The gap between integrated and catalogued is the interesting part, not an
-            embarrassment. Most personhood credentials cannot be read without the issuing
-            vendor's cooperation, and some are unreadable <em>by design</em>: ZKPassport scopes
-            its nullifier per service and never publishes an unscoped value, so nobody — us
-            included — can look one up unsolicited. That is the privacy property working. It is
-            also why Print works at the level of the credential <em>class</em> rather than the
-            credential: we never need to know that <em>this</em> subject's two credentials came
-            from one passport, only that those two protocols read passports, which is a public
-            fact about the world.
-          </p>
-          <p>
-            None of that is hidden in a footnote. It is in the API — as caveats you have to
-            receive before you get a verdict, and a <code>isHuman(threshold)</code> that throws
-            unless you choose the threshold yourself.
-          </p>
-        </div>
       </div>
     </section>
 
@@ -897,7 +833,7 @@ person.isHuman(Thresholds.standard)</code></pre>
             <span class="wordmark">print</span>
             <p>
               One call across every proof of humanity. The registry stores protocols, never
-              people — scoring runs client-side, and nobody, including us, holds the join key.
+              people.
             </p>
           </div>
           <div class="colophon-col">
