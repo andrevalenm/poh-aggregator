@@ -342,10 +342,15 @@ export async function findCustodyAcquisition(
     const held = await Promise.all(rungs.map(holdsAt))
     continuitySamples += rungs.length
     // Scan from the far end: the last block where the subject did *not* hold the fid is the
-    // tightest floor this ladder can establish.
+    // tightest floor this ladder can establish. The next round must search *above* it — up to
+    // the first rung known to be held again, or head — not below the stale candidate: leaving
+    // `acquired` under the floor made the restart bracket empty, so the search kept the first
+    // stint and overstated tenure, exactly the error the ladder exists to catch. Found by the
+    // away-and-back case in `farcaster.test.ts`.
     const broken = held.lastIndexOf(false)
     if (broken === -1) break
     floor = rungs[broken]!
+    acquired = rungs[broken + 1] ?? head
   }
 
   return { block: acquired, timestamp: await reader.blockTimestamp(acquired), continuitySamples }
