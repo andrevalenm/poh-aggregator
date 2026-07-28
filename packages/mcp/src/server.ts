@@ -17,7 +17,24 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { Print, DEFAULT_REGISTRY, weightHistory, type PersonhoodResult } from '@printid/sdk'
+import {
+  Print,
+  DEFAULT_REGISTRY,
+  weightHistory,
+  suggestEnrollment,
+  evaluateFleet,
+  lookupHumans,
+  priceOfPolicy,
+  costOfSlots,
+  defaultAdapters,
+  walletSignals,
+  type WalletChain,
+  type Address,
+  type FleetAgent,
+  type HumanEvidence,
+  type PersonhoodResult,
+} from '@printid/sdk'
+
 // Copied out of ontology/adapters.json by this package's build and shipped in the tarball.
 // It used to be read at run time from a path three levels above dist, which is the repo's own
 // ontology directory from packages/mcp/dist but node_modules/ontology from an installed
@@ -51,30 +68,20 @@ const client = new Print({
 
 const server = new McpServer({ name: 'print', version: '0.1.1' })
 
-/**
- * Compact, agent-legible rendering. Full detail stays available via the raw result.
- *
- * Root count leads and the score comes after it, because an agent that reads only the score
- * can be misled in the adversary's favour. Costs saturate within a trust root and sum across
- * roots, so on the deployed ontology four credentials derived from one passport chip
- * (world-id-document, zkpassport, self-protocol, rarimo) score 3.30 off a single root, while
- * four credentials from four different roots (World Orb, PoH, Circles, wallet history) score
- * 2.85. The farm outscores the person; only the root count inverts. Ordering the output so the
- * misleading number arrives first was an output-format bug, not a matter of taste.
- */
+/** Compact, agent-legible rendering. Full detail stays available via the raw result. */
 function render(r: PersonhoodResult): string {
   const lines: string[] = []
   lines.push(`subject: ${r.subjects.join(', ')}${r.name ? ` (${r.name})` : ''}`)
-  lines.push(
-    `independent trust roots: ${r.independentRoots}   <- read this first: it is what separates a person from a farm`,
-  )
+  lines.push(`score: ${r.score.toFixed(2)}  (log10 of adversary cost in cents)`)
+  lines.push(`independent trust roots: ${r.independentRoots}`)
+  lines.push(`total adversary cost: $${(r.totalCostCents / 100).toFixed(2)}`)
   lines.push('')
 
   const held = r.evidence.filter((e) => e.held)
   if (held.length === 0) {
     lines.push('credentials: none found')
   } else {
-    lines.push(`credentials held (${held.length}):`)
+    lines.push('credentials held:')
     for (const e of held) {
       const decay = e.freshness < 1 ? `, freshness ${(e.freshness * 100).toFixed(0)}%` : ''
       const dead = e.live ? '' : ' [DISCONTINUED — scored 0]'
@@ -94,16 +101,6 @@ function render(r: PersonhoodResult): string {
   }
 
   lines.push('')
-  lines.push(
-    `score: ${r.score.toFixed(2)}  (log10 of adversary cost in cents; cheapest attack costs $${(r.totalCostCents / 100).toFixed(2)})`,
-  )
-  lines.push(
-    '  Do not rank subjects on this alone. It prices the cheapest attack, and because costs',
-    '  saturate within a root, many credentials off one root can outscore few credentials off',
-    '  several — 3.30 for four proofs of one passport chip against 2.85 for four separate roots.',
-  )
-
-  lines.push('')
   lines.push('caveats:')
   for (const c of r.caveats) lines.push(`  - [${c.code}] ${c.message}`)
 
@@ -120,7 +117,7 @@ function render(r: PersonhoodResult): string {
 
 server.tool(
   'lookup_personhood',
-  'Find which proof-of-personhood credentials an address or ENS name holds, and how many INDEPENDENT trust roots stand behind them. The root count is the number to read: credentials tracing to the same root — one passport chip presented to four protocols — are one piece of evidence, not four, and the response names the ones discounted as correlated. Returns the evidence and the caveats, never a bare verdict. Pass several addresses when the same person controls more than one wallet — real users hold different credentials on different addresses.',
+  'Gather every proof-of-personhood credential for an address or ENS name and score it by independent trust root. Returns the evidence and what was discounted as correlated, never a bare verdict. Pass several addresses when the same person controls more than one wallet — real users hold different credentials on different addresses.',
   {
     subject: z
       .union([z.string(), z.array(z.string()).min(1)])
@@ -144,13 +141,13 @@ server.tool(
 
 server.tool(
   'check_personhood',
-  'Decide whether the credentials a subject holds clear a threshold you specify. There is no default threshold on purpose: at a plausible sybil rate a strong classifier still misjudges most of the people it flags, so the choice to deny belongs to you. The full evidence and its independent-trust-root count come back with the verdict — check the root count before acting on PASS, because a threshold cannot see the difference between several independent roots and several credentials off one. Prefer escalating (asking for another credential) over denying.',
+  'Decide whether a subject clears a personhood threshold you specify. There is no default threshold on purpose: at a plausible sybil rate a strong classifier still misjudges most of the people it flags, so the choice to deny belongs to you. Prefer escalating (asking for another credential) over denying.',
   {
     subject: z.union([z.string(), z.array(z.string()).min(1)]),
     threshold: z
       .number()
       .describe(
-        'Score to clear. Calibration against the deployed ontology: ~1.7 is cleared by a single easily-rented credential, ~2.7 by a PoH registration, ~3.5 by a KYC-rooted credential OR by several independent roots — and those last two are not the same finding, which is why the root count in the result matters more than where you put this number. Exported presets: lenient 1.5, standard 2.5, strict 3.5.',
+        'Score to clear. From the deployed ontology: ~1.7 = one cheap-to-rent credential (World Orb resells from $0.50; Circles registration), ~2.7 = a PoH registration, ~3.5 = a KYC-rooted credential or several independent roots. Exported presets: lenient 1.5, standard 2.5, strict 3.5.',
       ),
   },
   async ({ subject, threshold }) => {
@@ -169,7 +166,7 @@ server.tool(
 
 server.tool(
   'explain_trust_roots',
-  'The map of which personhood protocols read which trust root — what you need to tell whether two credentials are independent evidence or the same evidence counted twice. Protocols sharing a root are marked SHARED. Each entry also carries what it proves and what it costs to forge or rent, but the sharing structure is the point of this tool.',
+  'List the trust-root ontology: every known personhood protocol, what it proves, which root it reads, and what it costs to forge or rent. Use this to understand why two credentials might not be independent evidence.',
   {
     root: z.string().optional().describe('Filter to a single trust root, e.g. state-document:icao-9303'),
   },
@@ -203,7 +200,7 @@ server.tool(
 
 server.tool(
   'explain_weight_history',
-  'Whether one protocol\'s standing in the ontology has changed, and on whose evidence: the full audit trail for a single adapter, every revision it has ever been given, each with the source it was derived from and the block it landed in. The ontology\'s judgments are curated, and this history is what makes them accountable — if an adapter was re-rated or marked discontinued, this shows exactly when and why.',
+  'The full audit trail for one adapter: every weight the ontology has ever assigned it, each with the source it was derived from and the block it landed in. Weights here are curated judgments, so this history is what makes them accountable — if a score changed, this shows exactly when, why, and on whose evidence.',
   {
     adapter_id: z.string().describe('Adapter id, e.g. world-id-orb, poh-v2, circles-v2'),
   },
@@ -233,6 +230,241 @@ server.tool(
         `    tx: ${w.txHash}`,
       )
     }
+    return { content: [{ type: 'text', text: lines.join('\n') }] }
+  },
+)
+
+server.tool(
+  'suggest_enrollment',
+  'Which trust root is this subject missing, and where do they actually go to get it. Only ever suggests roots the subject does not already hold — a second passport-derived credential saturates against the first and raises nothing, which is also why this cannot be turned into a farming manual: the roots a farm can cheaply replicate are exactly the ones that gain it nothing.',
+  {
+    subject: z.union([z.string(), z.array(z.string()).min(1)]),
+  },
+  async ({ subject }) => {
+    const r = await client.resolve(subject)
+    const { adapters } = await client.ontology()
+    const advice = suggestEnrollment(r, adapters)
+    const lines: string[] = []
+    lines.push(`current: score ${r.score.toFixed(2)} across ${r.independentRoots} independent root${r.independentRoots === 1 ? '' : 's'}`)
+    lines.push('')
+    if (!advice.suggestions.length) {
+      lines.push('No unheld live roots to suggest — the subject already holds every root the ontology can price.')
+    } else {
+      lines.push('unheld roots, ranked by score gain (each priced at min(forge, rent) of its cheapest credential):')
+      for (const s of advice.suggestions) {
+        lines.push(`  - ${s.trustRoot}: +${s.scoreGain.toFixed(2)} → projected score ${s.projectedScore.toFixed(2)} across ${s.projectedRoots} roots ($${(s.contributionCents / 100).toFixed(2)} adversary cost)`)
+        for (const o of s.options) {
+          lines.push(`      ${o.name} — ${o.url} · ${o.effort} · ${o.price} · you give: ${o.youGive}`)
+        }
+      }
+    }
+    if (advice.wouldAddNothing.length) {
+      lines.push('')
+      lines.push('would add NOTHING (root already held — a second credential here saturates):')
+      for (const w of advice.wouldAddNothing) lines.push(`  - ${w.trustRoot}: ${w.options.map((o) => o.name).join(', ')}`)
+    }
+    lines.push('')
+    lines.push(`caveat: ${advice.caveat}`)
+    return { content: [{ type: 'text', text: lines.join('\n') }] }
+  },
+)
+
+server.tool(
+  'check_fleet',
+  'Apply a fleet policy to a set of agent wallets: who is the human behind each (read attested from World AgentBook), does that human clear your score and independence bar, and does any one human exceed your per-human agent cap. A fleet of agents is still one person. Verdicts come with the full rule trace; an unreadable registry yields indeterminate, never a deny.',
+  {
+    agents: z.array(z.string()).min(1).describe('Agent wallet addresses to evaluate together.'),
+    min_score: z.number().default(1.5).describe('Print score the backing human must reach.'),
+    min_independent_roots: z.number().int().default(1),
+    max_agents_per_human: z.number().int().default(1).describe('Agent slots one human may hold at once.'),
+    unbacked: z
+      .enum(['deny', 'count-as-distinct-human'])
+      .default('deny')
+      .describe('What to do with an agent nobody registered in AgentBook.'),
+  },
+  async ({ agents, min_score, min_independent_roots, max_agents_per_human, unbacked }) => {
+    const addrs = agents as Address[]
+    const backings = await lookupHumans(addrs)
+    const fleetAgents: FleetAgent[] = addrs.map((a) => ({
+      agent: a,
+      backing: backings.get(a) ?? { status: 'unknown', error: 'no lookup result' },
+    }))
+
+    // One personhood resolve per DISTINCT human — the whole point of the grouping.
+    const evidence = new Map<string, HumanEvidence>()
+    const humanIds = [...new Set(fleetAgents.flatMap((f) => (f.backing.status === 'backed' ? [f.backing.humanId] : [])))]
+    for (const humanId of humanIds) {
+      // AgentBook humanIds are World nullifiers, not addresses — personhood is resolved over
+      // the agent wallets that share the backing, which is the address set we actually have.
+      const wallets = fleetAgents.filter((f) => f.backing.status === 'backed' && f.backing.humanId === humanId).map((f) => f.agent)
+      try {
+        const r = await client.resolve(wallets)
+        evidence.set(humanId, { score: r.score, independentRoots: r.independentRoots, subjects: r.subjects, roots: r.roots.filter((x) => x.contributionCents > 0).map((x) => x.trustRoot) })
+      } catch (e) {
+        evidence.set(humanId, { score: 0, independentRoots: 0, error: e instanceof Error ? e.message : String(e) })
+      }
+    }
+    if (unbacked === 'count-as-distinct-human') {
+      // An unbacked agent admitted as its own human is scored on its own wallet.
+      for (const f of fleetAgents) {
+        if (f.backing.status !== 'unbacked') continue
+        try {
+          const r = await client.resolve(f.agent)
+          evidence.set(`unbacked:${f.agent.toLowerCase()}`, { score: r.score, independentRoots: r.independentRoots, subjects: r.subjects, roots: r.roots.filter((x) => x.contributionCents > 0).map((x) => x.trustRoot) })
+        } catch (e) {
+          evidence.set(`unbacked:${f.agent.toLowerCase()}`, { score: 0, independentRoots: 0, error: e instanceof Error ? e.message : String(e) })
+        }
+      }
+    }
+
+    const decision = evaluateFleet({
+      policy: {
+        name: 'mcp-caller',
+        minScore: min_score,
+        minIndependentRoots: min_independent_roots,
+        maxAgentsPerHuman: max_agents_per_human,
+        unbackedAgents: unbacked,
+        admission: 'as-presented',
+      },
+      agents: fleetAgents,
+      evidence,
+    })
+
+    const lines: string[] = []
+    lines.push(`fleet decision — policy: minScore ${min_score}, minRoots ${min_independent_roots}, cap ${max_agents_per_human}/human, unbacked=${unbacked}`)
+    lines.push('')
+    for (const v of decision.agents) {
+      lines.push(`  ${v.agent}: ${v.verdict.toUpperCase()} — ${v.because}`)
+      for (const o of v.rules) lines.push(`      [${o.pass === null ? '?' : o.pass ? 'ok' : 'FAIL'}] ${o.rule}: ${o.detail}`)
+    }
+    const s = decision.summary
+    lines.push('')
+    lines.push(
+      `humans identified: ${s.humans} · allowed ${s.allowed} · denied ${s.denied} (${s.deniedByCap} by cap) · indeterminate ${s.indeterminate} · collapse ratio ${s.collapseRatio.toFixed(1)}× (${s.agents} agents → ${s.humans} humans)`,
+    )
+    for (const c of decision.caveats) lines.push(`  caveat: [${c.code}] ${c.message}`)
+    return { content: [{ type: 'text', text: lines.join('\n') }] }
+  },
+)
+
+server.tool(
+  'wallet_signals',
+  'Wallet forensics for an address — age, outbound activity, balances, USDC holdings across Ethereum, Gnosis and Base. These price effort, NOT humanity: a rich old busy wallet can be one bot among thousands run by one operator, and a fresh empty wallet can be a real person arriving. Every result carries the wallet-forensics-are-not-personhood caveat; this tool will never fold these numbers into a personhood score, and neither should you.',
+  {
+    address: z.string().describe('The wallet address to read.'),
+    chains: z
+      .array(z.enum(['ethereum', 'gnosis', 'base', 'optimism', 'arbitrum']))
+      .optional()
+      .describe('Which chains to read. Default: ethereum + gnosis + base; optimism and arbitrum on request.'),
+  },
+  async ({ address, chains }) => {
+    const result = await walletSignals(address as Address, chains ? { chains: chains as WalletChain[] } : undefined)
+    const lines: string[] = []
+    const s = result.summary
+    lines.push(`wallet ${result.address}`)
+    lines.push(
+      `summary: ${s.anyActivity ? 'active' : 'no activity seen'} · ${s.totalTxOut} tx sent across answering chains${s.approxAgeDays !== undefined ? ` · first seen ~${Math.round(s.approxAgeDays)} days ago` : ''}`,
+    )
+    lines.push('')
+    for (const c of result.chains) {
+      const parts: string[] = []
+      if (c.txCountOut !== undefined) parts.push(`${c.txCountOut} tx out`)
+      if (c.nativeBalanceWei !== undefined) parts.push(`balance ${(Number(c.nativeBalanceWei) / 1e18).toFixed(4)} native`)
+      if (c.erc20?.usdc !== undefined) parts.push(`USDC ${(Number(c.erc20.usdc) / 1e6).toFixed(2)}`)
+      if (c.firstSeen) parts.push(`first seen ${new Date(c.firstSeen.timestamp * 1000).toISOString().slice(0, 10)}`)
+      if (c.totalTxCount !== undefined) parts.push(`${c.totalTxCount} total tx (indexed)`)
+      lines.push(`  ${c.chain}: ${parts.length ? parts.join(' · ') : 'nothing seen'}`)
+      for (const [source, err] of Object.entries(c.errors ?? {})) lines.push(`      unreachable: ${source} — ${err}`)
+    }
+    lines.push('')
+    lines.push(`caveat: [${result.caveat.code}] ${result.caveat.message}`)
+    return { content: [{ type: 'text', text: lines.join('\n') }] }
+  },
+)
+
+server.tool(
+  'price_policy',
+  'What it costs an adversary to defeat a personhood policy: the cheapest set of real credentials that clears your score line and root count, priced at min(forge, rent) from the deployed registry, one credential per root because saturation makes a second one worthless. Priced only over adapters this deployment can actually read — quoting the whole ontology would state a floor nobody can reach. With a per-human agent cap, also composes the bill for N agent slots: each batch of max_agents_per_human slots needs a whole new human, credentials and all.',
+  {
+    min_score: z.number().describe('The score line the policy demands.'),
+    min_independent_roots: z.number().int().default(2),
+    max_agents_per_human: z.number().int().default(1),
+    slots: z.number().int().default(1).describe('How many agent slots the adversary wants to hold.'),
+    must_include: z
+      .array(z.string())
+      .optional()
+      .describe('Trust roots every slot needs regardless of score (e.g. iris-registry:world-orb when AgentBook registration is also required).'),
+  },
+  async ({ min_score, min_independent_roots, max_agents_per_human, slots, must_include }) => {
+    const { adapters } = await client.ontology()
+    const readable = defaultAdapters().map((a) => a.adapterId)
+    const price = priceOfPolicy({
+      adapters,
+      minScore: min_score,
+      minIndependentRoots: min_independent_roots,
+      readableAdapterIds: readable,
+      ...(must_include ? { mustInclude: must_include } : {}),
+    })
+    const lines: string[] = []
+    lines.push(`policy: score ≥ ${min_score}, ≥ ${min_independent_roots} independent roots, ${max_agents_per_human} agent slot${max_agents_per_human === 1 ? '' : 's'} per human`)
+    lines.push('')
+    if (!price.feasible) {
+      lines.push(`INFEASIBLE with the ${readable.length} adapters this deployment reads: ${price.reason}`)
+      lines.push('No combination of readable credentials clears this policy — for a defender that means nobody can pass it either.')
+    } else {
+      lines.push(`cheapest slot: $${(price.cheapestSlotCents / 100).toFixed(2)}${price.approximate ? ' (approximate — greedy search)' : ''}`)
+      for (const r of price.roots) lines.push(`  - ${r.trustRoot} via ${r.adapterId}: $${(r.costCents / 100).toFixed(2)}`)
+      lines.push(`  (${price.reason})`)
+      const bill = costOfSlots(price, { name: 'priced', minScore: min_score, minIndependentRoots: min_independent_roots, maxAgentsPerHuman: max_agents_per_human, unbackedAgents: 'deny', admission: 'as-presented' }, slots)
+      lines.push('')
+      lines.push(
+        `${bill.slots} slot${bill.slots === 1 ? '' : 's'} → ${bill.humansRequired} human${bill.humansRequired === 1 ? '' : 's'} required → $${(bill.totalCents / 100).toFixed(2)} total, $${(bill.marginalCentsPerAgent / 100).toFixed(2)} marginal per agent`,
+      )
+      lines.push('Without the per-human cap, the marginal agent costs a keypair.')
+    }
+    lines.push('')
+    lines.push(`candidates considered: ${price.candidates.map((c) => `${c.trustRoot} ($${(c.costCents / 100).toFixed(2)})`).join(', ')}`)
+    return { content: [{ type: 'text', text: lines.join('\n') }] }
+  },
+)
+
+server.tool(
+  'compare_subjects',
+  'Two subjects side by side, scored identically: per-root contributions, where their credentials overlap, and whose evidence is more independent. The instructive case is a real person against a sybil farm — the farm can hold MORE credentials and still collapse to fewer roots, because its credentials are maximally correlated. Returns the factual comparison only; which one to admit is a threshold decision that stays with you.',
+  {
+    subject_a: z.union([z.string(), z.array(z.string()).min(1)]).describe('First subject: address, ENS name, or set.'),
+    subject_b: z.union([z.string(), z.array(z.string()).min(1)]).describe('Second subject.'),
+    label_a: z.string().default('A'),
+    label_b: z.string().default('B'),
+  },
+  async ({ subject_a, subject_b, label_a, label_b }) => {
+    const [a, b] = await Promise.all([client.resolve(subject_a), client.resolve(subject_b)])
+    const lines: string[] = []
+    const side = (label: string, r: PersonhoodResult) => {
+      lines.push(`${label}: score ${r.score.toFixed(2)} · ${r.independentRoots} independent root${r.independentRoots === 1 ? '' : 's'} · $${(r.totalCostCents / 100).toFixed(2)} adversary cost · ${r.evidence.filter((e) => e.held).length} credential${r.evidence.filter((e) => e.held).length === 1 ? '' : 's'} held`)
+      for (const root of r.roots) {
+        lines.push(`    ${root.trustRoot}: $${(root.contributionCents / 100).toFixed(2)}${root.saturated ? `  <- ${root.adapterIds.length} credentials, counted once` : ''}`)
+      }
+    }
+    side(label_a, a)
+    lines.push('')
+    side(label_b, b)
+    lines.push('')
+
+    const rootsA = new Map(a.roots.map((r) => [r.trustRoot, r.contributionCents]))
+    const rootsB = new Map(b.roots.map((r) => [r.trustRoot, r.contributionCents]))
+    const shared = [...rootsA.keys()].filter((r) => rootsB.has(r))
+    if (shared.length) {
+      lines.push(`shared roots (${shared.length}): ${shared.join(', ')} — evidence on a shared root is the same class of thing, not corroboration between the two subjects`)
+    }
+    const heldA = a.evidence.filter((e) => e.held).length
+    const heldB = b.evidence.filter((e) => e.held).length
+    if ((heldA > heldB && a.independentRoots < b.independentRoots) || (heldB > heldA && b.independentRoots < a.independentRoots)) {
+      const many = heldA > heldB ? label_a : label_b
+      lines.push(`note: ${many} holds more credentials but fewer independent roots — the extra credentials are correlated and saturate. This is the sybil-farm signature: quantity that collapses.`)
+    }
+    lines.push('')
+    lines.push('No verdict: admitting either is a threshold decision, and it stays with the caller (check_personhood takes one explicitly).')
     return { content: [{ type: 'text', text: lines.join('\n') }] }
   },
 )
